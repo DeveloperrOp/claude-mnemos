@@ -36,6 +36,11 @@ class WikiPage:
     body: str
 
     def serialize(self) -> str:
+        """Serialize the page to a markdown string with YAML frontmatter.
+
+        Output always ends with exactly one newline regardless of trailing
+        whitespace in ``body``.
+        """
         fm_dict = self.frontmatter.model_dump(mode="json", exclude_defaults=False)
         yaml_block = yaml.safe_dump(
             fm_dict,
@@ -43,4 +48,4 @@ class WikiPage:
             allow_unicode=True,
             default_flow_style=False,
         )
-        return f"---\n{yaml_block}---\n{self.body}"
+        return f"---\n{yaml_block}---\n{self.body.rstrip(chr(10))}\n"

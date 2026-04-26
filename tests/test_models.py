@@ -68,4 +68,25 @@ def test_wiki_page_serialize_roundtrip_shape():
     assert "\n---\n" in out
     assert "title: Sample" in out
     assert "type: source" in out
-    assert out.rstrip().endswith("body text.")
+    assert out.endswith("body text.\n")
+
+
+def test_wiki_page_serialize_normalizes_trailing_newline():
+    fm = WikiPageFrontmatter(
+        title="Sample",
+        type="source",
+        created=date(2026, 4, 26),
+        updated=date(2026, 4, 26),
+    )
+    page_no_nl = WikiPage(
+        relative_path=Path("raw/chats/abc.md"),
+        frontmatter=fm,
+        body="end without newline",
+    )
+    page_many_nl = WikiPage(
+        relative_path=Path("raw/chats/abc.md"),
+        frontmatter=fm,
+        body="end with too many\n\n\n",
+    )
+    assert page_no_nl.serialize().endswith("end without newline\n")
+    assert page_many_nl.serialize().endswith("end with too many\n")
