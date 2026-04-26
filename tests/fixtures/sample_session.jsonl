@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"Hello, what is 2+2?"},"sessionId":"abc-123","timestamp":"2026-04-26T10:00:00Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"2+2 equals 4."}]},"sessionId":"abc-123","timestamp":"2026-04-26T10:00:01Z"}
+{"type":"user","message":{"role":"user","content":"Thanks."},"sessionId":"abc-123","timestamp":"2026-04-26T10:00:02Z"}

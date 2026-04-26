@@ -14,7 +14,11 @@ classifiers = [
     "Development Status :: 1 - Planning",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = []
+dependencies = [
+    "pydantic>=2.0",
+    "filelock>=3.13",
+    "pyyaml>=6.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -23,6 +27,9 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
 ]
+
+[project.scripts]
+mnemos = "claude_mnemos.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["claude_mnemos"]
@@ -43,3 +50,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
