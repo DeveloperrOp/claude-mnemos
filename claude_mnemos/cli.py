@@ -111,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     except FileBusyError as exc:
         print(f"error: vault file busy after retries: {exc}", file=sys.stderr)
         return 75
+    except FileExistsError as exc:
+        print(f"error: source page collision: {exc}", file=sys.stderr)
+        return 73  # EX_CANTCREAT — same family as LockTimeoutError
 
     if result.status == "already_ingested":
         print(f"already_ingested: session_id={result.session_id}")

@@ -136,16 +136,25 @@ def ingest(
             relative_path=source_relative,
         )
 
-        all_pages = [*extraction.pages, source_page]
-
-        # Detect collisions
+        # Detect collisions on extracted pages (LLM-generated; skip-with-warning is correct)
         to_write: list[WikiPage] = []
         skipped: list[str] = []
-        for p in all_pages:
+        for p in extraction.pages:
             if (vault_root / p.relative_path).exists():
                 skipped.append(p.relative_path.as_posix())
             else:
                 to_write.append(p)
+
+        # Source page collision is a hard fail (we generate it, it's unique per session, manifest
+        # dedup should have caught a true repeat; collision means stale/manual file in the way).
+        source_target = vault_root / source_relative
+        if source_target.exists():
+            raise FileExistsError(
+                f"source page collision at {source_relative.as_posix()}: a file already exists. "
+                "This typically means a stale file from a previous manual edit. "
+                "Move or delete it before re-running."
+            )
+        to_write.append(source_page)
 
         if dry_run:
             return IngestResult(

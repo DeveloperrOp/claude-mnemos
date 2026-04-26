@@ -236,6 +236,29 @@ def test_ingest_under_lock_blocks_concurrent(tmp_path: Path):
         )
 
 
+def test_ingest_source_page_collision_hard_fails(tmp_path: Path):
+    """Stale source-page file at target must not be silently overwritten/skipped — fail loud."""
+    vault = tmp_path / "vault"
+    target = vault / "wiki" / "sources" / "2026-04-26-abc-123.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("---\ntitle: stale\n---\nold body", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        ingest(
+            FIXTURE,
+            vault,
+            cfg=_cfg(),
+            llm_client=MagicMock(),
+            extractor=_stub_extractor(),
+            today=FIXED_TODAY,
+        )
+
+    # Stale file must be preserved
+    assert "stale" in target.read_text(encoding="utf-8")
+    # Manifest must NOT contain a record for this sha (we failed before saving)
+    assert not (vault / ".manifest.json").exists()
+
+
 def test_ingest_empty_jsonl_does_not_create_vault(tmp_path: Path):
     from claude_mnemos.ingest.transcript import EmptyTranscriptError
 
