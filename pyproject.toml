@@ -17,6 +17,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0",
     "filelock>=3.13",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -46,3 +47,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
