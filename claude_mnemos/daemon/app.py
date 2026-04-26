@@ -10,6 +10,7 @@ from claude_mnemos import __version__
 from claude_mnemos.core.locks import LockTimeoutError
 from claude_mnemos.core.undo import UndoError
 from claude_mnemos.daemon.routes.health import router as health_router
+from claude_mnemos.daemon.routes.vault import router as vault_router
 from claude_mnemos.state.activity import ActivityCorruptError
 from claude_mnemos.state.manifest import ManifestCorruptError
 
@@ -20,6 +21,7 @@ def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
     app.state.daemon = daemon
 
     app.include_router(health_router)
+    app.include_router(vault_router)
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:
