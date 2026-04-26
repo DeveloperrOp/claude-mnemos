@@ -104,3 +104,12 @@ def test_cli_dry_run_writes_nothing(tmp_path: Path):
     assert not (vault / "raw").exists()
     assert not (vault / "wiki").exists()
     assert not (vault / ".manifest.json").exists()
+
+
+def test_cli_no_llm_prints_snapshot_line(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res = _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+    assert res.returncode == 0, res.stderr
+    assert "snapshot:" in res.stdout.lower()
+    # Snapshot path should reference .backups directory
+    assert ".backups" in res.stdout
