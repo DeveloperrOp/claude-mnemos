@@ -16,6 +16,7 @@ ActivityOperationType = Literal[
     "ingest_extracted",
     "ingest_raw_only",
     "manual_restore",
+    "ontology_apply",
 ]
 
 

@@ -187,3 +187,18 @@ def test_entry_validate_assignment_rejects_bad_field():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         e.undone = "not-a-bool"  # type: ignore[assignment]  # not coercible to bool
+
+
+def test_entry_accepts_ontology_apply_op_type():
+    """Plan #8 extends ActivityOperationType with `ontology_apply`."""
+    e = ActivityEntry(
+        id=uuid4().hex,
+        timestamp=datetime(2026, 4, 26, 14, 30, 0, tzinfo=UTC),
+        operation_type="ontology_apply",
+        status="success",
+        snapshot_path=".backups/pre-op-2026-04-26-14-30-00-ontology-abc",
+        can_undo=True,
+        affected_pages=["wiki/entities/foo.md"],
+        metadata={"suggestion_id": "ont-2026-04-26-aaaaaa", "operation": "merge_entities"},
+    )
+    assert e.operation_type == "ontology_apply"
