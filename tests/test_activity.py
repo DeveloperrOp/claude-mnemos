@@ -165,3 +165,25 @@ def test_entry_with_none_snapshot_path():
     )
     assert e.snapshot_path is None
     assert e.can_undo is False
+
+
+def test_append_rejects_out_of_order_timestamp():
+    log = ActivityLog()
+    log.append(
+        _entry().model_copy(
+            update={"timestamp": datetime(2026, 4, 26, 15, 0, 0, tzinfo=UTC)}
+        )
+    )
+    older = _entry().model_copy(
+        update={"id": uuid4().hex, "timestamp": datetime(2026, 4, 26, 14, 0, 0, tzinfo=UTC)}
+    )
+    with pytest.raises(ValueError, match="chronological"):
+        log.append(older)
+
+
+def test_entry_validate_assignment_rejects_bad_field():
+    """validate_assignment catches typos when mutating fields after construction."""
+    e = _entry()
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        e.undone = "not-a-bool"  # type: ignore[assignment]  # not coercible to bool

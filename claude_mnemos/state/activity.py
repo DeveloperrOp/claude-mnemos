@@ -24,7 +24,7 @@ class ActivityCorruptError(ValueError):
 
 
 class ActivityEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     id: str
     timestamp: datetime
@@ -83,6 +83,12 @@ class ActivityLog(BaseModel):
         atomic_write(path, self.serialize_to_string())
 
     def append(self, entry: ActivityEntry) -> None:
+        if self.entries and entry.timestamp < self.entries[-1].timestamp:
+            raise ValueError(
+                f"activity entries must be appended in chronological order; "
+                f"new entry timestamp {entry.timestamp} is older than last "
+                f"entry {self.entries[-1].timestamp}"
+            )
         if any(e.id == entry.id for e in self.entries):
             raise ValueError(f"activity log already contains entry id {entry.id}")
         self.entries.append(entry)
