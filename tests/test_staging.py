@@ -187,3 +187,39 @@ def test_promote_failure_when_snapshot_create_fails(tmp_path: Path, monkeypatch)
     # Vault never touched
     assert (vault / "preexisting.md").read_text(encoding="utf-8") == "intact"
     assert not (vault / "a.md").exists()
+
+
+def test_pre_promote_snapshot_path_is_deterministic(tmp_path: Path):
+    """First call locks the path; subsequent calls return the same path."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    with StagingTransaction(vault, operation_id="op-1") as txn:
+        path1 = txn.pre_promote_snapshot_path()
+        path2 = txn.pre_promote_snapshot_path()
+        assert path1 == path2
+        assert path1.parent == vault / ".backups"
+        assert path1.name.endswith("-ingest-op-1")
+        txn.promote_to_vault()
+
+
+def test_promote_uses_pre_computed_snapshot_path(tmp_path: Path):
+    """If pre_promote_snapshot_path is called first, promote uses that exact path."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    with StagingTransaction(vault, operation_id="op-2") as txn:
+        txn.write(Path("a.md"), "x")
+        locked = txn.pre_promote_snapshot_path()
+        result = txn.promote_to_vault()
+        assert result.snapshot == locked
+
+
+def test_promote_without_pre_promote_call_still_works(tmp_path: Path):
+    """If caller never calls pre_promote_snapshot_path, promote auto-computes."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    with StagingTransaction(vault, operation_id="op-3") as txn:
+        txn.write(Path("a.md"), "x")
+        result = txn.promote_to_vault()
+        assert result.snapshot is not None
+        assert result.snapshot.parent == vault / ".backups"
+        assert result.snapshot.name.endswith("-ingest-op-3")

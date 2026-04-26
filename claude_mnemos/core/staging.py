@@ -53,6 +53,7 @@ class StagingTransaction:
         self.staging_dir = vault / STAGING_DIRNAME / operation_id
         self._promoted = False
         self._rejected = False
+        self._locked_snapshot_path: Path | None = None
 
     def __enter__(self) -> StagingTransaction:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +76,23 @@ class StagingTransaction:
                 self.reject(reason)
         return False  # never swallow
 
+    def pre_promote_snapshot_path(self) -> Path:
+        """Lock in and return the snapshot path that promote_to_vault will use.
+
+        First call computes the path from current UTC time + op_id + op_type.
+        Subsequent calls return the same path. promote_to_vault re-uses it.
+
+        Used by callers (e.g. pipeline) that need to write the snapshot path
+        into a staged file (e.g. activity log entry) BEFORE the snapshot
+        is actually created.
+        """
+        if self._locked_snapshot_path is None:
+            from claude_mnemos.core.snapshots import SNAPSHOTS_DIRNAME, _timestamp
+            ts = _timestamp()
+            snap_name = f"pre-op-{ts}-{self.operation_type}-{self.operation_id}"
+            self._locked_snapshot_path = self.vault / SNAPSHOTS_DIRNAME / snap_name
+        return self._locked_snapshot_path
+
     def write(self, relative_path: Path, content: str) -> None:
         """Write content to staging area at `relative_path`. NOT to vault."""
         if self._promoted or self._rejected:
@@ -95,13 +113,24 @@ class StagingTransaction:
         if self._rejected:
             raise RuntimeError("StagingTransaction already rejected; cannot promote")
 
-        # 1. Snapshot vault BEFORE moving anything.
+        # 1. Snapshot vault BEFORE moving anything. Use precomputed path if
+        # caller invoked pre_promote_snapshot_path() — guarantees activity
+        # entries written into staging reference the correct snapshot.
         try:
-            snapshot = create_snapshot(
-                self.vault,
-                operation_id=self.operation_id,
-                operation_type=self.operation_type,
-            )
+            if self._locked_snapshot_path is not None:
+                from claude_mnemos.core.snapshots import create_snapshot_at
+                snapshot = create_snapshot_at(
+                    self.vault,
+                    self._locked_snapshot_path,
+                    operation_id=self.operation_id,
+                    operation_type=self.operation_type,
+                )
+            else:
+                snapshot = create_snapshot(
+                    self.vault,
+                    operation_id=self.operation_id,
+                    operation_type=self.operation_type,
+                )
         except Exception as exc:
             raise StagingPromoteError(
                 f"snapshot creation failed: {exc}"

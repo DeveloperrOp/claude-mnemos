@@ -67,28 +67,25 @@ def _vault_size(root: Path) -> int:
     return total
 
 
-def create_snapshot(
+def create_snapshot_at(
     vault: Path,
+    snap_path: Path,
     *,
     operation_id: str,
     operation_type: str,
 ) -> Path:
-    """Copy vault contents (excluding internal dirs) into .backups/pre-op-<ts>-<type>-<id>/.
+    """Create a snapshot at the exact path provided.
 
-    Writes .meta.json with timestamp + operation info + size/page counts.
-    Raises SnapshotError if the target snapshot path already exists.
+    Same exclusion rules and meta.json behavior as create_snapshot, but the
+    target path is dictated by the caller (used by StagingTransaction to lock
+    in a snapshot path before promote, so activity entries can reference it).
     """
-    ts = _timestamp()
-    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
-    snapshots_root = vault / SNAPSHOTS_DIRNAME
-    snapshots_root.mkdir(parents=True, exist_ok=True)
-    snap_path = snapshots_root / snap_name
-
     if snap_path.exists():
         raise SnapshotError(f"snapshot already exists: {snap_path}")
 
-    # Collect vault content (everything except internal dirs/files at root level).
+    snap_path.parent.mkdir(parents=True, exist_ok=True)
     snap_path.mkdir(parents=True)
+
     if vault.exists():
         for item in vault.iterdir():
             if item.name in _EXCLUDED_DIRS or item.name in _EXCLUDED_FILES:
@@ -115,6 +112,21 @@ def create_snapshot(
     )
 
     return snap_path
+
+
+def create_snapshot(
+    vault: Path,
+    *,
+    operation_id: str,
+    operation_type: str,
+) -> Path:
+    """Create a snapshot with auto-generated UTC timestamp in the path."""
+    ts = _timestamp()
+    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
+    snap_path = vault / SNAPSHOTS_DIRNAME / snap_name
+    return create_snapshot_at(
+        vault, snap_path, operation_id=operation_id, operation_type=operation_type
+    )
 
 
 def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:

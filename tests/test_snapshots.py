@@ -225,3 +225,47 @@ def test_restore_final_rename_failure_returns_recovery_hint(tmp_path: Path, monk
     # The original vault should be at .mnemos-old-... (un-restored state preserved)
     old_vaults = [p for p in vault.parent.iterdir() if p.name.startswith(".mnemos-old-")]
     assert len(old_vaults) == 1
+
+
+def test_create_snapshot_at_uses_provided_path(tmp_path: Path):
+    """create_snapshot_at writes to the exact path provided, not auto-generated."""
+    from claude_mnemos.core.snapshots import create_snapshot_at
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    custom_path = vault / ".backups" / "custom-name-here"
+    snap = create_snapshot_at(
+        vault, custom_path, operation_id="abc-123", operation_type="ingest"
+    )
+
+    assert snap == custom_path
+    assert snap.exists()
+    assert (snap / ".meta.json").exists()
+    assert (snap / "wiki" / "entities" / "foo.md").exists()
+
+
+def test_create_snapshot_at_collision_raises(tmp_path: Path):
+    """Reuses spec'd 'collision raises' behavior."""
+    from claude_mnemos.core.snapshots import SnapshotError, create_snapshot_at
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    target = vault / ".backups" / "fixed-name"
+    create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
+
+    with pytest.raises(SnapshotError):
+        create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
+
+
+def test_create_snapshot_delegates_to_create_snapshot_at(tmp_path: Path):
+    """create_snapshot still works (back-compat) and produces same shape as before."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    snap = create_snapshot(vault, operation_id="abc", operation_type="ingest")
+
+    assert snap.parent == vault / ".backups"
+    assert snap.name.startswith("pre-op-")
+    assert snap.name.endswith("-abc")
+    assert (snap / ".meta.json").exists()
