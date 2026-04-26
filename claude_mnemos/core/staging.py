@@ -157,6 +157,9 @@ class StagingTransaction:
         except Exception as exc:
             restore = restore_from_snapshot(self.vault, snapshot)
             self._promoted = True  # mark finalized so __exit__ doesn't reject
+            # Restore preserves .staging/ across the swap (so other concurrent
+            # transactions survive); clean up our own partial staging dir here.
+            shutil.rmtree(self.staging_dir, ignore_errors=True)
             if restore.success:
                 raise StagingPromoteError(
                     f"promote failed mid-move; vault restored from snapshot. cause: {exc}"

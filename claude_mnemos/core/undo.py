@@ -64,9 +64,7 @@ def undo(
             raise UndoError(f"entry {op_id} has no snapshot_path")
         snap_path = vault_root / entry.snapshot_path
         if not snap_path.is_dir():
-            raise UndoError(
-                f"snapshot at {snap_path} not found (manually deleted?)"
-            )
+            raise UndoError(f"snapshot at {snap_path} not found")
 
         result = restore_from_snapshot(vault_root, snap_path)
         if not result.success:

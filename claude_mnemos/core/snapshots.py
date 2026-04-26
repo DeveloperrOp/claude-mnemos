@@ -180,6 +180,31 @@ def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
             error=f"cannot stage restore: {exc}",
         )
 
+    # Preserve current vault's internal dirs into temp_root before swap.
+    # The snapshot deliberately excludes .backups/.trash/.staging so it doesn't
+    # recurse on itself. But after the atomic swap, those internal dirs would
+    # disappear — losing all earlier snapshots, breaking chain undo. Copy them
+    # over before the swap so they survive.
+    if vault.exists():
+        for preserved in (".backups", ".trash", ".staging"):
+            src = vault / preserved
+            if src.is_dir():
+                dst = temp_root / preserved
+                if dst.exists():
+                    # Snapshot included this dir somehow (shouldn't happen) — replace
+                    shutil.rmtree(dst)
+                try:
+                    shutil.copytree(src, dst)
+                except OSError as exc:
+                    # Couldn't preserve internal dir — abort restore.
+                    # Vault is still intact since we haven't swapped yet.
+                    shutil.rmtree(temp_root, ignore_errors=True)
+                    return RestoreResult(
+                        success=False,
+                        vault_intact=True,
+                        error=f"cannot preserve internal dir {preserved}: {exc}",
+                    )
+
     old_vault: Path | None = None
     if vault.exists():
         old_vault = vault.parent / f".mnemos-old-{int(time.time() * 1000)}"

@@ -198,3 +198,58 @@ def test_undo_manual_restore_entry_not_undoable(tmp_path: Path):
 
     with pytest.raises(UndoError):
         undo(vault, op_id)
+
+
+def test_undo_preserves_other_snapshots_for_chain_undo(tmp_path: Path):
+    """After undo of op2, op1's snapshot must still be available for undo."""
+    from claude_mnemos.core.snapshots import create_snapshot
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    # Simulate op1: snapshot the empty pre-op state, then log op1's entry.
+    snap1 = create_snapshot(vault, operation_id="op1", operation_type="ingest")
+    op1_id = uuid4().hex
+    log = ActivityLog.load(vault)
+    log.append(
+        ActivityEntry(
+            id=op1_id,
+            timestamp=datetime(2026, 4, 26, 14, 0, 0, tzinfo=UTC),
+            operation_type="ingest_extracted",
+            status="success",
+            snapshot_path=str(snap1.relative_to(vault)).replace("\\", "/"),
+            can_undo=True,
+            affected_pages=["wiki/entities/foo.md"],
+            metadata={"session_id": "op1"},
+        )
+    )
+    log.save(vault)
+
+    # Simulate op2: snapshot vault (now contains op1's log entry), then log op2.
+    snap2 = create_snapshot(vault, operation_id="op2", operation_type="ingest")
+    op2_id = uuid4().hex
+    log = ActivityLog.load(vault)
+    log.append(
+        ActivityEntry(
+            id=op2_id,
+            timestamp=datetime(2026, 4, 26, 14, 30, 0, tzinfo=UTC),
+            operation_type="ingest_extracted",
+            status="success",
+            snapshot_path=str(snap2.relative_to(vault)).replace("\\", "/"),
+            can_undo=True,
+            affected_pages=["wiki/entities/bar.md"],
+            metadata={"session_id": "op2"},
+        )
+    )
+    log.save(vault)
+
+    result = undo(vault, op2_id)
+
+    assert result.success is True
+    # CRITICAL: snap1 must still exist after the undo
+    assert snap1.exists(), "earlier snapshot was lost during undo — chain undo broken"
+    assert snap2.exists(), "current snapshot also expected to survive"
+
+    # Now undo op1 — it should still work (chain undo)
+    result2 = undo(vault, op1_id)
+    assert result2.success is True

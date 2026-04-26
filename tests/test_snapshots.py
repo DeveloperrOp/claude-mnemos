@@ -282,3 +282,40 @@ def test_compute_snapshot_path_format(tmp_path: Path):
     assert path.name.startswith("pre-op-")
     assert "-ingest-" in path.name
     assert path.name.endswith("-abc-123")
+
+
+def test_restore_preserves_backups_dir(tmp_path: Path):
+    """After restore, all earlier snapshots in .backups/ must still exist."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    # First snapshot
+    snap1 = create_snapshot(vault, operation_id="op-1", operation_type="ingest")
+    # Mutate vault, take a second snapshot
+    (vault / "wiki" / "entities" / "foo.md").write_text("changed", encoding="utf-8")
+    snap2 = create_snapshot(vault, operation_id="op-2", operation_type="ingest")
+
+    # Restore from snap2
+    result = restore_from_snapshot(vault, snap2)
+
+    assert result.success is True
+    # Both snapshots must still exist after restore
+    assert snap1.exists()
+    assert snap2.exists()
+    assert (snap1 / ".meta.json").exists()
+    assert (snap2 / ".meta.json").exists()
+
+
+def test_restore_preserves_trash_dir(tmp_path: Path):
+    """Trash dir survives restore (rejected staging from prior dry runs)."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    # Create a fake rejected staging in trash
+    rejected = vault / ".trash" / "rejected-test-123"
+    rejected.mkdir(parents=True)
+    (rejected / ".reason.txt").write_text("test rejection", encoding="utf-8")
+
+    snap = create_snapshot(vault, operation_id="op-1", operation_type="ingest")
+    restore_from_snapshot(vault, snap)
+
+    assert rejected.exists()
+    assert (rejected / ".reason.txt").read_text(encoding="utf-8") == "test rejection"
