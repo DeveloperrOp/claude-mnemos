@@ -419,3 +419,131 @@ def test_ingest_promote_failure_restores_vault(tmp_path: Path, monkeypatch):
         import json as _json
         m = _json.loads((vault / ".manifest.json").read_text(encoding="utf-8"))
         assert m["ingested"] == {}
+
+
+def test_ingest_extracted_writes_activity_entry(tmp_path: Path):
+    from claude_mnemos.state.activity import ActivityLog
+
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+
+    assert res.activity_id is not None
+
+    log = ActivityLog.load(vault)
+    assert len(log.entries) == 1
+    entry = log.entries[0]
+    assert entry.id == res.activity_id
+    assert entry.operation_type == "ingest_extracted"
+    assert entry.can_undo is True
+    assert entry.snapshot_path is not None
+    assert (vault / entry.snapshot_path).is_dir()
+    assert (vault / entry.snapshot_path) == res.snapshot_path
+    assert any("wiki/entities/fastapi.md" in p for p in entry.affected_pages)
+    assert entry.metadata.get("session_id") == "abc-123"
+
+
+def test_ingest_no_llm_writes_activity_entry(tmp_path: Path):
+    from claude_mnemos.state.activity import ActivityLog
+
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=None,
+        extractor=None,
+        extract=False,
+        today=FIXED_TODAY,
+    )
+
+    assert res.activity_id is not None
+    log = ActivityLog.load(vault)
+    assert len(log.entries) == 1
+    entry = log.entries[0]
+    assert entry.operation_type == "ingest_raw_only"
+    assert entry.can_undo is True
+    assert entry.snapshot_path is not None
+
+
+def test_ingest_already_ingested_no_activity_entry(tmp_path: Path):
+    """Re-ingesting same JSONL must not append a duplicate activity entry."""
+    from claude_mnemos.state.activity import ActivityLog
+
+    vault = tmp_path / "vault"
+    extractor = MagicMock(side_effect=_stub_extractor())
+    ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+    second = ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+
+    assert second.status == "already_ingested"
+    assert second.activity_id is None
+
+    log = ActivityLog.load(vault)
+    assert len(log.entries) == 1
+
+
+def test_ingest_dry_run_no_activity_entry(tmp_path: Path):
+    """Dry-run must not append a permanent activity entry (staging gets rejected)."""
+    from claude_mnemos.state.activity import ACTIVITY_FILENAME
+
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        dry_run=True,
+        today=FIXED_TODAY,
+    )
+
+    assert res.activity_id is None
+    assert not (vault / ACTIVITY_FILENAME).exists()
+
+
+def test_ingest_promote_failure_no_activity_entry(tmp_path: Path, monkeypatch):
+    """Failed promote leaves vault unchanged AND no activity entry."""
+    from claude_mnemos.state.activity import ACTIVITY_FILENAME
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "preexisting.md").write_text("survives", encoding="utf-8")
+
+    import shutil as _shutil
+    real_move = _shutil.move
+    calls = {"n": 0}
+
+    def flaky_move(src, dst, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] >= 2:
+            raise OSError("simulated mid-promote failure")
+        return real_move(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("claude_mnemos.core.staging.shutil.move", flaky_move)
+
+    from claude_mnemos.core.staging import StagingPromoteError
+
+    with pytest.raises(StagingPromoteError):
+        ingest(
+            FIXTURE,
+            vault,
+            cfg=_cfg(),
+            llm_client=MagicMock(),
+            extractor=_stub_extractor(),
+            today=FIXED_TODAY,
+        )
+
+    assert (vault / "preexisting.md").read_text(encoding="utf-8") == "survives"
+    assert not (vault / ACTIVITY_FILENAME).exists()
