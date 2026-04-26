@@ -175,3 +175,26 @@ def test_extract_renders_transcript_into_user_prompt():
     user_arg = fake_client.extract.call_args.kwargs["user"]
     assert "UNIQUE_TRANSCRIPT_MARKER" in user_arg
     assert 'language_hint="auto"' in user_arg
+
+
+def test_extract_unknown_page_type_raises_key_error(monkeypatch):
+    """If ExtractedPageType is widened later, _render_page must reject unmapped types."""
+    from claude_mnemos.ingest import extraction as extraction_mod
+
+    payload = _load("single_entity.json")
+    fake_client = MagicMock()
+    fake_client.extract.return_value = ExtractionRaw(
+        payload=payload, input_tokens=1, output_tokens=1
+    )
+
+    # Inject a foreign type into the validated ExtractedPage by patching the folder map.
+    # This simulates "someone added a new ExtractedPageType variant but forgot to update the map".
+    monkeypatch.setattr(extraction_mod, "_FOLDER_BY_TYPE", {"concept": "concepts"})
+
+    with pytest.raises(KeyError):
+        extraction_mod.extract_wiki_pages(
+            messages=_messages(),
+            cfg=_cfg(),
+            llm_client=fake_client,
+            today=date(2026, 4, 26),
+        )

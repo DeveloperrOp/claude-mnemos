@@ -17,6 +17,8 @@ from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.prompts import format_user, load_system
 from claude_mnemos.ingest.transcript import TranscriptMessage
 
+_FOLDER_BY_TYPE = {"entity": "entities", "concept": "concepts"}
+
 
 @dataclass(frozen=True)
 class ExtractionResult:
@@ -82,7 +84,7 @@ def _render_transcript(messages: list[TranscriptMessage]) -> str:
 
 def _render_page(p: ExtractedPage, today: date) -> WikiPage:
     slug = make_slug(p.slug_hint) if p.slug_hint else make_slug(p.title)
-    folder = "entities" if p.type == "entity" else "concepts"
+    folder = _FOLDER_BY_TYPE[p.type]
     rel = Path(f"wiki/{folder}/{slug}.md")
 
     fm = WikiPageFrontmatter(
