@@ -31,7 +31,7 @@ def _config(vault: Path, daemon_url: str = "http://daemon") -> MCPConfig:
 
 
 def test_tool_defs_count_and_names():
-    assert len({t.name for t in TOOL_DEFS}) == 9
+    assert len({t.name for t in TOOL_DEFS}) == 12
     expected = {
         "list_pages",
         "read_page",
@@ -42,6 +42,9 @@ def test_tool_defs_count_and_names():
         "create_snapshot",
         "restore_snapshot",
         "delete_snapshot",
+        "list_suggestions",
+        "apply_ontology_suggestion",
+        "propose_ontology_change",
     }
     assert expected == TOOL_NAMES
     assert READ_TOOL_NAMES.isdisjoint(WRITE_TOOL_NAMES)
@@ -72,7 +75,7 @@ async def _call_tool(server, name: str, arguments: dict | None = None):
 async def test_list_tools_via_handler(tmp_path: Path):
     server = build_server(_config(tmp_path))
     tools = await _list_tools(server)
-    assert len(tools) == 9
+    assert len(tools) == 12
     names = {t.name for t in tools}
     assert names == TOOL_NAMES
 

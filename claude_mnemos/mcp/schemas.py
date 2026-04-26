@@ -123,3 +123,57 @@ RESTORE_SNAPSHOT: dict[str, Any] = {
 }
 
 DELETE_SNAPSHOT: dict[str, Any] = RESTORE_SNAPSHOT
+
+LIST_SUGGESTIONS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected", "deferred", "all"],
+            "description": "Filter by suggestion status (default: pending only)",
+        },
+    },
+    "additionalProperties": False,
+}
+
+APPLY_ONTOLOGY_SUGGESTION: dict[str, Any] = {
+    "type": "object",
+    "required": ["suggestion_id"],
+    "properties": {
+        "suggestion_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Suggestion id (e.g. 'ont-2026-04-26-abc123')",
+        },
+    },
+    "additionalProperties": False,
+}
+
+PROPOSE_ONTOLOGY_CHANGE: dict[str, Any] = {
+    "type": "object",
+    "required": ["operation", "affected_pages"],
+    "properties": {
+        "operation": {
+            "type": "string",
+            "enum": ["merge_entities", "rename_entity", "delete_page"],
+        },
+        "affected_pages": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+            "description": "Vault-relative page paths to apply the operation to",
+        },
+        "proposed_target": {
+            "type": "string",
+            "description": "Required for merge_entities and rename_entity",
+        },
+        "reason": {"type": "string", "default": ""},
+        "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.7,
+        },
+    },
+    "additionalProperties": False,
+}
