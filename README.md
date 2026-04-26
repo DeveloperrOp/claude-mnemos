@@ -6,13 +6,14 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#6 в `main`. Готовы:
+`0.0.1` — Plans #1-#7 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
 - **Activity log + undo** (Plan #4): `.activity.json` + `mnemos undo <op_id>` / `mnemos undo --last`.
 - **Daemon foundation** (Plan #5): FastAPI на `127.0.0.1:5757` + APScheduler (daily snapshot 04:00 UTC, backups cleanup 05:00 UTC, 180-day retention) + REST endpoints.
 - **MCP server** (Plan #6): stdio MCP с 5 read tools (прямой доступ к vault) + 4 write tools (через REST к daemon).
+- **Claude Code plugin** (Plan #7): SessionEnd auto-ingest hook + 5 skills + plugin manifest. После установки каждая сессия автоматически попадает в vault.
 
 ## Установка
 
@@ -73,6 +74,54 @@ claude mcp add --transport stdio mnemos -- \
 
 **Read tools** работают без daemon'а — читают файлы напрямую. **Write tools** требуют запущенный daemon (`mnemos daemon start`); если daemon offline — возвращают понятное сообщение со ссылкой на нужную команду.
 
+## Install as Claude Code plugin
+
+Plugin упаковывает CLI/daemon/MCP вместе с SessionEnd hook'ом и 5 skills. После установки каждая Claude Code сессия автоматически уходит в vault через hook, и LLM в чате видит мнемос-tools без необходимости вручную регистрировать MCP.
+
+**Установка (dev mode):**
+
+```bash
+git clone <repo-url>
+cd claude-mnemos
+pip install -e .
+
+# Настроить vault path как env var (single source of truth)
+export MNEMOS_VAULT_ROOT=/absolute/path/to/your/vault     # bash/zsh
+# либо:
+[Environment]::SetEnvironmentVariable('MNEMOS_VAULT_ROOT', 'C:\path\to\vault', 'User')   # PowerShell
+
+# Запустить daemon (нужен для write tools и snapshots)
+mnemos daemon start
+
+# Подключить плагин в Claude Code
+claude --plugin-dir $(pwd)
+```
+
+После этого каждая сессия после закрытия → auto-ingest в vault через `hooks/session_end.py`.
+
+**5 skills:**
+
+| Skill | Что делает |
+|---|---|
+| `mnemos` | Главный behavioral prompt — даёт LLM понимание что есть mnemos и когда его дёргать |
+| `/mnemos-status` | Показать summary vault'а |
+| `/mnemos-search <query>` | Substring search по vault'у |
+| `/mnemos-undo [op_id\|--last]` | Откатить операцию |
+| `/mnemos-activity [limit]` | Последние записи activity log |
+
+**Структура плагина:**
+
+```
+.claude-plugin/plugin.json     # манифест плагина
+.mcp.json                       # регистрация MCP server'а
+hooks/
+  hooks.json                    # SessionEnd registration
+  session_end.py                # spawn detached `mnemos ingest`
+skills/
+  mnemos/SKILL.md               # главный behavioral
+  mnemos-{status,search,undo,activity}/SKILL.md
+```
+
 ## Структура
 
 ```
@@ -90,6 +139,6 @@ docs/plans/  # design + impl plans для каждого Plan #N
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~395 тестов)
+pytest -q              # быстрые (~423 тестов)
 pytest -q -m slow      # медленные E2E (subprocess daemon)
 ```

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mnemos": {
+      "command": "python",
+      "args": [
+        "-m",
+        "claude_mnemos.mcp",
+        "--vault",
+        "${MNEMOS_VAULT_ROOT}"
+      ],
+      "env": {}
+    }
+  }
+}

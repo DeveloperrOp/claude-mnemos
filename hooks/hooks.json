@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "command": "python ${CLAUDE_PLUGIN_ROOT}/hooks/session_end.py",
+        "timeout_seconds": 15,
+        "blocking": false
+      }
+    ]
+  }
+}
