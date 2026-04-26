@@ -93,3 +93,14 @@ def test_cli_no_llm_manifest_records_no_model(tmp_path: Path):
     rec = next(iter(m["ingested"].values()))
     assert rec["model"] is None
     assert rec["source_path"] is None
+
+
+def test_cli_dry_run_writes_nothing(tmp_path: Path):
+    """--dry-run with --no-llm should print 'dry_run' and write nothing to vault."""
+    vault = tmp_path / "vault"
+    res = _run("ingest", str(FIXTURE), str(vault), "--no-llm", "--dry-run")
+    assert res.returncode == 0
+    assert "dry_run" in res.stdout.lower()
+    assert not (vault / "raw").exists()
+    assert not (vault / "wiki").exists()
+    assert not (vault / ".manifest.json").exists()

@@ -57,10 +57,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.command != "ingest":
-        parser.error(f"unknown command: {args.command}")
-        return 2
-
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
         return 2

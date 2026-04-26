@@ -39,7 +39,7 @@ class Manifest(BaseModel):
     @classmethod
     def load(cls, vault_root: Path) -> Manifest:
         path = vault_root / MANIFEST_FILENAME
-        if not path.exists():
+        if not path.is_file():
             return cls()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
