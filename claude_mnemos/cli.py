@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
@@ -14,6 +14,7 @@ import httpx
 from claude_mnemos.config import Config, UnknownLanguageHintError
 from claude_mnemos.core.atomic import FileBusyError
 from claude_mnemos.core.locks import LockTimeoutError
+from claude_mnemos.core.ontology_apply import OntologyError, apply_suggestion
 from claude_mnemos.core.staging import StagingPromoteError
 from claude_mnemos.core.undo import UndoError, undo
 from claude_mnemos.daemon.config import DaemonConfig, default_pid_file
@@ -30,6 +31,13 @@ from claude_mnemos.ingest.pipeline import ingest
 from claude_mnemos.ingest.transcript import EmptyTranscriptError
 from claude_mnemos.state.activity import ActivityCorruptError, ActivityEntry, ActivityLog
 from claude_mnemos.state.manifest import ManifestCorruptError
+from claude_mnemos.state.ontology import (
+    OntologyCorruptError,
+    Suggestion,
+    SuggestionFrontmatter,
+    SuggestionStore,
+    generate_suggestion_id,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -123,6 +131,53 @@ def build_parser() -> argparse.ArgumentParser:
 
     daemon_sub.add_parser("status")
 
+    # ── ontology subgroup ─────────────────────────────────────────────────
+    ontology_p = sub.add_parser(
+        "ontology", help="Manage HITL ontology suggestions (merge/rename/delete)"
+    )
+    ontology_sub = ontology_p.add_subparsers(dest="ontology_cmd", required=True)
+
+    list_p = ontology_sub.add_parser("list", help="List suggestions (default: pending)")
+    list_p.add_argument("--vault", type=Path, default=Path.cwd())
+    list_p.add_argument(
+        "--all",
+        action="store_true",
+        help="Include archived (approved/rejected) suggestions",
+    )
+
+    for cmd in ("approve", "reject", "defer"):
+        sp = ontology_sub.add_parser(cmd)
+        sp.add_argument("suggestion_id", type=str)
+        sp.add_argument("--vault", type=Path, default=Path.cwd())
+
+    propose_p = ontology_sub.add_parser(
+        "propose", help="Create a new suggestion manually"
+    )
+    propose_sub = propose_p.add_subparsers(dest="propose_op", required=True)
+
+    merge_p = propose_sub.add_parser("merge")
+    merge_p.add_argument(
+        "--source", action="append", required=True,
+        help="Vault-relative source page (specify at least 2 times)",
+    )
+    merge_p.add_argument("--target", required=True)
+    merge_p.add_argument("--reason", default="")
+    merge_p.add_argument("--confidence", type=float, default=0.7)
+    merge_p.add_argument("--vault", type=Path, default=Path.cwd())
+
+    rename_p = propose_sub.add_parser("rename")
+    rename_p.add_argument("--source", required=True)
+    rename_p.add_argument("--target", required=True)
+    rename_p.add_argument("--reason", default="")
+    rename_p.add_argument("--confidence", type=float, default=0.7)
+    rename_p.add_argument("--vault", type=Path, default=Path.cwd())
+
+    delete_p = propose_sub.add_parser("delete")
+    delete_p.add_argument("--source", required=True)
+    delete_p.add_argument("--reason", default="")
+    delete_p.add_argument("--confidence", type=float, default=0.7)
+    delete_p.add_argument("--vault", type=Path, default=Path.cwd())
+
     return parser
 
 
@@ -136,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_undo(args)
     if args.command == "daemon":
         return _cmd_daemon(args)
+    if args.command == "ontology":
+        return _cmd_ontology(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -491,6 +548,171 @@ def _cmd_daemon_status(_args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+
+
+def _cmd_ontology(args: argparse.Namespace) -> int:
+    if args.ontology_cmd == "list":
+        return _cmd_ontology_list(args)
+    if args.ontology_cmd == "approve":
+        return _cmd_ontology_approve(args)
+    if args.ontology_cmd == "reject":
+        return _cmd_ontology_reject(args)
+    if args.ontology_cmd == "defer":
+        return _cmd_ontology_defer(args)
+    if args.ontology_cmd == "propose":
+        return _cmd_ontology_propose(args)
+    print(f"unknown ontology subcommand: {args.ontology_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_ontology_list(args: argparse.Namespace) -> int:
+    try:
+        store = SuggestionStore(args.vault)
+        items = store.list(include_archive=args.all)
+    except OntologyCorruptError as exc:
+        print(f"error: ontology corrupt: {exc}", file=sys.stderr)
+        return 74
+
+    if not items:
+        print("no suggestions")
+        return 0
+
+    for s in items:
+        fm = s.frontmatter
+        ts = fm.created.strftime("%Y-%m-%d %H:%M")
+        target = fm.proposed_target or "—"
+        print(
+            f"{fm.id}  {ts}  {fm.operation}  status={fm.status}  "
+            f"target={target}  conf={fm.confidence:.2f}"
+        )
+    return 0
+
+
+def _cmd_ontology_approve(args: argparse.Namespace) -> int:
+    try:
+        result = apply_suggestion(args.vault, args.suggestion_id)
+    except OntologyError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 81
+    except LockTimeoutError as exc:
+        print(f"error: another operation is running: {exc}", file=sys.stderr)
+        return 73
+    except StagingPromoteError as exc:
+        print(f"error: staging promote failed: {exc}", file=sys.stderr)
+        return 76
+
+    print(
+        f"approved: {result.suggestion_id} via {result.operation}; "
+        f"activity={result.activity_id} wikilinks_rewritten={result.wikilinks_rewritten}"
+    )
+    if result.target_path is not None:
+        print(f"target: {result.target_path}")
+    return 0
+
+
+def _cmd_ontology_reject(args: argparse.Namespace) -> int:
+    try:
+        store = SuggestionStore(args.vault)
+        existing = store.get(args.suggestion_id)
+        if existing is None:
+            print(f"error: suggestion not found: {args.suggestion_id}", file=sys.stderr)
+            return 81
+        if existing.frontmatter.status != "pending":
+            print(
+                f"error: suggestion already {existing.frontmatter.status}",
+                file=sys.stderr,
+            )
+            return 81
+        store.update_status(args.suggestion_id, "rejected")
+        store.archive_suggestion(args.suggestion_id)
+    except OntologyCorruptError as exc:
+        print(f"error: ontology corrupt: {exc}", file=sys.stderr)
+        return 74
+
+    print(f"rejected: {args.suggestion_id}")
+    return 0
+
+
+def _cmd_ontology_defer(args: argparse.Namespace) -> int:
+    try:
+        store = SuggestionStore(args.vault)
+        existing = store.get(args.suggestion_id)
+        if existing is None:
+            print(f"error: suggestion not found: {args.suggestion_id}", file=sys.stderr)
+            return 81
+        if existing.frontmatter.status != "pending":
+            print(
+                f"error: suggestion already {existing.frontmatter.status}",
+                file=sys.stderr,
+            )
+            return 81
+        store.update_status(args.suggestion_id, "deferred")
+    except OntologyCorruptError as exc:
+        print(f"error: ontology corrupt: {exc}", file=sys.stderr)
+        return 74
+
+    print(f"deferred: {args.suggestion_id}")
+    return 0
+
+
+def _cmd_ontology_propose(args: argparse.Namespace) -> int:
+    op = args.propose_op
+    if op == "merge":
+        if len(args.source) < 2:
+            print("error: merge requires at least 2 --source", file=sys.stderr)
+            return 2
+        affected = list(args.source)
+        target = args.target
+    elif op == "rename":
+        affected = [args.source]
+        target = args.target
+    elif op == "delete":
+        affected = [args.source]
+        target = None
+    else:
+        print(f"unknown propose operation: {op}", file=sys.stderr)
+        return 2
+
+    operation_map = {
+        "merge": "merge_entities",
+        "rename": "rename_entity",
+        "delete": "delete_page",
+    }
+    operation = operation_map[op]
+
+    # Validate sources exist
+    for src in affected:
+        if not (args.vault / src).is_file():
+            print(f"error: source page missing: {src}", file=sys.stderr)
+            return 81
+    if target is not None and (args.vault / target).exists():
+        print(f"error: target already exists: {target}", file=sys.stderr)
+        return 81
+
+    now = datetime.now(UTC)
+    sid = generate_suggestion_id(now)
+    suggestion = Suggestion(
+        frontmatter=SuggestionFrontmatter(
+            id=sid,
+            created=now,
+            operation=operation,  # type: ignore[arg-type]
+            affected_pages=affected,
+            proposed_target=target,
+            reason=args.reason,
+            confidence=args.confidence,
+        ),
+        body=args.reason,
+    )
+    store = SuggestionStore(args.vault)
+    try:
+        store.create(suggestion)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 81
+    print(f"created: {sid}  {operation}  affected={','.join(affected)}")
+    if target is not None:
+        print(f"target: {target}")
+    return 0
 
 
 if __name__ == "__main__":

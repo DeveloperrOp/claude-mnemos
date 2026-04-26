@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#7 в `main`. Готовы:
+`0.0.1` — Plans #1-#8 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -14,6 +14,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Daemon foundation** (Plan #5): FastAPI на `127.0.0.1:5757` + APScheduler (daily snapshot 04:00 UTC, backups cleanup 05:00 UTC, 180-day retention) + REST endpoints.
 - **MCP server** (Plan #6): stdio MCP с 5 read tools (прямой доступ к vault) + 4 write tools (через REST к daemon).
 - **Claude Code plugin** (Plan #7): SessionEnd auto-ingest hook + 5 skills + plugin manifest. После установки каждая сессия автоматически попадает в vault.
+- **Ontology HITL** (Plan #8): `.ontology-suggestions/` Pydantic-валидируемые suggestion файлы + 3 операции (`merge_entities`, `rename_entity`, `delete_page`) + REST endpoints + 3 MCP tools + CLI subgroup. Применение через `StagingTransaction` с pre-op snapshot — undo через `mnemos undo` восстанавливает всё (sources возвращаются из trash, wikilinks переписываются обратно).
 
 ## Установка
 
@@ -38,6 +39,17 @@ mnemos daemon start --vault <path> [--port N] [--host H]
 mnemos daemon status
 mnemos daemon stop
 mnemos daemon foreground --vault <path>   # для отладки
+
+# Ontology (HITL suggestions)
+mnemos ontology propose merge \
+  --source wiki/entities/foo.md --source wiki/entities/bar.md \
+  --target wiki/entities/foobar.md --reason "..." --vault <path>
+mnemos ontology propose rename --source old.md --target new.md --vault <path>
+mnemos ontology propose delete --source orphan.md --vault <path>
+mnemos ontology list --vault <path> [--all]
+mnemos ontology approve <id> --vault <path>
+mnemos ontology reject <id> --vault <path>
+mnemos ontology defer <id> --vault <path>
 ```
 
 ## MCP server
@@ -71,6 +83,9 @@ claude mcp add --transport stdio mnemos -- \
 | `create_snapshot(label?)` | write | Создать manual snapshot |
 | `restore_snapshot(name)` | write | Восстановить vault из snapshot'а |
 | `delete_snapshot(name)` | write | Удалить snapshot |
+| `list_suggestions(status?)` | read | Список ontology suggestions |
+| `apply_ontology_suggestion(id)` | write | Применить suggestion (merge/rename/delete) |
+| `propose_ontology_change(...)` | write | Создать новый suggestion |
 
 **Read tools** работают без daemon'а — читают файлы напрямую. **Write tools** требуют запущенный daemon (`mnemos daemon start`); если daemon offline — возвращают понятное сообщение со ссылкой на нужную команду.
 
@@ -126,8 +141,8 @@ skills/
 
 ```
 claude_mnemos/
-  core/      # примитивы: locks, atomic_write, snapshots, undo
-  state/     # state-файлы (manifest, activity) и их инварианты
+  core/      # примитивы: locks, atomic_write, snapshots, undo, wikilinks, ontology_apply
+  state/     # state-файлы (manifest, activity, ontology suggestions)
   ingest/    # pipeline ингеста чатов в vault через Claude API
   daemon/    # FastAPI + APScheduler + REST endpoints
   mcp/       # MCP server (stdio) с read+write tools
@@ -139,6 +154,6 @@ docs/plans/  # design + impl plans для каждого Plan #N
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~423 тестов)
+pytest -q              # быстрые (~543 тестов)
 pytest -q -m slow      # медленные E2E (subprocess daemon)
 ```

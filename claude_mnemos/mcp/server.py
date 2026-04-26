@@ -23,12 +23,15 @@ from claude_mnemos.mcp.read_tools import (
     get_recent_activity,
     get_status,
     list_pages,
+    list_suggestions,
     read_page,
     search_pages,
 )
 from claude_mnemos.mcp.write_tools import (
+    apply_ontology_suggestion,
     create_snapshot,
     delete_snapshot,
+    propose_ontology_change,
     restore_snapshot,
     undo_operation,
 )
@@ -108,6 +111,30 @@ TOOL_DEFS: list[types.Tool] = [
         description="Delete a snapshot directory by name.",
         inputSchema=schemas.DELETE_SNAPSHOT,
     ),
+    types.Tool(
+        name="list_suggestions",
+        description=(
+            "List ontology suggestions in the vault. Default returns pending only; "
+            "pass status='approved' / 'rejected' / 'deferred' / 'all' for archive view."
+        ),
+        inputSchema=schemas.LIST_SUGGESTIONS,
+    ),
+    types.Tool(
+        name="apply_ontology_suggestion",
+        description=(
+            "Apply an ontology suggestion (merge_entities / rename_entity / delete_page) "
+            "via the daemon. Suggestion must be in 'pending' status."
+        ),
+        inputSchema=schemas.APPLY_ONTOLOGY_SUGGESTION,
+    ),
+    types.Tool(
+        name="propose_ontology_change",
+        description=(
+            "Create a new ontology suggestion via the daemon. The suggestion stays "
+            "'pending' until apply_ontology_suggestion or the user rejects/defers it."
+        ),
+        inputSchema=schemas.PROPOSE_ONTOLOGY_CHANGE,
+    ),
 ]
 
 TOOL_NAMES = {t.name for t in TOOL_DEFS}
@@ -160,6 +187,11 @@ async def _dispatch_read(
             get_recent_activity, vault, limit=arguments.get("limit", 10)
         )
         return _to_text(result)
+    if name == "list_suggestions":
+        result = await asyncio.to_thread(
+            list_suggestions, vault, status=arguments.get("status")
+        )
+        return _to_text(result)
     raise ValueError(f"unknown read tool: {name}")
 
 
@@ -185,6 +217,20 @@ async def _dispatch_write(
                 result = await delete_snapshot(
                     client, config.daemon_url, arguments["name"]
                 )
+            elif name == "apply_ontology_suggestion":
+                result = await apply_ontology_suggestion(
+                    client, config.daemon_url, arguments["suggestion_id"]
+                )
+            elif name == "propose_ontology_change":
+                result = await propose_ontology_change(
+                    client,
+                    config.daemon_url,
+                    operation=arguments["operation"],
+                    affected_pages=arguments["affected_pages"],
+                    proposed_target=arguments.get("proposed_target"),
+                    reason=arguments.get("reason", ""),
+                    confidence=arguments.get("confidence", 0.7),
+                )
             else:
                 raise ValueError(f"unknown write tool: {name}")
     except DaemonUnreachableError:
@@ -208,12 +254,15 @@ READ_TOOL_NAMES = {
     "search_pages",
     "get_status",
     "get_recent_activity",
+    "list_suggestions",
 }
 WRITE_TOOL_NAMES = {
     "undo_operation",
     "create_snapshot",
     "restore_snapshot",
     "delete_snapshot",
+    "apply_ontology_suggestion",
+    "propose_ontology_change",
 }
 
 

@@ -4,6 +4,7 @@ import contextlib
 import shutil
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Literal
@@ -59,6 +60,11 @@ class StagingTransaction:
         self._promoted = False
         self._rejected = False
         self._locked_snapshot_path: Path | None = None
+        # Plan #8 ontology extensions: queued vault mutations applied during promote
+        # AFTER staged files are moved into vault. Snapshot taken before promote
+        # captures pre-mutation state, so any failure rolls back via restore.
+        self._to_move: list[tuple[str, str]] = []
+        self._to_remove: list[tuple[str, bool]] = []
 
     def __enter__(self) -> StagingTransaction:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +113,64 @@ class StagingTransaction:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
+    def move(self, src_relpath: str, dst_relpath: str) -> None:
+        """Queue a vault file move. Applied during promote AFTER staged writes.
+
+        `src_relpath` must exist in the vault at promote time; otherwise the move
+        fails the whole promote and rolls back via snapshot restore.
+        """
+        if self._promoted or self._rejected:
+            raise RuntimeError("StagingTransaction is finalized; cannot move")
+        if not src_relpath or not dst_relpath:
+            raise ValueError("src/dst relpath must be non-empty")
+        if src_relpath == dst_relpath:
+            raise ValueError("src and dst are equal — move is a no-op")
+        self._to_move.append((src_relpath, dst_relpath))
+
+    def delete(self, relpath: str, *, to_trash: bool = True) -> None:
+        """Queue a vault file delete. Applied during promote AFTER staged writes.
+
+        With `to_trash=True` (default): file moves to
+        `<vault>/.trash/deleted-<slug>-<utc-ts>/<basename>` with a
+        `.reason.txt` recording the operation id/type.
+        With `to_trash=False`: hard delete (used for staged-only artefacts).
+        """
+        if self._promoted or self._rejected:
+            raise RuntimeError("StagingTransaction is finalized; cannot delete")
+        if not relpath:
+            raise ValueError("relpath must be non-empty")
+        self._to_remove.append((relpath, to_trash))
+
+    def _apply_moves(self) -> None:
+        for src_rel, dst_rel in self._to_move:
+            src = self.vault / src_rel
+            dst = self.vault / dst_rel
+            if not src.exists():
+                raise FileNotFoundError(f"move source missing: {src_rel}")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+
+    def _apply_deletes(self) -> None:
+        for rel, to_trash in self._to_remove:
+            src = self.vault / rel
+            if not src.exists():
+                # Already gone (e.g. moved by an earlier op in same txn) — ok.
+                continue
+            if not to_trash:
+                src.unlink()
+                continue
+            slug = Path(rel).stem or "page"
+            ts = datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
+            trash_dir = (
+                self.vault / TRASH_DIRNAME / f"deleted-{slug}-{ts}-{self.operation_id[:8]}"
+            )
+            trash_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(trash_dir / src.name))
+            (trash_dir / ".reason.txt").write_text(
+                f"deleted via {self.operation_type} operation {self.operation_id}",
+                encoding="utf-8",
+            )
+
     def promote_to_vault(self) -> PromoteResult:
         """Snapshot vault, then atomically move staging files into vault.
 
@@ -143,6 +207,8 @@ class StagingTransaction:
 
         # 2. Move staged files into vault, one at a time, via shutil.move
         # (atomic rename on same filesystem; binary-safe; faster than read+write).
+        # Then apply queued moves and deletes (Plan #8 ontology operations) under
+        # the same try/restore umbrella.
         try:
             for staged in self.staging_dir.rglob("*"):
                 if not staged.is_file():
@@ -154,6 +220,8 @@ class StagingTransaction:
                 # Pipeline guarantees no collisions: already-existing pages are excluded
                 # via skipped_collisions BEFORE writing to staging.
                 shutil.move(str(staged), str(target))
+            self._apply_moves()
+            self._apply_deletes()
         except Exception as exc:
             restore = restore_from_snapshot(self.vault, snapshot)
             self._promoted = True  # mark finalized so __exit__ doesn't reject
