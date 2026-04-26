@@ -44,6 +44,9 @@ packages = ["claude_mnemos"]
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra -q --strict-markers"
+markers = [
+    "slow: tests that hit external services or take >1s",
+]
 
 [tool.ruff]
 line-length = 100
