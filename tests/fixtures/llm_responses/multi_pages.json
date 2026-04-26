@@ -1,0 +1,36 @@
+{
+  "summary": "Discussed FastAPI vs Flask, decided to prefer FastAPI for async.",
+  "skipped_reason": null,
+  "pages": [
+    {
+      "type": "entity",
+      "title": "FastAPI",
+      "slug_hint": null,
+      "flavor": ["reference"],
+      "confidence": 0.9,
+      "provenance": {"extracted_pct": 85, "inferred_pct": 10, "ambiguous_pct": 5},
+      "related": ["[[prefer-fastapi-over-flask]]"],
+      "body": "FastAPI: async-native, type hints, OpenAPI built-in."
+    },
+    {
+      "type": "entity",
+      "title": "Flask",
+      "slug_hint": null,
+      "flavor": ["reference"],
+      "confidence": 0.8,
+      "provenance": {"extracted_pct": 75, "inferred_pct": 20, "ambiguous_pct": 5},
+      "related": [],
+      "body": "Flask: minimal, sync-default, large ecosystem."
+    },
+    {
+      "type": "concept",
+      "title": "Prefer FastAPI over Flask",
+      "slug_hint": "prefer-fastapi-over-flask",
+      "flavor": ["decision"],
+      "confidence": 0.9,
+      "provenance": {"extracted_pct": 70, "inferred_pct": 25, "ambiguous_pct": 5},
+      "related": ["[[fastapi]]", "[[flask]]"],
+      "body": "When async is required and we have a clean slate, prefer FastAPI."
+    }
+  ]
+}

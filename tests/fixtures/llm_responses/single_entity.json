@@ -1,0 +1,16 @@
+{
+  "summary": "User asked about FastAPI; we discussed its async support.",
+  "skipped_reason": null,
+  "pages": [
+    {
+      "type": "entity",
+      "title": "FastAPI",
+      "slug_hint": null,
+      "flavor": ["reference"],
+      "confidence": 0.85,
+      "provenance": {"extracted_pct": 80, "inferred_pct": 15, "ambiguous_pct": 5},
+      "related": [],
+      "body": "FastAPI is a Python web framework with first-class async support."
+    }
+  ]
+}
