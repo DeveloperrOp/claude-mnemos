@@ -16,6 +16,8 @@ def test_ingest_creates_source_page(tmp_path: Path):
     assert result.page_path.is_relative_to(vault)
     assert result.page_path.name == "abc-123.md"
     assert result.page_path.parent == vault / "raw" / "chats"
+    assert result.session_id == "abc-123"
+    assert result.message_count == 3
 
 
 def test_ingest_page_has_valid_frontmatter(tmp_path: Path):
