@@ -1,0 +1,8 @@
+{
+  "name": "claude-mnemos",
+  "version": "0.0.1",
+  "description": "Per-project memory and structured wiki for Claude Code. Auto-ingest sessions, search vault, undo operations.",
+  "author": {
+    "name": "Yarik"
+  }
+}
