@@ -7,16 +7,18 @@ from claude_mnemos.core.locks import LockTimeoutError, pipeline_lock
 
 
 def test_lock_acquires_and_releases(tmp_path: Path):
-    lock_dir = tmp_path
+    lock_dir = tmp_path / "vault"
     with pipeline_lock(lock_dir, timeout=1.0):
-        assert (lock_dir / ".pipeline.lock").exists()
+        # Lock file lives NEXT TO the vault dir (not inside), so directory
+        # rename during snapshot restore on Windows is unblocked.
+        assert (lock_dir.parent / f".{lock_dir.name}.pipeline.lock").exists()
     # после выхода — lock освобождён, второй вход проходит мгновенно
     with pipeline_lock(lock_dir, timeout=0.1):
         pass
 
 
 def test_lock_timeout_raises(tmp_path: Path):
-    lock_dir = tmp_path
+    lock_dir = tmp_path / "vault"
     holder_started = threading.Event()
     holder_done = threading.Event()
 

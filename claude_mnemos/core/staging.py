@@ -8,7 +8,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal
 
-from claude_mnemos.core.atomic import atomic_write
+from claude_mnemos.core.atomic import atomic_write  # noqa: F401  (kept for tests)
 from claude_mnemos.core.snapshots import create_snapshot, restore_from_snapshot
 
 STAGING_DIRNAME = ".staging"
@@ -107,15 +107,19 @@ class StagingTransaction:
                 f"snapshot creation failed: {exc}"
             ) from exc
 
-        # 2. Move staged files into vault, one at a time, via atomic_write.
+        # 2. Move staged files into vault, one at a time, via shutil.move
+        # (atomic rename on same filesystem; binary-safe; faster than read+write).
         try:
             for staged in self.staging_dir.rglob("*"):
                 if not staged.is_file():
                     continue
                 relative = staged.relative_to(self.staging_dir)
                 target = self.vault / relative
-                content = staged.read_text(encoding="utf-8")
-                atomic_write(target, content)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                # shutil.move is atomic on same FS (uses os.rename) and is binary-safe.
+                # Pipeline guarantees no collisions: already-existing pages are excluded
+                # via skipped_collisions BEFORE writing to staging.
+                shutil.move(str(staged), str(target))
         except Exception as exc:
             restore = restore_from_snapshot(self.vault, snapshot)
             self._promoted = True  # mark finalized so __exit__ doesn't reject

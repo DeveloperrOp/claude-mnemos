@@ -137,23 +137,17 @@ def test_promote_failure_restores_from_snapshot(tmp_path: Path, monkeypatch):
     vault.mkdir()
     (vault / "preexisting.md").write_text("original", encoding="utf-8")
 
-    # First write succeeds, second raises mid-promote
-    real_atomic_write = __import__(
-        "claude_mnemos.core.atomic", fromlist=["atomic_write"]
-    ).atomic_write
+    import shutil as _shutil
+    real_move = _shutil.move
     calls = {"n": 0}
 
-    def flaky_atomic_write(target: Path, content: str) -> None:
-        # Only sabotage writes that target the vault root (i.e. promote moves),
-        # not the staging area.
-        if calls["n"] >= 1 and "staging" not in target.as_posix():
-            raise OSError("simulated mid-promote disk error")
+    def flaky_move(src, dst, *args, **kwargs):
         calls["n"] += 1
-        return real_atomic_write(target, content)
+        if calls["n"] >= 2:
+            raise OSError("simulated mid-promote disk error")
+        return real_move(src, dst, *args, **kwargs)
 
-    monkeypatch.setattr(
-        "claude_mnemos.core.staging.atomic_write", flaky_atomic_write
-    )
+    monkeypatch.setattr("claude_mnemos.core.staging.shutil.move", flaky_move)
 
     with (
         pytest.raises(StagingPromoteError),
