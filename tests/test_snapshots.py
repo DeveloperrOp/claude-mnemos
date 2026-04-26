@@ -319,3 +319,372 @@ def test_restore_preserves_trash_dir(tmp_path: Path):
 
     assert rejected.exists()
     assert (rejected / ".reason.txt").read_text(encoding="utf-8") == "test rejection"
+
+
+# ---------------------------------------------------------------------------
+# Plan #5 extensions: parse_snapshot_name, daily/manual snapshots, list, delete, prune
+# ---------------------------------------------------------------------------
+
+
+def test_parse_snapshot_name_pre_op():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    parsed = parse_snapshot_name("pre-op-2026-04-26-14-30-00-ingest_extracted-abc123")
+    assert parsed is not None
+    assert parsed.kind == "pre-op"
+    assert parsed.timestamp.year == 2026
+    assert parsed.timestamp.month == 4
+    assert parsed.timestamp.day == 26
+    assert parsed.timestamp.hour == 14
+    assert parsed.op_type == "ingest_extracted"
+    assert parsed.op_id == "abc123"
+    assert parsed.label is None
+
+
+def test_parse_snapshot_name_pre_op_with_dashes_in_id():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    parsed = parse_snapshot_name("pre-op-2026-04-26-14-30-00-ingest_extracted-abc-1-2-3")
+    assert parsed is not None
+    assert parsed.op_type == "ingest_extracted"
+    assert parsed.op_id == "abc-1-2-3"
+
+
+def test_parse_snapshot_name_daily():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    parsed = parse_snapshot_name("daily-2026-04-26")
+    assert parsed is not None
+    assert parsed.kind == "daily"
+    assert parsed.timestamp.year == 2026
+    assert parsed.timestamp.month == 4
+    assert parsed.timestamp.day == 26
+    assert parsed.timestamp.hour == 0
+    assert parsed.op_id is None
+    assert parsed.op_type is None
+    assert parsed.label is None
+
+
+def test_parse_snapshot_name_manual_no_label():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    parsed = parse_snapshot_name("manual-2026-04-26-14-30-00")
+    assert parsed is not None
+    assert parsed.kind == "manual"
+    assert parsed.timestamp.hour == 14
+    assert parsed.label is None
+
+
+def test_parse_snapshot_name_manual_with_label():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    parsed = parse_snapshot_name("manual-2026-04-26-14-30-00-pre-release")
+    assert parsed is not None
+    assert parsed.kind == "manual"
+    assert parsed.label == "pre-release"
+
+
+def test_parse_snapshot_name_junk_returns_none():
+    from claude_mnemos.core.snapshots import parse_snapshot_name
+
+    assert parse_snapshot_name("random-junk") is None
+    assert parse_snapshot_name("pre-op-malformed") is None
+    assert parse_snapshot_name("daily-not-a-date") is None
+    assert parse_snapshot_name("") is None
+
+
+def test_compute_daily_snapshot_path(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import compute_daily_snapshot_path
+
+    vault = tmp_path / "vault"
+    path = compute_daily_snapshot_path(vault, date(2026, 4, 26))
+    assert path == vault / ".backups" / "daily-2026-04-26"
+
+
+def test_compute_manual_snapshot_path_no_label(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from claude_mnemos.core.snapshots import compute_manual_snapshot_path
+
+    vault = tmp_path / "vault"
+    path = compute_manual_snapshot_path(
+        vault, label=None, now=datetime(2026, 4, 26, 14, 30, 0, tzinfo=UTC)
+    )
+    assert path == vault / ".backups" / "manual-2026-04-26-14-30-00"
+
+
+def test_compute_manual_snapshot_path_with_label(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from claude_mnemos.core.snapshots import compute_manual_snapshot_path
+
+    vault = tmp_path / "vault"
+    path = compute_manual_snapshot_path(
+        vault, label="release-1", now=datetime(2026, 4, 26, 14, 30, 0, tzinfo=UTC)
+    )
+    assert path == vault / ".backups" / "manual-2026-04-26-14-30-00-release-1"
+
+
+def test_compute_manual_snapshot_path_label_sanitized(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from claude_mnemos.core.snapshots import compute_manual_snapshot_path
+
+    vault = tmp_path / "vault"
+    path = compute_manual_snapshot_path(
+        vault,
+        label="my release/v1 alpha",
+        now=datetime(2026, 4, 26, 14, 30, 0, tzinfo=UTC),
+    )
+    assert "/" not in path.name
+    assert " " not in path.name
+    assert path.name.startswith("manual-2026-04-26-14-30-00-")
+
+
+def test_compute_manual_snapshot_path_rejects_empty_after_sanitize(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from claude_mnemos.core.snapshots import compute_manual_snapshot_path
+
+    vault = tmp_path / "vault"
+    with pytest.raises(ValueError):
+        compute_manual_snapshot_path(
+            vault, label="///", now=datetime(2026, 4, 26, tzinfo=UTC)
+        )
+
+
+def test_create_daily_snapshot_creates_directory(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import create_daily_snapshot
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    assert snap.exists()
+    assert snap.name == "daily-2026-04-26"
+    assert (snap / ".meta.json").exists()
+    meta = SnapshotMeta.model_validate(json.loads((snap / ".meta.json").read_text()))
+    assert meta.operation_type == "daily"
+
+
+def test_create_daily_snapshot_idempotent(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import create_daily_snapshot
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    today = date(2026, 4, 26)
+    snap1 = create_daily_snapshot(vault, today)
+    # Mutate vault — second call should NOT overwrite the snapshot
+    (vault / "wiki" / "entities" / "foo.md").write_text("changed", encoding="utf-8")
+    snap2 = create_daily_snapshot(vault, today)
+
+    assert snap1 == snap2
+    # Original content preserved
+    assert (snap1 / "wiki" / "entities" / "foo.md").read_text(encoding="utf-8") == (
+        "---\ntitle: Foo\n---\nbody\n"
+    )
+
+
+def test_create_manual_snapshot_creates_directory(tmp_path: Path):
+    from claude_mnemos.core.snapshots import create_manual_snapshot
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    snap = create_manual_snapshot(vault, label="smoke")
+    assert snap.exists()
+    assert snap.name.startswith("manual-")
+    assert snap.name.endswith("-smoke")
+    meta = SnapshotMeta.model_validate(json.loads((snap / ".meta.json").read_text()))
+    assert meta.operation_type == "manual"
+
+
+def test_list_snapshots_empty(tmp_path: Path):
+    from claude_mnemos.core.snapshots import list_snapshots
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    assert list_snapshots(vault) == []
+
+
+def test_list_snapshots_returns_known_kinds(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        create_daily_snapshot,
+        create_manual_snapshot,
+        create_snapshot,
+        list_snapshots,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+
+    create_snapshot(vault, operation_id="abc", operation_type="ingest_extracted")
+    create_daily_snapshot(vault, date(2026, 4, 26))
+    create_manual_snapshot(vault, label="release")
+
+    items = list_snapshots(vault)
+    kinds = {i.kind for i in items}
+    assert kinds == {"pre-op", "daily", "manual"}
+
+
+def test_list_snapshots_skips_junk(tmp_path: Path):
+    from claude_mnemos.core.snapshots import list_snapshots
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    (vault / ".backups" / "random-stuff").mkdir()
+    (vault / ".backups" / "another-junk").mkdir()
+
+    assert list_snapshots(vault) == []
+
+
+def test_list_snapshots_sorted_newest_first(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import compute_daily_snapshot_path, list_snapshots
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+
+    # Create directories manually with controlled names — bypass create_daily_snapshot
+    # to keep the test pure
+    for d in (date(2026, 4, 24), date(2026, 4, 26), date(2026, 4, 25)):
+        compute_daily_snapshot_path(vault, d).mkdir()
+
+    items = list_snapshots(vault)
+    assert [i.timestamp.day for i in items] == [26, 25, 24]
+
+
+def test_delete_snapshot_removes_directory(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import create_daily_snapshot, delete_snapshot
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    assert snap.exists()
+
+    delete_snapshot(vault, snap.name)
+    assert not snap.exists()
+
+
+def test_delete_snapshot_rejects_traversal(tmp_path: Path):
+    from claude_mnemos.core.snapshots import delete_snapshot
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(ValueError):
+        delete_snapshot(vault, "../etc-passwd")
+
+
+def test_delete_snapshot_rejects_absolute_path(tmp_path: Path):
+    from claude_mnemos.core.snapshots import delete_snapshot
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(ValueError):
+        delete_snapshot(vault, "/tmp/foo")
+
+
+def test_delete_snapshot_rejects_unknown_prefix(tmp_path: Path):
+    from claude_mnemos.core.snapshots import delete_snapshot
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    junk_dir = vault / ".backups" / "random-stuff"
+    junk_dir.mkdir()
+    with pytest.raises(ValueError):
+        delete_snapshot(vault, "random-stuff")
+    # Junk dir untouched (we don't delete things we don't own)
+    assert junk_dir.exists()
+
+
+def test_delete_snapshot_missing_raises(tmp_path: Path):
+    from claude_mnemos.core.snapshots import delete_snapshot
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        delete_snapshot(vault, "daily-2026-04-26")
+
+
+def test_prune_old_backups_removes_old_keeps_new(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        compute_daily_snapshot_path,
+        compute_snapshot_path,
+        prune_old_backups,
+    )
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+
+    # Old daily snapshot (250 days back)
+    compute_daily_snapshot_path(vault, date(2025, 8, 19)).mkdir()
+    # New daily snapshot (1 day back)
+    compute_daily_snapshot_path(vault, date(2026, 4, 25)).mkdir()
+    # Old pre-op (manually create with old timestamp in name)
+    old_pre_op = vault / ".backups" / "pre-op-2025-08-19-12-00-00-ingest-old"
+    old_pre_op.mkdir()
+    new_pre_op = compute_snapshot_path(
+        vault, operation_id="new", operation_type="ingest"
+    )
+    new_pre_op.mkdir()
+
+    result = prune_old_backups(vault, retention_days=180, today=date(2026, 4, 26))
+
+    pruned_names = set(result.pruned)
+    assert "daily-2025-08-19" in pruned_names
+    assert "pre-op-2025-08-19-12-00-00-ingest-old" in pruned_names
+    assert "daily-2026-04-25" not in pruned_names
+    assert new_pre_op.name not in pruned_names
+    assert result.kept == 2
+    assert result.errors == []
+
+
+def test_prune_old_backups_skips_junk(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import prune_old_backups
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    junk = vault / ".backups" / "random-stuff"
+    junk.mkdir()
+
+    result = prune_old_backups(vault, retention_days=30, today=date(2026, 4, 26))
+    assert result.pruned == []
+    # Junk not deleted, not counted as kept either (not ours)
+    assert junk.exists()
+
+
+def test_prune_old_backups_handles_rmtree_failure(tmp_path: Path, monkeypatch):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import compute_daily_snapshot_path, prune_old_backups
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    old = compute_daily_snapshot_path(vault, date(2025, 1, 1))
+    old.mkdir()
+
+    def boom(_path, **_kw):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("claude_mnemos.core.snapshots.shutil.rmtree", boom)
+
+    result = prune_old_backups(vault, retention_days=180, today=date(2026, 4, 26))
+    assert result.pruned == []
+    assert len(result.errors) == 1
+    assert result.errors[0][0] == old.name

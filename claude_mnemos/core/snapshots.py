@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 import shutil
 import time
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +17,22 @@ META_FILENAME = ".meta.json"
 
 _EXCLUDED_DIRS = {".staging", ".backups", ".trash"}
 _EXCLUDED_FILES = {".pipeline.lock"}
+
+logger = logging.getLogger(__name__)
+
+SnapshotKind = Literal["pre-op", "daily", "manual"]
+
+_PRE_OP_RE = re.compile(
+    r"^pre-op-"
+    r"(?P<ts>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})-"
+    r"(?P<op_type>[A-Za-z0-9_]+)-"
+    r"(?P<op_id>.+)$"
+)
+_DAILY_RE = re.compile(r"^daily-(?P<date>\d{4}-\d{2}-\d{2})$")
+_MANUAL_RE = re.compile(
+    r"^manual-(?P<ts>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})(?:-(?P<label>.+))?$"
+)
+_LABEL_SANITIZE_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 class SnapshotError(RuntimeError):
@@ -37,6 +56,246 @@ class RestoreResult:
     vault_possibly_corrupted: bool = False
     error: str | None = None
     recovery_hint: str | None = None
+
+
+@dataclass(frozen=True)
+class ParsedSnapshot:
+    """Parsed components of a snapshot directory name."""
+
+    kind: SnapshotKind
+    timestamp: datetime  # UTC
+    op_id: str | None = None
+    op_type: str | None = None
+    label: str | None = None
+
+
+class SnapshotInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: SnapshotKind
+    timestamp: datetime
+    op_id: str | None = None
+    op_type: str | None = None
+    label: str | None = None
+    size_bytes: int = 0
+    path: str  # relative to vault root, posix-style
+
+
+@dataclass(frozen=True)
+class PruneResult:
+    pruned: list[str] = field(default_factory=list)
+    kept: int = 0
+    errors: list[tuple[str, str]] = field(default_factory=list)
+
+
+def parse_snapshot_name(name: str) -> ParsedSnapshot | None:
+    """Parse a `.backups/<name>` directory name into structured components.
+
+    Returns None for unknown / malformed names.
+    """
+    if not name:
+        return None
+
+    m = _PRE_OP_RE.match(name)
+    if m is not None:
+        try:
+            ts = datetime.strptime(m.group("ts"), "%Y-%m-%d-%H-%M-%S").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        return ParsedSnapshot(
+            kind="pre-op",
+            timestamp=ts,
+            op_type=m.group("op_type"),
+            op_id=m.group("op_id"),
+        )
+
+    m = _DAILY_RE.match(name)
+    if m is not None:
+        try:
+            d = datetime.strptime(m.group("date"), "%Y-%m-%d").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        return ParsedSnapshot(kind="daily", timestamp=d)
+
+    m = _MANUAL_RE.match(name)
+    if m is not None:
+        try:
+            ts = datetime.strptime(m.group("ts"), "%Y-%m-%d-%H-%M-%S").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        return ParsedSnapshot(
+            kind="manual",
+            timestamp=ts,
+            label=m.group("label"),
+        )
+
+    return None
+
+
+def _sanitize_label(label: str) -> str:
+    """Replace anything outside [A-Za-z0-9._-] with `-`, collapse repeats, strip."""
+    cleaned = _LABEL_SANITIZE_RE.sub("-", label).strip("-")
+    cleaned = re.sub(r"-+", "-", cleaned)
+    return cleaned
+
+
+def compute_daily_snapshot_path(vault: Path, today: date) -> Path:
+    """Return <vault>/.backups/daily-<YYYY-MM-DD>/ — deterministic per-day path."""
+    return vault / SNAPSHOTS_DIRNAME / f"daily-{today.isoformat()}"
+
+
+def compute_manual_snapshot_path(
+    vault: Path,
+    *,
+    label: str | None,
+    now: datetime,
+) -> Path:
+    """Return <vault>/.backups/manual-<utc-ts>[-<sanitized-label>]/."""
+    ts = now.astimezone(UTC).strftime("%Y-%m-%d-%H-%M-%S")
+    if label is None:
+        return vault / SNAPSHOTS_DIRNAME / f"manual-{ts}"
+    sanitized = _sanitize_label(label)
+    if not sanitized:
+        raise ValueError(f"manual snapshot label is empty after sanitization: {label!r}")
+    return vault / SNAPSHOTS_DIRNAME / f"manual-{ts}-{sanitized}"
+
+
+def create_daily_snapshot(vault: Path, today: date) -> Path:
+    """Create daily snapshot if not exists; return path. Idempotent.
+
+    Operation type recorded in meta.json is `daily`.
+    """
+    snap_path = compute_daily_snapshot_path(vault, today)
+    if snap_path.exists():
+        return snap_path
+    return create_snapshot_at(
+        vault, snap_path, operation_id=today.isoformat(), operation_type="daily"
+    )
+
+
+def create_manual_snapshot(vault: Path, *, label: str | None = None) -> Path:
+    """Create a manual snapshot under unique timestamp, op_type='manual'."""
+    snap_path = compute_manual_snapshot_path(vault, label=label, now=datetime.now(UTC))
+    op_id = label if label else "manual"
+    return create_snapshot_at(
+        vault, snap_path, operation_id=op_id, operation_type="manual"
+    )
+
+
+def _snapshot_size(snap_dir: Path) -> int:
+    total = 0
+    if not snap_dir.exists():
+        return 0
+    for p in snap_dir.rglob("*"):
+        if p.is_file():
+            try:
+                total += p.stat().st_size
+            except OSError:
+                continue
+    return total
+
+
+def list_snapshots(vault: Path) -> list[SnapshotInfo]:
+    """List snapshots in <vault>/.backups/, sorted newest-first.
+
+    Skips directories that don't match known prefixes (logs warning).
+    Best-effort size computation; errors → size_bytes=0.
+    """
+    backups_root = vault / SNAPSHOTS_DIRNAME
+    if not backups_root.is_dir():
+        return []
+
+    items: list[SnapshotInfo] = []
+    for entry in backups_root.iterdir():
+        if not entry.is_dir():
+            continue
+        parsed = parse_snapshot_name(entry.name)
+        if parsed is None:
+            logger.warning("skipping unrecognized backup entry: %s", entry.name)
+            continue
+        items.append(
+            SnapshotInfo(
+                name=entry.name,
+                kind=parsed.kind,
+                timestamp=parsed.timestamp,
+                op_id=parsed.op_id,
+                op_type=parsed.op_type,
+                label=parsed.label,
+                size_bytes=_snapshot_size(entry),
+                path=f".backups/{entry.name}",
+            )
+        )
+
+    items.sort(key=lambda s: s.timestamp, reverse=True)
+    return items
+
+
+def delete_snapshot(vault: Path, name: str) -> None:
+    """Delete a snapshot directory by name. Path-traversal-safe.
+
+    Rejects:
+    - names containing path separators or `..`
+    - absolute paths
+    - names that don't match a known snapshot prefix
+    """
+    if "/" in name or "\\" in name or ".." in name:
+        raise ValueError(f"snapshot name contains path separators: {name!r}")
+    if Path(name).is_absolute():
+        raise ValueError(f"snapshot name must be relative: {name!r}")
+    if parse_snapshot_name(name) is None:
+        raise ValueError(f"not a snapshot name: {name!r}")
+
+    backups_root = (vault / SNAPSHOTS_DIRNAME).resolve()
+    target = (vault / SNAPSHOTS_DIRNAME / name).resolve()
+
+    # Double-check resolved path is inside .backups/
+    if backups_root not in target.parents and target != backups_root:
+        raise ValueError(f"snapshot path escapes .backups/: {name!r}")
+    if target == backups_root:
+        raise ValueError("cannot delete .backups/ itself")
+
+    if not target.exists():
+        raise FileNotFoundError(f"snapshot not found: {name}")
+
+    shutil.rmtree(target)
+
+
+def prune_old_backups(
+    vault: Path,
+    retention_days: int,
+    today: date,
+) -> PruneResult:
+    """Delete snapshots older than (today - retention_days). Junk dirs untouched.
+
+    Returns (pruned: list[str], kept: int, errors: list[(name, message)]).
+    """
+    backups_root = vault / SNAPSHOTS_DIRNAME
+    if not backups_root.is_dir():
+        return PruneResult()
+
+    cutoff = today - timedelta(days=retention_days)
+    pruned: list[str] = []
+    errors: list[tuple[str, str]] = []
+    kept = 0
+
+    for entry in backups_root.iterdir():
+        if not entry.is_dir():
+            continue
+        parsed = parse_snapshot_name(entry.name)
+        if parsed is None:
+            # Junk: not ours, leave it alone
+            continue
+        if parsed.timestamp.date() < cutoff:
+            try:
+                shutil.rmtree(entry)
+                pruned.append(entry.name)
+            except OSError as exc:
+                errors.append((entry.name, str(exc)))
+        else:
+            kept += 1
+
+    return PruneResult(pruned=pruned, kept=kept, errors=errors)
 
 
 def _timestamp() -> str:
