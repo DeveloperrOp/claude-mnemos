@@ -26,3 +26,6 @@ Thumbs.db
 # local data / artifacts
 tmp/
 *.log
+
+# uv (not used by this project — pip + venv are canonical)
+uv.lock
