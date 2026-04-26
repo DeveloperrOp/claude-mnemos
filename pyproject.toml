@@ -36,6 +36,10 @@ mnemos = "claude_mnemos.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["claude_mnemos"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"claude_mnemos/ingest/prompts/system.md" = "claude_mnemos/ingest/prompts/system.md"
+"claude_mnemos/ingest/prompts/extract_user.md" = "claude_mnemos/ingest/prompts/extract_user.md"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
