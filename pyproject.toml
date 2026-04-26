@@ -28,6 +28,9 @@ dev = [
     "mypy>=1.11",
 ]
 
+[project.scripts]
+mnemos = "claude_mnemos.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["claude_mnemos"]
 
