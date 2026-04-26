@@ -19,9 +19,11 @@ class TranscriptMessage:
 def parse_jsonl(path: Path) -> list[TranscriptMessage]:
     """Parse a Claude Code session JSONL into a flat list of text messages.
 
-    Ignores entries whose `type` is not `user` or `assistant`. Extracts text
-    from both string content and block-list content (Claude's two formats).
-    Raises EmptyTranscriptError if no messages are found.
+    Skips entries whose ``type`` is not ``user`` or ``assistant``, and skips
+    malformed JSON lines silently. Also skips user/assistant entries whose
+    ``content`` contains no text blocks (e.g. pure ``tool_use``/``tool_result``
+    entries). Raises ``EmptyTranscriptError`` when no messages survive these
+    filters — which can happen even on a non-empty file.
     """
     messages: list[TranscriptMessage] = []
     raw = path.read_text(encoding="utf-8")

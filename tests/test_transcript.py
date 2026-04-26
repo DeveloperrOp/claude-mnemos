@@ -47,7 +47,18 @@ def test_parse_skips_non_message_entries(tmp_path: Path):
     assert messages[0].text == "hi"
 
 
-def test_parse_session_id_from_first_entry():
+def test_parse_session_id_present_on_all_messages():
     messages = parse_jsonl(FIXTURE)
-    # session_id доступен через атрибут сообщения
-    assert messages[0].session_id == "abc-123"
+    assert all(m.session_id == "abc-123" for m in messages)
+
+
+def test_parse_skips_malformed_json(tmp_path: Path):
+    f = tmp_path / "bad.jsonl"
+    f.write_text(
+        '{invalid json}\n'
+        '{"type":"user","message":{"role":"user","content":"ok"}}\n',
+        encoding="utf-8",
+    )
+    messages = parse_jsonl(f)
+    assert len(messages) == 1
+    assert messages[0].text == "ok"
