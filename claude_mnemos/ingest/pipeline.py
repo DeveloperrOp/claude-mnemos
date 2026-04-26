@@ -28,12 +28,13 @@ def ingest_minimal(
     Spec: minimal e2e of section 8.1 (without LLM extraction, staging,
     snapshots, activity log — those are subsequent plans).
     """
+    messages = parse_jsonl(jsonl_path)
+    session_id = _resolve_session_id(messages, jsonl_path)
+    page = _build_page(messages, session_id)
+    target_relative = page.relative_path
     vault_root.mkdir(parents=True, exist_ok=True)
     with pipeline_lock(vault_root, timeout=lock_timeout):
-        messages = parse_jsonl(jsonl_path)
-        session_id = _resolve_session_id(messages, jsonl_path)
-        page = _build_page(messages, session_id)
-        target = vault_root / page.relative_path
+        target = vault_root / target_relative
         atomic_write(target, page.serialize())
         return IngestResult(
             page_path=target,

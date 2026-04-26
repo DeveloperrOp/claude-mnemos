@@ -58,6 +58,5 @@ def test_ingest_empty_jsonl_does_not_create_page(tmp_path: Path):
     empty.write_text("", encoding="utf-8")
     with pytest.raises(EmptyTranscriptError):
         ingest_minimal(empty, vault)
-    # Vault не должен содержать никаких файлов кроме .pipeline.lock
-    files = [p for p in vault.rglob("*") if p.is_file() and p.name != ".pipeline.lock"]
-    assert files == []
+    # Vault dir не должен быть создан вообще — parse falls before mkdir.
+    assert not vault.exists()

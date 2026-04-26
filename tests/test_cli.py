@@ -34,3 +34,21 @@ def test_cli_no_command_shows_help():
     res = _run()
     assert res.returncode != 0
     assert "ingest" in (res.stderr + res.stdout).lower()
+
+
+def test_cli_empty_jsonl_returns_data_error(tmp_path: Path):
+    vault = tmp_path / "vault"
+    empty = tmp_path / "empty.jsonl"
+    empty.write_text("", encoding="utf-8")
+    res = _run("ingest", str(empty), str(vault))
+    assert res.returncode == 65
+    assert "empty transcript" in res.stderr.lower()
+
+
+def test_main_module_safe_to_import():
+    # Importing __main__ should NOT execute the CLI (must be guarded by __name__).
+    import importlib
+
+    # Even if previously imported, reimport should not raise.
+    mod = importlib.import_module("claude_mnemos.__main__")
+    assert hasattr(mod, "main")
