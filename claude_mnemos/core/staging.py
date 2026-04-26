@@ -9,7 +9,12 @@ from types import TracebackType
 from typing import Literal
 
 from claude_mnemos.core.atomic import atomic_write  # noqa: F401  (kept for tests)
-from claude_mnemos.core.snapshots import create_snapshot, restore_from_snapshot
+from claude_mnemos.core.snapshots import (
+    compute_snapshot_path,
+    create_snapshot,
+    create_snapshot_at,
+    restore_from_snapshot,
+)
 
 STAGING_DIRNAME = ".staging"
 TRASH_DIRNAME = ".trash"
@@ -53,6 +58,7 @@ class StagingTransaction:
         self.staging_dir = vault / STAGING_DIRNAME / operation_id
         self._promoted = False
         self._rejected = False
+        self._locked_snapshot_path: Path | None = None
 
     def __enter__(self) -> StagingTransaction:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +81,24 @@ class StagingTransaction:
                 self.reject(reason)
         return False  # never swallow
 
+    def pre_promote_snapshot_path(self) -> Path:
+        """Lock in and return the snapshot path that promote_to_vault will use.
+
+        First call computes the path; subsequent calls return the same path.
+        After finalize (promoted or rejected), raises RuntimeError.
+        """
+        if self._promoted or self._rejected:
+            raise RuntimeError(
+                "StagingTransaction is finalized; cannot lock snapshot path"
+            )
+        if self._locked_snapshot_path is None:
+            self._locked_snapshot_path = compute_snapshot_path(
+                self.vault,
+                operation_id=self.operation_id,
+                operation_type=self.operation_type,
+            )
+        return self._locked_snapshot_path
+
     def write(self, relative_path: Path, content: str) -> None:
         """Write content to staging area at `relative_path`. NOT to vault."""
         if self._promoted or self._rejected:
@@ -95,13 +119,23 @@ class StagingTransaction:
         if self._rejected:
             raise RuntimeError("StagingTransaction already rejected; cannot promote")
 
-        # 1. Snapshot vault BEFORE moving anything.
+        # 1. Snapshot vault BEFORE moving anything. Use precomputed path if
+        # caller invoked pre_promote_snapshot_path() — guarantees activity
+        # entries written into staging reference the correct snapshot.
         try:
-            snapshot = create_snapshot(
-                self.vault,
-                operation_id=self.operation_id,
-                operation_type=self.operation_type,
-            )
+            if self._locked_snapshot_path is not None:
+                snapshot = create_snapshot_at(
+                    self.vault,
+                    self._locked_snapshot_path,
+                    operation_id=self.operation_id,
+                    operation_type=self.operation_type,
+                )
+            else:
+                snapshot = create_snapshot(
+                    self.vault,
+                    operation_id=self.operation_id,
+                    operation_type=self.operation_type,
+                )
         except Exception as exc:
             raise StagingPromoteError(
                 f"snapshot creation failed: {exc}"
@@ -123,6 +157,9 @@ class StagingTransaction:
         except Exception as exc:
             restore = restore_from_snapshot(self.vault, snapshot)
             self._promoted = True  # mark finalized so __exit__ doesn't reject
+            # Restore preserves .staging/ across the swap (so other concurrent
+            # transactions survive); clean up our own partial staging dir here.
+            shutil.rmtree(self.staging_dir, ignore_errors=True)
             if restore.success:
                 raise StagingPromoteError(
                     f"promote failed mid-move; vault restored from snapshot. cause: {exc}"

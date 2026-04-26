@@ -113,3 +113,80 @@ def test_cli_no_llm_prints_snapshot_line(tmp_path: Path):
     assert "snapshot:" in res.stdout.lower()
     # Snapshot path should reference .backups directory
     assert ".backups" in res.stdout
+
+
+def test_cli_activity_lists_recent_entries(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res_ingest = _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+    assert res_ingest.returncode == 0
+
+    res_activity = _run("activity", "--vault", str(vault))
+    assert res_activity.returncode == 0, res_activity.stderr
+    assert "ingest_raw_only" in res_activity.stdout
+
+
+def test_cli_activity_limit(tmp_path: Path):
+    vault = tmp_path / "vault"
+    _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+    res = _run("activity", "--vault", str(vault), "--limit", "0")
+    assert res.returncode == 0
+    assert "ingest_raw_only" in res.stdout
+
+
+def test_cli_activity_empty_vault(tmp_path: Path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    res = _run("activity", "--vault", str(vault))
+    assert res.returncode == 0
+    assert "no activity" in res.stdout.lower() or res.stdout.strip() == ""
+
+
+def test_cli_undo_unknown_id_returns_77(tmp_path: Path):
+    vault = tmp_path / "vault"
+    _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+
+    res = _run("undo", "fake-id-doesnotexist", "--vault", str(vault))
+    assert res.returncode == 77
+    assert "not found" in res.stderr.lower()
+
+
+def test_cli_undo_last_no_undoable_returns_77(tmp_path: Path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    res = _run("undo", "--last", "--vault", str(vault))
+    assert res.returncode == 77
+    assert "no undoable" in res.stderr.lower()
+
+
+def test_cli_undo_last_succeeds_after_ingest(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res_ingest = _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+    assert res_ingest.returncode == 0
+
+    res_undo = _run("undo", "--last", "--vault", str(vault))
+    assert res_undo.returncode == 0, res_undo.stderr
+    assert "undone" in res_undo.stdout.lower() or "restored" in res_undo.stdout.lower()
+
+    import json as _json
+    log_text = (vault / ".activity.json").read_text(encoding="utf-8")
+    log = _json.loads(log_text)
+    assert len(log["entries"]) == 2
+    types = [e["operation_type"] for e in log["entries"]]
+    assert "ingest_raw_only" in types
+    assert "manual_restore" in types
+    ingest_entry = next(e for e in log["entries"] if e["operation_type"] == "ingest_raw_only")
+    assert ingest_entry["undone"] is True
+
+
+def test_cli_undo_id_prefix_match(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res_ingest = _run("ingest", str(FIXTURE), str(vault), "--no-llm")
+    assert res_ingest.returncode == 0
+
+    import json as _json
+    log = _json.loads((vault / ".activity.json").read_text(encoding="utf-8"))
+    full_id = log["entries"][0]["id"]
+    short_prefix = full_id[:8]
+
+    res_undo = _run("undo", short_prefix, "--vault", str(vault))
+    assert res_undo.returncode == 0, res_undo.stderr

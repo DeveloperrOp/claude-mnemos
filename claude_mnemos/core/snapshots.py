@@ -44,6 +44,23 @@ def _timestamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
 
 
+def compute_snapshot_path(
+    vault: Path,
+    *,
+    operation_id: str,
+    operation_type: str,
+) -> Path:
+    """Compute the snapshot directory path for the current UTC moment.
+
+    Single source of truth for the snapshot path format.
+    Used by both create_snapshot (auto-compute) and StagingTransaction
+    (lock-in before promote).
+    """
+    ts = _timestamp()
+    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
+    return vault / SNAPSHOTS_DIRNAME / snap_name
+
+
 def _ignore_internal(directory: str, names: list[str]) -> set[str]:
     return {n for n in names if n in _EXCLUDED_DIRS or n in _EXCLUDED_FILES}
 
@@ -67,28 +84,25 @@ def _vault_size(root: Path) -> int:
     return total
 
 
-def create_snapshot(
+def create_snapshot_at(
     vault: Path,
+    snap_path: Path,
     *,
     operation_id: str,
     operation_type: str,
 ) -> Path:
-    """Copy vault contents (excluding internal dirs) into .backups/pre-op-<ts>-<type>-<id>/.
+    """Create a snapshot at the exact path provided.
 
-    Writes .meta.json with timestamp + operation info + size/page counts.
-    Raises SnapshotError if the target snapshot path already exists.
+    Same exclusion rules and meta.json behavior as create_snapshot, but the
+    target path is dictated by the caller (used by StagingTransaction to lock
+    in a snapshot path before promote, so activity entries can reference it).
     """
-    ts = _timestamp()
-    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
-    snapshots_root = vault / SNAPSHOTS_DIRNAME
-    snapshots_root.mkdir(parents=True, exist_ok=True)
-    snap_path = snapshots_root / snap_name
-
     if snap_path.exists():
         raise SnapshotError(f"snapshot already exists: {snap_path}")
 
-    # Collect vault content (everything except internal dirs/files at root level).
+    snap_path.parent.mkdir(parents=True, exist_ok=True)
     snap_path.mkdir(parents=True)
+
     if vault.exists():
         for item in vault.iterdir():
             if item.name in _EXCLUDED_DIRS or item.name in _EXCLUDED_FILES:
@@ -115,6 +129,21 @@ def create_snapshot(
     )
 
     return snap_path
+
+
+def create_snapshot(
+    vault: Path,
+    *,
+    operation_id: str,
+    operation_type: str,
+) -> Path:
+    """Create a snapshot with auto-generated UTC timestamp in the path."""
+    snap_path = compute_snapshot_path(
+        vault, operation_id=operation_id, operation_type=operation_type
+    )
+    return create_snapshot_at(
+        vault, snap_path, operation_id=operation_id, operation_type=operation_type
+    )
 
 
 def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
@@ -150,6 +179,31 @@ def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
             vault_intact=True,
             error=f"cannot stage restore: {exc}",
         )
+
+    # Preserve current vault's internal dirs into temp_root before swap.
+    # The snapshot deliberately excludes .backups/.trash/.staging so it doesn't
+    # recurse on itself. But after the atomic swap, those internal dirs would
+    # disappear — losing all earlier snapshots, breaking chain undo. Copy them
+    # over before the swap so they survive.
+    if vault.exists():
+        for preserved in (".backups", ".trash", ".staging"):
+            src = vault / preserved
+            if src.is_dir():
+                dst = temp_root / preserved
+                if dst.exists():
+                    # Snapshot included this dir somehow (shouldn't happen) — replace
+                    shutil.rmtree(dst)
+                try:
+                    shutil.copytree(src, dst)
+                except OSError as exc:
+                    # Couldn't preserve internal dir — abort restore.
+                    # Vault is still intact since we haven't swapped yet.
+                    shutil.rmtree(temp_root, ignore_errors=True)
+                    return RestoreResult(
+                        success=False,
+                        vault_intact=True,
+                        error=f"cannot preserve internal dir {preserved}: {exc}",
+                    )
 
     old_vault: Path | None = None
     if vault.exists():

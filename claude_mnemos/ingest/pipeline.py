@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from claude_mnemos.config import Config
 from claude_mnemos.core.locks import pipeline_lock
@@ -14,6 +15,12 @@ from claude_mnemos.core.staging import StagingTransaction
 from claude_mnemos.ingest.extraction import ExtractionResult, extract_wiki_pages
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.transcript import TranscriptMessage, parse_jsonl
+from claude_mnemos.state.activity import (
+    ACTIVITY_FILENAME,
+    ActivityEntry,
+    ActivityLog,
+    ActivityOperationType,
+)
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 IngestStatus = Literal["extracted", "raw_only", "already_ingested", "dry_run"]
@@ -32,6 +39,7 @@ class IngestResult:
     output_tokens: int | None = None
     model: str | None = None
     snapshot_path: Path | None = None
+    activity_id: str | None = None
 
 
 def ingest(
@@ -75,7 +83,10 @@ def ingest(
                 input_tokens=existing.input_tokens,
                 output_tokens=existing.output_tokens,
                 snapshot_path=None,
+                activity_id=None,
             )
+
+        activity = ActivityLog.load(vault_root)
 
         raw_relative = Path("raw/chats") / f"{session_id}.md"
         raw_body = _render_raw_transcript(messages)
@@ -101,6 +112,20 @@ def ingest(
                 )
                 txn.write(Path(".manifest.json"), manifest.serialize_to_string())
 
+                snapshot_target = txn.pre_promote_snapshot_path()
+                activity_id = uuid4().hex
+                activity.append(
+                    _build_activity_entry(
+                        op_type="ingest_raw_only",
+                        snapshot_target=snapshot_target,
+                        vault_root=vault_root,
+                        affected=[raw_relative.as_posix()],
+                        metadata={"session_id": session_id},
+                        entry_id=activity_id,
+                    )
+                )
+                txn.write(Path(ACTIVITY_FILENAME), activity.serialize_to_string())
+
                 if dry_run:
                     txn.reject("dry-run (--no-llm)")
                     return IngestResult(
@@ -108,6 +133,7 @@ def ingest(
                         session_id=session_id,
                         raw_path=None,
                         snapshot_path=None,
+                        activity_id=None,
                     )
 
                 promote = txn.promote_to_vault()
@@ -116,6 +142,7 @@ def ingest(
                     session_id=session_id,
                     raw_path=vault_root / raw_relative,
                     snapshot_path=promote.snapshot,
+                    activity_id=activity_id,
                 )
 
             # LLM-extract path
@@ -178,6 +205,28 @@ def ingest(
             )
             txn.write(Path(".manifest.json"), manifest.serialize_to_string())
 
+            snapshot_target = txn.pre_promote_snapshot_path()
+            activity_id = uuid4().hex
+            affected_paths = [p.relative_path.as_posix() for p in to_write]
+            affected_paths.append(raw_relative.as_posix())
+            activity.append(
+                _build_activity_entry(
+                    op_type="ingest_extracted",
+                    snapshot_target=snapshot_target,
+                    vault_root=vault_root,
+                    affected=affected_paths,
+                    metadata={
+                        "session_id": session_id,
+                        "model": cfg.model,
+                        "input_tokens": extraction.input_tokens,
+                        "output_tokens": extraction.output_tokens,
+                        "skipped_collisions": skipped,
+                    },
+                    entry_id=activity_id,
+                )
+            )
+            txn.write(Path(ACTIVITY_FILENAME), activity.serialize_to_string())
+
             if dry_run:
                 txn.reject("dry-run (--extract)")
                 return IngestResult(
@@ -191,6 +240,7 @@ def ingest(
                     output_tokens=extraction.output_tokens,
                     model=cfg.model,
                     snapshot_path=None,
+                    activity_id=None,
                 )
 
             promote = txn.promote_to_vault()
@@ -206,6 +256,7 @@ def ingest(
                 output_tokens=extraction.output_tokens,
                 model=cfg.model,
                 snapshot_path=promote.snapshot,
+                activity_id=activity_id,
             )
 
 
@@ -263,3 +314,25 @@ def _build_source_page(
 
 def _to_wikilink(rel: Path) -> str:
     return f"[[{rel.stem}]]"
+
+
+def _build_activity_entry(
+    *,
+    op_type: ActivityOperationType,
+    snapshot_target: Path,
+    vault_root: Path,
+    affected: list[str],
+    metadata: dict[str, object],
+    entry_id: str,
+) -> ActivityEntry:
+    snapshot_relative = snapshot_target.relative_to(vault_root).as_posix()
+    return ActivityEntry(
+        id=entry_id,
+        timestamp=datetime.now(UTC),
+        operation_type=op_type,
+        status="success",
+        snapshot_path=snapshot_relative,
+        can_undo=True,
+        affected_pages=affected,
+        metadata=metadata,
+    )
