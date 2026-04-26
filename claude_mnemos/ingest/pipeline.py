@@ -8,16 +8,15 @@ from pathlib import Path
 from typing import Literal
 
 from claude_mnemos.config import Config
-from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.core.locks import pipeline_lock
 from claude_mnemos.core.models import WikiPage, WikiPageFrontmatter
+from claude_mnemos.core.staging import StagingTransaction
 from claude_mnemos.ingest.extraction import ExtractionResult, extract_wiki_pages
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.transcript import TranscriptMessage, parse_jsonl
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 IngestStatus = Literal["extracted", "raw_only", "already_ingested", "dry_run"]
-
 Extractor = Callable[..., ExtractionResult]
 
 
@@ -32,6 +31,7 @@ class IngestResult:
     input_tokens: int | None = None
     output_tokens: int | None = None
     model: str | None = None
+    snapshot_path: Path | None = None
 
 
 def ingest(
@@ -45,19 +45,13 @@ def ingest(
     dry_run: bool = False,
     today: date,
 ) -> IngestResult:
-    """Full ingest pipeline.
+    """Full ingest pipeline. All vault writes go through StagingTransaction.
 
-    - Parse JSONL (raises EmptyTranscriptError before any side effects).
-    - Acquire pipeline lock.
-    - Compute SHA-256, check manifest -> no-op if seen.
-    - Write raw/chats/<sid>.md (plain).
-    - If `extract` and not dry_run: call extractor (LLM), write wiki pages, source page.
-    - Update and save manifest.
-
-    Pass `extractor` to inject a stub in tests; default uses real extract_wiki_pages.
-    Pass `llm_client=None` only when `extract=False` (no-llm path).
+    On success: snapshot created, files atomically moved into vault, manifest updated.
+    On failure mid-promote: vault restored from snapshot via StagingTransaction.
+    On dry_run or exception in `with` block: staging moved to .trash/rejected-...
     """
-    messages = parse_jsonl(jsonl_path)  # may raise EmptyTranscriptError
+    messages = parse_jsonl(jsonl_path)
     session_id = _resolve_session_id(messages, jsonl_path)
     raw_bytes = jsonl_path.read_bytes()
     sha = hashlib.sha256(raw_bytes).hexdigest()
@@ -80,16 +74,17 @@ def ingest(
                 model=existing.model,
                 input_tokens=existing.input_tokens,
                 output_tokens=existing.output_tokens,
+                snapshot_path=None,
             )
 
         raw_relative = Path("raw/chats") / f"{session_id}.md"
-        raw_target = vault_root / raw_relative
         raw_body = _render_raw_transcript(messages)
 
-        # No-LLM path: plain raw chat + manifest, done.
-        if not extract:
-            if not dry_run:
-                atomic_write(raw_target, raw_body)
+        with StagingTransaction(vault_root, operation_id=session_id) as txn:
+            txn.write(raw_relative, raw_body)
+
+            if not extract:
+                # No-LLM path
                 manifest.add(
                     sha,
                     IngestRecord(
@@ -104,105 +99,114 @@ def ingest(
                         output_tokens=None,
                     ),
                 )
-                manifest.save(vault_root)
-            return IngestResult(
-                status="raw_only" if not dry_run else "dry_run",
-                session_id=session_id,
-                raw_path=raw_target if not dry_run else None,
+                txn.write(Path(".manifest.json"), manifest.serialize_to_string())
+
+                if dry_run:
+                    txn.reject("dry-run (--no-llm)")
+                    return IngestResult(
+                        status="dry_run",
+                        session_id=session_id,
+                        raw_path=None,
+                        snapshot_path=None,
+                    )
+
+                promote = txn.promote_to_vault()
+                return IngestResult(
+                    status="raw_only",
+                    session_id=session_id,
+                    raw_path=vault_root / raw_relative,
+                    snapshot_path=promote.snapshot,
+                )
+
+            # LLM-extract path
+            if extractor is None:
+                raise ValueError("extractor cannot be None when extract=True")
+            if llm_client is None:
+                raise ValueError("llm_client cannot be None when extract=True")
+
+            extraction = extractor(
+                messages=messages, cfg=cfg, llm_client=llm_client, today=today
             )
 
-        # LLM extraction required from here on.
-        if extractor is None:
-            raise ValueError("extractor cannot be None when extract=True")
-        if llm_client is None:
-            raise ValueError("llm_client cannot be None when extract=True")
-
-        extraction = extractor(
-            messages=messages,
-            cfg=cfg,
-            llm_client=llm_client,
-            today=today,
-        )
-
-        # Build the source page (we generate this, not the LLM)
-        source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
-        source_page = _build_source_page(
-            session_id=session_id,
-            summary=extraction.summary,
-            skipped_reason=extraction.skipped_reason,
-            extracted_pages=extraction.pages,
-            today=today,
-            relative_path=source_relative,
-        )
-
-        # Detect collisions on extracted pages (LLM-generated; skip-with-warning is correct)
-        to_write: list[WikiPage] = []
-        skipped: list[str] = []
-        for p in extraction.pages:
-            if (vault_root / p.relative_path).exists():
-                skipped.append(p.relative_path.as_posix())
-            else:
-                to_write.append(p)
-
-        # Source page collision is a hard fail (we generate it, it's unique per session, manifest
-        # dedup should have caught a true repeat; collision means stale/manual file in the way).
-        source_target = vault_root / source_relative
-        if source_target.exists():
-            raise FileExistsError(
-                f"source page collision at {source_relative.as_posix()}: a file already exists. "
-                "This typically means a stale file from a previous manual edit. "
-                "Move or delete it before re-running."
+            source_relative = (
+                Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
             )
-        to_write.append(source_page)
-
-        if dry_run:
-            return IngestResult(
-                status="dry_run",
+            source_page = _build_source_page(
                 session_id=session_id,
-                raw_path=None,
-                source_path=None,
+                summary=extraction.summary,
+                skipped_reason=extraction.skipped_reason,
+                extracted_pages=extraction.pages,
+                today=today,
+                relative_path=source_relative,
+            )
+
+            # Source-page collision is HARD FAIL (per Plan #2 design)
+            source_target_in_vault = vault_root / source_relative
+            if source_target_in_vault.exists():
+                raise FileExistsError(
+                    f"source page collision at {source_relative.as_posix()}: "
+                    "a file already exists. This typically means a stale file from a "
+                    "previous manual edit. Move or delete it before re-running."
+                )
+
+            # Extracted pages: skip-with-warning on collision
+            to_write: list[WikiPage] = []
+            skipped: list[str] = []
+            for p in extraction.pages:
+                if (vault_root / p.relative_path).exists():
+                    skipped.append(p.relative_path.as_posix())
+                else:
+                    to_write.append(p)
+            to_write.append(source_page)
+
+            for p in to_write:
+                txn.write(p.relative_path, p.serialize())
+
+            manifest.add(
+                sha,
+                IngestRecord(
+                    session_id=session_id,
+                    ingested_at=datetime.now(UTC),
+                    raw_path=raw_relative.as_posix(),
+                    source_path=source_relative.as_posix(),
+                    created_pages=[p.relative_path.as_posix() for p in to_write],
+                    skipped_collisions=skipped,
+                    model=cfg.model,
+                    input_tokens=extraction.input_tokens,
+                    output_tokens=extraction.output_tokens,
+                ),
+            )
+            txn.write(Path(".manifest.json"), manifest.serialize_to_string())
+
+            if dry_run:
+                txn.reject("dry-run (--extract)")
+                return IngestResult(
+                    status="dry_run",
+                    session_id=session_id,
+                    raw_path=None,
+                    source_path=None,
+                    created_pages=[vault_root / p.relative_path for p in to_write],
+                    skipped_collisions=skipped,
+                    input_tokens=extraction.input_tokens,
+                    output_tokens=extraction.output_tokens,
+                    model=cfg.model,
+                    snapshot_path=None,
+                )
+
+            promote = txn.promote_to_vault()
+
+            return IngestResult(
+                status="extracted",
+                session_id=session_id,
+                raw_path=vault_root / raw_relative,
+                source_path=vault_root / source_relative,
                 created_pages=[vault_root / p.relative_path for p in to_write],
                 skipped_collisions=skipped,
                 input_tokens=extraction.input_tokens,
                 output_tokens=extraction.output_tokens,
                 model=cfg.model,
+                snapshot_path=promote.snapshot,
             )
-
-        # Real writes
-        atomic_write(raw_target, raw_body)
-        created_paths: list[Path] = []
-        for p in to_write:
-            target = vault_root / p.relative_path
-            atomic_write(target, p.serialize())
-            created_paths.append(target)
-
-        manifest.add(
-            sha,
-            IngestRecord(
-                session_id=session_id,
-                ingested_at=datetime.now(UTC),
-                raw_path=raw_relative.as_posix(),
-                source_path=source_relative.as_posix(),
-                created_pages=[p.relative_path.as_posix() for p in to_write],
-                skipped_collisions=skipped,
-                model=cfg.model,
-                input_tokens=extraction.input_tokens,
-                output_tokens=extraction.output_tokens,
-            ),
-        )
-        manifest.save(vault_root)
-
-        return IngestResult(
-            status="extracted",
-            session_id=session_id,
-            raw_path=raw_target,
-            source_path=vault_root / source_relative,
-            created_pages=created_paths,
-            skipped_collisions=skipped,
-            input_tokens=extraction.input_tokens,
-            output_tokens=extraction.output_tokens,
-            model=cfg.model,
-        )
 
 
 def _resolve_session_id(messages: list[TranscriptMessage], jsonl_path: Path) -> str:
