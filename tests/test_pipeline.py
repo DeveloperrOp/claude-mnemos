@@ -1,62 +1,254 @@
+import hashlib
+from datetime import date
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
-from claude_mnemos.ingest.pipeline import IngestResult, ingest_minimal
+from claude_mnemos.config import Config
+from claude_mnemos.core.models import (
+    WikiPage,
+    WikiPageFrontmatter,
+)
+from claude_mnemos.ingest.extraction import ExtractionResult
+from claude_mnemos.ingest.pipeline import ingest
+from claude_mnemos.state.manifest import MANIFEST_FILENAME, Manifest
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_session.jsonl"
+FIXED_TODAY = date(2026, 4, 26)
 
 
-def test_ingest_creates_source_page(tmp_path: Path):
+def _cfg() -> Config:
+    return Config(
+        api_key="sk-test",
+        model="claude-sonnet-4-6",
+        language_hint="auto",
+        max_input_tokens=150_000,
+        lock_timeout=60.0,
+    )
+
+
+def _stub_extraction(today: date) -> ExtractionResult:
+    fm = WikiPageFrontmatter(
+        title="FastAPI",
+        type="entity",
+        flavor=[],
+        confidence=0.8,
+        related=[],
+        created=today,
+        updated=today,
+    )
+    page = WikiPage(
+        relative_path=Path("wiki/entities/fastapi.md"),
+        frontmatter=fm,
+        body="FastAPI is a framework.",
+    )
+    return ExtractionResult(
+        summary="Talked about FastAPI.",
+        skipped_reason=None,
+        pages=[page],
+        input_tokens=1000,
+        output_tokens=200,
+    )
+
+
+def _stub_extractor():
+    """Returns a callable matching extract_wiki_pages signature."""
+    def _extract(*, messages, cfg, llm_client, today):  # noqa: ARG001
+        return _stub_extraction(today)
+    return _extract
+
+
+def test_ingest_writes_plain_raw_chat(tmp_path: Path):
     vault = tmp_path / "vault"
-    result = ingest_minimal(FIXTURE, vault)
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    raw = vault / "raw" / "chats" / "abc-123.md"
+    assert raw.exists()
+    text = raw.read_text(encoding="utf-8")
+    # Plain transcript: no YAML frontmatter
+    assert not text.startswith("---")
+    assert text.startswith("# Transcript")
+    assert "## user" in text
+    assert "Hello, what is 2+2?" in text
 
-    assert isinstance(result, IngestResult)
-    assert result.page_path.exists()
-    assert result.page_path.is_relative_to(vault)
-    assert result.page_path.name == "abc-123.md"
-    assert result.page_path.parent == vault / "raw" / "chats"
-    assert result.session_id == "abc-123"
-    assert result.message_count == 3
 
-
-def test_ingest_page_has_valid_frontmatter(tmp_path: Path):
+def test_ingest_writes_source_page(tmp_path: Path):
     vault = tmp_path / "vault"
-    result = ingest_minimal(FIXTURE, vault)
-    text = result.page_path.read_text(encoding="utf-8")
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    assert res.source_path is not None
+    assert res.source_path.name == "2026-04-26-abc-123.md"
+    assert res.source_path.parent == vault / "wiki" / "sources"
+    text = res.source_path.read_text(encoding="utf-8")
     assert text.startswith("---\n")
     assert "type: source" in text
-    assert "title: " in text
-    assert "Hello, what is 2+2?" in text  # body содержит транскрипт
-    assert "2+2 equals 4." in text
+    assert "Talked about FastAPI." in text  # summary in body
+    assert "[[wiki/entities/fastapi]]" in text
 
 
-def test_ingest_idempotent_overwrite(tmp_path: Path):
+def test_ingest_writes_extracted_pages(tmp_path: Path):
     vault = tmp_path / "vault"
-    first = ingest_minimal(FIXTURE, vault)
-    first_mtime = first.page_path.stat().st_mtime
-    second = ingest_minimal(FIXTURE, vault)
-    assert second.page_path == first.page_path
-    assert second.page_path.stat().st_mtime >= first_mtime
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    page = vault / "wiki" / "entities" / "fastapi.md"
+    assert page.exists()
+    assert "type: entity" in page.read_text(encoding="utf-8")
+    assert page.as_posix().endswith("wiki/entities/fastapi.md")
+    assert any("wiki/entities/fastapi.md" in p.as_posix() for p in res.created_pages)
+
+
+def test_ingest_creates_manifest_entry(tmp_path: Path):
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    m = Manifest.load(vault)
+    expected_sha = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    assert expected_sha in m.ingested
+    rec = m.ingested[expected_sha]
+    assert rec.session_id == "abc-123"
+    assert rec.source_path is not None
+    assert rec.input_tokens == 1000
+
+
+def test_ingest_idempotent_on_repeat(tmp_path: Path):
+    vault = tmp_path / "vault"
+    extractor = MagicMock(side_effect=_stub_extractor())
+
+    first = ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+    assert first.status == "extracted"
+
+    second = ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+    assert second.status == "already_ingested"
+    # Extractor called only once — second was a no-op
+    assert extractor.call_count == 1
+
+
+def test_ingest_dry_run_writes_nothing(tmp_path: Path):
+    vault = tmp_path / "vault"
+    extractor = MagicMock(side_effect=_stub_extractor())
+
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=extractor,
+        dry_run=True,
+        today=FIXED_TODAY,
+    )
+    assert res.status == "dry_run"
+    # Extractor was called (we exercise the prompt path)
+    assert extractor.call_count == 1
+    # No files written (vault dir itself may exist from mkdir, but no content)
+    assert not (vault / "raw").exists()
+    assert not (vault / "wiki").exists()
+    assert not (vault / MANIFEST_FILENAME).exists()
+
+
+def test_ingest_no_llm_writes_only_raw_and_manifest(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=None,
+        extractor=None,
+        extract=False,
+        today=FIXED_TODAY,
+    )
+    assert res.status == "raw_only"
+    assert res.source_path is None
+    assert (vault / "raw" / "chats" / "abc-123.md").exists()
+    assert not (vault / "wiki").exists()
+
+    m = Manifest.load(vault)
+    sha = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    assert m.ingested[sha].source_path is None
+    assert m.ingested[sha].model is None
+
+
+def test_ingest_skips_existing_extracted_page(tmp_path: Path):
+    vault = tmp_path / "vault"
+    # Pre-create the file the stub extractor wants to write
+    target = vault / "wiki" / "entities" / "fastapi.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("---\ntitle: existing\n---\nbody", encoding="utf-8")
+
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    # Existing file is preserved
+    assert "existing" in target.read_text(encoding="utf-8")
+    # And it's reported as a collision
+    assert any("wiki/entities/fastapi.md" in p for p in res.skipped_collisions)
 
 
 def test_ingest_under_lock_blocks_concurrent(tmp_path: Path):
-    # Если в этом vault уже стоит pipeline lock — ingest_minimal падает с LockTimeoutError.
     from claude_mnemos.core.locks import LockTimeoutError, pipeline_lock
 
     vault = tmp_path / "vault"
     vault.mkdir()
+    cfg = _cfg().with_overrides(lock_timeout=0.2)
     with pipeline_lock(vault, timeout=1.0), pytest.raises(LockTimeoutError):
-        ingest_minimal(FIXTURE, vault, lock_timeout=0.2)
+        ingest(
+            FIXTURE,
+            vault,
+            cfg=cfg,
+            llm_client=MagicMock(),
+            extractor=_stub_extractor(),
+            today=FIXED_TODAY,
+        )
 
 
-def test_ingest_empty_jsonl_does_not_create_page(tmp_path: Path):
+def test_ingest_empty_jsonl_does_not_create_vault(tmp_path: Path):
     from claude_mnemos.ingest.transcript import EmptyTranscriptError
 
     vault = tmp_path / "vault"
     empty = tmp_path / "empty.jsonl"
     empty.write_text("", encoding="utf-8")
     with pytest.raises(EmptyTranscriptError):
-        ingest_minimal(empty, vault)
-    # Vault dir не должен быть создан вообще — parse falls before mkdir.
+        ingest(
+            empty,
+            vault,
+            cfg=_cfg(),
+            llm_client=MagicMock(),
+            extractor=_stub_extractor(),
+            today=FIXED_TODAY,
+        )
     assert not vault.exists()
