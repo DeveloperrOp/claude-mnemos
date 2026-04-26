@@ -17,7 +17,7 @@ def pipeline_lock(lock_dir: Path, timeout: float = 60.0) -> Generator[Path, None
     """
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / ".pipeline.lock"
-    lock = FileLock(str(lock_path), timeout=timeout)
+    lock = FileLock(lock_path, timeout=timeout)
     try:
         lock.acquire()
     except Timeout as exc:

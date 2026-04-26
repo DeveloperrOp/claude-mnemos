@@ -30,8 +30,9 @@ def test_lock_timeout_raises(tmp_path: Path):
     assert holder_started.wait(timeout=1.0)
 
     try:
-        with pytest.raises(LockTimeoutError), pipeline_lock(lock_dir, timeout=0.2):
-            pass
+        with pytest.raises(LockTimeoutError):  # noqa: SIM117
+            with pipeline_lock(lock_dir, timeout=0.2):
+                pass
     finally:
         holder_done.set()
         thread.join(timeout=2.0)
