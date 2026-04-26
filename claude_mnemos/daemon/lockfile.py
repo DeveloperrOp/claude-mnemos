@@ -5,6 +5,16 @@ from pathlib import Path
 import psutil
 
 DAEMON_CMDLINE_MARKER = "claude_mnemos.daemon"
+DAEMON_CMDLINE_MARKER_CLI = ("mnemos", "daemon")
+
+
+def _cmdline_matches_daemon(cmdline: str) -> bool:
+    """Match either `python -m claude_mnemos.daemon ...` (start subprocess)
+    or `mnemos daemon foreground/run ...` (CLI entrypoint).
+    """
+    if DAEMON_CMDLINE_MARKER in cmdline:
+        return True
+    return all(token in cmdline for token in DAEMON_CMDLINE_MARKER_CLI)
 
 
 def is_daemon_running(pid_file: Path) -> int | None:
@@ -33,7 +43,7 @@ def is_daemon_running(pid_file: Path) -> int | None:
     try:
         proc = psutil.Process(pid)
         cmdline = " ".join(proc.cmdline())
-        if DAEMON_CMDLINE_MARKER not in cmdline:
+        if not _cmdline_matches_daemon(cmdline):
             cleanup_pid_file(pid_file)
             return None
     except (psutil.NoSuchProcess, psutil.AccessDenied):

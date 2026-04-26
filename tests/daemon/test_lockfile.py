@@ -131,3 +131,46 @@ def test_pytest_ensures_psutil_installed():
     assert hasattr(psutil, "Process")
     # ensure pytest module imported (used by other tests)
     _ = pytest
+
+
+def test_pid_alive_with_mnemos_cli_marker_returns_pid(tmp_path: Path, monkeypatch):
+    """`mnemos daemon foreground` cmdline doesn't contain `claude_mnemos.daemon`
+    but does contain both `mnemos` and `daemon` tokens — must match.
+    """
+    pf = tmp_path / "daemon.pid"
+    pf.write_text("4242", encoding="utf-8")
+    monkeypatch.setattr(psutil, "pid_exists", lambda _pid: True)
+
+    class FakeProc:
+        def __init__(self, pid):
+            self._pid = pid
+
+        def cmdline(self):
+            return [
+                "C:\\Users\\u\\.venv\\Scripts\\mnemos.exe",
+                "daemon",
+                "foreground",
+                "--vault",
+                "C:\\tmp\\v",
+            ]
+
+    monkeypatch.setattr(psutil, "Process", FakeProc)
+    assert is_daemon_running(pf) == 4242
+
+
+def test_pid_alive_partial_marker_rejected(tmp_path: Path, monkeypatch):
+    """cmdline with only `mnemos` (no `daemon`) — reject as PID reuse."""
+    pf = tmp_path / "daemon.pid"
+    pf.write_text("777", encoding="utf-8")
+    monkeypatch.setattr(psutil, "pid_exists", lambda _pid: True)
+
+    class FakeProc:
+        def __init__(self, pid):
+            self._pid = pid
+
+        def cmdline(self):
+            return ["python", "mnemos", "ingest", "x.jsonl", "vault"]
+
+    monkeypatch.setattr(psutil, "Process", FakeProc)
+    assert is_daemon_running(pf) is None
+    assert not pf.exists()
