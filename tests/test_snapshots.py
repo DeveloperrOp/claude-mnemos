@@ -269,3 +269,16 @@ def test_create_snapshot_delegates_to_create_snapshot_at(tmp_path: Path):
     assert snap.name.startswith("pre-op-")
     assert snap.name.endswith("-abc")
     assert (snap / ".meta.json").exists()
+
+
+def test_compute_snapshot_path_format(tmp_path: Path):
+    """Single source of truth for snapshot path format."""
+    from claude_mnemos.core.snapshots import compute_snapshot_path
+
+    vault = tmp_path / "vault"
+    path = compute_snapshot_path(vault, operation_id="abc-123", operation_type="ingest")
+
+    assert path.parent == vault / ".backups"
+    assert path.name.startswith("pre-op-")
+    assert "-ingest-" in path.name
+    assert path.name.endswith("-abc-123")

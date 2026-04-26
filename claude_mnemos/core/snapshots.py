@@ -44,6 +44,23 @@ def _timestamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
 
 
+def compute_snapshot_path(
+    vault: Path,
+    *,
+    operation_id: str,
+    operation_type: str,
+) -> Path:
+    """Compute the snapshot directory path for the current UTC moment.
+
+    Single source of truth for the snapshot path format.
+    Used by both create_snapshot (auto-compute) and StagingTransaction
+    (lock-in before promote).
+    """
+    ts = _timestamp()
+    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
+    return vault / SNAPSHOTS_DIRNAME / snap_name
+
+
 def _ignore_internal(directory: str, names: list[str]) -> set[str]:
     return {n for n in names if n in _EXCLUDED_DIRS or n in _EXCLUDED_FILES}
 
@@ -121,9 +138,9 @@ def create_snapshot(
     operation_type: str,
 ) -> Path:
     """Create a snapshot with auto-generated UTC timestamp in the path."""
-    ts = _timestamp()
-    snap_name = f"pre-op-{ts}-{operation_type}-{operation_id}"
-    snap_path = vault / SNAPSHOTS_DIRNAME / snap_name
+    snap_path = compute_snapshot_path(
+        vault, operation_id=operation_id, operation_type=operation_type
+    )
     return create_snapshot_at(
         vault, snap_path, operation_id=operation_id, operation_type=operation_type
     )

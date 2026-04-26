@@ -149,7 +149,9 @@ def test_undo_success_marks_entry_undone(tmp_path: Path):
     assert new_entry.operation_type == "manual_restore"
     assert new_entry.can_undo is False
     assert new_entry.snapshot_path is None
+    assert new_entry.affected_pages == []
     assert new_entry.metadata["undone_id"] == op_id
+    assert new_entry.metadata["reverted_pages"] == ["wiki/entities/foo.md"]
 
 
 def test_undo_restore_failure_raises_with_recovery_hint(tmp_path: Path):

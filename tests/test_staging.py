@@ -223,3 +223,14 @@ def test_promote_without_pre_promote_call_still_works(tmp_path: Path):
         assert result.snapshot is not None
         assert result.snapshot.parent == vault / ".backups"
         assert result.snapshot.name.endswith("-ingest-op-3")
+
+
+def test_pre_promote_snapshot_path_after_promote_raises(tmp_path: Path):
+    """Post-finalize calls to pre_promote_snapshot_path are programming errors."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    with StagingTransaction(vault, operation_id="op-x") as txn:
+        txn.write(Path("a.md"), "x")
+        txn.promote_to_vault()
+        with pytest.raises(RuntimeError, match="finalized"):
+            txn.pre_promote_snapshot_path()

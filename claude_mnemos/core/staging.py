@@ -9,7 +9,12 @@ from types import TracebackType
 from typing import Literal
 
 from claude_mnemos.core.atomic import atomic_write  # noqa: F401  (kept for tests)
-from claude_mnemos.core.snapshots import create_snapshot, restore_from_snapshot
+from claude_mnemos.core.snapshots import (
+    compute_snapshot_path,
+    create_snapshot,
+    create_snapshot_at,
+    restore_from_snapshot,
+)
 
 STAGING_DIRNAME = ".staging"
 TRASH_DIRNAME = ".trash"
@@ -79,18 +84,19 @@ class StagingTransaction:
     def pre_promote_snapshot_path(self) -> Path:
         """Lock in and return the snapshot path that promote_to_vault will use.
 
-        First call computes the path from current UTC time + op_id + op_type.
-        Subsequent calls return the same path. promote_to_vault re-uses it.
-
-        Used by callers (e.g. pipeline) that need to write the snapshot path
-        into a staged file (e.g. activity log entry) BEFORE the snapshot
-        is actually created.
+        First call computes the path; subsequent calls return the same path.
+        After finalize (promoted or rejected), raises RuntimeError.
         """
+        if self._promoted or self._rejected:
+            raise RuntimeError(
+                "StagingTransaction is finalized; cannot lock snapshot path"
+            )
         if self._locked_snapshot_path is None:
-            from claude_mnemos.core.snapshots import SNAPSHOTS_DIRNAME, _timestamp
-            ts = _timestamp()
-            snap_name = f"pre-op-{ts}-{self.operation_type}-{self.operation_id}"
-            self._locked_snapshot_path = self.vault / SNAPSHOTS_DIRNAME / snap_name
+            self._locked_snapshot_path = compute_snapshot_path(
+                self.vault,
+                operation_id=self.operation_id,
+                operation_type=self.operation_type,
+            )
         return self._locked_snapshot_path
 
     def write(self, relative_path: Path, content: str) -> None:
@@ -118,7 +124,6 @@ class StagingTransaction:
         # entries written into staging reference the correct snapshot.
         try:
             if self._locked_snapshot_path is not None:
-                from claude_mnemos.core.snapshots import create_snapshot_at
                 snapshot = create_snapshot_at(
                     self.vault,
                     self._locked_snapshot_path,

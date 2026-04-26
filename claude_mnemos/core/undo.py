@@ -114,8 +114,11 @@ def undo(
             status="success",
             snapshot_path=None,
             can_undo=False,
-            affected_pages=list(original.affected_pages),
-            metadata={"undone_id": original.id},
+            affected_pages=[],
+            metadata={
+                "undone_id": original.id,
+                "reverted_pages": list(original.affected_pages),
+            },
         )
         log.append(manual_restore_entry)
         log.save(vault_root)
