@@ -96,7 +96,7 @@ def test_ingest_writes_source_page(tmp_path: Path):
     assert text.startswith("---\n")
     assert "type: source" in text
     assert "Talked about FastAPI." in text  # summary in body
-    assert "[[wiki/entities/fastapi]]" in text
+    assert "[[fastapi]]" in text
 
 
 def test_ingest_writes_extracted_pages(tmp_path: Path):
@@ -257,6 +257,26 @@ def test_ingest_source_page_collision_hard_fails(tmp_path: Path):
     assert "stale" in target.read_text(encoding="utf-8")
     # Manifest must NOT contain a record for this sha (we failed before saving)
     assert not (vault / ".manifest.json").exists()
+
+
+def test_ingest_source_page_wikilinks_use_shortest_slug(tmp_path: Path):
+    """Source page wikilinks must match the shortest-slug style used by LLM-extracted pages."""
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    text = res.source_path.read_text(encoding="utf-8")
+    # Stem-style:
+    assert "[[fastapi]]" in text
+    # Old full-path style must be gone:
+    assert "[[wiki/entities/fastapi]]" not in text
+    # Backlink to raw uses session_id stem with alias:
+    assert "[[abc-123|Open transcript]]" in text
 
 
 def test_ingest_empty_jsonl_does_not_create_vault(tmp_path: Path):

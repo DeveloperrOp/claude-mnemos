@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -43,7 +43,7 @@ def ingest(
     extractor: Extractor | None = extract_wiki_pages,
     extract: bool = True,
     dry_run: bool = False,
-    today: date | None = None,
+    today: date,
 ) -> IngestResult:
     """Full ingest pipeline.
 
@@ -59,7 +59,6 @@ def ingest(
     """
     messages = parse_jsonl(jsonl_path)  # may raise EmptyTranscriptError
     session_id = _resolve_session_id(messages, jsonl_path)
-    today_d = today or date.today()
     raw_bytes = jsonl_path.read_bytes()
     sha = hashlib.sha256(raw_bytes).hexdigest()
 
@@ -95,7 +94,7 @@ def ingest(
                     sha,
                     IngestRecord(
                         session_id=session_id,
-                        ingested_at=datetime.now(),
+                        ingested_at=datetime.now(UTC),
                         raw_path=raw_relative.as_posix(),
                         source_path=None,
                         created_pages=[raw_relative.as_posix()],
@@ -122,17 +121,17 @@ def ingest(
             messages=messages,
             cfg=cfg,
             llm_client=llm_client,
-            today=today_d,
+            today=today,
         )
 
         # Build the source page (we generate this, not the LLM)
-        source_relative = Path("wiki/sources") / f"{today_d.isoformat()}-{session_id}.md"
+        source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
         source_page = _build_source_page(
             session_id=session_id,
             summary=extraction.summary,
             skipped_reason=extraction.skipped_reason,
             extracted_pages=extraction.pages,
-            today=today_d,
+            today=today,
             relative_path=source_relative,
         )
 
@@ -181,7 +180,7 @@ def ingest(
             sha,
             IngestRecord(
                 session_id=session_id,
-                ingested_at=datetime.now(),
+                ingested_at=datetime.now(UTC),
                 raw_path=raw_relative.as_posix(),
                 source_path=source_relative.as_posix(),
                 created_pages=[p.relative_path.as_posix() for p in to_write],
@@ -243,7 +242,7 @@ def _build_source_page(
         for p in extracted_pages:
             body_lines.append(f"- {_to_wikilink(p.relative_path)}")
         body_lines.append("")
-    body_lines.extend(["## Original", "", f"[[raw/chats/{session_id}|Open transcript]]"])
+    body_lines.extend(["## Original", "", f"[[{session_id}|Open transcript]]"])
     body = "\n".join(body_lines)
 
     fm = WikiPageFrontmatter(
@@ -259,4 +258,4 @@ def _build_source_page(
 
 
 def _to_wikilink(rel: Path) -> str:
-    return f"[[{rel.with_suffix('').as_posix()}]]"
+    return f"[[{rel.stem}]]"

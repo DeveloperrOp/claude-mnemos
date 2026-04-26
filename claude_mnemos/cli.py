@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 from pathlib import Path
 
 from claude_mnemos.config import Config, UnknownLanguageHintError
@@ -70,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
     except UnknownLanguageHintError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    except ValueError as exc:
+        print(f"error: invalid env config: {exc}", file=sys.stderr)
+        return 2
 
     extract = not args.no_llm
     llm_client: LLMClient | None = None
@@ -85,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
             llm_client=llm_client,
             extract=extract,
             dry_run=args.dry_run,
+            today=date.today(),
         )
     except EmptyTranscriptError as exc:
         print(f"error: empty transcript: {exc}", file=sys.stderr)
