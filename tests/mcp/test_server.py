@@ -43,7 +43,7 @@ def test_tool_defs_count_and_names():
         "restore_snapshot",
         "delete_snapshot",
     }
-    assert TOOL_NAMES == expected
+    assert expected == TOOL_NAMES
     assert READ_TOOL_NAMES.isdisjoint(WRITE_TOOL_NAMES)
 
 
