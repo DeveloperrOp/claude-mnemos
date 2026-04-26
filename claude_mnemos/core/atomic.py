@@ -24,6 +24,11 @@ def atomic_write(
     os.replace raises PermissionError (typical antivirus/indexer race).
 
     Spec: section 7.3 (Layer 3).
+
+    Note: a SIGKILL or hard process crash will leave an orphan `.tmp` file
+    (the `finally` block cannot run). Per spec §7.3 this is acceptable — the
+    orphan stays as inert cruft and will be overwritten on the next write to
+    the same target if a name collision occurs.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f"{target.name}.{uuid.uuid4().hex}.tmp")

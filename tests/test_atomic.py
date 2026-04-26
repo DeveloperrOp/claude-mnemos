@@ -27,7 +27,7 @@ def test_atomic_write_no_partial_file_on_crash(tmp_path: Path, monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("simulated crash mid-write")
 
-    monkeypatch.setattr("os.replace", boom)
+    monkeypatch.setattr("claude_mnemos.core.atomic.os.replace", boom)
     with pytest.raises(RuntimeError):
         atomic_write(target, "new content")
 
