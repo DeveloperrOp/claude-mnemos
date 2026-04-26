@@ -8,6 +8,7 @@ from pathlib import Path
 from claude_mnemos.config import Config, UnknownLanguageHintError
 from claude_mnemos.core.atomic import FileBusyError
 from claude_mnemos.core.locks import LockTimeoutError
+from claude_mnemos.core.staging import StagingPromoteError
 from claude_mnemos.ingest.llm import (
     LLMClient,
     LLMExtractionError,
@@ -115,6 +116,9 @@ def main(argv: list[str] | None = None) -> int:
     except FileExistsError as exc:
         print(f"error: source page collision: {exc}", file=sys.stderr)
         return 73  # EX_CANTCREAT — same family as LockTimeoutError
+    except StagingPromoteError as exc:
+        print(f"error: staging promote failed: {exc}", file=sys.stderr)
+        return 76
 
     if result.status == "already_ingested":
         print(f"already_ingested: session_id={result.session_id}")
@@ -127,12 +131,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if result.status == "raw_only":
         print(f"raw_only: wrote {result.raw_path}")
+        if result.snapshot_path is not None:
+            print(f"snapshot: {result.snapshot_path}")
         return 0
     print(
         f"extracted: session_id={result.session_id} "
         f"pages={len(result.created_pages)} skipped={len(result.skipped_collisions)} "
         f"tokens_in={result.input_tokens} tokens_out={result.output_tokens}"
     )
+    if result.snapshot_path is not None:
+        print(f"snapshot: {result.snapshot_path}")
     return 0
 
 

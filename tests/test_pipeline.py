@@ -295,3 +295,127 @@ def test_ingest_empty_jsonl_does_not_create_vault(tmp_path: Path):
             today=FIXED_TODAY,
         )
     assert not vault.exists()
+
+
+def test_ingest_extracted_returns_snapshot_path(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    assert res.snapshot_path is not None
+    assert res.snapshot_path.exists()
+    assert res.snapshot_path.is_dir()
+    assert res.snapshot_path.parent == vault / ".backups"
+
+
+def test_ingest_no_llm_returns_snapshot_path(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=None,
+        extractor=None,
+        extract=False,
+        today=FIXED_TODAY,
+    )
+    assert res.snapshot_path is not None
+    assert res.snapshot_path.exists()
+
+
+def test_ingest_dry_run_no_snapshot(tmp_path: Path):
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        dry_run=True,
+        today=FIXED_TODAY,
+    )
+    assert res.snapshot_path is None
+    # Dry run rejects staging → goes to .trash
+    rejected = list((vault / ".trash").glob("rejected-abc-123-*"))
+    assert len(rejected) == 1
+
+
+def test_ingest_already_ingested_no_snapshot(tmp_path: Path):
+    vault = tmp_path / "vault"
+    extractor = MagicMock(side_effect=_stub_extractor())
+    first = ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+    assert first.snapshot_path is not None
+
+    second = ingest(
+        FIXTURE, vault, cfg=_cfg(), llm_client=MagicMock(), extractor=extractor,
+        today=FIXED_TODAY,
+    )
+    assert second.status == "already_ingested"
+    assert second.snapshot_path is None  # no new snapshot for no-op
+
+
+def test_ingest_cleans_up_staging_on_success(tmp_path: Path):
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    # .staging/ должен быть либо удалён целиком, либо пуст
+    staging = vault / ".staging"
+    if staging.exists():
+        assert list(staging.iterdir()) == []
+
+
+def test_ingest_promote_failure_restores_vault(tmp_path: Path, monkeypatch):
+    vault = tmp_path / "vault"
+    # Pre-populate vault with one extracted page
+    vault.mkdir()
+    (vault / "wiki" / "concepts").mkdir(parents=True)
+    (vault / "wiki" / "concepts" / "preserved.md").write_text("survives", encoding="utf-8")
+
+    import shutil as _shutil
+    real_move = _shutil.move
+    calls = {"n": 0}
+
+    def flaky_move(src, dst, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] >= 2:
+            raise OSError("simulated mid-promote failure")
+        return real_move(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("claude_mnemos.core.staging.shutil.move", flaky_move)
+
+    from claude_mnemos.core.staging import StagingPromoteError
+
+    with pytest.raises(StagingPromoteError):
+        ingest(
+            FIXTURE,
+            vault,
+            cfg=_cfg(),
+            llm_client=MagicMock(),
+            extractor=_stub_extractor(),
+            today=FIXED_TODAY,
+        )
+
+    # Pre-existing file must survive
+    assert (vault / "wiki" / "concepts" / "preserved.md").read_text(encoding="utf-8") == "survives"
+    # No partially-written ingest pages in vault
+    assert not (vault / "raw" / "chats" / "abc-123.md").exists()
+    assert not (vault / "wiki" / "entities" / "fastapi.md").exists()
+    # Manifest must NOT be updated (we rolled back)
+    if (vault / ".manifest.json").exists():
+        import json as _json
+        m = _json.loads((vault / ".manifest.json").read_text(encoding="utf-8"))
+        assert m["ingested"] == {}

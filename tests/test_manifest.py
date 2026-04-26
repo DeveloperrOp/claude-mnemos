@@ -111,3 +111,30 @@ def test_record_with_none_for_no_llm_path(tmp_path: Path):
     loaded = Manifest.load(tmp_path)
     assert loaded.ingested["sha-x"].source_path is None
     assert loaded.ingested["sha-x"].model is None
+
+
+def test_serialize_to_string_matches_save_output(tmp_path: Path):
+    """serialize_to_string() must produce identical bytes to save() writes to disk."""
+    m = Manifest()
+    m.add("sha-x", _record("sid-x"))
+
+    serialized = m.serialize_to_string()
+
+    m.save(tmp_path)
+    on_disk = (tmp_path / ".manifest.json").read_text(encoding="utf-8")
+
+    assert serialized == on_disk
+
+
+def test_serialize_to_string_roundtrip_via_model_validate_json():
+    import json as _json
+
+    m = Manifest()
+    m.add("sha-y", _record("sid-y"))
+
+    out = m.serialize_to_string()
+    parsed = _json.loads(out)
+    reloaded = Manifest.model_validate(parsed)
+
+    assert "sha-y" in reloaded.ingested
+    assert reloaded.ingested["sha-y"].session_id == "sid-y"

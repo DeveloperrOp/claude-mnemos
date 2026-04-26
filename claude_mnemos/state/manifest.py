@@ -54,15 +54,24 @@ class Manifest(BaseModel):
                 f"manifest at {path} fails schema: {exc}"
             ) from exc
 
+    def serialize_to_string(self) -> str:
+        """Serialize manifest to the exact JSON string we'd write to disk.
+
+        Used by pipeline to put manifest content into the staging area before promote.
+        """
+        return (
+            json.dumps(
+                self.model_dump(mode="json"),
+                indent=2,
+                ensure_ascii=False,
+                sort_keys=False,
+            )
+            + "\n"
+        )
+
     def save(self, vault_root: Path) -> None:
         path = vault_root / MANIFEST_FILENAME
-        payload = json.dumps(
-            self.model_dump(mode="json"),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=False,
-        )
-        atomic_write(path, payload + "\n")
+        atomic_write(path, self.serialize_to_string())
 
     def add(self, sha: str, record: IngestRecord) -> None:
         if sha in self.ingested:
