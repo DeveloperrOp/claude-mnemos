@@ -20,6 +20,7 @@ from claude_mnemos.daemon.routes.dead_letter import router as dead_letter_router
 from claude_mnemos.daemon.routes.health import router as health_router
 from claude_mnemos.daemon.routes.jobs import router as jobs_router
 from claude_mnemos.daemon.routes.lint import router as lint_router
+from claude_mnemos.daemon.routes.lost_sessions import router as lost_sessions_router
 from claude_mnemos.daemon.routes.ontology import router as ontology_router
 from claude_mnemos.daemon.routes.pages import router as pages_router
 from claude_mnemos.daemon.routes.sessions import router as sessions_router
@@ -50,6 +51,7 @@ def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
     app.include_router(pages_router)
     app.include_router(trash_router)
     app.include_router(sessions_router)
+    app.include_router(lost_sessions_router)
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:
