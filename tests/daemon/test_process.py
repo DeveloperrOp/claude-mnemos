@@ -79,3 +79,51 @@ def test_start_observer_then_stop(daemon: MnemosDaemon, tmp_path: Path):
     assert daemon.observer.is_running
     daemon._stop_observer()
     assert daemon.observer is None
+
+
+# Plan #11 — jobs subsystem wiring
+
+
+def test_daemon_initializes_jobs_subsystem(daemon: MnemosDaemon):
+    from claude_mnemos.state.jobs import JobStore
+
+    assert isinstance(daemon.job_store, JobStore)
+    assert daemon.job_worker is None  # not started yet
+
+
+async def test_daemon_recovery_runs_on_start(
+    daemon: MnemosDaemon, monkeypatch: pytest.MonkeyPatch
+):
+    from claude_mnemos.state.jobs import RecoveryResult
+
+    calls: list[bool] = []
+    real_recover = daemon.job_store.recover_zombie_running
+
+    def spy() -> RecoveryResult:
+        calls.append(True)
+        return real_recover()
+
+    monkeypatch.setattr(daemon.job_store, "recover_zombie_running", spy)
+    await daemon._start_jobs_subsystem()
+    try:
+        assert calls == [True]
+        assert daemon.job_worker is not None
+    finally:
+        await daemon._stop_jobs_subsystem()
+
+
+async def test_daemon_jobs_subsystem_failure_is_alert(
+    daemon: MnemosDaemon, monkeypatch: pytest.MonkeyPatch
+):
+    """If JobWorker.start raises, daemon logs alert and continues."""
+
+    async def boom(self):  # noqa: ANN001
+        raise RuntimeError("worker boom")
+
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.jobs.worker.JobWorker.start", boom
+    )
+    await daemon._start_jobs_subsystem()
+    items = daemon.alerts.list()
+    assert any(a.kind == "handler_error" for a in items)
+    await daemon._stop_jobs_subsystem()
