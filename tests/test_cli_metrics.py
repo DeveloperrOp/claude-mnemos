@@ -97,7 +97,7 @@ def test_main_metrics_usage_empty(tmp_path: Path, capsys) -> None:
     assert "period_days: 30" in out
     assert "sessions_covered: 0" in out
     assert "tokens_input: 0" in out
-    assert "compression_ratio: —" in out
+    assert "tokens_per_byte: —" in out
 
 
 def test_main_metrics_usage_with_seeded_manifest(tmp_path: Path, capsys) -> None:

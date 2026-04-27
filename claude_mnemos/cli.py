@@ -1618,12 +1618,12 @@ def _cmd_metrics_usage(args: argparse.Namespace) -> int:
     print(f"tokens_output: {summary.tokens_output}")
     print(f"tokens_injected: {summary.tokens_injected}")
     print(f"raw_bytes_total: {summary.raw_bytes_total}")
-    cr = (
-        f"{summary.compression_ratio:.6f}"
-        if summary.compression_ratio is not None
+    tpb = (
+        f"{summary.tokens_per_byte:.6f}"
+        if summary.tokens_per_byte is not None
         else "—"
     )
-    print(f"compression_ratio: {cr}")
+    print(f"tokens_per_byte: {tpb}")
     return 0
 
 

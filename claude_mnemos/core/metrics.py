@@ -13,10 +13,12 @@ count toward ``sessions_covered`` and per-day session counts. Records with
 ``usage_summary``/``timeline`` (but appear in ``top_sessions``, which is
 window-agnostic by design — top sessions of all time).
 
-``compression_ratio`` is computed as ``tokens_output / raw_bytes_total`` and
-is ``None`` whenever the denominator is zero (no raw bytes recorded). The
-ratio is a rough proxy per design doc §3.4 — Plan #13c may revisit once
-adaptive context lands.
+``tokens_per_byte`` is computed as ``tokens_output / raw_bytes_total`` and
+is ``None`` whenever the denominator is zero (no raw bytes recorded). It
+expresses how many emitted tokens we get per byte of raw transcript — a
+rough proxy for ingest density per design doc §3.4. NOT the spec §15
+``compression_ratio`` (which compares full vs adaptive token counts and
+will land in Plan #13c).
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ class UsageSummary(BaseModel):
     tokens_output: int
     tokens_injected: int
     raw_bytes_total: int
-    compression_ratio: float | None
+    tokens_per_byte: float | None
 
 
 class SessionMetric(BaseModel):
@@ -90,7 +92,7 @@ def usage_summary(
             to keep results deterministic.
 
     Returns:
-        :class:`UsageSummary` with per-window totals and compression ratio.
+        :class:`UsageSummary` with per-window totals and tokens-per-byte ratio.
     """
     today = today or date_class.today()
     cutoff = today - timedelta(days=period_days)
@@ -102,7 +104,10 @@ def usage_summary(
     tokens_output = sum((rec.output_tokens or 0) for rec in records)
     raw_bytes_total = sum((rec.raw_transcript_bytes or 0) for rec in records)
 
-    compression_ratio: float | None = (
+    # tokens emitted per byte of raw transcript — proxy for ingest density.
+    # NOT the spec §15 compression_ratio (which compares full vs adaptive
+    # token counts; lands in Plan #13c).
+    tokens_per_byte: float | None = (
         tokens_output / raw_bytes_total if raw_bytes_total > 0 else None
     )
 
@@ -113,7 +118,7 @@ def usage_summary(
         tokens_output=tokens_output,
         tokens_injected=tokens_input + tokens_output,
         raw_bytes_total=raw_bytes_total,
-        compression_ratio=compression_ratio,
+        tokens_per_byte=tokens_per_byte,
     )
 
 

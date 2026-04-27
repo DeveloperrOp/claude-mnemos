@@ -53,7 +53,7 @@ def test_usage_summary_empty_manifest_returns_all_zero(tmp_path: Path) -> None:
     assert summary.tokens_output == 0
     assert summary.tokens_injected == 0
     assert summary.raw_bytes_total == 0
-    assert summary.compression_ratio is None
+    assert summary.tokens_per_byte is None
 
 
 def test_usage_summary_sums_three_records_with_mixed_none_tokens(
@@ -101,8 +101,8 @@ def test_usage_summary_sums_three_records_with_mixed_none_tokens(
     assert summary.tokens_output == 250  # 200 + 50 + 0
     assert summary.tokens_injected == 360
     assert summary.raw_bytes_total == 1500  # 1000 + 500 + 0
-    assert summary.compression_ratio is not None
-    assert summary.compression_ratio == 250 / 1500
+    assert summary.tokens_per_byte is not None
+    assert summary.tokens_per_byte == 250 / 1500
 
 
 def test_usage_summary_period_days_filter_excludes_old_entries(
@@ -142,7 +142,7 @@ def test_usage_summary_period_days_filter_excludes_old_entries(
     assert summary.raw_bytes_total == 100
 
 
-def test_usage_summary_compression_ratio_none_when_raw_bytes_zero(
+def test_usage_summary_tokens_per_byte_none_when_raw_bytes_zero(
     tmp_path: Path,
 ) -> None:
     today = date(2026, 4, 27)
@@ -161,7 +161,7 @@ def test_usage_summary_compression_ratio_none_when_raw_bytes_zero(
 
     summary = usage_summary(tmp_path, period_days=30, today=today)
     assert summary.raw_bytes_total == 0
-    assert summary.compression_ratio is None
+    assert summary.tokens_per_byte is None
 
 
 # ---------------------------------------------------------------------------
