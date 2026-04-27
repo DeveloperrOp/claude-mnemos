@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LintSeverity(StrEnum):
@@ -33,6 +33,14 @@ class LintFinding(BaseModel):
     fix_kind: LintFixKind | None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _check_fix_kind_invariant(self) -> LintFinding:
+        if self.fixable and self.fix_kind is None:
+            raise ValueError("fix_kind is required when fixable=True")
+        if not self.fixable and self.fix_kind is not None:
+            raise ValueError("fix_kind must be None when fixable=False")
+        return self
+
 
 class LintReportSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -52,5 +60,5 @@ class LintReport(BaseModel):
     finished_at: datetime
     vault_root: str
     rule_versions: dict[str, str] = Field(default_factory=dict)
-    findings: list[LintFinding] = Field(default_factory=list)
     summary: LintReportSummary
+    findings: list[LintFinding] = Field(default_factory=list)

@@ -94,3 +94,29 @@ def test_report_round_trip_json():
     reloaded = LintReport.model_validate_json(raw)
     assert reloaded.run_id == "abc123"
     assert reloaded.findings[0].rule_id == "orphan_pages"
+
+
+def test_finding_rejects_fixable_true_without_fix_kind():
+    with pytest.raises(ValidationError):
+        LintFinding(
+            id="x",
+            rule_id="x",
+            severity=LintSeverity.WARNING,
+            message="m",
+            page_path="p.md",
+            fixable=True,
+            fix_kind=None,
+        )
+
+
+def test_finding_rejects_fix_kind_when_not_fixable():
+    with pytest.raises(ValidationError):
+        LintFinding(
+            id="x",
+            rule_id="x",
+            severity=LintSeverity.WARNING,
+            message="m",
+            page_path="p.md",
+            fixable=False,
+            fix_kind=LintFixKind.STRIP_TRAILING_WS,
+        )
