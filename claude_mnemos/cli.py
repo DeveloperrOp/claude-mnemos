@@ -376,6 +376,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     metrics_timeline_p.add_argument("--period", default="30d")
 
+    # ─── project ──────────────────────────────────────────────────────────
+    project_p = sub.add_parser("project", help="Manage project-map.json entries")
+    project_sub = project_p.add_subparsers(dest="project_command", required=True)
+
+    pa = project_sub.add_parser("add", help="Add a project entry")
+    pa.add_argument("--name", required=True)
+    pa.add_argument("--vault", required=True, type=Path)
+    pa.add_argument("--cwd-pattern", action="append", default=[],
+                    help="May be repeated; glob pattern matched against cwd")
+
+    pl = project_sub.add_parser("list", help="List all projects")
+    pl.add_argument("--json", action="store_true")
+
+    ps = project_sub.add_parser("show", help="Show combined view (entry + settings)")
+    ps.add_argument("name")
+    ps.add_argument("--json", action="store_true")
+
+    pu = project_sub.add_parser("update", help="Update fields on an existing project")
+    pu.add_argument("name")
+    pu.add_argument("--vault", type=Path, default=None)
+    pu.add_argument("--add-cwd-pattern", action="append", default=[])
+    pu.add_argument("--remove-cwd-pattern", action="append", default=[])
+
+    pr = project_sub.add_parser("remove", help="Remove a project entry")
+    pr.add_argument("name")
+    pr.add_argument("--yes", action="store_true")
+
+    pres = project_sub.add_parser("resolve", help="Debug: which project matches the cwd")
+    pres.add_argument("--cwd", type=Path, default=Path.cwd())
+    pres.add_argument("--json", action="store_true")
+
     return parser
 
 
@@ -405,6 +436,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_lost_sessions(args)
     if args.command == "metrics":
         return _cmd_metrics(args)
+    if args.command == "project":
+        from claude_mnemos.cli_project import handle as project_handle
+        return project_handle(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)

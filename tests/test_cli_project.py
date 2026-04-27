@@ -1,0 +1,116 @@
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from claude_mnemos.cli import main as cli_main
+from claude_mnemos.state.projects import (
+    HOME_CONFIG_DIRNAME,
+    PROJECT_MAP_FILENAME,
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.delenv("MNEMOS_VAULT_ROOT", raising=False)
+
+
+def test_project_add_writes_map(tmp_path):
+    rc = cli_main([
+        "project", "add",
+        "--name", "claude-mnemos",
+        "--vault", str(tmp_path / "v"),
+        "--cwd-pattern", "~/code/cm*",
+    ])
+    assert rc == 0
+    f = tmp_path / HOME_CONFIG_DIRNAME / PROJECT_MAP_FILENAME
+    data = json.loads(f.read_text())
+    assert data["projects"][0]["name"] == "claude-mnemos"
+    assert data["projects"][0]["cwd_patterns"] == ["~/code/cm*"]
+
+
+def test_project_add_duplicate_returns_error(tmp_path):
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", "~/x"])
+    rc = cli_main(["project", "add", "--name", "x",
+                   "--vault", str(tmp_path / "v2"), "--cwd-pattern", "~/y"])
+    assert rc != 0
+
+
+def test_project_add_invalid_name_returns_error(tmp_path):
+    rc = cli_main(["project", "add", "--name", "Bad Name",
+                   "--vault", str(tmp_path / "v")])
+    assert rc != 0
+
+
+def test_project_list_empty(capsys):
+    rc = cli_main(["project", "list", "--json"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert json.loads(out) == []
+
+
+def test_project_list_after_add(tmp_path, capsys):
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", "~/x"])
+    capsys.readouterr()
+    cli_main(["project", "list", "--json"])
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert len(data) == 1
+    assert data[0]["name"] == "x"
+
+
+def test_project_show_returns_view(tmp_path, capsys):
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", "~/x"])
+    capsys.readouterr()
+    cli_main(["project", "show", "x", "--json"])
+    data = json.loads(capsys.readouterr().out)
+    assert data["name"] == "x"
+    assert "settings" in data
+    assert data["settings"]["snapshots"]["retention_days"] == 180
+
+
+def test_project_update_replaces_cwd_patterns(tmp_path):
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", "~/old"])
+    rc = cli_main(["project", "update", "x",
+                   "--add-cwd-pattern", "~/new",
+                   "--remove-cwd-pattern", "~/old"])
+    assert rc == 0
+    from claude_mnemos.state.projects import ProjectStore
+    e = ProjectStore().get("x")
+    assert e.cwd_patterns == ["~/new"]
+
+
+def test_project_remove_cleans_settings(tmp_path):
+    from claude_mnemos.state.projects import project_settings_path
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", "~/x"])
+    sp = project_settings_path("x")
+    sp.parent.mkdir(parents=True, exist_ok=True)
+    sp.write_text("{}")
+    rc = cli_main(["project", "remove", "x", "--yes"])
+    assert rc == 0
+    assert not sp.exists()
+
+
+def test_project_resolve_with_explicit_cwd(tmp_path, capsys):
+    cwd = tmp_path / "code" / "x"
+    cwd.mkdir(parents=True)
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"), "--cwd-pattern", str(cwd)])
+    capsys.readouterr()
+    rc = cli_main(["project", "resolve", "--cwd", str(cwd), "--json"])
+    assert rc == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["name"] == "x"
+
+
+def test_project_resolve_no_match_nonzero(tmp_path):
+    rc = cli_main(["project", "resolve", "--cwd", str(tmp_path / "elsewhere"), "--json"])
+    assert rc != 0
