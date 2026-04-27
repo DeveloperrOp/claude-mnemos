@@ -13,7 +13,6 @@ thread must never die from an uncaught exception.
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,14 +40,6 @@ from claude_mnemos.state.activity import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Files whose mtime is younger than this and whose frontmatter looks fully
-# agent-written are assumed to be ingest writes that arrived as MODIFIED via
-# atomic replace. The handler skips them to avoid false-positive marks. Trade-
-# off: concurrent CLI ingest within a 10s window will not be flagged. Documented
-# in design §3.2 as a known limitation; closed when daemon becomes the ingest
-# orchestrator (Plan #11+).
-INGEST_FRESHNESS_S = 10.0
 
 DEFAULT_LOCK_TIMEOUT_S = 5.0
 
@@ -167,9 +158,6 @@ class VaultChangeHandler(FileSystemEventHandler):
             )
             return
 
-        if self._looks_like_recent_ingest_write(path, parsed):
-            return
-
         new_fm = parsed.frontmatter.model_copy(
             update={
                 "agent_written": False,
@@ -188,18 +176,6 @@ class VaultChangeHandler(FileSystemEventHandler):
             self.tracker.remove(path)
 
         self._append_activity(path)
-
-    def _looks_like_recent_ingest_write(self, path: Path, parsed: ParsedPage) -> bool:
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            return False
-        age_s = time.time() - mtime
-        if age_s >= INGEST_FRESHNESS_S:
-            return False
-        if not parsed.frontmatter.agent_written:
-            return False
-        return parsed.frontmatter.last_human_edit is None
 
     def _append_activity(self, path: Path) -> None:
         rel = path.relative_to(self.vault).as_posix()

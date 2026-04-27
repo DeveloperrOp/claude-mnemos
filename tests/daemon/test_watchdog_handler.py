@@ -20,10 +20,7 @@ from watchdog.events import (
 from claude_mnemos.core.locks import pipeline_lock
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.our_writes import OurWritesTracker
-from claude_mnemos.daemon.watchdog_handler import (
-    INGEST_FRESHNESS_S,
-    VaultChangeHandler,
-)
+from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 
 
 def _frozen_now() -> datetime:
@@ -74,8 +71,8 @@ def _make_handler(
 
 
 def _make_old(path: Path) -> None:
-    """Backdate mtime so the freshness heuristic doesn't kick in."""
-    old = time.time() - INGEST_FRESHNESS_S - 5.0
+    """Backdate mtime so test reads are deterministic (no real-time dependency)."""
+    old = time.time() - 60.0
     os.utime(path, (old, old))
 
 
@@ -195,23 +192,11 @@ def test_modified_writes_activity_entry(tmp_path: Path):
     assert e.affected_pages == ["wiki/entities/foo.md"]
 
 
-def test_freshness_heuristic_skips_recent_file(tmp_path: Path):
-    """If file was just created (mtime now), don't mark — could be ingest write."""
-    vault = tmp_path / "vault"
-    p = _seed_page(vault, "wiki/entities/foo.md")
-    # Do NOT backdate — file is fresh.
-    h, _, alerts = _make_handler(vault)
-    h.on_modified(FileModifiedEvent(str(p)))
-    assert "agent_written: true" in p.read_text(encoding="utf-8")
-    assert alerts.list() == []
-
-
-def test_freshness_heuristic_does_not_skip_already_human(tmp_path: Path):
-    """If page already has agent_written=False, freshness heuristic must NOT skip."""
+def test_already_human_edited_page_still_marked(tmp_path: Path):
+    """If page already has agent_written=False, handler still bumps last_human_edit."""
     vault = tmp_path / "vault"
     p = _seed_page(vault, "wiki/entities/foo.md", agent_written=False)
-    # File is fresh, but page is already human-edited — handler should still bump
-    # last_human_edit and append activity.
+    _make_old(p)
     h, _, _ = _make_handler(vault)
     h.on_modified(FileModifiedEvent(str(p)))
     text = p.read_text(encoding="utf-8")
@@ -339,33 +324,6 @@ def test_self_write_loop_prevention(tmp_path: Path):
     assert any(seen_during_write)
     # After exit, path must be removed from tracker.
     assert not tracker.contains(p)
-
-
-def test_recent_file_with_existing_human_edit_marker_proceeds(tmp_path: Path):
-    """Freshness heuristic only skips when the page looks fully agent-written."""
-    vault = tmp_path / "vault"
-    p = vault / "wiki/entities/foo.md"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(
-        """---
-title: Foo
-type: entity
-created: 2026-04-26
-updated: 2026-04-26
-agent_written: false
-last_human_edit: 2026-04-27T13:00:00Z
----
-body
-""",
-        encoding="utf-8",
-    )
-    # Fresh mtime, but page already has last_human_edit — heuristic must allow.
-    h, _, _ = _make_handler(vault)
-    h.on_modified(FileModifiedEvent(str(p)))
-    text = p.read_text(encoding="utf-8")
-    assert "agent_written: false" in text
-    # last_human_edit should have been bumped to handler clock.
-    assert "2026-04-27T14:00:00" in text
 
 
 def test_clock_is_used_for_last_human_edit(tmp_path: Path):
