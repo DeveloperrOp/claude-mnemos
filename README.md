@@ -21,6 +21,42 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Page edit + Trash** (Plan #12): direct page mutations (edit/verify/archive/delete) and trash management (list/restore/dismiss/empty). All mutations route through `StagingTransaction` with pre-op snapshot — undo via `mnemos undo` reverts everything. `.trash/<id>/.metadata.json` carries `original_path` so restore puts content back to its original location. REST `PATCH/POST/DELETE /pages/{ref:path}` + `GET/POST/DELETE /trash`. CLI `mnemos page {edit, verify, archive, delete}` and `mnemos trash {list, restore, dismiss, empty}`. New activity types: `manual_edit`, `manual_delete` (undoable), `manual_restore_trash` (undoable), `trash_dismissed`, `trash_emptied` (audit-only).
 - **Sessions + Lost-sessions + Token metrics** (Plan #13a): backend views of session lifecycle (merged manifest IngestRecord + jobs queue), lost-session scanner over `~/.claude/projects/` with cache + ignore-list, token usage aggregations (per-period summary, per-project, top-sessions, daily timeline). Manifest extended with `transcript_path` + `raw_transcript_bytes` (cross-ref + compression metric). New state file `<vault>/.lost-sessions-ignore.json`. REST `/sessions/*` + `/lost-sessions/*` + `/metrics/usage*`. CLI `mnemos {sessions, lost-sessions, metrics} ...`. Multi-vault `by-project` returns single entry — multi-vault routing → Plan #13b.
 
+### Plan #13b-α — Settings + project-map foundation (2026-04-27)
+
+- `~/.claude-mnemos/project-map.json` now routes cwd → vault.
+- Per-project settings: `~/.claude-mnemos/settings/<project>.json` (9 spec §12.8 groups).
+- Global settings: `~/.claude-mnemos/global-settings.json`.
+- New CLI: `mnemos project {add,list,show,update,remove,resolve}`,
+  `mnemos settings {get,set,reset} --project NAME | --global`.
+- All other CLI commands now take `--project NAME` (auto-resolves via cwd if omitted).
+- Daemon at startup applies `snapshots.retention_days` + `snapshots.daily_enabled`
+  for its registered vault; `PATCH /settings/{project}` reloads live (rescheduling
+  daily snapshot job + backups cleanup).
+- MCP server defaults to `--auto-resolve` (cwd → project-map). Falls back to
+  degraded mode if no match (server stays alive, every tool returns a fix-hint
+  TextContent — avoids Claude Code spawn-loop on crash).
+- SessionEnd hook resolves cwd → project; unmatched cwd → silent skip
+  (transcript stays in lost-sessions, picked up by `mnemos lost-sessions scan`).
+- One-shot migration: PID file moved from `~/.mnemos/` to `~/.claude-mnemos/`
+  (legacy files relocated automatically on daemon start, never overwritten).
+
+#### Migration from previous versions
+
+If you previously set `MNEMOS_VAULT_ROOT`, register your vault explicitly:
+
+```bash
+mnemos project add \
+  --name claude-mnemos \
+  --vault $MNEMOS_VAULT_ROOT \
+  --cwd-pattern "$(dirname $MNEMOS_VAULT_ROOT)/*"
+unset MNEMOS_VAULT_ROOT
+```
+
+Then restart any running daemon so it can read your project's settings.
+
+The `MNEMOS_VAULT_ROOT` env var is no longer read by anything (CLI, hook,
+MCP server, daemon).
+
 ## Установка
 
 ```bash
