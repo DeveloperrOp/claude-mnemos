@@ -8,9 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from claude_mnemos.core.snapshots import SnapshotInfo
 
 __all__ = [
-    "AutofixApiResult",
     "HealthResponse",
-    "LintReportResponse",
     "SchedulerJobInfo",
     "SnapshotInfo",
     "UndoApiResult",
@@ -84,20 +82,3 @@ class UndoApiResult(BaseModel):
     restored_pages: list[str] = Field(default_factory=list)
     new_entry_id: str | None = None
 
-
-class LintReportResponse(BaseModel):
-    """Pass-through alias around lint.models.LintReport for the REST surface."""
-
-    model_config = ConfigDict(extra="allow")
-    # Body follows lint.models.LintReport — defined here as opaque pass-through
-    # so /lint/results can serve any future-additive field without schema work.
-
-
-class AutofixApiResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    success: bool
-    snapshot_path: str | None
-    fixed_findings: list[str] = Field(default_factory=list)
-    skipped_findings: list[str] = Field(default_factory=list)
-    activity_id: str | None
