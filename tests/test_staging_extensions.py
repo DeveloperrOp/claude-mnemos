@@ -285,3 +285,30 @@ def test_promote_without_tracker_unchanged(tmp_path: Path):
         result = txn.promote_to_vault()
     assert result.success is True
     assert (vault / "wiki/entities/new.md").read_text() == "x"
+
+
+def test_delete_to_trash_writes_metadata_json(tmp_path: Path):
+    """Plan #12: trash dirs include .metadata.json with original_path."""
+    import json
+    vault = tmp_path / "vault"
+    _populate(vault)
+
+    with StagingTransaction(vault, "op-meta-1", operation_type="manual_delete") as txn:
+        txn.delete("wiki/entities/foo.md")
+        txn.promote_to_vault()
+
+    trash_root = vault / ".trash"
+    deleted_dirs = [
+        p for p in trash_root.iterdir()
+        if p.is_dir() and p.name.startswith("deleted-foo-")
+    ]
+    assert len(deleted_dirs) == 1
+    meta_path = deleted_dirs[0] / ".metadata.json"
+    assert meta_path.is_file()
+    data = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert data["version"] == 1
+    assert data["original_path"] == "wiki/entities/foo.md"
+    assert data["operation_id"] == "op-meta-1"
+    assert data["operation_type"] == "manual_delete"
+    assert data["trash_id"] == deleted_dirs[0].name
+    assert "deleted_at" in data
