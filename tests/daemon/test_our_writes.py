@@ -69,7 +69,7 @@ def test_writing_context_removes_on_exception(tmp_path: Path):
 
 
 def test_paused_context_disables_membership(tmp_path: Path):
-    tracker = OurWritesTracker()
+    tracker = OurWritesTracker(pause_cooldown_s=0.0)
     p = tmp_path / "foo.md"
     p.write_text("hi", encoding="utf-8")
     tracker.add(p)
@@ -82,10 +82,31 @@ def test_paused_context_disables_membership(tmp_path: Path):
 
 
 def test_paused_context_restores_on_exception():
-    tracker = OurWritesTracker()
+    tracker = OurWritesTracker(pause_cooldown_s=0.0)
     with pytest.raises(RuntimeError), tracker.paused():
         assert tracker.is_paused
         raise RuntimeError("boom")
+    assert not tracker.is_paused
+
+
+def test_paused_cooldown_keeps_paused_after_exit(monkeypatch: pytest.MonkeyPatch):
+    fake_now = [1000.0]
+
+    def fake_monotonic() -> float:
+        return fake_now[0]
+
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.our_writes.time.monotonic", fake_monotonic
+    )
+
+    tracker = OurWritesTracker(pause_cooldown_s=2.0)
+    with tracker.paused():
+        assert tracker.is_paused
+    # Just after exit, cooldown is still active.
+    fake_now[0] = 1000.5
+    assert tracker.is_paused
+    # After cooldown expires, is_paused flips to False.
+    fake_now[0] = 1003.0
     assert not tracker.is_paused
 
 

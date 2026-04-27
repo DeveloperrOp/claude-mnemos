@@ -25,16 +25,30 @@ from contextlib import contextmanager
 from pathlib import Path
 
 DEFAULT_TTL_S = 5.0
+DEFAULT_PAUSE_COOLDOWN_S = 1.0
 
 
 class OurWritesTracker:
-    """Thread-safe path set with TTL and a pause flag."""
+    """Thread-safe path set with TTL and a pause flag.
 
-    def __init__(self, ttl_s: float = DEFAULT_TTL_S) -> None:
+    The pause flag has a trailing cooldown: after `paused()` exits, the tracker
+    still reports `is_paused == True` for `pause_cooldown_s` seconds. This
+    absorbs straggler filesystem events that the OS emits with delay (e.g. from
+    a bulk snapshot restore) and would otherwise leak past the pause boundary
+    and trigger spurious human_edit_detected entries.
+    """
+
+    def __init__(
+        self,
+        ttl_s: float = DEFAULT_TTL_S,
+        pause_cooldown_s: float = DEFAULT_PAUSE_COOLDOWN_S,
+    ) -> None:
         self._entries: dict[Path, float] = {}
         self._lock = threading.Lock()
         self._paused: int = 0
+        self._pause_cooldown_until: float = 0.0
         self._ttl_s = ttl_s
+        self._pause_cooldown_s = pause_cooldown_s
 
     def add(self, path: Path, *, ttl_s: float | None = None) -> None:
         ttl = ttl_s if ttl_s is not None else self._ttl_s
@@ -72,11 +86,17 @@ class OurWritesTracker:
         finally:
             with self._lock:
                 self._paused -= 1
+                if self._paused == 0 and self._pause_cooldown_s > 0:
+                    self._pause_cooldown_until = (
+                        time.monotonic() + self._pause_cooldown_s
+                    )
 
     @property
     def is_paused(self) -> bool:
         with self._lock:
-            return self._paused > 0
+            if self._paused > 0:
+                return True
+            return time.monotonic() < self._pause_cooldown_until
 
     def _gc_locked(self) -> None:
         now = time.monotonic()

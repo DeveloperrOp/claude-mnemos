@@ -59,7 +59,20 @@ def vault(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def harness(vault: Path):
-    tracker = OurWritesTracker(ttl_s=60.0)
+    tracker = OurWritesTracker(ttl_s=60.0, pause_cooldown_s=0.0)
+    alerts = Alerts()
+    handler = VaultChangeHandler(vault, tracker, alerts)
+    observer = VaultObserver(vault, handler)
+    observer.start()
+    try:
+        yield observer, tracker, alerts
+    finally:
+        observer.stop()
+
+
+@pytest.fixture
+def harness_with_cooldown(vault: Path):
+    tracker = OurWritesTracker(ttl_s=60.0, pause_cooldown_s=2.0)
     alerts = Alerts()
     handler = VaultChangeHandler(vault, tracker, alerts)
     observer = VaultObserver(vault, handler)
@@ -135,9 +148,13 @@ def test_paused_tracker_blocks_marking(vault: Path, harness):
     assert _wait_for(marked, timeout=4.0)
 
 
-def test_restore_under_pause_no_new_marks(vault: Path, harness):
-    """Restore must not generate human_edit_detected entries from its own swap."""
-    _, tracker, _ = harness
+def test_restore_under_pause_no_new_marks(vault: Path, harness_with_cooldown):
+    """Restore must not generate human_edit_detected entries from its own swap.
+
+    Uses pause_cooldown so straggler events that arrive after pause exits are
+    still ignored.
+    """
+    _, tracker, _ = harness_with_cooldown
     _seed_page(vault, "wiki/entities/foo.md")
     snap = create_snapshot(vault, operation_id="op-int-1", operation_type="ingest")
 
@@ -148,7 +165,7 @@ def test_restore_under_pause_no_new_marks(vault: Path, harness):
     assert result.success is True
 
     # Wait long enough for any straggling events to arrive after restore.
-    time.sleep(1.5)
+    time.sleep(2.5)
 
     log = ActivityLog.load(vault)
     # The restored vault came from before we'd written any human_edit_detected

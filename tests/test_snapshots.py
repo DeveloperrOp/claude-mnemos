@@ -704,7 +704,7 @@ def test_restore_pauses_tracker_during_swap(tmp_path: Path):
 
     class _SpyTracker(OurWritesTracker):
         def __init__(self) -> None:
-            super().__init__(ttl_s=60.0)
+            super().__init__(ttl_s=60.0, pause_cooldown_s=0.0)
 
         def paused(self):  # type: ignore[override]
             cm = super().paused()
