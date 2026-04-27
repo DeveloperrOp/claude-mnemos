@@ -23,8 +23,9 @@ def test_mcp_manifest_registers_mnemos_server():
     server = manifest["mcpServers"]["mnemos"]
     assert server["command"] == "python"
     assert "claude_mnemos.mcp" in server["args"]
-    assert "--vault" in server["args"]
-    assert "${MNEMOS_VAULT_ROOT}" in server["args"]
+    # Plan #13b-α: server resolves vault via project-map (no env var).
+    assert "--auto-resolve" in server["args"]
+    assert "${MNEMOS_VAULT_ROOT}" not in server["args"]
 
 
 def test_hooks_manifest_registers_session_end():

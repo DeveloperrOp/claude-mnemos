@@ -31,9 +31,12 @@ def test_parser_overrides(tmp_path: Path):
     assert args.log_level == "debug"
 
 
-def test_parser_requires_vault():
-    with pytest.raises(SystemExit):
-        build_parser().parse_args([])
+def test_parser_no_args_ok():
+    # After Task 12: no args -> auto-resolve fallback (does not exit)
+    args = build_parser().parse_args([])
+    assert args.vault is None
+    assert args.project is None
+    assert args.auto_resolve is False  # default; still falls through to auto-resolve
 
 
 def test_parser_invalid_log_level(tmp_path: Path):

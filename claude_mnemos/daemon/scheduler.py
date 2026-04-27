@@ -12,22 +12,25 @@ def build_scheduler(
     retention_days: int,
     *,
     timezone: str = "UTC",
+    snapshots_enabled: bool = True,
 ) -> AsyncIOScheduler:
-    """Construct (but do not start) AsyncIOScheduler with two cron jobs.
+    """Construct (but do not start) AsyncIOScheduler with cron jobs.
 
-    - daily_snapshot at 04:00
-    - backups_cleanup at 05:00
+    - daily_snapshot at 04:00 (only if ``snapshots_enabled``)
+    - backups_cleanup at 05:00 (always — old backups must be cleaned even
+      if no new snapshots are being created)
     """
     sch = AsyncIOScheduler(timezone=timezone)
-    sch.add_job(
-        daily_snapshot_task,
-        "cron",
-        hour=4,
-        minute=0,
-        args=[vault],
-        id="daily_snapshot",
-        replace_existing=True,
-    )
+    if snapshots_enabled:
+        sch.add_job(
+            daily_snapshot_task,
+            "cron",
+            hour=4,
+            minute=0,
+            args=[vault],
+            id="daily_snapshot",
+            replace_existing=True,
+        )
     sch.add_job(
         backups_cleanup_task,
         "cron",

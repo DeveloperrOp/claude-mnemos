@@ -16,9 +16,9 @@ from claude_mnemos.state.manifest import IngestRecord, Manifest
 # ─── parser tests ─────────────────────────────────────────────────────────
 
 
-def test_parser_sessions_list(tmp_path: Path) -> None:
+def test_parser_sessions_list() -> None:
     args = build_parser().parse_args(
-        ["sessions", "list", "--vault", str(tmp_path), "--status", "queued", "--limit", "5"]
+        ["sessions", "list", "--project", "p", "--status", "queued", "--limit", "5"]
     )
     assert args.command == "sessions"
     assert args.sessions_cmd == "list"
@@ -26,9 +26,9 @@ def test_parser_sessions_list(tmp_path: Path) -> None:
     assert args.limit == 5
 
 
-def test_parser_sessions_show(tmp_path: Path) -> None:
+def test_parser_sessions_show() -> None:
     args = build_parser().parse_args(
-        ["sessions", "show", "abc-sid", "--vault", str(tmp_path)]
+        ["sessions", "show", "abc-sid", "--project", "p"]
     )
     assert args.sessions_cmd == "show"
     assert args.session_id == "abc-sid"
@@ -38,7 +38,7 @@ def test_parser_sessions_ingest(tmp_path: Path) -> None:
     transcript = tmp_path / "abc.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
     args = build_parser().parse_args(
-        ["sessions", "ingest", str(transcript), "--vault", str(tmp_path)]
+        ["sessions", "ingest", str(transcript), "--project", "p"]
     )
     assert args.sessions_cmd == "ingest"
     assert Path(args.transcript_path) == transcript
@@ -80,14 +80,22 @@ def _mock_response(status_code: int = 200, json_body: Any = None, text: str = ""
 # ─── direct-read: sessions list ───────────────────────────────────────────
 
 
-def test_main_sessions_list_empty(tmp_path: Path, capsys) -> None:
-    rc = main(["sessions", "list", "--vault", str(tmp_path)])
+def test_main_sessions_list_empty(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["sessions", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "no sessions" in out.lower()
 
 
-def test_main_sessions_list_with_seeded_manifest(tmp_path: Path, capsys) -> None:
+def test_main_sessions_list_with_seeded_manifest(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     m = Manifest()
     m.add(
         "sha-1",
@@ -98,16 +106,20 @@ def test_main_sessions_list_with_seeded_manifest(tmp_path: Path, capsys) -> None
             output_tokens=200,
         ),
     )
-    m.save(tmp_path)
+    m.save(vault)
 
-    rc = main(["sessions", "list", "--vault", str(tmp_path)])
+    rc = main(["sessions", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "alpha-sid" in out
     assert "succeeded" in out
 
 
-def test_main_sessions_show_existing(tmp_path: Path, capsys) -> None:
+def test_main_sessions_show_existing(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     m = Manifest()
     m.add(
         "sha-1",
@@ -116,24 +128,32 @@ def test_main_sessions_show_existing(tmp_path: Path, capsys) -> None:
             ingested_at=datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC),
         ),
     )
-    m.save(tmp_path)
+    m.save(vault)
 
-    rc = main(["sessions", "show", "real-sid", "--vault", str(tmp_path)])
+    rc = main(["sessions", "show", "real-sid", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "real-sid" in out
 
 
-def test_main_sessions_show_missing_returns_91(tmp_path: Path, capsys) -> None:
-    rc = main(["sessions", "show", "missing-sid", "--vault", str(tmp_path)])
+def test_main_sessions_show_missing_returns_91(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["sessions", "show", "missing-sid", "--project", "p"])
     assert rc == 91
     err = capsys.readouterr().err
     assert "missing-sid" in err
 
 
-def test_main_sessions_corrupt_manifest_returns_93(tmp_path: Path, capsys) -> None:
-    (tmp_path / ".manifest.json").write_text("{not valid", encoding="utf-8")
-    rc = main(["sessions", "list", "--vault", str(tmp_path)])
+def test_main_sessions_corrupt_manifest_returns_93(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    (vault / ".manifest.json").write_text("{not valid", encoding="utf-8")
+    rc = main(["sessions", "list", "--project", "p"])
     assert rc == 93
     err = capsys.readouterr().err
     assert "manifest" in err.lower()
@@ -142,7 +162,11 @@ def test_main_sessions_corrupt_manifest_returns_93(tmp_path: Path, capsys) -> No
 # ─── ingest (via daemon REST) ─────────────────────────────────────────────
 
 
-def test_main_sessions_ingest_posts_to_daemon(tmp_path: Path, capsys) -> None:
+def test_main_sessions_ingest_posts_to_daemon(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     transcript = tmp_path / "my-session.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
     captured: dict[str, Any] = {}
@@ -155,7 +179,7 @@ def test_main_sessions_ingest_posts_to_daemon(tmp_path: Path, capsys) -> None:
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["sessions", "ingest", str(transcript), "--vault", str(tmp_path)]
+            ["sessions", "ingest", str(transcript), "--project", "p"]
         )
 
     assert rc == 0
@@ -167,8 +191,10 @@ def test_main_sessions_ingest_posts_to_daemon(tmp_path: Path, capsys) -> None:
 
 
 def test_main_sessions_ingest_daemon_offline_returns_87(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, register_project
 ) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     transcript = tmp_path / "x.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
 
@@ -177,7 +203,7 @@ def test_main_sessions_ingest_daemon_offline_returns_87(
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["sessions", "ingest", str(transcript), "--vault", str(tmp_path)]
+            ["sessions", "ingest", str(transcript), "--project", "p"]
         )
 
     assert rc == 87

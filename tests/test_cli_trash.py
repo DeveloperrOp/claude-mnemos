@@ -15,37 +15,37 @@ from claude_mnemos.cli import build_parser, main
 # ─── parser tests ─────────────────────────────────────────────────────────
 
 
-def test_parser_trash_list(tmp_path: Path) -> None:
-    args = build_parser().parse_args(["trash", "list", "--vault", str(tmp_path)])
+def test_parser_trash_list() -> None:
+    args = build_parser().parse_args(["trash", "list", "--project", "p"])
     assert args.command == "trash"
     assert args.trash_cmd == "list"
 
 
-def test_parser_trash_restore(tmp_path: Path) -> None:
+def test_parser_trash_restore() -> None:
     args = build_parser().parse_args(
-        ["trash", "restore", "deleted-foo-x", "--vault", str(tmp_path)]
+        ["trash", "restore", "deleted-foo-x", "--project", "p"]
     )
     assert args.trash_cmd == "restore"
     assert args.trash_id == "deleted-foo-x"
 
 
-def test_parser_trash_dismiss(tmp_path: Path) -> None:
+def test_parser_trash_dismiss() -> None:
     args = build_parser().parse_args(
-        ["trash", "dismiss", "deleted-bar-y", "--vault", str(tmp_path)]
+        ["trash", "dismiss", "deleted-bar-y", "--project", "p"]
     )
     assert args.trash_cmd == "dismiss"
     assert args.trash_id == "deleted-bar-y"
 
 
-def test_parser_trash_empty(tmp_path: Path) -> None:
-    args = build_parser().parse_args(["trash", "empty", "--vault", str(tmp_path)])
+def test_parser_trash_empty() -> None:
+    args = build_parser().parse_args(["trash", "empty", "--project", "p"])
     assert args.trash_cmd == "empty"
     assert args.yes is False
 
 
-def test_parser_trash_empty_yes(tmp_path: Path) -> None:
+def test_parser_trash_empty_yes() -> None:
     args = build_parser().parse_args(
-        ["trash", "empty", "--yes", "--vault", str(tmp_path)]
+        ["trash", "empty", "--yes", "--project", "p"]
     )
     assert args.yes is True
 
@@ -92,17 +92,23 @@ def _seed_trash_dir(
 # ─── trash list (direct DB read) ──────────────────────────────────────────
 
 
-def test_main_trash_list_empty(tmp_path: Path, capsys) -> None:
-    rc = main(["trash", "list", "--vault", str(tmp_path)])
+def test_main_trash_list_empty(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["trash", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "no trash entries" in out
 
 
-def test_main_trash_list_after_delete(tmp_path: Path, capsys) -> None:
+def test_main_trash_list_after_delete(
+    tmp_path: Path, capsys, register_project
+) -> None:
     """list reads .trash/ directly (no daemon needed)."""
-    _seed_trash_dir(tmp_path, "deleted-foo-2026-04-27-12-00-00-aaaaaaaa")
-    rc = main(["trash", "list", "--vault", str(tmp_path)])
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    _seed_trash_dir(vault, "deleted-foo-2026-04-27-12-00-00-aaaaaaaa")
+    rc = main(["trash", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "deleted-foo-2026-04-27-12-00-00-aaaaaaaa" in out
@@ -110,12 +116,16 @@ def test_main_trash_list_after_delete(tmp_path: Path, capsys) -> None:
     assert "restorable" in out
 
 
-def test_main_trash_list_unrestorable(tmp_path: Path, capsys) -> None:
+def test_main_trash_list_unrestorable(
+    tmp_path: Path, capsys, register_project
+) -> None:
     """Entries without metadata are flagged blocked."""
-    d = tmp_path / ".trash" / "deleted-bar-no-meta"
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    d = vault / ".trash" / "deleted-bar-no-meta"
     d.mkdir(parents=True)
     (d / "bar.md").write_text("# bar", encoding="utf-8")
-    rc = main(["trash", "list", "--vault", str(tmp_path)])
+    rc = main(["trash", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "deleted-bar-no-meta" in out
@@ -125,7 +135,9 @@ def test_main_trash_list_unrestorable(tmp_path: Path, capsys) -> None:
 # ─── trash restore (via daemon REST) ──────────────────────────────────────
 
 
-def test_main_trash_restore(tmp_path: Path, capsys) -> None:
+def test_main_trash_restore(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -143,7 +155,7 @@ def test_main_trash_restore(tmp_path: Path, capsys) -> None:
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["trash", "restore", "deleted-foo-x", "--vault", str(tmp_path)]
+            ["trash", "restore", "deleted-foo-x", "--project", "p"]
         )
 
     assert rc == 0
@@ -151,25 +163,35 @@ def test_main_trash_restore(tmp_path: Path, capsys) -> None:
     assert captured["url"].endswith("/trash/deleted-foo-x/restore")
 
 
-def test_main_trash_restore_collision(tmp_path: Path, capsys) -> None:
+def test_main_trash_restore_collision(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(409, {"error": "collision"}, text='{"error":"collision"}')
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["trash", "restore", "deleted-foo-x", "--vault", str(tmp_path)]
+            ["trash", "restore", "deleted-foo-x", "--project", "p"]
         )
 
     assert rc == 89
 
 
-def test_main_trash_restore_daemon_offline(tmp_path: Path, capsys) -> None:
+def test_main_trash_restore_daemon_offline(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         raise httpx.ConnectError("refused")
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["trash", "restore", "deleted-foo-x", "--vault", str(tmp_path)]
+            ["trash", "restore", "deleted-foo-x", "--project", "p"]
         )
 
     assert rc == 87
@@ -178,7 +200,9 @@ def test_main_trash_restore_daemon_offline(tmp_path: Path, capsys) -> None:
 # ─── trash dismiss (via daemon REST) ──────────────────────────────────────
 
 
-def test_main_trash_dismiss(tmp_path: Path, capsys) -> None:
+def test_main_trash_dismiss(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -188,7 +212,7 @@ def test_main_trash_dismiss(tmp_path: Path, capsys) -> None:
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["trash", "dismiss", "deleted-bar-y", "--vault", str(tmp_path)]
+            ["trash", "dismiss", "deleted-bar-y", "--project", "p"]
         )
 
     assert rc == 0
@@ -198,13 +222,16 @@ def test_main_trash_dismiss(tmp_path: Path, capsys) -> None:
     assert "deleted-bar-y" in out
 
 
-def test_main_trash_dismiss_404(tmp_path: Path, capsys) -> None:
+def test_main_trash_dismiss_404(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(404, {"error": "not_found"}, text='{"error":"not_found"}')
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["trash", "dismiss", "deleted-missing", "--vault", str(tmp_path)]
+            ["trash", "dismiss", "deleted-missing", "--project", "p"]
         )
 
     assert rc == 88
@@ -213,8 +240,12 @@ def test_main_trash_dismiss_404(tmp_path: Path, capsys) -> None:
 # ─── trash empty (with confirmation) ──────────────────────────────────────
 
 
-def test_main_trash_empty_with_yes_skips_prompt(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_main_trash_empty_with_yes_skips_prompt(
+    tmp_path: Path, capsys, monkeypatch, register_project
+) -> None:
     """`--yes` flag skips stdin prompt and goes straight to DELETE /trash."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -232,15 +263,19 @@ def test_main_trash_empty_with_yes_skips_prompt(tmp_path: Path, capsys, monkeypa
     monkeypatch.setattr("sys.stdin", _NoReadStdin())
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["trash", "empty", "--yes", "--vault", str(tmp_path)])
+        rc = main(["trash", "empty", "--yes", "--project", "p"])
 
     assert rc == 0
     assert captured["method"] == "DELETE"
     assert captured["url"].endswith("/trash")
 
 
-def test_main_trash_empty_typed_delete_proceeds(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_main_trash_empty_typed_delete_proceeds(
+    tmp_path: Path, capsys, monkeypatch, register_project
+) -> None:
     """Without --yes, typing 'delete' on stdin triggers DELETE /trash."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -253,15 +288,19 @@ def test_main_trash_empty_typed_delete_proceeds(tmp_path: Path, capsys, monkeypa
     monkeypatch.setattr("sys.stdin", io.StringIO("delete\n"))
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["trash", "empty", "--vault", str(tmp_path)])
+        rc = main(["trash", "empty", "--project", "p"])
 
     assert rc == 0
     assert captured["method"] == "DELETE"
     assert captured["url"].endswith("/trash")
 
 
-def test_main_trash_empty_wrong_input_aborts(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_main_trash_empty_wrong_input_aborts(
+    tmp_path: Path, capsys, monkeypatch, register_project
+) -> None:
     """Without --yes, anything other than 'delete' aborts (no daemon call)."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
 
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         raise AssertionError("daemon should not be called when user aborts")
@@ -269,7 +308,7 @@ def test_main_trash_empty_wrong_input_aborts(tmp_path: Path, capsys, monkeypatch
     monkeypatch.setattr("sys.stdin", io.StringIO("yes\n"))
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["trash", "empty", "--vault", str(tmp_path)])
+        rc = main(["trash", "empty", "--project", "p"])
 
     assert rc == 1
     err = capsys.readouterr().err

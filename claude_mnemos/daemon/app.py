@@ -24,7 +24,9 @@ from claude_mnemos.daemon.routes.lost_sessions import router as lost_sessions_ro
 from claude_mnemos.daemon.routes.metrics import router as metrics_router
 from claude_mnemos.daemon.routes.ontology import router as ontology_router
 from claude_mnemos.daemon.routes.pages import router as pages_router
+from claude_mnemos.daemon.routes.projects import router as projects_router
 from claude_mnemos.daemon.routes.sessions import router as sessions_router
+from claude_mnemos.daemon.routes.settings import router as settings_router
 from claude_mnemos.daemon.routes.snapshots import router as snapshots_router
 from claude_mnemos.daemon.routes.trash import router as trash_router
 from claude_mnemos.daemon.routes.vault import router as vault_router
@@ -33,6 +35,8 @@ from claude_mnemos.state.activity import ActivityCorruptError
 from claude_mnemos.state.jobs import JobsCorruptError
 from claude_mnemos.state.manifest import ManifestCorruptError
 from claude_mnemos.state.ontology import OntologyCorruptError
+from claude_mnemos.state.projects import ProjectMapCorruptError, ProjectMapError
+from claude_mnemos.state.settings import SettingsCorruptError
 
 
 def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
@@ -54,6 +58,8 @@ def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
     app.include_router(sessions_router)
     app.include_router(lost_sessions_router)
     app.include_router(metrics_router)
+    app.include_router(projects_router)
+    app.include_router(settings_router)
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:
@@ -139,6 +145,27 @@ def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
         return JSONResponse(
             status_code=404,
             content={"error": "trash_entry_not_found", "detail": str(exc)},
+        )
+
+    @app.exception_handler(ProjectMapCorruptError)
+    async def _project_map_corrupt(_request: Request, exc: ProjectMapCorruptError) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "project_map_corrupt", "detail": str(exc)},
+        )
+
+    @app.exception_handler(ProjectMapError)
+    async def _project_map_error(_request: Request, exc: ProjectMapError) -> JSONResponse:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "project_map_error", "detail": str(exc)},
+        )
+
+    @app.exception_handler(SettingsCorruptError)
+    async def _settings_corrupt(_request: Request, exc: SettingsCorruptError) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "settings_corrupt", "detail": str(exc)},
         )
 
     @app.exception_handler(ValidationError)

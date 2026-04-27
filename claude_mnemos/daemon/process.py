@@ -21,9 +21,13 @@ from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.daemon.scheduler import build_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
+from claude_mnemos.daemon.tasks import daily_snapshot_task
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
+from claude_mnemos.mapping.resolver import ProjectResolver
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
+from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
+from claude_mnemos.state.settings import GlobalSettings, ProjectSettings, SettingsStore
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +39,44 @@ class MnemosDaemon:
 
     def __init__(self, config: DaemonConfig) -> None:
         self.config = config
-        self.scheduler: AsyncIOScheduler = build_scheduler(
-            config.vault_root, config.retention_days
-        )
         self.tracker = OurWritesTracker()
         self.alerts = Alerts()
+        self.project_store = ProjectStore()
+        self.settings_store = SettingsStore()
+        self.global_settings: GlobalSettings = self.settings_store.get_global()
+        self.project_entry: ProjectMapEntry | None = None
+        try:
+            self.project_entry = ProjectResolver(self.project_store).resolve_by_vault(
+                config.vault_root
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("project resolver failed at startup")
+            self.alerts.add(
+                kind="handler_error",
+                path=str(config.vault_root),
+                message=f"project resolver failed: {exc}",
+                detected_at=datetime.now(UTC),
+            )
+        if self.project_entry is None:
+            self.project_settings: ProjectSettings = ProjectSettings()
+            self.alerts.add(
+                kind="handler_error",
+                path=str(config.vault_root),
+                message=(
+                    f"daemon vault {config.vault_root} not registered in "
+                    "project-map; using built-in defaults"
+                ),
+                detected_at=datetime.now(UTC),
+            )
+        else:
+            self.project_settings = self.settings_store.get_project(
+                self.project_entry.name
+            )
+        self.scheduler: AsyncIOScheduler = build_scheduler(
+            config.vault_root,
+            self.project_settings.snapshots.retention_days,
+            snapshots_enabled=self.project_settings.snapshots.daily_enabled,
+        )
         self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
         self.job_worker: JobWorker | None = None
         # Plan #13a: TTL-cached lost-sessions list owned by the daemon, so the
@@ -176,6 +213,49 @@ class MnemosDaemon:
             self.job_store.close()
         except Exception:
             logger.exception("job store close failed")
+
+    def reload_settings(self, new_settings: ProjectSettings) -> None:
+        """Apply new settings; reschedule snapshot jobs as needed.
+
+        Called by PATCH /settings/{project} when the patched project's
+        vault matches our own. Lint-schedule reload is deferred to
+        Plan #11+ when the scheduled lint runner exists.
+
+        Thread-safety: this method assumes the daemon runs uvicorn
+        with a single worker (default), so concurrent PATCH requests
+        are serialised on the event loop. Multi-worker deployment is
+        out of scope for Plan #13b-α; #13b-β multi-vault refactor
+        will revisit synchronisation when needed.
+        """
+        old = self.project_settings
+        self.project_settings = new_settings
+
+        if old.snapshots.daily_enabled != new_settings.snapshots.daily_enabled:
+            existing = self.scheduler.get_job("daily_snapshot")
+            if new_settings.snapshots.daily_enabled and existing is None:
+                self.scheduler.add_job(
+                    daily_snapshot_task,
+                    "cron",
+                    hour=4,
+                    minute=0,
+                    args=[self.config.vault_root],
+                    id="daily_snapshot",
+                    replace_existing=True,
+                )
+            elif not new_settings.snapshots.daily_enabled and existing is not None:
+                self.scheduler.remove_job("daily_snapshot")
+
+        if old.snapshots.retention_days != new_settings.snapshots.retention_days:
+            # APScheduler's add_job(replace_existing=True) is a no-op for jobs
+            # in the pending list (scheduler not started yet) — modify_job
+            # works for both pending and live jobs.
+            self.scheduler.modify_job(
+                "backups_cleanup",
+                args=[
+                    self.config.vault_root,
+                    new_settings.snapshots.retention_days,
+                ],
+            )
 
     def _install_signal_handlers(self) -> None:
         try:

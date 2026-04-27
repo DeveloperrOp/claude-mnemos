@@ -5,8 +5,7 @@
       "args": [
         "-m",
         "claude_mnemos.mcp",
-        "--vault",
-        "${MNEMOS_VAULT_ROOT}"
+        "--auto-resolve"
       ],
       "env": {}
     }
