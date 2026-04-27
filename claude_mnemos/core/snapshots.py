@@ -5,7 +5,7 @@ import logging
 import re
 import shutil
 import time
-from contextlib import nullcontext
+from contextlib import nullcontext, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -500,10 +500,8 @@ def restore_from_snapshot(
                     dst = temp_root / preserved_file
                     if dst.exists():
                         # Snapshot included this file somehow (shouldn't happen) — replace
-                        try:
+                        with suppress(OSError):
                             dst.unlink()
-                        except OSError:
-                            pass
                     try:
                         shutil.copy2(src, dst)
                     except OSError as exc:
