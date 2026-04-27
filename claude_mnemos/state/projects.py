@@ -29,7 +29,7 @@ _LOCKS_GUARD = threading.Lock()
 
 
 def _lock_for(path: Path) -> threading.Lock:
-    key = str(path.resolve()) if path.exists() else str(path.absolute())
+    key = str(Path(path).expanduser().resolve())
     with _LOCKS_GUARD:
         lock = _LOCKS.get(key)
         if lock is None:

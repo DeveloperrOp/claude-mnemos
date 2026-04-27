@@ -160,7 +160,7 @@ _LOCKS_GUARD = threading.Lock()
 
 
 def _lock_for(root: Path) -> threading.Lock:
-    key = str(root.resolve()) if root.exists() else str(root.absolute())
+    key = str(Path(root).expanduser().resolve())
     with _LOCKS_GUARD:
         lock = _LOCKS.get(key)
         if lock is None:

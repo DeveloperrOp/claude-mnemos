@@ -189,3 +189,13 @@ def test_settings_store_reset_global(tmp_path: Path):
     store.patch_global({"locale": "en"})
     store.reset_global()
     assert store.get_global() == GlobalSettings()
+
+
+def test_lock_key_stable_across_root_creation(tmp_path: Path):
+    """SettingsStore lock must persist across root-directory creation."""
+    nonexistent_root = tmp_path / "subdir" / "config"
+    s_before = SettingsStore(root=nonexistent_root)
+    lock_before = s_before._lock
+    nonexistent_root.mkdir(parents=True)
+    s_after = SettingsStore(root=nonexistent_root)
+    assert s_after._lock is lock_before

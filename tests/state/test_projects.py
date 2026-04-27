@@ -144,3 +144,16 @@ def test_two_stores_share_lock(tmp_path: Path, monkeypatch):
     s1 = ProjectStore()
     s2 = ProjectStore()
     assert s1._lock is s2._lock
+
+
+def test_lock_key_stable_across_directory_creation(tmp_path: Path, monkeypatch):
+    """_lock_for must return the same lock before and after the
+    target directory is created (resolve() works on non-existing paths)."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    s_before = ProjectStore()  # ~/.claude-mnemos doesn't exist yet
+    lock_before = s_before._lock
+    # Create file via add (which creates the dir)
+    s_before.add(ProjectMapEntry(name="x", vault_root=tmp_path / "v", cwd_patterns=[]))
+    s_after = ProjectStore()  # now ~/.claude-mnemos exists
+    assert s_after._lock is lock_before
