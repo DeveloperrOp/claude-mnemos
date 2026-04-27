@@ -75,3 +75,63 @@ async def test_version_endpoint(client):
 async def test_unknown_endpoint_returns_404(client):
     r = await client.get("/does-not-exist")
     assert r.status_code == 404
+
+
+async def test_health_default_watchdog_fields(client):
+    r = await client.get("/health")
+    body = r.json()
+    assert body["watchdog_running"] is False
+    assert body["alerts_count"] == 0
+
+
+async def test_health_reports_running_observer(tmp_path: Path):
+    from claude_mnemos.daemon.alerts import Alerts
+
+    class FakeObserver:
+        is_running = True
+
+    class FakeDaemon:
+        started_at_monotonic = 0.0
+        observer = FakeObserver()
+        alerts = Alerts()
+
+        def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
+            return []
+
+    daemon = FakeDaemon()
+    daemon.alerts.add(
+        kind="parse_failed",
+        path="/x.md",
+        message="m",
+        detected_at=datetime(2026, 4, 27, 14, 0, tzinfo=UTC),
+    )
+
+    app = create_app(tmp_path, daemon=daemon)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/health")
+    body = r.json()
+    assert body["watchdog_running"] is True
+    assert body["alerts_count"] == 1
+
+
+async def test_health_reports_observer_not_alive(tmp_path: Path):
+    from claude_mnemos.daemon.alerts import Alerts
+
+    class StoppedObserver:
+        is_running = False
+
+    class FakeDaemon:
+        started_at_monotonic = 0.0
+        observer = StoppedObserver()
+        alerts = Alerts()
+
+        def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
+            return []
+
+    app = create_app(tmp_path, daemon=FakeDaemon())
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/health")
+    body = r.json()
+    assert body["watchdog_running"] is False
