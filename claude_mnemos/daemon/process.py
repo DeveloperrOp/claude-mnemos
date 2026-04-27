@@ -15,19 +15,21 @@ from fastapi import FastAPI
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
+from claude_mnemos.daemon.jobs.worker import JobWorker
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.daemon.scheduler import build_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
+from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 
 logger = logging.getLogger(__name__)
 
 
 class MnemosDaemon:
     """Long-running daemon: FastAPI server + APScheduler housekeeping +
-    real-time vault watchdog (Plan #9).
+    real-time vault watchdog (Plan #9) + jobs queue worker (Plan #11).
     """
 
     def __init__(self, config: DaemonConfig) -> None:
@@ -37,6 +39,8 @@ class MnemosDaemon:
         )
         self.tracker = OurWritesTracker()
         self.alerts = Alerts()
+        self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
+        self.job_worker: JobWorker | None = None
         self.app: FastAPI = create_app(config.vault_root, daemon=self)
         self.started_at_monotonic: float = 0.0
         self._server: uvicorn.Server | None = None
@@ -59,6 +63,7 @@ class MnemosDaemon:
         self.started_at_monotonic = time.monotonic()
         try:
             self._start_observer()
+            await self._start_jobs_subsystem()
             self.scheduler.start()
             uconfig = uvicorn.Config(
                 app=self.app,
@@ -71,6 +76,7 @@ class MnemosDaemon:
             self._install_signal_handlers()
             await self._server.serve()
         finally:
+            await self._stop_jobs_subsystem()
             self._stop_observer()
             try:
                 self.scheduler.shutdown(wait=False)
@@ -108,6 +114,63 @@ class MnemosDaemon:
             logger.exception("observer stop failed")
         finally:
             self.observer = None
+
+    async def _start_jobs_subsystem(self) -> None:
+        """Recover zombies, then spawn JobWorker. Failure surfaces as alert —
+        the daemon keeps running without the worker.
+        """
+        try:
+            from claude_mnemos.config import Config
+            from claude_mnemos.daemon.jobs.handlers import IngestHandler, JobHandler
+            from claude_mnemos.ingest.llm import LLMClient
+            from claude_mnemos.state.jobs import JobKind
+
+            self.job_store.recover_zombie_running()
+
+            def cfg_factory() -> Config:
+                return Config.from_env()
+
+            def llm_factory(cfg: Config) -> LLMClient | None:
+                if not cfg.api_key:
+                    return None
+                return LLMClient(cfg)
+
+            handlers: dict[JobKind, JobHandler] = {
+                "ingest": IngestHandler(
+                    vault=self.config.vault_root,
+                    cfg_factory=cfg_factory,
+                    llm_factory=llm_factory,
+                )
+            }
+            worker = JobWorker(
+                store=self.job_store,
+                handlers=handlers,
+                scheduler=self.scheduler,
+            )
+            await worker.start()
+            self.job_worker = worker
+        except Exception as exc:
+            logger.exception("failed to start jobs subsystem")
+            self.alerts.add(
+                kind="handler_error",
+                path=str(self.config.vault_root),
+                message=f"jobs subsystem failed to start: {exc}",
+                detected_at=datetime.now(UTC),
+            )
+            self.job_worker = None
+
+    async def _stop_jobs_subsystem(self) -> None:
+        if self.job_worker is not None:
+            try:
+                await self.job_worker.stop(timeout=10.0)
+            except Exception:
+                logger.exception("job worker stop failed")
+            finally:
+                self.job_worker = None
+        try:
+            self.job_store.close()
+        except Exception:
+            logger.exception("job store close failed")
 
     def _install_signal_handlers(self) -> None:
         try:

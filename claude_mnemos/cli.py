@@ -201,6 +201,39 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="Print planned fixes without applying"
     )
 
+    # ─── jobs ─────────────────────────────────────────────────────────────
+    jobs_parser = sub.add_parser("jobs", help="Inspect or manage the daemon job queue")
+    jobs_subs = jobs_parser.add_subparsers(dest="jobs_cmd", required=True)
+
+    jobs_list_p = jobs_subs.add_parser("list", help="List jobs (filtered by status)")
+    jobs_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_list_p.add_argument(
+        "--status",
+        choices=["queued", "running", "succeeded", "failed", "dead_letter"],
+        default=None,
+    )
+    jobs_list_p.add_argument("--limit", type=int, default=50)
+
+    jobs_show_p = jobs_subs.add_parser("show", help="Show one job by id")
+    jobs_show_p.add_argument("job_id")
+    jobs_show_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    jobs_cancel_p = jobs_subs.add_parser("cancel", help="Cancel a queued job")
+    jobs_cancel_p.add_argument("job_id")
+    jobs_cancel_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    jobs_retry_p = jobs_subs.add_parser(
+        "retry-dead", help="Restore a dead-letter job to the queue"
+    )
+    jobs_retry_p.add_argument("job_id")
+    jobs_retry_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    jobs_dismiss_p = jobs_subs.add_parser(
+        "dismiss", help="Permanently delete a dead-letter job"
+    )
+    jobs_dismiss_p.add_argument("job_id")
+    jobs_dismiss_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
     return parser
 
 
@@ -218,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_ontology(args)
     if args.command == "lint":
         return _cmd_lint(args)
+    if args.command == "jobs":
+        return _cmd_jobs(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -850,6 +885,110 @@ def _resolve_vault(args: argparse.Namespace) -> Path | None:
         )
         return None
     return Path(raw)
+
+
+# ─── jobs ──────────────────────────────────────────────────────────────
+
+
+def _cmd_jobs(args: argparse.Namespace) -> int:
+    if args.jobs_cmd == "list":
+        return _cmd_jobs_list(args)
+    if args.jobs_cmd == "show":
+        return _cmd_jobs_show(args)
+    if args.jobs_cmd == "cancel":
+        return _cmd_jobs_cancel(args)
+    if args.jobs_cmd == "retry-dead":
+        return _cmd_jobs_retry_dead(args)
+    if args.jobs_cmd == "dismiss":
+        return _cmd_jobs_dismiss(args)
+    print(f"unknown jobs subcommand: {args.jobs_cmd}", file=sys.stderr)
+    return 86
+
+
+def _cmd_jobs_list(args: argparse.Namespace) -> int:
+    from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobsCorruptError, JobStore
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        with JobStore(vault / JOBS_DB_FILENAME) as store:
+            jobs = store.list_by_status(args.status, limit=args.limit)
+            counts = store.count_by_status()
+    except JobsCorruptError as exc:
+        print(f"jobs DB corrupt: {exc}", file=sys.stderr)
+        return 85
+
+    print(f"{len(jobs)} jobs (counts: {counts})")
+    for j in jobs:
+        line = (
+            f"  {j.id[:8]}  {j.status:<12}  attempt={j.attempt}  "
+            f"{j.kind}  {j.created_at.isoformat(timespec='seconds')}"
+        )
+        if j.error:
+            line += f"  err={j.error[:60]}"
+        print(line)
+    return 0
+
+
+def _cmd_jobs_show(args: argparse.Namespace) -> int:
+    from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobsCorruptError, JobStore
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        with JobStore(vault / JOBS_DB_FILENAME) as store:
+            job = store.get_by_id(args.job_id)
+    except JobsCorruptError as exc:
+        print(f"jobs DB corrupt: {exc}", file=sys.stderr)
+        return 85
+    if job is None:
+        print(f"job not found: {args.job_id}", file=sys.stderr)
+        return 86
+    print(json.dumps(job.model_dump(mode="json"), indent=2, ensure_ascii=False))
+    return 0
+
+
+def _cmd_jobs_cancel(args: argparse.Namespace) -> int:
+    return _post_or_delete_to_daemon(
+        args, method="DELETE", path=f"/jobs/{args.job_id}"
+    )
+
+
+def _cmd_jobs_retry_dead(args: argparse.Namespace) -> int:
+    return _post_or_delete_to_daemon(
+        args, method="POST", path=f"/dead-letter/{args.job_id}/retry"
+    )
+
+
+def _cmd_jobs_dismiss(args: argparse.Namespace) -> int:
+    return _post_or_delete_to_daemon(
+        args, method="DELETE", path=f"/dead-letter/{args.job_id}"
+    )
+
+
+def _post_or_delete_to_daemon(
+    args: argparse.Namespace, *, method: str, path: str
+) -> int:
+    daemon_url = os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+    try:
+        r = httpx.request(method, f"{daemon_url}{path}", timeout=5.0)
+    except httpx.HTTPError as exc:
+        print(f"daemon unreachable at {daemon_url}: {exc}", file=sys.stderr)
+        return 84
+    if r.status_code in (200, 201, 204):
+        if r.status_code != 204:
+            print(r.text)
+        return 0
+    if r.status_code == 404:
+        print(f"job not found: {args.job_id}", file=sys.stderr)
+        return 86
+    if r.status_code == 409:
+        print(f"invalid state: {r.text}", file=sys.stderr)
+        return 86
+    print(f"daemon HTTP {r.status_code}: {r.text}", file=sys.stderr)
+    return 86
 
 
 if __name__ == "__main__":

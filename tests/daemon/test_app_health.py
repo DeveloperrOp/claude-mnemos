@@ -135,3 +135,43 @@ async def test_health_reports_observer_not_alive(tmp_path: Path):
         r = await c.get("/health")
     body = r.json()
     assert body["watchdog_running"] is False
+
+
+async def test_health_jobs_counts_default(client):
+    r = await client.get("/health")
+    body = r.json()
+    assert body["jobs_queued"] == 0
+    assert body["jobs_running"] == 0
+    assert body["jobs_dead_letter"] == 0
+    assert body["jobs_alert"] is False
+
+
+async def test_health_jobs_alert_threshold(tmp_path: Path):
+    from claude_mnemos.daemon.alerts import Alerts
+    from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
+
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    # Create 11 dead_letter rows
+    for i in range(11):
+        job = store.create(kind="ingest", payload={"transcript_path": f"/p{i}"})
+        store._conn.execute(
+            "UPDATE jobs SET status='dead_letter' WHERE id=?", (job.id,)
+        )
+
+    class FakeDaemon:
+        started_at_monotonic = 0.0
+        observer = None
+        alerts = Alerts()
+        job_store = store
+
+        def scheduler_jobs_info(self) -> list:
+            return []
+
+    app = create_app(tmp_path, daemon=FakeDaemon())
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/health")
+    store.close()
+    body = r.json()
+    assert body["jobs_dead_letter"] == 11
+    assert body["jobs_alert"] is True

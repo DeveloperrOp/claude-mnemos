@@ -20,7 +20,13 @@ SNAPSHOTS_DIRNAME = ".backups"
 META_FILENAME = ".meta.json"
 
 _EXCLUDED_DIRS = {".staging", ".backups", ".trash"}
-_EXCLUDED_FILES = {".pipeline.lock"}
+_EXCLUDED_FILES = {
+    ".pipeline.lock",
+    ".jobs.db",
+    ".jobs.db-wal",
+    ".jobs.db-shm",
+    ".jobs.db-journal",
+}
 
 logger = logging.getLogger(__name__)
 

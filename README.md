@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#10 в `main`. Готовы:
+`0.0.1` — Plans #1-#11 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -17,6 +17,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Ontology HITL** (Plan #8): `.ontology-suggestions/` Pydantic-валидируемые suggestion файлы + 3 операции (`merge_entities`, `rename_entity`, `delete_page`) + REST endpoints + 3 MCP tools + CLI subgroup. Применение через `StagingTransaction` с pre-op snapshot — undo через `mnemos undo` восстанавливает всё (sources возвращаются из trash, wikilinks переписываются обратно).
 - **Watchdog real-time** (Plan #9): daemon наблюдает `wiki/*.md` через Python `watchdog`, отличает self-writes от human edits через in-memory `OurWritesTracker` (TTL set + paused() context). При external modify помечает страницу `agent_written: false` + `last_human_edit: <ts>` + пишет activity entry `human_edit_detected`. Alerts buffer (in-memory, cap 200) + endpoints `GET /alerts` / `DELETE /alerts/{id}`. `HealthResponse` расширен `watchdog_running` + `alerts_count`.
 - **Lint** (Plan #10): 8 structural rules + 1 synthetic (`page_parse_failed`) — `wikilinks_broken` (with Levenshtein-typo autofix), `orphan_pages`, `stale_pages`, `duplicate_titles`, `provenance_inferred_high`, `provenance_ambiguous_high`, `trailing_whitespace`, `missing_required_frontmatter`. Cached report in `<vault>/.lint-results.json`. Safe autofix whitelist runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. CLI `mnemos lint {run, results, autofix}`, REST `POST /lint/run|autofix` + `GET /lint/results`, MCP `run_lint` + `get_lint_results` (12→14 tools).
+- **Jobs queue + Dead-letter** (Plan #11): persistent SQLite-backed queue at `<vault>/.jobs.db` (excluded from snapshots). `IngestHandler` runs the existing sync ingest in `asyncio.to_thread`, with retry policy 4 attempts × backoff 30s/2min/20min. SessionEnd hook now prefers `POST /jobs` over the detached subprocess (closes Plan #9 watchdog false-positive). REST `POST/GET/DELETE /jobs`, `GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`. CLI `mnemos jobs {list, show, cancel, retry-dead, dismiss}`. Health response gains `jobs_queued/running/dead_letter/jobs_alert` (alert at >10 dead-letter).
 
 ## Установка
 
@@ -218,9 +219,46 @@ REST: `POST /lint/run`, `GET /lint/results`, `POST /lint/autofix`. MCP: `run_lin
 - Scheduled weekly lint via APScheduler — Plan #11+.
 - Lint-driven ontology suggestions for low-confidence wikilinks fixes — Plan #11+.
 
+## Jobs queue
+
+Persistent job queue inside the daemon (SQLite at `<vault>/.jobs.db`). Single
+asyncio worker pulls ready jobs and dispatches to `IngestHandler` (only
+`kind="ingest"` in Plan #11 — Plans #12+ add lint, ontology, etc.).
+
+```bash
+mnemos jobs list --vault <path> [--status STATUS] [--limit N]
+mnemos jobs show <job_id> --vault <path>
+mnemos jobs cancel <job_id> --vault <path>          # queued only
+mnemos jobs retry-dead <job_id> --vault <path>      # restore from dead-letter
+mnemos jobs dismiss <job_id> --vault <path>         # permanent delete from dead-letter
+```
+
+REST: `POST /jobs`, `GET /jobs?status=...`, `GET /jobs/{id}`, `DELETE /jobs/{id}`,
+`GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`.
+
+### Retry policy
+
+- 4 attempts total: initial + 3 retries.
+- Backoff between attempts: 30s, 2min, 20min.
+- After the 4th failure → `dead_letter`. Auto-cleanup never (per spec §8.9).
+- Health alert flips on when dead-letter > 10.
+
+### Crash recovery
+
+On daemon startup, every `running` job is requeued (`attempt += 1`) or moved to
+`dead_letter` if that would exceed `MAX_ATTEMPTS`. ingest pipeline is idempotent
+via SHA-dedup manifest, so re-running a partially-applied ingest is safe.
+
+### SessionEnd hook integration
+
+The hook now POSTs to `/jobs` first; if the daemon is offline it falls back to
+the existing detached `mnemos ingest` subprocess. Concurrent CLI ingest with the
+daemon running no longer triggers the watchdog false-positive
+`human_edit_detected` (Plan #9 known limitation closed).
+
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~690 тестов)
-pytest -q -m slow      # медленные E2E (subprocess daemon + watchdog)
+pytest -q              # быстрые (~756 тестов)
+pytest -q -m slow      # медленные E2E (~10 тестов: subprocess daemon + watchdog + jobs E2E)
 ```
