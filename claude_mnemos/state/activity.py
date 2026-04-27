@@ -18,6 +18,7 @@ ActivityOperationType = Literal[
     "manual_restore",
     "ontology_apply",
     "human_edit_detected",
+    "lint_fix",
 ]
 
 

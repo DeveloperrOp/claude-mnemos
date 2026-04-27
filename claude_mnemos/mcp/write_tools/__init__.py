@@ -1,4 +1,5 @@
 from claude_mnemos.mcp.write_tools.activity import undo_operation
+from claude_mnemos.mcp.write_tools.lint import run_lint
 from claude_mnemos.mcp.write_tools.ontology import (
     apply_ontology_suggestion,
     propose_ontology_change,
@@ -15,5 +16,6 @@ __all__ = [
     "delete_snapshot",
     "propose_ontology_change",
     "restore_snapshot",
+    "run_lint",
     "undo_operation",
 ]

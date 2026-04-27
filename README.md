@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#9 в `main`. Готовы:
+`0.0.1` — Plans #1-#10 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -16,6 +16,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Claude Code plugin** (Plan #7): SessionEnd auto-ingest hook + 5 skills + plugin manifest. После установки каждая сессия автоматически попадает в vault.
 - **Ontology HITL** (Plan #8): `.ontology-suggestions/` Pydantic-валидируемые suggestion файлы + 3 операции (`merge_entities`, `rename_entity`, `delete_page`) + REST endpoints + 3 MCP tools + CLI subgroup. Применение через `StagingTransaction` с pre-op snapshot — undo через `mnemos undo` восстанавливает всё (sources возвращаются из trash, wikilinks переписываются обратно).
 - **Watchdog real-time** (Plan #9): daemon наблюдает `wiki/*.md` через Python `watchdog`, отличает self-writes от human edits через in-memory `OurWritesTracker` (TTL set + paused() context). При external modify помечает страницу `agent_written: false` + `last_human_edit: <ts>` + пишет activity entry `human_edit_detected`. Alerts buffer (in-memory, cap 200) + endpoints `GET /alerts` / `DELETE /alerts/{id}`. `HealthResponse` расширен `watchdog_running` + `alerts_count`.
+- **Lint** (Plan #10): 8 structural rules + 1 synthetic (`page_parse_failed`) — `wikilinks_broken` (with Levenshtein-typo autofix), `orphan_pages`, `stale_pages`, `duplicate_titles`, `provenance_inferred_high`, `provenance_ambiguous_high`, `trailing_whitespace`, `missing_required_frontmatter`. Cached report in `<vault>/.lint-results.json`. Safe autofix whitelist runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. CLI `mnemos lint {run, results, autofix}`, REST `POST /lint/run|autofix` + `GET /lint/results`, MCP `run_lint` + `get_lint_results` (12→14 tools).
 
 ## Установка
 
@@ -184,9 +185,42 @@ curl http://127.0.0.1:5757/health  # содержит watchdog_running + alerts_
 - Один daemon наблюдает один vault. Multi-vault — Plan #13.
 - Debouncing batch external changes (replace-all из IDE) не реализован — handler обрабатывает каждый event отдельно.
 
+## Lint
+
+Health-check the wiki: 8 structural rules + 1 synthetic for parse failures.
+
+```bash
+mnemos lint run --vault <path>
+mnemos lint results --vault <path> [--severity error|warning|info]
+mnemos lint autofix --vault <path> [--dry-run]
+```
+
+### Rules
+
+| ID | Severity | Autofix |
+|---|---|---|
+| `wikilinks_broken` | warning | typo fix (Levenshtein ≤ 2 unique) |
+| `orphan_pages` | warning | — |
+| `stale_pages` | info | — |
+| `duplicate_titles` | warning | — |
+| `provenance_inferred_high` (>=50%) | info | — |
+| `provenance_ambiguous_high` (>30%) | info | — |
+| `trailing_whitespace` | info | strip |
+| `missing_required_frontmatter` | warning | (placeholder, no-op) |
+| `page_parse_failed` (synthetic) | error | — |
+
+REST: `POST /lint/run`, `GET /lint/results`, `POST /lint/autofix`. MCP: `run_lint` (write, daemon required), `get_lint_results` (read, direct file). Autofix runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. Concurrent ingest is serialized by `pipeline_lock`.
+
+### Known limitations
+
+- LLM-powered rules (`contradictions_between_pages`) — Plan #11+.
+- Auto-stale state transition (`draft → stale` after 90 days) — Plan #11+ via `core/lifecycle.py`.
+- Scheduled weekly lint via APScheduler — Plan #11+.
+- Lint-driven ontology suggestions for low-confidence wikilinks fixes — Plan #11+.
+
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~570 тестов)
+pytest -q              # быстрые (~690 тестов)
 pytest -q -m slow      # медленные E2E (subprocess daemon + watchdog)
 ```
