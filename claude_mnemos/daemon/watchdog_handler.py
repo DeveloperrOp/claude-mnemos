@@ -114,6 +114,11 @@ class VaultChangeHandler(FileSystemEventHandler):
             src = Path(_as_str(event.src_path)).resolve()
             if not (self._is_watched(dst) or self._is_watched(src)):
                 return
+            # Suppress alerts for moves that the daemon initiated itself —
+            # StagingTransaction registers move sources/destinations in the
+            # tracker before shutil.move runs.
+            if self.tracker.contains(src) or self.tracker.contains(dst):
+                return
             self.alerts.add(
                 kind="external_rename",
                 path=str(dst),
@@ -175,20 +180,33 @@ class VaultChangeHandler(FileSystemEventHandler):
         finally:
             self.tracker.remove(path)
 
-        self._append_activity(path)
+        # Activity append is best-effort: page mutation already succeeded, so
+        # a failure here (e.g. ActivityCorruptError) must not propagate and
+        # leave the page partially "marked but unlogged". Surface as alert.
+        try:
+            self._append_activity(path)
+        except Exception as exc:
+            logger.exception("watchdog handler: activity append failed for %s", path)
+            self.alerts.add(
+                kind="handler_error",
+                path=str(path),
+                message=f"page marked human-edited but activity log append failed: {exc}",
+                detected_at=self.clock(),
+            )
 
     def _append_activity(self, path: Path) -> None:
         rel = path.relative_to(self.vault).as_posix()
+        ts = self.clock()
         log = ActivityLog.load(self.vault)
         entry = ActivityEntry(
             id=uuid4().hex,
-            timestamp=self.clock(),
+            timestamp=ts,
             operation_type="human_edit_detected",
             status="success",
             snapshot_path=None,
             can_undo=False,
             affected_pages=[rel],
-            metadata={"detected_at": self.clock().isoformat()},
+            metadata={"detected_at": ts.isoformat()},
         )
         log.append(entry)
         activity_path = self.vault / ".activity.json"

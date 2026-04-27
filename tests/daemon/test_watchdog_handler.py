@@ -326,6 +326,77 @@ def test_self_write_loop_prevention(tmp_path: Path):
     assert not tracker.contains(p)
 
 
+def test_moved_internal_tracker_skip(tmp_path: Path):
+    """Internal moves (via tracker) must NOT generate external_rename alerts."""
+    vault = tmp_path / "vault"
+    src = _seed_page(vault, "wiki/entities/old.md")
+    dst = vault / "wiki/entities/new.md"
+    tracker = OurWritesTracker(ttl_s=60.0)
+    tracker.add(src)
+    tracker.add(dst)
+    h, _, alerts = _make_handler(vault, tracker=tracker)
+    h.on_moved(FileMovedEvent(str(src), str(dst)))
+    assert alerts.list() == []
+
+
+def test_activity_append_failure_is_isolated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """If activity-append fails after the page is mutated, surface as alert
+    rather than letting the partial-write surface as a generic handler_error
+    that hides the page already being marked."""
+    vault = tmp_path / "vault"
+    p = _seed_page(vault, "wiki/entities/foo.md")
+    _make_old(p)
+    h, _, alerts = _make_handler(vault)
+
+    def boom(self, _vault_root: Path) -> None:  # noqa: ANN001
+        raise RuntimeError("synthetic activity log corrupt")
+
+    monkeypatch.setattr(
+        "claude_mnemos.state.activity.ActivityLog.save", boom
+    )
+    h.on_modified(FileModifiedEvent(str(p)))
+
+    # Page DID get marked despite activity append failing.
+    assert "agent_written: false" in p.read_text(encoding="utf-8")
+    items = alerts.list()
+    assert any(
+        a.kind == "handler_error"
+        and "activity log append failed" in a.message
+        for a in items
+    )
+
+
+def test_activity_append_uses_single_clock_value(tmp_path: Path):
+    """timestamp and metadata.detected_at must come from the same clock call."""
+    vault = tmp_path / "vault"
+    p = _seed_page(vault, "wiki/entities/foo.md")
+    _make_old(p)
+
+    # 1st: mark frontmatter; 2nd: captured ts inside _append_activity;
+    # 3rd: would be a second clock() call in append — must NOT be reached.
+    times = iter(
+        [
+            datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+            datetime(2026, 4, 27, 14, 0, 1, tzinfo=UTC),
+            datetime(2026, 4, 27, 14, 0, 9, tzinfo=UTC),
+        ]
+    )
+    h = VaultChangeHandler(
+        vault, OurWritesTracker(ttl_s=60.0), Alerts(), clock=lambda: next(times)
+    )
+    h.on_modified(FileModifiedEvent(str(p)))
+
+    from claude_mnemos.state.activity import ActivityLog
+
+    log = ActivityLog.load(vault)
+    e = log.entries[0]
+    # Both fields must equal the one ts captured inside _append_activity.
+    assert e.timestamp.isoformat().startswith("2026-04-27T14:00:01")
+    assert e.metadata["detected_at"].startswith("2026-04-27T14:00:01")
+
+
 def test_clock_is_used_for_last_human_edit(tmp_path: Path):
     vault = tmp_path / "vault"
     p = _seed_page(vault, "wiki/entities/foo.md")

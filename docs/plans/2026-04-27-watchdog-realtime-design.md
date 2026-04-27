@@ -377,20 +377,15 @@ class VaultChangeHandler(FileSystemEventHandler):
 
     def _mark_human_edited(self, path: Path) -> None:
         # Acquire pipeline_lock so we don't race ingest. If busy, just alert.
+        # NOTE 2026-04-27: the mtime-based ingest-freshness heuristic that was
+        # originally documented here was REMOVED in commit 7641e2d. write_text
+        # on a real human edit also bumps mtime, so the heuristic blocked
+        # legitimate edits — it was a false-friend, not a true filter for ingest
+        # writes. Concurrent CLI ingest false-positive remains a documented
+        # known limitation, closed in Plan #11+ (daemon-as-orchestrator).
         try:
             with pipeline_lock(self.vault, timeout=5.0):
                 page = read_page(path)
-                # Heuristic against ingest-write false positives:
-                # if file was created < 10s ago and page reports agent_written=True
-                # with no last_human_edit, this is likely an ingest write that
-                # arrived as on_modified due to atomic replace. Skip.
-                stat = path.stat()
-                age_s = time.time() - stat.st_mtime
-                if age_s < 10.0 and page.frontmatter.agent_written and page.frontmatter.last_human_edit is None:
-                    return
-                if not page.frontmatter.agent_written:
-                    # Already marked human-edited; just bump last_human_edit and append activity once per write
-                    pass
                 new_fm = page.frontmatter.model_copy(update={
                     "agent_written": False,
                     "last_human_edit": self.clock(),
