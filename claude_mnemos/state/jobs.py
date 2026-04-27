@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -140,6 +141,11 @@ class JobStore:
 
         self._conn = conn
         self._closed = False
+        # Serializes transactional methods (claim_next_ready, mark_*) on this
+        # connection. sqlite3 with isolation_level=None still auto-starts
+        # implicit transactions on DML, so cross-thread calls can collide on
+        # BEGIN IMMEDIATE; this lock keeps the test contract simple.
+        self._tx_lock = threading.Lock()
 
     def __enter__(self) -> JobStore:
         return self
@@ -221,3 +227,104 @@ class JobStore:
             "SELECT status, COUNT(*) FROM jobs GROUP BY status"
         )
         return {row[0]: int(row[1]) for row in cur.fetchall()}
+
+    def claim_next_ready(self, *, now: datetime) -> Job | None:
+        """Pull the oldest queued job with next_attempt_at <= now and mark it
+        running. Atomic via BEGIN IMMEDIATE — concurrent claimers never get the
+        same row."""
+        with self._tx_lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._conn.execute(
+                    """
+                    SELECT * FROM jobs
+                    WHERE status='queued' AND next_attempt_at <= ?
+                    ORDER BY created_at
+                    LIMIT 1
+                    """,
+                    (_ts(now),),
+                ).fetchone()
+                if row is None:
+                    self._conn.execute("COMMIT")
+                    return None
+                self._conn.execute(
+                    "UPDATE jobs SET status='running', started_at=? WHERE id=?",
+                    (_ts(now), row["id"]),
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+
+        # Re-read row with running fields populated
+        return self.get_by_id(row["id"])
+
+    def mark_succeeded(self, job_id: str, *, finished_at: datetime) -> None:
+        self._conn.execute(
+            """
+            UPDATE jobs
+            SET status='succeeded', finished_at=?, error=NULL, error_traceback=NULL
+            WHERE id=?
+            """,
+            (_ts(finished_at), job_id),
+        )
+
+    def mark_failed_with_retry(
+        self,
+        job_id: str,
+        *,
+        error: str,
+        traceback: str,
+        finished_at: datetime,
+    ) -> Job:
+        """Increment attempt; if attempt >= MAX_ATTEMPTS, mark dead_letter
+        else mark queued with next_attempt_at += backoff(attempt-1)."""
+        with self._tx_lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._conn.execute(
+                    "SELECT attempt FROM jobs WHERE id=?", (job_id,)
+                ).fetchone()
+                if row is None:
+                    self._conn.execute("COMMIT")
+                    raise KeyError(job_id)
+                new_attempt = int(row["attempt"]) + 1
+                if new_attempt >= MAX_ATTEMPTS:
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='dead_letter', attempt=?, finished_at=?,
+                            error=?, error_traceback=?
+                        WHERE id=?
+                        """,
+                        (new_attempt, _ts(finished_at), error, traceback, job_id),
+                    )
+                else:
+                    # retry: pick delay based on attempt index (0-based into RETRY_DELAYS_S)
+                    delay_idx = min(new_attempt - 1, len(RETRY_DELAYS_S) - 1)
+                    next_at = _ts(finished_at) + RETRY_DELAYS_S[delay_idx]
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='queued', attempt=?, next_attempt_at=?,
+                            finished_at=?, error=?, error_traceback=?,
+                            started_at=NULL
+                        WHERE id=?
+                        """,
+                        (
+                            new_attempt,
+                            next_at,
+                            _ts(finished_at),
+                            error,
+                            traceback,
+                            job_id,
+                        ),
+                    )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+
+        result = self.get_by_id(job_id)
+        assert result is not None
+        return result

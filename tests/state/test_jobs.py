@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -6,8 +7,10 @@ from claude_mnemos.state.jobs import (
     JOBS_DB_FILENAME,
     MAX_ATTEMPTS,
     RETRY_DELAYS_S,
+    Job,
     JobsCorruptError,
     JobStore,
+    _ts,
 )
 
 
@@ -120,3 +123,121 @@ def test_close_idempotent(tmp_path: Path):
     store = JobStore(tmp_path / JOBS_DB_FILENAME)
     store.close()
     store.close()  # second close must not raise
+
+
+def test_claim_next_ready_returns_oldest_ready(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        a = store.create(kind="ingest", payload={"transcript_path": "/a"})
+        b = store.create(kind="ingest", payload={"transcript_path": "/b"})
+        # 'a' is older
+        claimed = store.claim_next_ready(now=datetime.now(UTC))
+        assert claimed is not None
+        assert claimed.id == a.id
+        assert claimed.status == "running"
+        assert claimed.started_at is not None
+        # second claim returns 'b'
+        claimed2 = store.claim_next_ready(now=datetime.now(UTC))
+        assert claimed2 is not None
+        assert claimed2.id == b.id
+
+
+def test_claim_next_ready_skips_future(tmp_path: Path):
+    """Jobs with next_attempt_at > now must NOT be claimed."""
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        store.create(kind="ingest", payload={"transcript_path": "/future"})
+        # Bump next_attempt_at to far future
+        store._conn.execute(
+            "UPDATE jobs SET next_attempt_at = ?",
+            (_ts(datetime(2099, 1, 1, tzinfo=UTC)),),
+        )
+        claimed = store.claim_next_ready(now=datetime.now(UTC))
+        assert claimed is None
+
+
+def test_claim_next_ready_returns_none_when_empty(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        assert store.claim_next_ready(now=datetime.now(UTC)) is None
+
+
+def test_mark_succeeded_transitions_state(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store.claim_next_ready(now=datetime.now(UTC))
+        store.mark_succeeded(job.id, finished_at=datetime.now(UTC))
+        loaded = store.get_by_id(job.id)
+        assert loaded is not None
+        assert loaded.status == "succeeded"
+        assert loaded.finished_at is not None
+        assert loaded.error is None
+
+
+def test_mark_failed_with_retry_first_failure_requeues(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store.claim_next_ready(now=datetime.now(UTC))
+        finished = datetime.now(UTC)
+        updated = store.mark_failed_with_retry(
+            job.id, error="boom", traceback="Traceback...", finished_at=finished
+        )
+        assert updated.status == "queued"
+        assert updated.attempt == 1
+        # Retry delay = RETRY_DELAYS_S[0] = 30s after finished_at
+        delta = (updated.next_attempt_at - finished).total_seconds()
+        assert 29.5 < delta < 30.5
+
+
+def test_mark_failed_with_retry_max_attempts_to_dead_letter(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        # Simulate 3 prior failed retries — set attempt=3 directly
+        store._conn.execute("UPDATE jobs SET attempt=3 WHERE id=?", (job.id,))
+        store.claim_next_ready(now=datetime.now(UTC))
+        updated = store.mark_failed_with_retry(
+            job.id, error="boom", traceback="tb", finished_at=datetime.now(UTC)
+        )
+        # attempt=3 + 1 = 4 = MAX_ATTEMPTS -> dead_letter
+        assert updated.status == "dead_letter"
+        assert updated.attempt == 4
+        assert updated.error == "boom"
+        assert updated.error_traceback == "tb"
+
+
+def test_mark_failed_with_retry_records_error(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store.claim_next_ready(now=datetime.now(UTC))
+        store.mark_failed_with_retry(
+            job.id, error="msg", traceback="tb", finished_at=datetime.now(UTC)
+        )
+        loaded = store.get_by_id(job.id)
+        assert loaded is not None
+        assert loaded.error == "msg"
+        assert loaded.error_traceback == "tb"
+
+
+def test_concurrent_claim_returns_distinct(tmp_path: Path):
+    """Two parallel claim_next_ready against same DB never return same job."""
+    import threading
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        for i in range(10):
+            store.create(kind="ingest", payload={"transcript_path": f"/p{i}"})
+        results: list[Job] = []
+        lock = threading.Lock()
+
+        def worker():
+            while True:
+                claimed = store.claim_next_ready(now=datetime.now(UTC))
+                if claimed is None:
+                    return
+                with lock:
+                    results.append(claimed)
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        ids = [j.id for j in results]
+        assert len(ids) == 10
+        assert len(set(ids)) == 10  # all distinct
