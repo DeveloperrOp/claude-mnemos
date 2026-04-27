@@ -21,19 +21,22 @@ LINT_RESULTS_FILENAME = ".lint-results.json"
 def load_last_report(vault: Path) -> LintReport | None:
     """Load <vault>/.lint-results.json. Returns None if missing.
 
-    Raises LintCorruptError if the file exists but is invalid JSON or fails
-    Pydantic schema validation.
+    Raises LintCorruptError if the file is invalid JSON or fails Pydantic
+    schema validation. Two-step parse so each error path produces an
+    accurate message.
     """
     path = vault / LINT_RESULTS_FILENAME
     if not path.is_file():
         return None
+    text = path.read_text(encoding="utf-8")
     try:
-        text = path.read_text(encoding="utf-8")
-        return LintReport.model_validate_json(text)
+        data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise LintCorruptError(
             f"lint results at {path} is not valid JSON: {exc}"
         ) from exc
+    try:
+        return LintReport.model_validate(data)
     except ValidationError as exc:
         raise LintCorruptError(
             f"lint results at {path} fails schema: {exc}"
