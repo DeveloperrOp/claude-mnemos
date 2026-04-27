@@ -125,13 +125,21 @@ body
         # Page mutation should be reflected.
         assert "agent_written: false" in page.read_text(encoding="utf-8")
 
-        # /alerts should not contain handler errors for the normal path.
+        # /alerts should not contain unexpected handler errors for the normal
+        # path. The daemon adds an informational handler_error when its vault
+        # isn't registered in project-map (Plan #13b-α Task 7); that one is
+        # expected here since this E2E uses an ad-hoc tmp vault.
         r = httpx.get(f"http://127.0.0.1:{port}/alerts", timeout=2.0)
         assert r.status_code == 200
         # external_create alerts may exist (initial write was external from
         # daemon's perspective) — they're informational, not errors.
-        kinds = {a["kind"] for a in r.json()}
-        assert "handler_error" not in kinds
+        unexpected = [
+            a
+            for a in r.json()
+            if a["kind"] == "handler_error"
+            and "not registered in project-map" not in a["message"]
+        ]
+        assert not unexpected, f"unexpected handler_error alerts: {unexpected}"
 
     finally:
         with contextlib.suppress(psutil.NoSuchProcess):
