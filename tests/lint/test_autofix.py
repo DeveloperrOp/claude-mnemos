@@ -138,3 +138,45 @@ def test_autofix_fix_wikilink_typo(tmp_path: Path) -> None:
     text = (tmp_path / rel).read_text(encoding="utf-8")
     assert "[[file-lock-bug]]" in text
     assert "[[file-lock-bub]]" not in text
+
+
+def test_autofix_skips_page_now_unparsable(tmp_path: Path) -> None:
+    """If a page changed to invalid content between lint run and autofix,
+    it's recorded in errors and other pages still fix."""
+    rel_ok = "wiki/entities/ok.md"
+    rel_broken = "wiki/entities/broken.md"
+    _seed(tmp_path, rel_ok, "ok line  \n")
+    p = tmp_path / rel_broken
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("not a markdown page", encoding="utf-8")  # broken now
+
+    findings = [_ws_finding(rel_ok), _ws_finding(rel_broken)]
+    findings[1] = LintFinding(
+        id="trailing_whitespace:beef",
+        rule_id="trailing_whitespace",
+        severity=LintSeverity.INFO,
+        message="m",
+        page_path=rel_broken,
+        fixable=True,
+        fix_kind=LintFixKind.STRIP_TRAILING_WS,
+        metadata={"lines": [1]},
+    )
+    result = apply_autofix(tmp_path, _report_with(findings))
+    assert result.success is False
+    assert result.fixed_findings == ["trailing_whitespace:abcd1234"]
+    assert len(result.errors) == 1
+    assert result.errors[0][0] == "trailing_whitespace:beef"
+    # ok page actually fixed
+    assert "ok line  " not in (tmp_path / rel_ok).read_text(encoding="utf-8")
+
+
+def test_autofix_skips_page_deleted_between_run_and_fix(tmp_path: Path) -> None:
+    rel = "wiki/entities/missing.md"
+    findings = [_ws_finding(rel)]
+    result = apply_autofix(tmp_path, _report_with(findings))
+    assert result.success is False
+    assert result.fixed_findings == []
+    assert len(result.errors) == 1
+    assert result.errors[0][0] == "trailing_whitespace:abcd1234"
+    assert result.snapshot_path is None  # no staging opened
+    assert result.activity_id is None

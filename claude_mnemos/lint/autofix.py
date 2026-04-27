@@ -80,18 +80,52 @@ def apply_autofix(
     for f in applicable:
         by_page[f.page_path].append(f)
 
-    op_id = uuid4().hex
-    with (
-        pipeline_lock(vault, timeout=cfg.lock_timeout),
-        StagingTransaction(vault, op_id, operation_type="lint_fix") as txn,
-    ):
-        for page_rel, fixes in by_page.items():
-            full = vault / page_rel
+    # Pre-pass: parse and apply fixes in memory so a broken page doesn't abort
+    # the whole batch or open a useless StagingTransaction.
+    fixed_findings: list[str] = []
+    errors: list[tuple[str, str]] = []
+    prepared: list[tuple[str, str]] = []  # (page_rel, serialized_content)
+    fixed_by_page: dict[str, list[LintFinding]] = {}
+
+    for page_rel, fixes in by_page.items():
+        full = vault / page_rel
+        try:
             parsed = read_page(full)
             new_parsed = parsed
             for fix in fixes:
                 new_parsed = _apply_fix(new_parsed, fix)
-            txn.write(Path(page_rel), serialize_page(new_parsed))
+            content = serialize_page(new_parsed)
+        except (FileNotFoundError, OSError) as exc:
+            errors.append((fixes[0].id, f"page unreadable: {exc}"))
+            continue
+        except Exception as exc:  # PageParseError + anything else from _apply_fix
+            errors.append((fixes[0].id, f"{type(exc).__name__}: {exc}"))
+            continue
+        prepared.append((page_rel, content))
+        fixed_by_page[page_rel] = fixes
+        fixed_findings.extend(f.id for f in fixes)
+
+    if not prepared:
+        # All pages failed (or none were applicable after errors). Surface
+        # errors but skip staging/activity entirely — symmetrical with the
+        # empty-applicable case.
+        return AutofixResult(
+            success=len(errors) == 0,
+            snapshot_path=None,
+            fixed_findings=[],
+            skipped_findings=skipped,
+            errors=errors,
+            activity_id=None,
+        )
+
+    op_id = uuid4().hex
+    fixed_findings_objs = [f for fixes in fixed_by_page.values() for f in fixes]
+    with (
+        pipeline_lock(vault, timeout=cfg.lock_timeout),
+        StagingTransaction(vault, op_id, operation_type="lint_fix") as txn,
+    ):
+        for page_rel, content in prepared:
+            txn.write(Path(page_rel), content)
 
         snap = txn.pre_promote_snapshot_path()
         activity = ActivityLog.load(vault)
@@ -103,10 +137,10 @@ def apply_autofix(
                 status="success",
                 snapshot_path=snap.relative_to(vault).as_posix(),
                 can_undo=True,
-                affected_pages=sorted({f.page_path for f in applicable}),
+                affected_pages=sorted(fixed_by_page.keys()),
                 metadata={
-                    "fixed_finding_ids": [f.id for f in applicable],
-                    "rule_breakdown": _count_by_rule(applicable),
+                    "fixed_finding_ids": fixed_findings,
+                    "rule_breakdown": _count_by_rule(fixed_findings_objs),
                 },
             )
         )
@@ -115,11 +149,11 @@ def apply_autofix(
         promote = txn.promote_to_vault(tracker=tracker)
 
     return AutofixResult(
-        success=True,
+        success=len(errors) == 0,
         snapshot_path=promote.snapshot,
-        fixed_findings=[f.id for f in applicable],
+        fixed_findings=fixed_findings,
         skipped_findings=skipped,
-        errors=[],
+        errors=errors,
         activity_id=op_id,
     )
 
