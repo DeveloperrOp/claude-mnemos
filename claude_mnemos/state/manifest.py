@@ -28,6 +28,8 @@ class IngestRecord(BaseModel):
     model: str | None
     input_tokens: int | None
     output_tokens: int | None
+    transcript_path: str | None = None
+    raw_transcript_bytes: int | None = None
 
 
 class Manifest(BaseModel):
