@@ -43,7 +43,8 @@ async def test_ingest_handler_invokes_ingest_with_payload(tmp_path: Path):
 
     assert len(calls) == 1
     assert calls[0]["vault_root"] == tmp_path
-    assert calls[0]["extract"] is True
+    # extract downgraded to False because llm_factory returned None (no API key)
+    assert calls[0]["extract"] is False
     assert calls[0]["dry_run"] is False
     assert calls[0]["llm_client"] is None
 
@@ -84,3 +85,41 @@ async def test_ingest_handler_payload_overrides(tmp_path: Path):
     }))
     assert seen["extract"] is False
     assert seen["dry_run"] is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_keeps_extract_true_when_llm_present(tmp_path: Path):
+    seen: dict = {}
+
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+        seen["extract"] = extract
+        seen["llm_client"] = llm_client
+
+    fake_llm = object()
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: fake_llm,
+        ingest_fn=fake_ingest,
+    )
+    await handler.run(_job({"transcript_path": "/x.jsonl"}))
+    assert seen["extract"] is True
+    assert seen["llm_client"] is fake_llm
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_downgrades_extract_when_no_llm(tmp_path: Path):
+    seen: dict = {}
+
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+        seen["extract"] = extract
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,
+        ingest_fn=fake_ingest,
+    )
+    # Payload requests extract=True, but llm is None → downgrade
+    await handler.run(_job({"transcript_path": "/x.jsonl", "extract": True}))
+    assert seen["extract"] is False

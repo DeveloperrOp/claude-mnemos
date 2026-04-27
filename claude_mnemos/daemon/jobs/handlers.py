@@ -40,11 +40,16 @@ class IngestHandler:
 
     async def run(self, job: Job) -> None:
         transcript_path = Path(job.payload["transcript_path"])
-        extract = bool(job.payload.get("extract", True))
+        extract_requested = bool(job.payload.get("extract", True))
         dry_run = bool(job.payload.get("dry_run", False))
 
         cfg = self._cfg_factory()
-        llm = self._llm_factory(cfg) if extract else None
+        llm = self._llm_factory(cfg) if extract_requested else None
+        # If extract was requested but no LLM client available (e.g. no API
+        # key), downgrade to raw_only ingest. Avoids dead_letter spam for
+        # users without ANTHROPIC_API_KEY — the transcript still lands in
+        # raw/chats/, just no wiki extraction.
+        effective_extract = extract_requested and llm is not None
 
         await asyncio.to_thread(
             self._ingest_fn,
@@ -52,7 +57,7 @@ class IngestHandler:
             self._vault,
             cfg=cfg,
             llm_client=llm,
-            extract=extract,
+            extract=effective_extract,
             dry_run=dry_run,
             today=date.today(),
         )
