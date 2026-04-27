@@ -95,6 +95,18 @@ async def import_route(
                 },
             )
         transcript_path = match.transcript_path
+    else:
+        # Body-supplied path: validate the file exists before queuing,
+        # mirroring /jobs and /sessions/{sid}/ingest. Without this the
+        # worker would dead-letter after MAX_ATTEMPTS retries.
+        if not Path(transcript_path).is_file():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "transcript_not_found",
+                    "transcript_path": transcript_path,
+                },
+            )
     daemon = request.app.state.daemon
     if daemon is None or getattr(daemon, "job_store", None) is None:
         raise HTTPException(

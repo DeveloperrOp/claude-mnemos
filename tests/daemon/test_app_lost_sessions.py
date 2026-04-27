@@ -99,6 +99,17 @@ async def test_post_import_success(client, tmp_path: Path, transcripts_root: Pat
     assert body["payload"]["transcript_path"].endswith("lostie.jsonl")
 
 
+async def test_post_import_with_nonexistent_transcript_returns_400(
+    client, daemon, transcripts_root: Path
+):
+    r = await client.post(
+        "/lost-sessions/sid-x/import",
+        json={"transcript_path": "/no/such/file.jsonl"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "transcript_not_found"
+
+
 async def test_post_ignore_adds_sha(client, tmp_path: Path, transcripts_root: Path):
     (transcripts_root / "skipme.jsonl").write_text("zzz", encoding="utf-8")
     r = await client.post("/lost-sessions/skipme/ignore", json={})
