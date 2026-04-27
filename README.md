@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#12 в `main`. Готовы:
+`0.0.1` — Plans #1-#13a в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -19,6 +19,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Lint** (Plan #10): 8 structural rules + 1 synthetic (`page_parse_failed`) — `wikilinks_broken` (with Levenshtein-typo autofix), `orphan_pages`, `stale_pages`, `duplicate_titles`, `provenance_inferred_high`, `provenance_ambiguous_high`, `trailing_whitespace`, `missing_required_frontmatter`. Cached report in `<vault>/.lint-results.json`. Safe autofix whitelist runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. CLI `mnemos lint {run, results, autofix}`, REST `POST /lint/run|autofix` + `GET /lint/results`, MCP `run_lint` + `get_lint_results` (12→14 tools).
 - **Jobs queue + Dead-letter** (Plan #11): persistent SQLite-backed queue at `<vault>/.jobs.db` (excluded from snapshots). `IngestHandler` runs the existing sync ingest in `asyncio.to_thread`, with retry policy 4 attempts × backoff 30s/2min/20min. SessionEnd hook now prefers `POST /jobs` over the detached subprocess (closes Plan #9 watchdog false-positive). REST `POST/GET/DELETE /jobs`, `GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`. CLI `mnemos jobs {list, show, cancel, retry-dead, dismiss}`. Health response gains `jobs_queued/running/dead_letter/jobs_alert` (alert at >10 dead-letter).
 - **Page edit + Trash** (Plan #12): direct page mutations (edit/verify/archive/delete) and trash management (list/restore/dismiss/empty). All mutations route through `StagingTransaction` with pre-op snapshot — undo via `mnemos undo` reverts everything. `.trash/<id>/.metadata.json` carries `original_path` so restore puts content back to its original location. REST `PATCH/POST/DELETE /pages/{ref:path}` + `GET/POST/DELETE /trash`. CLI `mnemos page {edit, verify, archive, delete}` and `mnemos trash {list, restore, dismiss, empty}`. New activity types: `manual_edit`, `manual_delete` (undoable), `manual_restore_trash` (undoable), `trash_dismissed`, `trash_emptied` (audit-only).
+- **Sessions + Lost-sessions + Token metrics** (Plan #13a): backend views of session lifecycle (merged manifest IngestRecord + jobs queue), lost-session scanner over `~/.claude/projects/` with cache + ignore-list, token usage aggregations (per-period summary, per-project, top-sessions, daily timeline). Manifest extended with `transcript_path` + `raw_transcript_bytes` (cross-ref + compression metric). New state file `<vault>/.lost-sessions-ignore.json`. REST `/sessions/*` + `/lost-sessions/*` + `/metrics/usage*`. CLI `mnemos {sessions, lost-sessions, metrics} ...`. Multi-vault `by-project` returns single entry — multi-vault routing → Plan #13b.
 
 ## Установка
 
@@ -277,9 +278,30 @@ REST: PATCH/POST/DELETE on `/pages/{page_ref:path}{,/verify,/archive}` + GET/POS
 
 Trash entries with `.metadata.json` (`original_path`, `operation_id`, etc.) are restorable. Old trash dirs from before Plan #12 (no metadata) are listed but not restorable.
 
+## Sessions + Metrics
+
+Backend views on session lifecycle, lost transcripts, and token usage.
+
+```bash
+mnemos sessions list --vault <path> [--status STATUS] [--limit N]
+mnemos sessions show <session_id> --vault <path>
+mnemos sessions ingest <transcript_path> --vault <path>      # → POST /jobs queue
+
+mnemos lost-sessions list --vault <path>
+mnemos lost-sessions scan --vault <path>                      # rescan ~/.claude/projects/
+mnemos lost-sessions import <session_id> --vault <path>       # enqueue ingest
+mnemos lost-sessions ignore <session_id> --vault <path>
+
+mnemos metrics usage --vault <path> [--period 30d]
+mnemos metrics top-sessions --vault <path> [--limit 10]
+mnemos metrics timeline --vault <path> [--period 30d]
+```
+
+REST: `/sessions/*` (merged manifest + jobs view), `/lost-sessions/*` (scanner with cache + ignore list), `/metrics/usage*` (summary, by-project, top-sessions, timeline). Manifest extended with `transcript_path` + `raw_transcript_bytes` for cross-ref + compression metric. New state file: `<vault>/.lost-sessions-ignore.json`.
+
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~830 тестов)
-pytest -q -m slow      # медленные E2E (~10 тестов: subprocess daemon + watchdog + jobs + pages E2E)
+pytest -q              # быстрые (924 теста + 2 skipped)
+pytest -q -m slow      # медленные E2E (11 тестов + 2 skipped: subprocess daemon + watchdog + jobs + pages E2E)
 ```
