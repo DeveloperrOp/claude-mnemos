@@ -241,3 +241,111 @@ def test_concurrent_claim_returns_distinct(tmp_path: Path):
         ids = [j.id for j in results]
         assert len(ids) == 10
         assert len(set(ids)) == 10  # all distinct
+
+
+def test_recover_zombie_running_requeues(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        a = store.create(kind="ingest", payload={"transcript_path": "/a"})
+        b = store.create(kind="ingest", payload={"transcript_path": "/b"})
+        store.claim_next_ready(now=datetime.now(UTC))
+        store.claim_next_ready(now=datetime.now(UTC))
+        result = store.recover_zombie_running()
+        assert result.requeued == 2
+        assert result.moved_to_dead_letter == 0
+        for job_id in (a.id, b.id):
+            loaded = store.get_by_id(job_id)
+            assert loaded is not None
+            assert loaded.status == "queued"
+            assert loaded.attempt == 1
+
+
+def test_recover_zombie_running_moves_to_dead_letter_when_max(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        # Pre-set attempt=3 (next failure → 4 = MAX → dead_letter)
+        store._conn.execute("UPDATE jobs SET attempt=3 WHERE id=?", (job.id,))
+        store.claim_next_ready(now=datetime.now(UTC))
+        result = store.recover_zombie_running()
+        assert result.requeued == 0
+        assert result.moved_to_dead_letter == 1
+        loaded = store.get_by_id(job.id)
+        assert loaded is not None
+        assert loaded.status == "dead_letter"
+        assert loaded.attempt == 4
+        assert "crashed" in (loaded.error or "").lower()
+
+
+def test_recover_zombie_running_noop_when_nothing_running(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        store.create(kind="ingest", payload={"transcript_path": "/x"})
+        result = store.recover_zombie_running()
+        assert result.requeued == 0
+        assert result.moved_to_dead_letter == 0
+
+
+def test_cancel_queued_succeeds(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        assert store.cancel_queued(job.id) is True
+        loaded = store.get_by_id(job.id)
+        assert loaded is None  # cancel = delete
+
+
+def test_cancel_running_fails(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store.claim_next_ready(now=datetime.now(UTC))
+        assert store.cancel_queued(job.id) is False
+        loaded = store.get_by_id(job.id)
+        assert loaded is not None
+        assert loaded.status == "running"
+
+
+def test_cancel_missing_returns_false(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        assert store.cancel_queued("nonexistent") is False
+
+
+def test_restore_from_dead_letter(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        # Force into dead_letter
+        store._conn.execute(
+            "UPDATE jobs SET status='dead_letter', attempt=4, error='boom' WHERE id=?",
+            (job.id,),
+        )
+        restored = store.restore_from_dead_letter(job.id)
+        assert restored.status == "queued"
+        assert restored.attempt == 0
+        assert restored.error is None
+
+
+def test_restore_from_dead_letter_missing_raises(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store, pytest.raises(KeyError):
+        store.restore_from_dead_letter("nonexistent")
+
+
+def test_restore_from_dead_letter_wrong_status_raises(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        # status is queued, not dead_letter
+        with pytest.raises(ValueError):
+            store.restore_from_dead_letter(job.id)
+
+
+def test_dismiss_dead_letter(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store._conn.execute(
+            "UPDATE jobs SET status='dead_letter' WHERE id=?", (job.id,)
+        )
+        assert store.dismiss_dead_letter(job.id) is True
+        assert store.get_by_id(job.id) is None
+
+
+def test_dismiss_dead_letter_wrong_status_returns_false(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        # status=queued
+        assert store.dismiss_dead_letter(job.id) is False
+        assert store.get_by_id(job.id) is not None

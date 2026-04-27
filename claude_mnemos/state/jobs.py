@@ -13,6 +13,7 @@ import contextlib
 import json
 import sqlite3
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -32,6 +33,12 @@ JobKind = Literal["ingest"]
 
 class JobsCorruptError(ValueError):
     """Raised when .jobs.db is unreadable or has an unknown schema version."""
+
+
+@dataclass(frozen=True)
+class RecoveryResult:
+    requeued: int = 0
+    moved_to_dead_letter: int = 0
 
 
 class Job(BaseModel):
@@ -328,3 +335,88 @@ class JobStore:
         result = self.get_by_id(job_id)
         assert result is not None
         return result
+
+    # — recovery + admin —
+
+    def recover_zombie_running(self) -> RecoveryResult:
+        """Called once on daemon startup. For each status=running job:
+        - if attempt + 1 < MAX_ATTEMPTS → status=queued, attempt+=1, next_attempt_at=now
+        - else → status=dead_letter, error='daemon crashed during execution'.
+        """
+        now_dt = datetime.now(UTC)
+        requeued = 0
+        moved = 0
+        with self._tx_lock:
+            rows = self._conn.execute(
+                "SELECT id, attempt FROM jobs WHERE status='running'"
+            ).fetchall()
+            for row in rows:
+                new_attempt = int(row["attempt"]) + 1
+                if new_attempt >= MAX_ATTEMPTS:
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='dead_letter', attempt=?, finished_at=?,
+                            error=?, error_traceback=NULL
+                        WHERE id=?
+                        """,
+                        (
+                            new_attempt,
+                            _ts(now_dt),
+                            "daemon crashed during execution",
+                            row["id"],
+                        ),
+                    )
+                    moved += 1
+                else:
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='queued', attempt=?, next_attempt_at=?,
+                            started_at=NULL
+                        WHERE id=?
+                        """,
+                        (new_attempt, _ts(now_dt), row["id"]),
+                    )
+                    requeued += 1
+        return RecoveryResult(requeued=requeued, moved_to_dead_letter=moved)
+
+    def cancel_queued(self, job_id: str) -> bool:
+        with self._tx_lock:
+            cur = self._conn.execute(
+                "DELETE FROM jobs WHERE id=? AND status='queued'", (job_id,)
+            )
+            return cur.rowcount > 0
+
+    def restore_from_dead_letter(self, job_id: str) -> Job:
+        with self._tx_lock:
+            row = self._conn.execute(
+                "SELECT status FROM jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(job_id)
+            if row["status"] != "dead_letter":
+                raise ValueError(
+                    f"job {job_id} is in status {row['status']!r}, not dead_letter"
+                )
+            now = datetime.now(UTC)
+            self._conn.execute(
+                """
+                UPDATE jobs
+                SET status='queued', attempt=0, next_attempt_at=?,
+                    started_at=NULL, finished_at=NULL,
+                    error=NULL, error_traceback=NULL
+                WHERE id=?
+                """,
+                (_ts(now), job_id),
+            )
+        result = self.get_by_id(job_id)
+        assert result is not None
+        return result
+
+    def dismiss_dead_letter(self, job_id: str) -> bool:
+        with self._tx_lock:
+            cur = self._conn.execute(
+                "DELETE FROM jobs WHERE id=? AND status='dead_letter'", (job_id,)
+            )
+            return cur.rowcount > 0
