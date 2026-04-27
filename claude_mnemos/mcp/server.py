@@ -20,6 +20,7 @@ from claude_mnemos.mcp.errors import (
     format_error,
 )
 from claude_mnemos.mcp.read_tools import (
+    get_lint_results,
     get_recent_activity,
     get_status,
     list_pages,
@@ -33,6 +34,7 @@ from claude_mnemos.mcp.write_tools import (
     delete_snapshot,
     propose_ontology_change,
     restore_snapshot,
+    run_lint,
     undo_operation,
 )
 
@@ -135,6 +137,22 @@ TOOL_DEFS: list[types.Tool] = [
         ),
         inputSchema=schemas.PROPOSE_ONTOLOGY_CHANGE,
     ),
+    types.Tool(
+        name="get_lint_results",
+        description=(
+            "Read the cached lint report from <vault>/.lint-results.json. "
+            "Returns 'no lint run yet' if no report has been produced."
+        ),
+        inputSchema=schemas.GET_LINT_RESULTS,
+    ),
+    types.Tool(
+        name="run_lint",
+        description=(
+            "Run lint check across the vault via the daemon (POST /lint/run). "
+            "Saves results to <vault>/.lint-results.json. Daemon must be running."
+        ),
+        inputSchema=schemas.RUN_LINT,
+    ),
 ]
 
 TOOL_NAMES = {t.name for t in TOOL_DEFS}
@@ -153,6 +171,8 @@ async def _dispatch_read(
     name: str, arguments: dict[str, Any], config: MCPConfig
 ) -> list[types.TextContent]:
     vault = config.vault_root
+    if name == "get_lint_results":
+        return await get_lint_results(vault)
     result: Any
     if name == "list_pages":
         result = await asyncio.to_thread(
@@ -198,6 +218,8 @@ async def _dispatch_read(
 async def _dispatch_write(
     name: str, arguments: dict[str, Any], config: MCPConfig
 ) -> list[types.TextContent]:
+    if name == "run_lint":
+        return await run_lint(config.daemon_url, timeout_s=config.daemon_timeout_s)
     timeout = httpx.Timeout(config.daemon_timeout_s)
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -255,6 +277,7 @@ READ_TOOL_NAMES = {
     "get_status",
     "get_recent_activity",
     "list_suggestions",
+    "get_lint_results",
 }
 WRITE_TOOL_NAMES = {
     "undo_operation",
@@ -263,6 +286,7 @@ WRITE_TOOL_NAMES = {
     "delete_snapshot",
     "apply_ontology_suggestion",
     "propose_ontology_change",
+    "run_lint",
 }
 
 

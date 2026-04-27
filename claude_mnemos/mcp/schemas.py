@@ -177,3 +177,15 @@ PROPOSE_ONTOLOGY_CHANGE: dict[str, Any] = {
     },
     "additionalProperties": False,
 }
+
+GET_LINT_RESULTS: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {},
+}
+
+RUN_LINT: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {},
+}
