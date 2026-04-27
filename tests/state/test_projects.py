@@ -136,3 +136,11 @@ def test_missing_file_returns_empty(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     store = ProjectStore()
     assert store.list_all() == []
+
+
+def test_two_stores_share_lock(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    s1 = ProjectStore()
+    s2 = ProjectStore()
+    assert s1._lock is s2._lock

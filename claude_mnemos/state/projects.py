@@ -20,7 +20,22 @@ HOME_CONFIG_DIRNAME = ".claude-mnemos"
 PROJECT_MAP_FILENAME = "project-map.json"
 SETTINGS_DIRNAME = "settings"
 
+# Max 64 chars: 1 (leading [a-z0-9]) + 63 (tail [a-z0-9_-]).
 PROJECT_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
+
+
+_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(path: Path) -> threading.Lock:
+    key = str(path.resolve()) if path.exists() else str(path.absolute())
+    with _LOCKS_GUARD:
+        lock = _LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _LOCKS[key] = lock
+        return lock
 
 
 def home_config_dir() -> Path:
@@ -71,7 +86,7 @@ class ProjectStore:
 
     def __init__(self, map_path: Path | None = None) -> None:
         self._path = map_path if map_path is not None else project_map_path()
-        self._lock = threading.Lock()
+        self._lock = _lock_for(self._path)
 
     @property
     def path(self) -> Path:
@@ -82,14 +97,26 @@ class ProjectStore:
             return ProjectMap()
         try:
             raw = self._path.read_text(encoding="utf-8")
-            return ProjectMap.model_validate_json(raw)
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except OSError as exc:
             raise ProjectMapCorruptError(
-                f"project-map at {self._path} is corrupt: {exc}"
+                f"project-map at {self._path} unreadable: {exc}"
+            ) from exc
+        try:
+            return ProjectMap.model_validate_json(raw)
+        except json.JSONDecodeError as exc:
+            raise ProjectMapCorruptError(
+                f"project-map at {self._path} is not valid JSON: {exc}"
+            ) from exc
+        except ValidationError as exc:
+            raise ProjectMapCorruptError(
+                f"project-map at {self._path} fails schema: {exc}"
             ) from exc
 
     def _save(self, pm: ProjectMap) -> None:
-        atomic_write(self._path, json.dumps(pm.model_dump(mode="json"), indent=2))
+        atomic_write(
+            self._path,
+            json.dumps(pm.model_dump(mode="json"), indent=2) + "\n",
+        )
 
     def list_all(self) -> list[ProjectMapEntry]:
         return list(self._load().projects)
@@ -118,6 +145,11 @@ class ProjectStore:
         vault_root: Path | None = None,
         cwd_patterns: list[str] | None = None,
     ) -> ProjectMapEntry:
+        """Update fields of an existing entry.
+
+        ``None`` means "leave unchanged". Pass ``cwd_patterns=[]`` to clear
+        all patterns. Raises ``ProjectNotFoundError`` if name absent.
+        """
         with self._lock:
             pm = self._load()
             for i, e in enumerate(pm.projects):
@@ -145,4 +177,7 @@ class ProjectStore:
             self._save(pm)
             # Cleanup orphan settings file
             sf = project_settings_path(name)
+            # Orphan settings file is preferred over a map entry without data.
+            # If unlink fails (e.g. PermissionError), the map is already updated;
+            # orphan will be overwritten on next add() with the same name.
             sf.unlink(missing_ok=True)
