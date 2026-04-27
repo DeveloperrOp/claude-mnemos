@@ -239,3 +239,19 @@ def test_entry_accepts_ontology_apply_op_type():
         metadata={"suggestion_id": "ont-2026-04-26-aaaaaa", "operation": "merge_entities"},
     )
     assert e.operation_type == "ontology_apply"
+
+
+def test_lint_fix_op_type_accepted():
+    e = ActivityEntry(
+        id=uuid4().hex,
+        timestamp=datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+        operation_type="lint_fix",
+        status="success",
+        snapshot_path=".backups/pre-op-2026-04-27-14-00-00-lint_fix-abc",
+        can_undo=True,
+        affected_pages=["wiki/entities/foo.md"],
+        metadata={"fixed_finding_ids": ["trailing_whitespace:abcd1234"]},
+    )
+    log = ActivityLog()
+    log.append(e)
+    assert log.entries[0].operation_type == "lint_fix"
