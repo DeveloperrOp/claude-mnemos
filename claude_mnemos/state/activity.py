@@ -19,6 +19,11 @@ ActivityOperationType = Literal[
     "ontology_apply",
     "human_edit_detected",
     "lint_fix",
+    "manual_edit",
+    "manual_delete",
+    "manual_restore_trash",
+    "trash_dismissed",
+    "trash_emptied",
 ]
 
 

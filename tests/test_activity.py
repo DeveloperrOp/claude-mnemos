@@ -255,3 +255,36 @@ def test_lint_fix_op_type_accepted():
     log = ActivityLog()
     log.append(e)
     assert log.entries[0].operation_type == "lint_fix"
+
+
+def test_manual_edit_op_type_accepted():
+    e = ActivityEntry(
+        id=uuid4().hex,
+        timestamp=datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+        operation_type="manual_edit",
+        status="success",
+        snapshot_path=".backups/pre-op-...",
+        can_undo=True,
+        affected_pages=["wiki/entities/foo.md"],
+        metadata={"fields_changed": ["status"]},
+    )
+    log = ActivityLog()
+    log.append(e)
+    assert log.entries[0].operation_type == "manual_edit"
+
+
+def test_all_new_op_types_accepted():
+    for op in ("manual_delete", "manual_restore_trash", "trash_dismissed", "trash_emptied"):
+        e = ActivityEntry(
+            id=uuid4().hex,
+            timestamp=datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+            operation_type=op,
+            status="success",
+            snapshot_path=None,
+            can_undo=False,
+            affected_pages=[],
+            metadata={},
+        )
+        log = ActivityLog()
+        log.append(e)
+        assert log.entries[0].operation_type == op
