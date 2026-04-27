@@ -220,6 +220,12 @@ class MnemosDaemon:
         Called by PATCH /settings/{project} when the patched project's
         vault matches our own. Lint-schedule reload is deferred to
         Plan #11+ when the scheduled lint runner exists.
+
+        Thread-safety: this method assumes the daemon runs uvicorn
+        with a single worker (default), so concurrent PATCH requests
+        are serialised on the event loop. Multi-worker deployment is
+        out of scope for Plan #13b-α; #13b-β multi-vault refactor
+        will revisit synchronisation when needed.
         """
         old = self.project_settings
         self.project_settings = new_settings
