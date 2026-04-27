@@ -756,3 +756,16 @@ def test_restore_pauses_tracker_on_snapshot_missing(tmp_path: Path):
     result = restore_from_snapshot(vault, nonexistent, tracker=tracker)
     assert result.success is False
     assert tracker.is_paused is False
+
+
+def test_snapshot_excludes_jobs_db(tmp_path: Path):
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    # Seed the jobs DB and its WAL companions
+    (vault / ".jobs.db").write_bytes(b"sqlite db content")
+    (vault / ".jobs.db-wal").write_bytes(b"wal")
+    (vault / ".jobs.db-shm").write_bytes(b"shm")
+    snap = create_snapshot(vault, operation_id="op-jobs", operation_type="ingest")
+    assert not (snap / ".jobs.db").exists()
+    assert not (snap / ".jobs.db-wal").exists()
+    assert not (snap / ".jobs.db-shm").exists()
