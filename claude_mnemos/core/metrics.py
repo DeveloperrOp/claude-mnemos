@@ -148,7 +148,9 @@ def top_sessions(vault: Path, *, limit: int = 10) -> list[SessionMetric]:
     manifest = Manifest.load(vault)
     metrics = [_record_to_metric(rec) for rec in manifest.ingested.values()]
     metrics.sort(key=lambda m: m.tokens_total or 0, reverse=True)
-    return metrics[:limit]
+    # Clamp negative limit to 0 — Python slice with negative N returns "all
+    # but last N" which would be wrong here; treat negative the same as 0.
+    return metrics[: max(0, limit)]
 
 
 def timeline(

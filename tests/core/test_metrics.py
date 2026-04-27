@@ -204,6 +204,27 @@ def test_top_sessions_sorts_by_total_tokens_desc_and_respects_limit(
     assert result[1].tokens_total == 180
 
 
+def test_top_sessions_negative_limit_returns_empty(tmp_path: Path) -> None:
+    base = datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC)
+    m = Manifest()
+    m.add(
+        "sha-only",
+        _ingest_record(
+            "only",
+            ingested_at=base,
+            input_tokens=100,
+            output_tokens=200,
+            raw_transcript_bytes=10,
+        ),
+    )
+    m.save(tmp_path)
+
+    # Without clamping, negative limits use Python's "all but last N" slice
+    # semantics, which is the wrong behaviour for a "top N" function.
+    assert top_sessions(tmp_path, limit=-1) == []
+    assert top_sessions(tmp_path, limit=-100) == []
+
+
 # ---------------------------------------------------------------------------
 # timeline
 # ---------------------------------------------------------------------------
