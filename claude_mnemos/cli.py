@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -234,6 +235,34 @@ def build_parser() -> argparse.ArgumentParser:
     jobs_dismiss_p.add_argument("job_id")
     jobs_dismiss_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
 
+    # ─── page ─────────────────────────────────────────────────────────────
+    page_parser = sub.add_parser(
+        "page", help="Edit / verify / archive / soft-delete a wiki page"
+    )
+    page_subs = page_parser.add_subparsers(dest="page_cmd", required=True)
+
+    page_edit_p = page_subs.add_parser(
+        "edit", help="Patch frontmatter and/or body of a page (via daemon)"
+    )
+    page_edit_p.add_argument("page_ref")
+    page_edit_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    page_edit_p.add_argument(
+        "--frontmatter",
+        default=None,
+        help='JSON object of frontmatter fields to patch, e.g. \'{"status": "verified"}\'',
+    )
+    page_edit_p.add_argument(
+        "--body-file",
+        type=Path,
+        default=None,
+        help="Path to a file whose contents replace the page body",
+    )
+
+    for cmd in ("verify", "archive", "delete"):
+        sp = page_subs.add_parser(cmd, help=f"{cmd.title()} a page (via daemon)")
+        sp.add_argument("page_ref")
+        sp.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
     return parser
 
 
@@ -253,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_lint(args)
     if args.command == "jobs":
         return _cmd_jobs(args)
+    if args.command == "page":
+        return _cmd_page(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -989,6 +1020,147 @@ def _post_or_delete_to_daemon(
         return 86
     print(f"daemon HTTP {r.status_code}: {r.text}", file=sys.stderr)
     return 86
+
+
+# ─── page / trash ──────────────────────────────────────────────────────────
+
+
+# Exit codes per design §3.6
+_EXIT_DAEMON_OFFLINE = 87
+_EXIT_REF_NOT_FOUND = 88
+_EXIT_COLLISION = 89
+_EXIT_VALIDATION = 90
+
+
+def _daemon_url() -> str:
+    return os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+
+
+def _http_request_to_daemon(
+    method: str,
+    path: str,
+    *,
+    json_body: Mapping[str, object] | None = None,
+    timeout: float = 10.0,
+) -> tuple[httpx.Response | None, int | None]:
+    """Send a request to the daemon. Returns (response, None) on success
+    or (None, exit_code) on transport failure."""
+    url = f"{_daemon_url()}{path}"
+    try:
+        r = httpx.request(method, url, json=json_body, timeout=timeout)
+    except httpx.HTTPError as exc:
+        print(f"daemon unreachable at {_daemon_url()}: {exc}", file=sys.stderr)
+        return None, _EXIT_DAEMON_OFFLINE
+    return r, None
+
+
+def _map_daemon_status_to_exit(status_code: int, body_text: str) -> int:
+    if status_code in (200, 201, 204):
+        return 0
+    if status_code == 404:
+        print(f"not found: {body_text}", file=sys.stderr)
+        return _EXIT_REF_NOT_FOUND
+    if status_code == 409:
+        print(f"conflict: {body_text}", file=sys.stderr)
+        return _EXIT_COLLISION
+    if status_code == 422:
+        print(f"validation error: {body_text}", file=sys.stderr)
+        return _EXIT_VALIDATION
+    print(f"daemon HTTP {status_code}: {body_text}", file=sys.stderr)
+    return 1
+
+
+def _cmd_page(args: argparse.Namespace) -> int:
+    if args.page_cmd == "edit":
+        return _cmd_page_edit(args)
+    if args.page_cmd == "verify":
+        return _cmd_page_verify(args)
+    if args.page_cmd == "archive":
+        return _cmd_page_archive(args)
+    if args.page_cmd == "delete":
+        return _cmd_page_delete(args)
+    print(f"unknown page subcommand: {args.page_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_page_edit(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+
+    fm_patch: dict[str, object] | None = None
+    if args.frontmatter is not None:
+        try:
+            parsed = json.loads(args.frontmatter)
+        except json.JSONDecodeError as exc:
+            print(f"error: --frontmatter is not valid JSON: {exc}", file=sys.stderr)
+            return _EXIT_VALIDATION
+        if not isinstance(parsed, dict):
+            print(
+                "error: --frontmatter must be a JSON object", file=sys.stderr
+            )
+            return _EXIT_VALIDATION
+        fm_patch = parsed
+
+    body_text: str | None = None
+    if args.body_file is not None:
+        body_path = Path(args.body_file)
+        if not body_path.is_file():
+            print(f"error: --body-file not found: {body_path}", file=sys.stderr)
+            return _EXIT_VALIDATION
+        body_text = body_path.read_text(encoding="utf-8")
+
+    payload = {"frontmatter": fm_patch, "body": body_text}
+    response, err = _http_request_to_daemon(
+        "PATCH", f"/pages/{args.page_ref}", json_body=payload
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_page_verify(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "POST", f"/pages/{args.page_ref}/verify"
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_page_archive(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "POST", f"/pages/{args.page_ref}/archive"
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_page_delete(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "DELETE", f"/pages/{args.page_ref}"
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
 
 
 if __name__ == "__main__":
