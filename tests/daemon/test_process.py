@@ -43,3 +43,39 @@ def test_daemon_request_shutdown_no_server_safe(daemon: MnemosDaemon):
     # Calling shutdown when server hasn't been created must not raise
     daemon._request_shutdown()
     assert daemon._server is None
+
+
+# Plan #9 — watchdog wiring
+
+
+def test_daemon_holds_tracker_and_alerts(daemon: MnemosDaemon):
+    from claude_mnemos.daemon.alerts import Alerts
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+    assert isinstance(daemon.tracker, OurWritesTracker)
+    assert isinstance(daemon.alerts, Alerts)
+    assert daemon.observer is None
+
+
+def test_start_observer_handles_failure_with_alert(
+    daemon: MnemosDaemon, monkeypatch: pytest.MonkeyPatch
+):
+    def boom(self):  # noqa: ANN001
+        raise RuntimeError("watcher boom")
+
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.watchdog_observer.VaultObserver.start", boom
+    )
+    daemon._start_observer()
+    # Daemon must keep running; failure surfaces as alert.
+    assert daemon.observer is None
+    items = daemon.alerts.list()
+    assert any(a.kind == "handler_error" for a in items)
+
+
+def test_start_observer_then_stop(daemon: MnemosDaemon, tmp_path: Path):
+    daemon._start_observer()
+    assert daemon.observer is not None
+    assert daemon.observer.is_running
+    daemon._stop_observer()
+    assert daemon.observer is None
