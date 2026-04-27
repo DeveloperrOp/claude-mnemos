@@ -108,6 +108,8 @@ def ingest(
                         model=None,
                         input_tokens=None,
                         output_tokens=None,
+                        transcript_path=str(jsonl_path.resolve()),
+                        raw_transcript_bytes=len(raw_bytes),
                     ),
                 )
                 txn.write(Path(".manifest.json"), manifest.serialize_to_string())
@@ -201,6 +203,8 @@ def ingest(
                     model=cfg.model,
                     input_tokens=extraction.input_tokens,
                     output_tokens=extraction.output_tokens,
+                    transcript_path=str(jsonl_path.resolve()),
+                    raw_transcript_bytes=len(raw_bytes),
                 ),
             )
             txn.write(Path(".manifest.json"), manifest.serialize_to_string())
