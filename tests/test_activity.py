@@ -109,6 +109,43 @@ def test_find_by_id_missing():
     assert log.find_by_id("nonexistent") is None
 
 
+def test_human_edit_detected_op_type_accepted():
+    e = ActivityEntry(
+        id=uuid4().hex,
+        timestamp=datetime(2026, 4, 27, 14, 23, 11, tzinfo=UTC),
+        operation_type="human_edit_detected",
+        status="success",
+        snapshot_path=None,
+        can_undo=False,
+        affected_pages=["wiki/entities/foo.md"],
+        metadata={"detected_at": "2026-04-27T14:23:11Z"},
+    )
+    log = ActivityLog()
+    log.append(e)
+    assert log.entries[0].operation_type == "human_edit_detected"
+    assert log.entries[0].can_undo is False
+    assert log.entries[0].snapshot_path is None
+
+
+def test_human_edit_detected_roundtrip(tmp_path: Path):
+    log = ActivityLog()
+    log.append(
+        ActivityEntry(
+            id=uuid4().hex,
+            timestamp=datetime(2026, 4, 27, 14, 23, 11, tzinfo=UTC),
+            operation_type="human_edit_detected",
+            status="success",
+            snapshot_path=None,
+            can_undo=False,
+            affected_pages=["wiki/entities/foo.md"],
+            metadata={"detected_at": "2026-04-27T14:23:11Z"},
+        )
+    )
+    log.save(tmp_path)
+    loaded = ActivityLog.load(tmp_path)
+    assert loaded.entries[0].operation_type == "human_edit_detected"
+
+
 def test_last_undoable_returns_newest_undoable():
     log = ActivityLog()
     e_old = _entry()

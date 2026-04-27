@@ -14,6 +14,7 @@ __all__ = [
     "UndoApiResult",
     "VaultInfo",
     "VersionResponse",
+    "WatchdogAlertResponse",
 ]
 
 
@@ -33,6 +34,24 @@ class HealthResponse(BaseModel):
     vault: str
     uptime_s: float = Field(ge=0.0)
     scheduler_jobs: list[SchedulerJobInfo] = Field(default_factory=list)
+    watchdog_running: bool = False
+    alerts_count: int = Field(default=0, ge=0)
+
+
+class WatchdogAlertResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    kind: Literal[
+        "external_create",
+        "external_rename",
+        "lock_timeout",
+        "parse_failed",
+        "handler_error",
+    ]
+    path: str
+    message: str
+    detected_at: datetime
 
 
 class VersionResponse(BaseModel):

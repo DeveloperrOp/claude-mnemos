@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -218,6 +218,64 @@ def test_frontmatter_agent_written_default_true():
         updated=date(2026, 4, 26),
     )
     assert fm.agent_written is True
+
+
+def test_frontmatter_last_human_edit_default_none():
+    fm = WikiPageFrontmatter(
+        title="X",
+        type="entity",
+        created=date(2026, 4, 26),
+        updated=date(2026, 4, 26),
+    )
+    assert fm.last_human_edit is None
+
+
+def test_frontmatter_last_human_edit_accepts_datetime():
+    ts = datetime(2026, 4, 27, 14, 23, 11, tzinfo=UTC)
+    fm = WikiPageFrontmatter(
+        title="X",
+        type="entity",
+        created=date(2026, 4, 26),
+        updated=date(2026, 4, 27),
+        agent_written=False,
+        last_human_edit=ts,
+    )
+    assert fm.last_human_edit == ts
+
+
+def test_frontmatter_last_human_edit_serializes_iso():
+    ts = datetime(2026, 4, 27, 14, 23, 11, tzinfo=UTC)
+    fm = WikiPageFrontmatter(
+        title="X",
+        type="entity",
+        created=date(2026, 4, 26),
+        updated=date(2026, 4, 27),
+        agent_written=False,
+        last_human_edit=ts,
+    )
+    dumped = fm.model_dump(mode="json")
+    assert dumped["last_human_edit"] == "2026-04-27T14:23:11Z"
+
+
+def test_wiki_page_serialize_includes_last_human_edit():
+    ts = datetime(2026, 4, 27, 14, 23, 11, tzinfo=UTC)
+    fm = WikiPageFrontmatter(
+        title="X",
+        type="entity",
+        created=date(2026, 4, 26),
+        updated=date(2026, 4, 27),
+        agent_written=False,
+        last_human_edit=ts,
+    )
+    page = WikiPage(
+        relative_path=Path("wiki/entities/x.md"),
+        frontmatter=fm,
+        body="body",
+    )
+    out = page.serialize()
+    assert "agent_written: false" in out
+    assert "last_human_edit:" in out
+    assert "2026-04-27T14:23:11" in out
 
 
 def test_frontmatter_provenance_serializes_as_dict():

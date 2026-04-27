@@ -202,3 +202,86 @@ def test_move_after_finalize_raises(tmp_path: Path):
         txn.move("a.md", "b.md")
     with pytest.raises(RuntimeError):
         txn.delete("a.md")
+
+
+# Plan #9 — tracker integration
+
+
+def test_promote_registers_targets_with_tracker(tmp_path: Path):
+    """Each target path is in the tracker for the duration of shutil.move."""
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+    vault = tmp_path / "vault"
+    _populate(vault)
+
+    add_calls: list[Path] = []
+    remove_calls: list[Path] = []
+
+    class _SpyTracker(OurWritesTracker):
+        def __init__(self) -> None:
+            super().__init__(ttl_s=60.0)
+
+        def add(self, path: Path, *, ttl_s: float | None = None) -> None:
+            add_calls.append(path.resolve())
+            super().add(path, ttl_s=ttl_s)
+
+        def remove(self, path: Path) -> None:
+            remove_calls.append(path.resolve())
+            super().remove(path)
+
+    tracker = _SpyTracker()
+
+    with StagingTransaction(vault, "op-trk-1") as txn:
+        txn.write(Path("wiki/entities/new.md"), "new body\n")
+        txn.write(Path("wiki/entities/another.md"), "more body\n")
+        txn.promote_to_vault(tracker=tracker)
+
+    expected_targets = {
+        (vault / "wiki/entities/new.md").resolve(),
+        (vault / "wiki/entities/another.md").resolve(),
+    }
+    assert expected_targets.issubset(set(add_calls))
+    assert expected_targets.issubset(set(remove_calls))
+    # All targets removed by exit time.
+    assert not any(tracker.contains(t) for t in expected_targets)
+
+
+def test_promote_registers_move_endpoints_and_delete_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    import shutil as _shutil
+
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+    vault = tmp_path / "vault"
+    _populate(vault)
+    tracker = OurWritesTracker(ttl_s=60.0)
+    seen_during_move: set[Path] = set()
+
+    original_move = _shutil.move
+
+    def spy_move(src: str, dst: str) -> str:
+        # Tracker should have dst registered before the move runs.
+        if tracker.contains(Path(dst)):
+            seen_during_move.add(Path(dst).resolve())
+        return original_move(src, dst)
+
+    monkeypatch.setattr("claude_mnemos.core.staging.shutil.move", spy_move)
+
+    with StagingTransaction(vault, "op-trk-2", operation_type="ontology") as txn:
+        txn.move("wiki/entities/foo.md", "wiki/entities/foo-renamed.md")
+        txn.delete("wiki/entities/bar.md")
+        txn.promote_to_vault(tracker=tracker)
+
+    # The renamed page goes through the move loop; tracker must hold its dst path.
+    assert (vault / "wiki/entities/foo-renamed.md").resolve() in seen_during_move
+
+
+def test_promote_without_tracker_unchanged(tmp_path: Path):
+    vault = tmp_path / "vault"
+    _populate(vault)
+    with StagingTransaction(vault, "op-trk-3") as txn:
+        txn.write(Path("wiki/entities/new.md"), "x")
+        result = txn.promote_to_vault()
+    assert result.success is True
+    assert (vault / "wiki/entities/new.md").read_text() == "x"
