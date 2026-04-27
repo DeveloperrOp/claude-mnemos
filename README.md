@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#8 в `main`. Готовы:
+`0.0.1` — Plans #1-#9 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -15,6 +15,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **MCP server** (Plan #6): stdio MCP с 5 read tools (прямой доступ к vault) + 4 write tools (через REST к daemon).
 - **Claude Code plugin** (Plan #7): SessionEnd auto-ingest hook + 5 skills + plugin manifest. После установки каждая сессия автоматически попадает в vault.
 - **Ontology HITL** (Plan #8): `.ontology-suggestions/` Pydantic-валидируемые suggestion файлы + 3 операции (`merge_entities`, `rename_entity`, `delete_page`) + REST endpoints + 3 MCP tools + CLI subgroup. Применение через `StagingTransaction` с pre-op snapshot — undo через `mnemos undo` восстанавливает всё (sources возвращаются из trash, wikilinks переписываются обратно).
+- **Watchdog real-time** (Plan #9): daemon наблюдает `wiki/*.md` через Python `watchdog`, отличает self-writes от human edits через in-memory `OurWritesTracker` (TTL set + paused() context). При external modify помечает страницу `agent_written: false` + `last_human_edit: <ts>` + пишет activity entry `human_edit_detected`. Alerts buffer (in-memory, cap 200) + endpoints `GET /alerts` / `DELETE /alerts/{id}`. `HealthResponse` расширен `watchdog_running` + `alerts_count`.
 
 ## Установка
 
@@ -151,9 +152,41 @@ tests/
 docs/plans/  # design + impl plans для каждого Plan #N
 ```
 
+## Watchdog real-time
+
+После `mnemos daemon start` daemon наблюдает за `wiki/*.md` через Python `watchdog`. Любое внешнее изменение (через Obsidian, IDE, любой текстовый редактор) детектируется в течение ~1 секунды:
+
+- **External modify** → page marked `agent_written: false` + `last_human_edit: <ts>` (Obsidian-extras в frontmatter сохраняются при round-trip), активность пишется в `.activity.json` как `human_edit_detected` (non-undoable).
+- **External create/rename** → alert (mutation не делается; user сам решает).
+- **Frontmatter parsing failed** → alert; файл не трогается.
+- **Pipeline lock timeout** → alert (на ваш ingest pipeline нет race).
+
+Что наблюдается / нет:
+
+| Path | Поведение |
+|---|---|
+| `wiki/**/*.md` | Watched |
+| `raw/**`, `.staging/`, `.backups/`, `.trash/`, `.ontology-suggestions/`, `.obsidian/`, `.git/` | Skipped |
+| Non-`.md` файлы под `wiki/` | Skipped |
+
+Inspecting alerts:
+
+```bash
+curl http://127.0.0.1:5757/alerts
+curl -X DELETE http://127.0.0.1:5757/alerts/<id>
+curl http://127.0.0.1:5757/health  # содержит watchdog_running + alerts_count
+```
+
+**Известные ограничения:**
+
+- Если CLI `mnemos ingest` запускается параллельно с daemon'ом, их writes могут пометиться daemon'ом как `human_edit_detected` (false positive). В стандартном flow (auto-ingest через SessionEnd hook → не concurrent с user editing) это не возникает. Закроется в Plan #11+, когда daemon станет orchestrator'ом ingest'а.
+- Alerts хранятся только в памяти (cap 200) — теряются при restart daemon'а. Persistence — Plan #11+.
+- Один daemon наблюдает один vault. Multi-vault — Plan #13.
+- Debouncing batch external changes (replace-all из IDE) не реализован — handler обрабатывает каждый event отдельно.
+
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~543 тестов)
-pytest -q -m slow      # медленные E2E (subprocess daemon)
+pytest -q              # быстрые (~570 тестов)
+pytest -q -m slow      # медленные E2E (subprocess daemon + watchdog)
 ```
