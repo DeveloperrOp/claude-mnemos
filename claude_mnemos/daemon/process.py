@@ -12,6 +12,7 @@ import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 
+from claude_mnemos.core.lost_sessions import LostSessionsCache
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
@@ -41,6 +42,10 @@ class MnemosDaemon:
         self.alerts = Alerts()
         self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
         self.job_worker: JobWorker | None = None
+        # Plan #13a: TTL-cached lost-sessions list owned by the daemon, so the
+        # GET /lost-sessions endpoint doesn't re-hash every transcript on each
+        # request. Invalidated by /lost-sessions/scan and /lost-sessions/*/ignore.
+        self.lost_sessions_cache: LostSessionsCache = LostSessionsCache()
         self.app: FastAPI = create_app(config.vault_root, daemon=self)
         self.started_at_monotonic: float = 0.0
         self._server: uvicorn.Server | None = None
