@@ -263,6 +263,30 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("page_ref")
         sp.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
 
+    # ─── trash ────────────────────────────────────────────────────────────
+    trash_parser = sub.add_parser(
+        "trash", help="Manage the vault's .trash/ (list / restore / dismiss / empty)"
+    )
+    trash_subs = trash_parser.add_subparsers(dest="trash_cmd", required=True)
+
+    trash_list_p = trash_subs.add_parser("list", help="List trash entries (direct DB read)")
+    trash_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    for cmd in ("restore", "dismiss"):
+        sp = trash_subs.add_parser(cmd, help=f"{cmd.title()} a trash entry (via daemon)")
+        sp.add_argument("trash_id")
+        sp.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    trash_empty_p = trash_subs.add_parser(
+        "empty", help="Permanently delete all trash entries (via daemon)"
+    )
+    trash_empty_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    trash_empty_p.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the typed 'delete' confirmation prompt",
+    )
+
     return parser
 
 
@@ -284,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_jobs(args)
     if args.command == "page":
         return _cmd_page(args)
+    if args.command == "trash":
+        return _cmd_trash(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -1155,6 +1181,94 @@ def _cmd_page_delete(args: argparse.Namespace) -> int:
     response, err = _http_request_to_daemon(
         "DELETE", f"/pages/{args.page_ref}"
     )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+# ─── trash ────────────────────────────────────────────────────────────────
+
+
+def _cmd_trash(args: argparse.Namespace) -> int:
+    if args.trash_cmd == "list":
+        return _cmd_trash_list(args)
+    if args.trash_cmd == "restore":
+        return _cmd_trash_restore(args)
+    if args.trash_cmd == "dismiss":
+        return _cmd_trash_dismiss(args)
+    if args.trash_cmd == "empty":
+        return _cmd_trash_empty(args)
+    print(f"unknown trash subcommand: {args.trash_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_trash_list(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.trash import list_trash
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+
+    entries = list_trash(vault)
+    if not entries:
+        print("no trash entries")
+        return 0
+
+    print(f"{len(entries)} trash entries")
+    for e in entries:
+        ts = e.deleted_at.strftime("%Y-%m-%d %H:%M:%S")
+        flag = "restorable" if e.restorable else "blocked"
+        orig = e.original_path or "—"
+        line = f"  {e.trash_id}  {ts}  {flag}  orig={orig}"
+        if e.restore_blocked_reason:
+            line += f"  ({e.restore_blocked_reason})"
+        print(line)
+    return 0
+
+
+def _cmd_trash_restore(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "POST", f"/trash/{args.trash_id}/restore"
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_trash_dismiss(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "DELETE", f"/trash/{args.trash_id}"
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(f"dismissed: {args.trash_id}")
+    return rc
+
+
+def _cmd_trash_empty(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+
+    if not args.yes:
+        print("Type 'delete' to confirm: ", end="", flush=True)
+        line = sys.stdin.readline().strip()
+        if line != "delete":
+            print("aborted: confirmation not received", file=sys.stderr)
+            return 1
+
+    response, err = _http_request_to_daemon("DELETE", "/trash")
     if response is None:
         return err or 1
     rc = _map_daemon_status_to_exit(response.status_code, response.text)
