@@ -171,6 +171,10 @@ async def _dispatch_read(
     name: str, arguments: dict[str, Any], config: MCPConfig
 ) -> list[types.TextContent]:
     vault = config.vault_root
+    # Plan #13b-α: vault_root is Path | None on MCPConfig, but the production
+    # path through build_server always supplies a non-None vault. None is only
+    # used by the degraded server, which has its own dispatcher.
+    assert vault is not None, "build_server requires non-None vault_root"
     if name == "get_lint_results":
         return await get_lint_results(vault)
     result: Any
