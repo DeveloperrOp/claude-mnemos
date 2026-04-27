@@ -3,11 +3,12 @@ from __future__ import annotations
 import contextlib
 import shutil
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from claude_mnemos.core.atomic import atomic_write  # noqa: F401  (kept for tests)
 from claude_mnemos.core.snapshots import (
@@ -16,6 +17,9 @@ from claude_mnemos.core.snapshots import (
     create_snapshot_at,
     restore_from_snapshot,
 )
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 STAGING_DIRNAME = ".staging"
 TRASH_DIRNAME = ".trash"
@@ -171,12 +175,20 @@ class StagingTransaction:
                 encoding="utf-8",
             )
 
-    def promote_to_vault(self) -> PromoteResult:
+    def promote_to_vault(
+        self, *, tracker: OurWritesTracker | None = None
+    ) -> PromoteResult:
         """Snapshot vault, then atomically move staging files into vault.
 
         On any failure during the move loop, restore vault from snapshot and raise
         StagingPromoteError. On snapshot creation failure, vault is untouched and
         StagingPromoteError still fires (no restore needed).
+
+        If `tracker` is provided, every vault path that this promote touches —
+        staged-file destinations, ontology move sources/destinations, and delete
+        sources — is registered with the tracker for the duration of the move
+        loop, so a parallel watchdog handler can suppress its own self-write
+        events.
         """
         if self._promoted:
             raise RuntimeError("StagingTransaction already promoted")
@@ -205,25 +217,30 @@ class StagingTransaction:
                 f"snapshot creation failed: {exc}"
             ) from exc
 
-        # 2. Move staged files into vault, one at a time, via shutil.move
+        # 2. Materialize the list of staged files BEFORE the move loop — pathlib
+        # rglob is lazy and the tree mutates under our feet during shutil.move.
+        staged_files = [p for p in self.staging_dir.rglob("*") if p.is_file()]
+        target_paths = self._collect_target_paths(staged_files)
+        cm = tracker.writing(target_paths) if tracker is not None else nullcontext()
+
+        # 3. Move staged files into vault, one at a time, via shutil.move
         # (atomic rename on same filesystem; binary-safe; faster than read+write).
         # Then apply queued moves and deletes (Plan #8 ontology operations) under
         # the same try/restore umbrella.
         try:
-            for staged in self.staging_dir.rglob("*"):
-                if not staged.is_file():
-                    continue
-                relative = staged.relative_to(self.staging_dir)
-                target = self.vault / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                # shutil.move is atomic on same FS (uses os.rename) and is binary-safe.
-                # Pipeline guarantees no collisions: already-existing pages are excluded
-                # via skipped_collisions BEFORE writing to staging.
-                shutil.move(str(staged), str(target))
-            self._apply_moves()
-            self._apply_deletes()
+            with cm:
+                for staged in staged_files:
+                    relative = staged.relative_to(self.staging_dir)
+                    target = self.vault / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    # shutil.move is atomic on same FS (uses os.rename) and is binary-safe.
+                    # Pipeline guarantees no collisions: already-existing pages are excluded
+                    # via skipped_collisions BEFORE writing to staging.
+                    shutil.move(str(staged), str(target))
+                self._apply_moves()
+                self._apply_deletes()
         except Exception as exc:
-            restore = restore_from_snapshot(self.vault, snapshot)
+            restore = restore_from_snapshot(self.vault, snapshot, tracker=tracker)
             self._promoted = True  # mark finalized so __exit__ doesn't reject
             # Restore preserves .staging/ across the swap (so other concurrent
             # transactions survive); clean up our own partial staging dir here.
@@ -237,11 +254,23 @@ class StagingTransaction:
                 f"recovery hint: {restore.recovery_hint}. original cause: {exc}"
             ) from exc
 
-        # 3. Cleanup staging.
+        # 4. Cleanup staging.
         shutil.rmtree(self.staging_dir, ignore_errors=True)
         self._promoted = True
 
         return PromoteResult(success=True, snapshot=snapshot)
+
+    def _collect_target_paths(self, staged_files: list[Path]) -> list[Path]:
+        """All vault paths the promote will touch — for OurWritesTracker registration."""
+        targets: list[Path] = [
+            self.vault / staged.relative_to(self.staging_dir) for staged in staged_files
+        ]
+        for src, dst in self._to_move:
+            targets.append(self.vault / src)
+            targets.append(self.vault / dst)
+        for rel, _ in self._to_remove:
+            targets.append(self.vault / rel)
+        return targets
 
     def reject(self, reason: str) -> None:
         """Move staging dir into .trash/rejected-<op_id>-<ts>/ with a .reason.txt."""
