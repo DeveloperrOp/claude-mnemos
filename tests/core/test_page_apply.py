@@ -106,6 +106,17 @@ def test_apply_restore_from_trash(tmp_path: Path):
     assert log.entries[-1].operation_type == "manual_restore_trash"
 
 
+def test_delete_then_restore_roundtrip_uses_authoritative_trash_id(tmp_path: Path):
+    """trash_id from DeleteResult must match the on-disk dir, even across second boundaries."""
+    p = _seed(tmp_path)
+    delete_result = apply_soft_delete(tmp_path, p, today=date(2026, 4, 27))
+    # The dir name must equal the returned trash_id exactly
+    assert (tmp_path / ".trash" / delete_result.trash_id).is_dir()
+    # And restore by that exact id must succeed
+    apply_restore_from_trash(tmp_path, delete_result.trash_id, today=date(2026, 4, 27))
+    assert p.exists()
+
+
 def test_apply_restore_collision_raises(tmp_path: Path):
     p = _seed(tmp_path)
     delete_result = apply_soft_delete(tmp_path, p, today=date(2026, 4, 27))

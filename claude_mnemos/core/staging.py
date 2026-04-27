@@ -69,7 +69,13 @@ class StagingTransaction:
         # AFTER staged files are moved into vault. Snapshot taken before promote
         # captures pre-mutation state, so any failure rolls back via restore.
         self._to_move: list[tuple[str, str]] = []
-        self._to_remove: list[tuple[str, bool]] = []
+        # Each delete entry is (relpath, to_trash, trash_id_override).
+        # `trash_id_override` is None unless the caller pre-pinned the dir name
+        # (Plan #12 followup): then `_apply_deletes` uses it verbatim instead of
+        # recomputing from datetime.now(UTC), so callers like apply_soft_delete
+        # can return an authoritative trash_id that exactly matches the on-disk
+        # directory created during promote.
+        self._to_remove: list[tuple[str, bool, str | None]] = []
 
     def __enter__(self) -> StagingTransaction:
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -132,19 +138,31 @@ class StagingTransaction:
             raise ValueError("src and dst are equal — move is a no-op")
         self._to_move.append((src_relpath, dst_relpath))
 
-    def delete(self, relpath: str, *, to_trash: bool = True) -> None:
+    def delete(
+        self,
+        relpath: str,
+        *,
+        to_trash: bool = True,
+        trash_id: str | None = None,
+    ) -> None:
         """Queue a vault file delete. Applied during promote AFTER staged writes.
 
         With `to_trash=True` (default): file moves to
         `<vault>/.trash/deleted-<slug>-<utc-ts>/<basename>` with a
         `.reason.txt` recording the operation id/type.
         With `to_trash=False`: hard delete (used for staged-only artefacts).
+
+        If `trash_id` is provided (only meaningful when `to_trash=True`), it is
+        used verbatim as the `.trash/<trash_id>/` directory name. This lets
+        callers pre-compute and pin the trash dir so a returned id exactly
+        matches the on-disk artefact, avoiding cross-second drift between an
+        external `datetime.now(UTC)` call and the one inside `_apply_deletes`.
         """
         if self._promoted or self._rejected:
             raise RuntimeError("StagingTransaction is finalized; cannot delete")
         if not relpath:
             raise ValueError("relpath must be non-empty")
-        self._to_remove.append((relpath, to_trash))
+        self._to_remove.append((relpath, to_trash, trash_id))
 
     def _apply_moves(self) -> None:
         for src_rel, dst_rel in self._to_move:
@@ -156,7 +174,7 @@ class StagingTransaction:
             shutil.move(str(src), str(dst))
 
     def _apply_deletes(self) -> None:
-        for rel, to_trash in self._to_remove:
+        for rel, to_trash, trash_id_override in self._to_remove:
             src = self.vault / rel
             if not src.exists():
                 # Already gone (e.g. moved by an earlier op in same txn) — ok.
@@ -164,9 +182,12 @@ class StagingTransaction:
             if not to_trash:
                 src.unlink()
                 continue
-            slug = Path(rel).stem or "page"
-            ts = datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
-            trash_dir_name = f"deleted-{slug}-{ts}-{self.operation_id[:8]}"
+            if trash_id_override is not None:
+                trash_dir_name = trash_id_override
+            else:
+                slug = Path(rel).stem or "page"
+                ts = datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
+                trash_dir_name = f"deleted-{slug}-{ts}-{self.operation_id[:8]}"
             trash_dir = self.vault / TRASH_DIRNAME / trash_dir_name
             trash_dir.mkdir(parents=True, exist_ok=True)
             shutil.move(str(src), str(trash_dir / src.name))
@@ -280,7 +301,7 @@ class StagingTransaction:
         for src, dst in self._to_move:
             targets.append(self.vault / src)
             targets.append(self.vault / dst)
-        for rel, _ in self._to_remove:
+        for rel, _, _ in self._to_remove:
             targets.append(self.vault / rel)
         return targets
 

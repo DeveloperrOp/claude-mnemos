@@ -76,6 +76,22 @@ def test_delete_with_to_trash_default(tmp_path: Path):
     assert "op-4" in reason
 
 
+def test_delete_uses_provided_trash_id(tmp_path: Path):
+    """Plan #12 followup: caller can pin the trash_id so it matches DeleteResult."""
+    vault = tmp_path / "vault"
+    _populate(vault)
+    pinned_id = "deleted-foo-2026-04-27-12-00-00-customid"
+
+    with StagingTransaction(vault, "op-pinned-1", operation_type="manual_delete") as txn:
+        txn.delete("wiki/entities/foo.md", to_trash=True, trash_id=pinned_id)
+        txn.promote_to_vault()
+
+    assert (vault / ".trash" / pinned_id).is_dir()
+    import json
+    meta = json.loads((vault / ".trash" / pinned_id / ".metadata.json").read_text(encoding="utf-8"))
+    assert meta["trash_id"] == pinned_id
+
+
 def test_delete_hard(tmp_path: Path):
     vault = tmp_path / "vault"
     _populate(vault)

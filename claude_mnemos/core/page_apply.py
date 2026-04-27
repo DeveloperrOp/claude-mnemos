@@ -162,14 +162,11 @@ def apply_soft_delete(
     today: date | None = None,
     cfg: Config | None = None,
 ) -> DeleteResult:
-    """Move a page to .trash/ via StagingTransaction, with snapshot for undo.
+    """Soft-delete a page to .trash/ via StagingTransaction.
 
-    Note on trash_id: pre-computed using `datetime.now(UTC)` here, then again
-    inside `_apply_deletes` ~ms later. If a second-boundary flips between the
-    two calls, the activity log's `trash_id` will be off by 1s from the actual
-    trash dir name. Tests look up trash dirs by prefix (`deleted-<slug>-`),
-    not exact match, so this drift doesn't break correctness. Restore semantics
-    use the `original_path` field from `.metadata.json` (authoritative).
+    The trash_id is now passed through to StagingTransaction.delete so the
+    returned DeleteResult.trash_id is authoritative — exactly matches the
+    on-disk directory name created by _apply_deletes.
     """
     cfg = cfg or Config.from_env()
     rel = page_path.relative_to(vault).as_posix()
@@ -182,7 +179,7 @@ def apply_soft_delete(
         pipeline_lock(vault, timeout=cfg.lock_timeout),
         StagingTransaction(vault, op_id, operation_type="manual_delete") as txn,
     ):
-        txn.delete(rel, to_trash=True)
+        txn.delete(rel, to_trash=True, trash_id=trash_id)
         snap = txn.pre_promote_snapshot_path()
         log = ActivityLog.load(vault)
         log.append(
