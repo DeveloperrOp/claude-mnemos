@@ -16,7 +16,7 @@ DEFAULT_LOG_LEVEL: LogLevel = "info"
 class MCPConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vault_root: Path
+    vault_root: Path | None = None
     daemon_url: str = DEFAULT_DAEMON_URL
     daemon_timeout_s: float = Field(default=DEFAULT_TIMEOUT_S, gt=0.0)
     log_level: LogLevel = DEFAULT_LOG_LEVEL
