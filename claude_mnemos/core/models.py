@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,6 +40,7 @@ class WikiPageFrontmatter(BaseModel):
     updated: date
     provenance: ProvenanceCounts | None = None
     agent_written: bool = True
+    last_human_edit: datetime | None = None
 
 
 @dataclass(frozen=True)
