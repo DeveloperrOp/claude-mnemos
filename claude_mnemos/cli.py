@@ -287,6 +287,95 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip the typed 'delete' confirmation prompt",
     )
 
+    # ─── sessions ─────────────────────────────────────────────────────────
+    sessions_parser = sub.add_parser(
+        "sessions", help="Inspect ingested sessions (manifest + jobs queue)"
+    )
+    sessions_subs = sessions_parser.add_subparsers(dest="sessions_cmd", required=True)
+
+    sessions_list_p = sessions_subs.add_parser(
+        "list", help="List sessions (succeeded + queued + dead-letter)"
+    )
+    sessions_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    sessions_list_p.add_argument(
+        "--status",
+        choices=["succeeded", "queued", "running", "failed", "dead_letter"],
+        default=None,
+    )
+    sessions_list_p.add_argument("--limit", type=int, default=50)
+
+    sessions_show_p = sessions_subs.add_parser(
+        "show", help="Show one session view by id"
+    )
+    sessions_show_p.add_argument("session_id")
+    sessions_show_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    sessions_ingest_p = sessions_subs.add_parser(
+        "ingest", help="Enqueue an ingest job for a transcript (via daemon)"
+    )
+    sessions_ingest_p.add_argument("transcript_path")
+    sessions_ingest_p.add_argument(
+        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+    )
+
+    # ─── lost-sessions ────────────────────────────────────────────────────
+    lost_parser = sub.add_parser(
+        "lost-sessions",
+        help="Discover, import, or ignore transcripts not in the manifest",
+    )
+    lost_subs = lost_parser.add_subparsers(dest="lost_cmd", required=True)
+
+    lost_list_p = lost_subs.add_parser(
+        "list", help="List lost transcripts (direct scan)"
+    )
+    lost_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    lost_scan_p = lost_subs.add_parser(
+        "scan", help="Force a daemon-side rescan of lost transcripts"
+    )
+    lost_scan_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    lost_import_p = lost_subs.add_parser(
+        "import", help="Enqueue an ingest job for a lost session (via daemon)"
+    )
+    lost_import_p.add_argument("session_id")
+    lost_import_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    lost_ignore_p = lost_subs.add_parser(
+        "ignore", help="Mark a lost session as ignored (via daemon)"
+    )
+    lost_ignore_p.add_argument("session_id")
+    lost_ignore_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lost_ignore_p.add_argument("--reason", default=None)
+
+    # ─── metrics ──────────────────────────────────────────────────────────
+    metrics_parser = sub.add_parser(
+        "metrics", help="Token usage aggregations over the manifest"
+    )
+    metrics_subs = metrics_parser.add_subparsers(dest="metrics_cmd", required=True)
+
+    metrics_usage_p = metrics_subs.add_parser(
+        "usage", help="Show token totals over a rolling window"
+    )
+    metrics_usage_p.add_argument(
+        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+    )
+    metrics_usage_p.add_argument("--period", default="30d")
+
+    metrics_top_p = metrics_subs.add_parser(
+        "top-sessions", help="List heaviest sessions by combined tokens"
+    )
+    metrics_top_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    metrics_top_p.add_argument("--limit", type=int, default=10)
+
+    metrics_timeline_p = metrics_subs.add_parser(
+        "timeline", help="Show per-day session+token bucket timeline"
+    )
+    metrics_timeline_p.add_argument(
+        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+    )
+    metrics_timeline_p.add_argument("--period", default="30d")
+
     return parser
 
 
@@ -310,6 +399,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_page(args)
     if args.command == "trash":
         return _cmd_trash(args)
+    if args.command == "sessions":
+        return _cmd_sessions(args)
+    if args.command == "lost-sessions":
+        return _cmd_lost_sessions(args)
+    if args.command == "metrics":
+        return _cmd_metrics(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -1056,6 +1151,9 @@ _EXIT_DAEMON_OFFLINE = 87
 _EXIT_REF_NOT_FOUND = 88
 _EXIT_COLLISION = 89
 _EXIT_VALIDATION = 90
+_EXIT_SESSION_NOT_FOUND = 91
+_EXIT_LOST_SESSION_NOT_FOUND = 92
+_EXIT_MANIFEST_CORRUPT = 93
 
 
 def _daemon_url() -> str:
@@ -1275,6 +1373,313 @@ def _cmd_trash_empty(args: argparse.Namespace) -> int:
     if rc == 0:
         print(response.text)
     return rc
+
+
+# ─── sessions ─────────────────────────────────────────────────────────────
+
+
+def _cmd_sessions(args: argparse.Namespace) -> int:
+    if args.sessions_cmd == "list":
+        return _cmd_sessions_list(args)
+    if args.sessions_cmd == "show":
+        return _cmd_sessions_show(args)
+    if args.sessions_cmd == "ingest":
+        return _cmd_sessions_ingest(args)
+    print(f"unknown sessions subcommand: {args.sessions_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_sessions_list(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.sessions import list_sessions
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        items = list_sessions(vault)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+
+    if args.status:
+        items = [s for s in items if s.status.value == args.status]
+    items = items[: args.limit]
+
+    if not items:
+        print("no sessions")
+        return 0
+
+    print(f"{len(items)} sessions")
+    for s in items:
+        ts = (
+            s.ingested_at.strftime("%Y-%m-%d %H:%M:%S")
+            if s.ingested_at is not None
+            else "—"
+        )
+        tokens = ""
+        if s.input_tokens is not None or s.output_tokens is not None:
+            tokens = f"  tokens_in={s.input_tokens or 0} tokens_out={s.output_tokens or 0}"
+        line = f"  {s.session_id}  {s.status.value:<11}  {ts}{tokens}"
+        if s.error:
+            line += f"  err={s.error[:60]}"
+        print(line)
+    return 0
+
+
+def _cmd_sessions_show(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.sessions import SessionNotFoundError, get_session
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        session = get_session(vault, args.session_id)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+    except SessionNotFoundError:
+        print(f"session not found: {args.session_id}", file=sys.stderr)
+        return _EXIT_SESSION_NOT_FOUND
+
+    print(json.dumps(session.model_dump(mode="json"), indent=2, ensure_ascii=False))
+    return 0
+
+
+def _cmd_sessions_ingest(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+
+    transcript = Path(args.transcript_path)
+    if not transcript.is_file():
+        print(f"error: transcript not found: {transcript}", file=sys.stderr)
+        return _EXIT_VALIDATION
+
+    sid = transcript.stem
+    payload = {"transcript_path": str(transcript.resolve())}
+    response, err = _http_request_to_daemon(
+        "POST", f"/sessions/{sid}/ingest", json_body=payload
+    )
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+# ─── lost-sessions ────────────────────────────────────────────────────────
+
+
+def _cmd_lost_sessions(args: argparse.Namespace) -> int:
+    if args.lost_cmd == "list":
+        return _cmd_lost_sessions_list(args)
+    if args.lost_cmd == "scan":
+        return _cmd_lost_sessions_scan(args)
+    if args.lost_cmd == "import":
+        return _cmd_lost_sessions_import(args)
+    if args.lost_cmd == "ignore":
+        return _cmd_lost_sessions_ignore(args)
+    print(f"unknown lost-sessions subcommand: {args.lost_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_lost_sessions_list(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.lost_sessions import scan_lost_sessions
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        items = scan_lost_sessions(vault)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+
+    if not items:
+        print("no lost sessions")
+        return 0
+
+    print(f"{len(items)} lost sessions")
+    for s in items:
+        ts = s.mtime.strftime("%Y-%m-%d %H:%M:%S")
+        print(
+            f"  {s.sha[:8]}  {s.session_id}  {s.size_bytes}b  {ts}"
+        )
+    return 0
+
+
+def _cmd_lost_sessions_scan(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon("POST", "/lost-sessions/scan")
+    if response is None:
+        return err or 1
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_lost_sessions_import(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    response, err = _http_request_to_daemon(
+        "POST",
+        f"/lost-sessions/{args.session_id}/import",
+        json_body={},
+    )
+    if response is None:
+        return err or 1
+    if response.status_code == 404:
+        print(
+            f"lost session not found: {args.session_id}",
+            file=sys.stderr,
+        )
+        return _EXIT_LOST_SESSION_NOT_FOUND
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+def _cmd_lost_sessions_ignore(args: argparse.Namespace) -> int:
+    if _resolve_vault(args) is None:
+        return 1
+    body: dict[str, object] = {}
+    if args.reason is not None:
+        body["reason"] = args.reason
+    response, err = _http_request_to_daemon(
+        "POST",
+        f"/lost-sessions/{args.session_id}/ignore",
+        json_body=body,
+    )
+    if response is None:
+        return err or 1
+    if response.status_code == 404:
+        print(
+            f"lost session not found: {args.session_id}",
+            file=sys.stderr,
+        )
+        return _EXIT_LOST_SESSION_NOT_FOUND
+    rc = _map_daemon_status_to_exit(response.status_code, response.text)
+    if rc == 0:
+        print(response.text)
+    return rc
+
+
+# ─── metrics ──────────────────────────────────────────────────────────────
+
+
+def _parse_period_days(period: str) -> int | None:
+    """Parse ``"Nd"`` → ``N``. Returns None on malformed input."""
+    if period.endswith("d"):
+        try:
+            value = int(period[:-1])
+        except ValueError:
+            return None
+        if value > 0:
+            return value
+    return None
+
+
+def _cmd_metrics(args: argparse.Namespace) -> int:
+    if args.metrics_cmd == "usage":
+        return _cmd_metrics_usage(args)
+    if args.metrics_cmd == "top-sessions":
+        return _cmd_metrics_top_sessions(args)
+    if args.metrics_cmd == "timeline":
+        return _cmd_metrics_timeline(args)
+    print(f"unknown metrics subcommand: {args.metrics_cmd}", file=sys.stderr)
+    return 2
+
+
+def _cmd_metrics_usage(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.metrics import usage_summary
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    days = _parse_period_days(args.period)
+    if days is None:
+        print(
+            f"error: invalid --period (expected Nd, got {args.period!r})",
+            file=sys.stderr,
+        )
+        return _EXIT_VALIDATION
+    try:
+        summary = usage_summary(vault, period_days=days)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+
+    print(f"period_days: {summary.period_days}")
+    print(f"sessions_covered: {summary.sessions_covered}")
+    print(f"tokens_input: {summary.tokens_input}")
+    print(f"tokens_output: {summary.tokens_output}")
+    print(f"tokens_injected: {summary.tokens_injected}")
+    print(f"raw_bytes_total: {summary.raw_bytes_total}")
+    cr = (
+        f"{summary.compression_ratio:.6f}"
+        if summary.compression_ratio is not None
+        else "—"
+    )
+    print(f"compression_ratio: {cr}")
+    return 0
+
+
+def _cmd_metrics_top_sessions(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.metrics import top_sessions
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        items = top_sessions(vault, limit=args.limit)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+
+    if not items:
+        print("no sessions")
+        return 0
+
+    print(f"{len(items)} sessions")
+    for m in items:
+        ts = m.ingested_at.strftime("%Y-%m-%d %H:%M:%S")
+        total = m.tokens_total if m.tokens_total is not None else 0
+        print(
+            f"  {m.session_id}  {ts}  total={total} "
+            f"in={m.tokens_input or 0} out={m.tokens_output or 0}"
+        )
+    return 0
+
+
+def _cmd_metrics_timeline(args: argparse.Namespace) -> int:
+    from claude_mnemos.core.metrics import timeline
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    days = _parse_period_days(args.period)
+    if days is None:
+        print(
+            f"error: invalid --period (expected Nd, got {args.period!r})",
+            file=sys.stderr,
+        )
+        return _EXIT_VALIDATION
+    try:
+        points = timeline(vault, period_days=days)
+    except ManifestCorruptError as exc:
+        print(f"error: manifest corrupt: {exc}", file=sys.stderr)
+        return _EXIT_MANIFEST_CORRUPT
+
+    print(f"{len(points)} days")
+    for p in points:
+        print(
+            f"  {p.date.isoformat()}  sessions={p.sessions} "
+            f"tokens_in={p.tokens_input} tokens_out={p.tokens_output}"
+        )
+    return 0
 
 
 if __name__ == "__main__":

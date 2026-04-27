@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -138,3 +138,56 @@ def test_serialize_to_string_roundtrip_via_model_validate_json():
 
     assert "sha-y" in reloaded.ingested
     assert reloaded.ingested["sha-y"].session_id == "sid-y"
+
+
+def test_ingest_record_accepts_new_fields():
+    rec = IngestRecord(
+        session_id="abc",
+        ingested_at=datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+        raw_path="raw/chats/abc.md",
+        source_path=None,
+        created_pages=[],
+        skipped_collisions=[],
+        model=None,
+        input_tokens=None,
+        output_tokens=None,
+        transcript_path="/abs/path/to/abc.jsonl",
+        raw_transcript_bytes=12345,
+    )
+    assert rec.transcript_path == "/abs/path/to/abc.jsonl"
+    assert rec.raw_transcript_bytes == 12345
+
+
+def test_ingest_record_new_fields_optional():
+    rec = IngestRecord(
+        session_id="abc",
+        ingested_at=datetime(2026, 4, 27, 14, 0, 0, tzinfo=UTC),
+        raw_path="raw/chats/abc.md",
+        source_path=None,
+        created_pages=[],
+        skipped_collisions=[],
+        model=None,
+        input_tokens=None,
+        output_tokens=None,
+    )
+    assert rec.transcript_path is None
+    assert rec.raw_transcript_bytes is None
+
+
+def test_manifest_round_trip_with_new_fields(tmp_path: Path):
+    m = Manifest()
+    m.add(
+        "sha-abc",
+        IngestRecord(
+            session_id="abc", ingested_at=datetime.now(UTC),
+            raw_path="raw/chats/abc.md", source_path=None,
+            created_pages=[], skipped_collisions=[],
+            model=None, input_tokens=None, output_tokens=None,
+            transcript_path="/x.jsonl", raw_transcript_bytes=1024,
+        ),
+    )
+    m.save(tmp_path)
+    loaded = Manifest.load(tmp_path)
+    rec = loaded.ingested["sha-abc"]
+    assert rec.transcript_path == "/x.jsonl"
+    assert rec.raw_transcript_bytes == 1024

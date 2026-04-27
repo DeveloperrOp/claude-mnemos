@@ -198,6 +198,43 @@ def test_ingest_no_llm_writes_only_raw_and_manifest(tmp_path: Path):
     assert m.ingested[sha].model is None
 
 
+def test_ingest_raw_only_populates_transcript_path_and_bytes(tmp_path: Path):
+    """raw_only ingest must populate transcript_path + raw_transcript_bytes in manifest."""
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=None,
+        extractor=None,
+        extract=False,
+        today=FIXED_TODAY,
+    )
+    m = Manifest.load(vault)
+    sha = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    rec = m.ingested[sha]
+    assert rec.transcript_path == str(FIXTURE.resolve())
+    assert rec.raw_transcript_bytes == FIXTURE.stat().st_size
+
+
+def test_ingest_extracted_populates_transcript_path_and_bytes(tmp_path: Path):
+    """LLM-extract ingest must populate transcript_path + raw_transcript_bytes in manifest."""
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=FIXED_TODAY,
+    )
+    m = Manifest.load(vault)
+    sha = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    rec = m.ingested[sha]
+    assert rec.transcript_path == str(FIXTURE.resolve())
+    assert rec.raw_transcript_bytes == FIXTURE.stat().st_size
+
+
 def test_ingest_skips_existing_extracted_page(tmp_path: Path):
     vault = tmp_path / "vault"
     # Pre-create the file the stub extractor wants to write
