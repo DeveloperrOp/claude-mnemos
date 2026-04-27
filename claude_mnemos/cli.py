@@ -407,6 +407,31 @@ def build_parser() -> argparse.ArgumentParser:
     pres.add_argument("--cwd", type=Path, default=Path.cwd())
     pres.add_argument("--json", action="store_true")
 
+    # ----- settings -----
+    settings_p = sub.add_parser("settings", help="Per-project + global settings")
+    settings_sub = settings_p.add_subparsers(dest="settings_command", required=True)
+
+    sg = settings_sub.add_parser("get", help="Read a setting (or all)")
+    sg_target = sg.add_mutually_exclusive_group(required=True)
+    sg_target.add_argument("--project", type=str)
+    sg_target.add_argument("--global", dest="is_global", action="store_true")
+    sg.add_argument("key", nargs="?", default=None,
+                    help="Dot-path; omit to dump everything")
+    sg.add_argument("--json", action="store_true")
+
+    ss = settings_sub.add_parser("set", help="Write a setting (value parsed as JSON)")
+    ss_target = ss.add_mutually_exclusive_group(required=True)
+    ss_target.add_argument("--project", type=str)
+    ss_target.add_argument("--global", dest="is_global", action="store_true")
+    ss.add_argument("key")
+    ss.add_argument("value", help='JSON-encoded: 30 / true / "foo" / ["a"]')
+
+    sr = settings_sub.add_parser("reset", help="Reset a field to default (or whole project)")
+    sr_target = sr.add_mutually_exclusive_group(required=True)
+    sr_target.add_argument("--project", type=str)
+    sr_target.add_argument("--global", dest="is_global", action="store_true")
+    sr.add_argument("key", nargs="?", default=None)
+
     return parser
 
 
@@ -439,6 +464,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "project":
         from claude_mnemos.cli_project import handle as project_handle
         return project_handle(args)
+    if args.command == "settings":
+        from claude_mnemos.cli_settings import handle as settings_handle
+        return settings_handle(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
