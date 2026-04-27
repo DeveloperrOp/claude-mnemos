@@ -485,6 +485,37 @@ def restore_from_snapshot(
                             error=f"cannot preserve internal dir {preserved}: {exc}",
                         )
 
+            # Preserve jobs DB and its WAL/SHM/journal companions across the swap.
+            # The snapshot excludes them (Plan #11), so without this they would be
+            # wiped on every restore — silently losing permanent dead_letter rows
+            # that spec §8.9 promises will never auto-clean.
+            for preserved_file in (
+                ".jobs.db",
+                ".jobs.db-wal",
+                ".jobs.db-shm",
+                ".jobs.db-journal",
+            ):
+                src = vault / preserved_file
+                if src.is_file():
+                    dst = temp_root / preserved_file
+                    if dst.exists():
+                        # Snapshot included this file somehow (shouldn't happen) — replace
+                        try:
+                            dst.unlink()
+                        except OSError:
+                            pass
+                    try:
+                        shutil.copy2(src, dst)
+                    except OSError as exc:
+                        # Couldn't preserve internal file — abort restore.
+                        # Vault is still intact since we haven't swapped yet.
+                        shutil.rmtree(temp_root, ignore_errors=True)
+                        return RestoreResult(
+                            success=False,
+                            vault_intact=True,
+                            error=f"cannot preserve internal file {preserved_file}: {exc}",
+                        )
+
         old_vault: Path | None = None
         if vault.exists():
             old_vault = vault.parent / f".mnemos-old-{int(time.time() * 1000)}"

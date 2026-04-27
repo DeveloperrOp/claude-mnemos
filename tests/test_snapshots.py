@@ -769,3 +769,45 @@ def test_snapshot_excludes_jobs_db(tmp_path: Path):
     assert not (snap / ".jobs.db").exists()
     assert not (snap / ".jobs.db-wal").exists()
     assert not (snap / ".jobs.db-shm").exists()
+
+
+def test_restore_preserves_jobs_db(tmp_path: Path):
+    """Restore must not wipe the live jobs DB — spec §8.9 forbids auto-cleanup
+    of dead_letter rows.
+    """
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    # Seed jobs DB before snapshot
+    (vault / ".jobs.db").write_bytes(b"sqlite db v1")
+    snap = create_snapshot(vault, operation_id="op-jobs-restore", operation_type="ingest")
+    # Modify jobs DB after snapshot (simulating runtime queue activity)
+    (vault / ".jobs.db").write_bytes(b"sqlite db v2")
+    # Mutate vault content too
+    (vault / "wiki" / "entities" / "foo.md").write_text(
+        "---\ntitle: Foo\n---\nMODIFIED\n", encoding="utf-8"
+    )
+    result = restore_from_snapshot(vault, snap)
+    assert result.success is True
+    # Vault content rolled back
+    assert "MODIFIED" not in (vault / "wiki" / "entities" / "foo.md").read_text(encoding="utf-8")
+    # BUT jobs DB content preserved (the runtime v2, not snapshot's nothing)
+    assert (vault / ".jobs.db").read_bytes() == b"sqlite db v2"
+
+
+def test_restore_preserves_jobs_db_wal_companions(tmp_path: Path):
+    """Restore preserves WAL/SHM/journal sidecars too."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="op-wal-restore", operation_type="ingest")
+    # Create WAL/SHM/journal AFTER snapshot (so snapshot definitely doesn't have them)
+    (vault / ".jobs.db").write_bytes(b"db")
+    (vault / ".jobs.db-wal").write_bytes(b"wal-data")
+    (vault / ".jobs.db-shm").write_bytes(b"shm-data")
+    (vault / ".jobs.db-journal").write_bytes(b"journal-data")
+
+    result = restore_from_snapshot(vault, snap)
+    assert result.success is True
+    assert (vault / ".jobs.db").read_bytes() == b"db"
+    assert (vault / ".jobs.db-wal").read_bytes() == b"wal-data"
+    assert (vault / ".jobs.db-shm").read_bytes() == b"shm-data"
+    assert (vault / ".jobs.db-journal").read_bytes() == b"journal-data"
