@@ -11,6 +11,7 @@ from claude_mnemos.core.locks import LockTimeoutError
 from claude_mnemos.core.ontology_apply import OntologyError
 from claude_mnemos.core.undo import UndoError
 from claude_mnemos.daemon.routes.activity import router as activity_router
+from claude_mnemos.daemon.routes.alerts import router as alerts_router
 from claude_mnemos.daemon.routes.health import router as health_router
 from claude_mnemos.daemon.routes.ontology import router as ontology_router
 from claude_mnemos.daemon.routes.snapshots import router as snapshots_router
@@ -30,6 +31,7 @@ def create_app(vault_root: Path, daemon: Any | None = None) -> FastAPI:
     app.include_router(activity_router)
     app.include_router(snapshots_router)
     app.include_router(ontology_router)
+    app.include_router(alerts_router)
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:
