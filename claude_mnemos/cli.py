@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import time
@@ -178,6 +179,28 @@ def build_parser() -> argparse.ArgumentParser:
     delete_p.add_argument("--confidence", type=float, default=0.7)
     delete_p.add_argument("--vault", type=Path, default=Path.cwd())
 
+    # ─── lint ─────────────────────────────────────────────────────────────
+    lint_parser = sub.add_parser("lint", help="Health-check the wiki vault")
+    lint_subs = lint_parser.add_subparsers(dest="lint_cmd", required=True)
+
+    lint_run_p = lint_subs.add_parser("run", help="Run all lint rules")
+    lint_run_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+
+    lint_results_p = lint_subs.add_parser("results", help="Show last cached lint report")
+    lint_results_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lint_results_p.add_argument(
+        "--severity",
+        choices=["error", "warning", "info"],
+        default=None,
+        help="Filter findings by severity",
+    )
+
+    lint_autofix_p = lint_subs.add_parser("autofix", help="Apply safe autofixes")
+    lint_autofix_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lint_autofix_p.add_argument(
+        "--dry-run", action="store_true", help="Print planned fixes without applying"
+    )
+
     return parser
 
 
@@ -193,6 +216,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_daemon(args)
     if args.command == "ontology":
         return _cmd_ontology(args)
+    if args.command == "lint":
+        return _cmd_lint(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
@@ -713,6 +738,118 @@ def _cmd_ontology_propose(args: argparse.Namespace) -> int:
     if target is not None:
         print(f"target: {target}")
     return 0
+
+
+# ─── lint ──────────────────────────────────────────────────────────────
+
+
+def _cmd_lint(args: argparse.Namespace) -> int:
+    if args.lint_cmd == "run":
+        return _cmd_lint_run(args)
+    if args.lint_cmd == "results":
+        return _cmd_lint_results(args)
+    if args.lint_cmd == "autofix":
+        return _cmd_lint_autofix(args)
+    print(f"unknown lint subcommand: {args.lint_cmd}", file=sys.stderr)
+    return 82
+
+
+def _cmd_lint_run(args: argparse.Namespace) -> int:
+    from claude_mnemos.lint.exceptions import LintError
+    from claude_mnemos.lint.runner import LintRunner
+    from claude_mnemos.lint.state import save_report
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        report = LintRunner(vault).run()
+        save_report(vault, report)
+    except LintError as exc:
+        print(f"lint failed: {exc}", file=sys.stderr)
+        return 82
+
+    print(f"findings: {report.summary.total}")
+    print(f"  by severity: {report.summary.by_severity}")
+    print(f"  by rule: {report.summary.by_rule}")
+    print(f"  fixable: {report.summary.fixable_count}")
+    return 0
+
+
+def _cmd_lint_results(args: argparse.Namespace) -> int:
+    from claude_mnemos.lint.exceptions import LintCorruptError
+    from claude_mnemos.lint.state import load_last_report
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    try:
+        report = load_last_report(vault)
+    except LintCorruptError as exc:
+        print(f"lint results corrupt: {exc}", file=sys.stderr)
+        return 83
+
+    if report is None:
+        print("no lint run yet — run `mnemos lint run` first")
+        return 0
+
+    findings = report.findings
+    if args.severity:
+        findings = [f for f in findings if f.severity.value == args.severity]
+    print(f"run_id: {report.run_id}  total: {len(findings)}")
+    for f in findings:
+        print(f"  [{f.severity.value}] {f.rule_id}  {f.page_path}  {f.message}")
+    return 0
+
+
+def _cmd_lint_autofix(args: argparse.Namespace) -> int:
+    from claude_mnemos.lint.autofix import SAFE_FIX_KINDS, apply_autofix
+    from claude_mnemos.lint.exceptions import LintError
+    from claude_mnemos.lint.state import load_last_report
+
+    vault = _resolve_vault(args)
+    if vault is None:
+        return 1
+    report = load_last_report(vault)
+    if report is None:
+        print("no lint run yet — run `mnemos lint run` first", file=sys.stderr)
+        return 82
+
+    applicable = [
+        f for f in report.findings
+        if f.fixable and f.fix_kind is not None and f.fix_kind in SAFE_FIX_KINDS
+    ]
+
+    if args.dry_run:
+        print(f"would fix {len(applicable)} findings:")
+        for f in applicable:
+            print(f"  {f.id}  {f.page_path}  {f.message}")
+        return 0
+
+    try:
+        result = apply_autofix(vault, report)
+    except LintError as exc:
+        print(f"autofix failed: {exc}", file=sys.stderr)
+        return 82
+
+    print(
+        f"fixed {len(result.fixed_findings)} findings; "
+        f"skipped {len(result.skipped_findings)}; "
+        f"snapshot: {result.snapshot_path}; "
+        f"activity: {result.activity_id}"
+    )
+    return 0
+
+
+def _resolve_vault(args: argparse.Namespace) -> Path | None:
+    """Resolve --vault arg or MNEMOS_VAULT_ROOT env. Mirrors existing cli helpers."""
+    raw = getattr(args, "vault", None)
+    if not raw:
+        print(
+            "vault not provided (--vault or MNEMOS_VAULT_ROOT)", file=sys.stderr
+        )
+        return None
+    return Path(raw)
 
 
 if __name__ == "__main__":
