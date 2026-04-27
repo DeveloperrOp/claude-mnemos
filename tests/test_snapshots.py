@@ -688,3 +688,71 @@ def test_prune_old_backups_handles_rmtree_failure(tmp_path: Path, monkeypatch):
     assert result.pruned == []
     assert len(result.errors) == 1
     assert result.errors[0][0] == old.name
+
+
+# Plan #9 — tracker pause integration
+
+
+def test_restore_pauses_tracker_during_swap(tmp_path: Path):
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="op-pause", operation_type="ingest")
+
+    pause_seen: list[bool] = []
+
+    class _SpyTracker(OurWritesTracker):
+        def __init__(self) -> None:
+            super().__init__(ttl_s=60.0)
+
+        def paused(self):  # type: ignore[override]
+            cm = super().paused()
+
+            outer = self
+
+            class _Wrapped:
+                def __enter__(_inner):
+                    cm.__enter__()
+                    pause_seen.append(outer.is_paused)
+                    return None
+
+                def __exit__(_inner, exc_type, exc, tb):
+                    return cm.__exit__(exc_type, exc, tb)
+
+            return _Wrapped()
+
+    tracker = _SpyTracker()
+    result = restore_from_snapshot(vault, snap, tracker=tracker)
+
+    assert result.success is True
+    assert pause_seen == [True]
+    assert tracker.is_paused is False
+
+
+def test_restore_without_tracker_unchanged(tmp_path: Path):
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="op-none", operation_type="ingest")
+
+    # Modify post-snapshot, restore should bring back snapshot state.
+    (vault / "wiki" / "entities" / "foo.md").write_text(
+        "---\ntitle: Foo\n---\nMODIFIED\n", encoding="utf-8"
+    )
+    result = restore_from_snapshot(vault, snap)
+    assert result.success is True
+    assert "body" in (vault / "wiki" / "entities" / "foo.md").read_text()
+
+
+def test_restore_pauses_tracker_on_snapshot_missing(tmp_path: Path):
+    """Even on early-fail paths, tracker pause must release."""
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    tracker = OurWritesTracker(ttl_s=60.0)
+    nonexistent = vault / ".backups" / "nope"
+
+    result = restore_from_snapshot(vault, nonexistent, tracker=tracker)
+    assert result.success is False
+    assert tracker.is_paused is False

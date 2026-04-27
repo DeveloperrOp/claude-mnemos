@@ -5,12 +5,16 @@ import logging
 import re
 import shutil
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 SNAPSHOTS_DIRNAME = ".backups"
 META_FILENAME = ".meta.json"
@@ -405,7 +409,12 @@ def create_snapshot(
     )
 
 
-def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
+def restore_from_snapshot(
+    vault: Path,
+    snapshot: Path,
+    *,
+    tracker: OurWritesTracker | None = None,
+) -> RestoreResult:
     """Atomic restore via copy-first / atomic-swap.
 
     1. Copy snapshot (minus .meta.json) to temp dir on same filesystem.
@@ -415,6 +424,10 @@ def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
     On step 1 failure -> vault not touched, success=False, vault_intact=True.
     On step 2 partial failure -> vault possibly corrupted, recovery_hint returned.
     NEVER recurses inside except (per spec section 7.4 invariant).
+
+    If `tracker` is provided, the restore runs inside `tracker.paused()` so a
+    parallel watchdog handler ignores the dozens of CREATE events the swap
+    produces (Plan #9).
     """
     if not snapshot.exists():
         return RestoreResult(
@@ -423,76 +436,78 @@ def restore_from_snapshot(vault: Path, snapshot: Path) -> RestoreResult:
             error=f"snapshot not found: {snapshot}",
         )
 
-    temp_root = vault.parent / f".mnemos-restore-{int(time.time() * 1000)}"
-    try:
-        shutil.copytree(
-            snapshot,
-            temp_root,
-            ignore=lambda d, names: {n for n in names if n == META_FILENAME},
-        )
-    except OSError as exc:
-        if temp_root.exists():
-            shutil.rmtree(temp_root, ignore_errors=True)
-        return RestoreResult(
-            success=False,
-            vault_intact=True,
-            error=f"cannot stage restore: {exc}",
-        )
-
-    # Preserve current vault's internal dirs into temp_root before swap.
-    # The snapshot deliberately excludes .backups/.trash/.staging so it doesn't
-    # recurse on itself. But after the atomic swap, those internal dirs would
-    # disappear — losing all earlier snapshots, breaking chain undo. Copy them
-    # over before the swap so they survive.
-    if vault.exists():
-        for preserved in (".backups", ".trash", ".staging"):
-            src = vault / preserved
-            if src.is_dir():
-                dst = temp_root / preserved
-                if dst.exists():
-                    # Snapshot included this dir somehow (shouldn't happen) — replace
-                    shutil.rmtree(dst)
-                try:
-                    shutil.copytree(src, dst)
-                except OSError as exc:
-                    # Couldn't preserve internal dir — abort restore.
-                    # Vault is still intact since we haven't swapped yet.
-                    shutil.rmtree(temp_root, ignore_errors=True)
-                    return RestoreResult(
-                        success=False,
-                        vault_intact=True,
-                        error=f"cannot preserve internal dir {preserved}: {exc}",
-                    )
-
-    old_vault: Path | None = None
-    if vault.exists():
-        old_vault = vault.parent / f".mnemos-old-{int(time.time() * 1000)}"
+    pause_cm = tracker.paused() if tracker is not None else nullcontext()
+    with pause_cm:
+        temp_root = vault.parent / f".mnemos-restore-{int(time.time() * 1000)}"
         try:
-            vault.rename(old_vault)
+            shutil.copytree(
+                snapshot,
+                temp_root,
+                ignore=lambda d, names: {n for n in names if n == META_FILENAME},
+            )
         except OSError as exc:
-            shutil.rmtree(temp_root, ignore_errors=True)
+            if temp_root.exists():
+                shutil.rmtree(temp_root, ignore_errors=True)
             return RestoreResult(
                 success=False,
                 vault_intact=True,
-                error=f"cannot rename vault to old: {exc}",
+                error=f"cannot stage restore: {exc}",
             )
 
-    try:
-        temp_root.rename(vault)
-    except OSError as exc:
-        # Worst case: vault is gone, temp_root still has the staged copy.
-        return RestoreResult(
-            success=False,
-            vault_intact=False,
-            vault_possibly_corrupted=True,
-            error=str(exc),
-            recovery_hint=(
-                f"Manual recovery: pre-restore state at {old_vault}, "
-                f"snapshot copy at {temp_root}. Move one of them to {vault}."
-            ),
-        )
+        # Preserve current vault's internal dirs into temp_root before swap.
+        # The snapshot deliberately excludes .backups/.trash/.staging so it doesn't
+        # recurse on itself. But after the atomic swap, those internal dirs would
+        # disappear — losing all earlier snapshots, breaking chain undo. Copy them
+        # over before the swap so they survive.
+        if vault.exists():
+            for preserved in (".backups", ".trash", ".staging"):
+                src = vault / preserved
+                if src.is_dir():
+                    dst = temp_root / preserved
+                    if dst.exists():
+                        # Snapshot included this dir somehow (shouldn't happen) — replace
+                        shutil.rmtree(dst)
+                    try:
+                        shutil.copytree(src, dst)
+                    except OSError as exc:
+                        # Couldn't preserve internal dir — abort restore.
+                        # Vault is still intact since we haven't swapped yet.
+                        shutil.rmtree(temp_root, ignore_errors=True)
+                        return RestoreResult(
+                            success=False,
+                            vault_intact=True,
+                            error=f"cannot preserve internal dir {preserved}: {exc}",
+                        )
 
-    if old_vault is not None:
-        shutil.rmtree(old_vault, ignore_errors=True)
+        old_vault: Path | None = None
+        if vault.exists():
+            old_vault = vault.parent / f".mnemos-old-{int(time.time() * 1000)}"
+            try:
+                vault.rename(old_vault)
+            except OSError as exc:
+                shutil.rmtree(temp_root, ignore_errors=True)
+                return RestoreResult(
+                    success=False,
+                    vault_intact=True,
+                    error=f"cannot rename vault to old: {exc}",
+                )
 
-    return RestoreResult(success=True, vault_intact=False)
+        try:
+            temp_root.rename(vault)
+        except OSError as exc:
+            # Worst case: vault is gone, temp_root still has the staged copy.
+            return RestoreResult(
+                success=False,
+                vault_intact=False,
+                vault_possibly_corrupted=True,
+                error=str(exc),
+                recovery_hint=(
+                    f"Manual recovery: pre-restore state at {old_vault}, "
+                    f"snapshot copy at {temp_root}. Move one of them to {vault}."
+                ),
+            )
+
+        if old_vault is not None:
+            shutil.rmtree(old_vault, ignore_errors=True)
+
+        return RestoreResult(success=True, vault_intact=False)
