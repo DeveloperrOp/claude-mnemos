@@ -19,6 +19,9 @@ async def health(request: Request) -> HealthResponse:
     jobs: list[SchedulerJobInfo] = []
     watchdog_running = False
     alerts_count = 0
+    jobs_queued = 0
+    jobs_running = 0
+    jobs_dead_letter = 0
     if daemon is not None:
         if getattr(daemon, "started_at_monotonic", 0.0) > 0.0:
             uptime_s = max(0.0, time.monotonic() - daemon.started_at_monotonic)
@@ -29,6 +32,15 @@ async def health(request: Request) -> HealthResponse:
         alerts = getattr(daemon, "alerts", None)
         if alerts is not None:
             alerts_count = len(alerts.list())
+        store = getattr(daemon, "job_store", None)
+        if store is not None:
+            try:
+                counts = store.count_by_status()
+            except Exception:
+                counts = {}
+            jobs_queued = int(counts.get("queued", 0))
+            jobs_running = int(counts.get("running", 0))
+            jobs_dead_letter = int(counts.get("dead_letter", 0))
     return HealthResponse(
         status="ok",
         version=__version__,
@@ -37,6 +49,10 @@ async def health(request: Request) -> HealthResponse:
         scheduler_jobs=jobs,
         watchdog_running=watchdog_running,
         alerts_count=alerts_count,
+        jobs_queued=jobs_queued,
+        jobs_running=jobs_running,
+        jobs_dead_letter=jobs_dead_letter,
+        jobs_alert=jobs_dead_letter > 10,
     )
 
 

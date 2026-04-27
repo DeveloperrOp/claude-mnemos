@@ -36,6 +36,10 @@ class HealthResponse(BaseModel):
     scheduler_jobs: list[SchedulerJobInfo] = Field(default_factory=list)
     watchdog_running: bool = False
     alerts_count: int = Field(default=0, ge=0)
+    jobs_queued: int = Field(default=0, ge=0)
+    jobs_running: int = Field(default=0, ge=0)
+    jobs_dead_letter: int = Field(default=0, ge=0)
+    jobs_alert: bool = False
 
 
 class WatchdogAlertResponse(BaseModel):
