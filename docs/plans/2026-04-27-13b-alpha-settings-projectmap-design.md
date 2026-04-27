@@ -99,7 +99,7 @@ PATCH  /api/settings/global                  partial merge
 
 Spec явно использует `~/.claude-mnemos/` в §5.5 (`PID_FILE = Path.home() / ".claude-mnemos" / "daemon.pid"`) и §13.1 (`~/.claude-mnemos/onboarding-complete` flag). Имя self-describing, низкая вероятность collision с другими `mnemos`-tools.
 
-Текущий `daemon.pid` уже лежит в `~/.claude-mnemos/` (см. `claude_mnemos/daemon/lockfile.py`) — миграции не требуется.
+**Существующее расхождение с spec'ом:** `claude_mnemos/daemon/config.py:default_pid_file()` сейчас возвращает `~/.mnemos/daemon.pid` (legacy). В Plan #13b-α меняем на `~/.claude-mnemos/daemon.pid` для согласованности со spec'ом и со всеми новыми state-файлами. Migration: при старте daemon, если `~/.mnemos/daemon.pid` существует и `~/.claude-mnemos/daemon.pid` — нет, перенести его (one-shot). Также `default_runtime_config_file()` (`~/.mnemos/daemon.config.json`) → `~/.claude-mnemos/daemon.config.json`.
 
 ### 2.3 Project identifier — user-supplied `name` (string slug)
 
@@ -946,17 +946,17 @@ Plan #13b-α считается выполненным когда:
 1. `state/projects.py` (ProjectMapEntry/ProjectMap + exceptions + ProjectStore) + tests
 2. `state/settings.py` (ProjectSettings/GlobalSettings + SettingsStore + helpers) + tests
 3. `mapping/resolver.py` (ProjectResolver) + tests
-4. `daemon/routes/projects.py` + tests
+4. `daemon/routes/projects.py` + register in app.py + exception handlers + tests
 5. `daemon/routes/settings.py` (incl. daemon reload trigger) + tests
-6. `daemon/process.py` (settings consumption, build_scheduler extension) + tests
-7. CLI `mnemos project` subgroup + tests
-8. CLI `mnemos settings` subgroup + tests
-9. CLI migration: existing subgroups `--vault PATH` → `--project NAME` + tests
-10. `hooks/session_end.py` resolver integration + tests
-11. `mcp/__main__.py` `--auto-resolve` / `--project` / degraded mode + tests
-12. `.mcp.json` plugin manifest update
-13. README + CHANGELOG migration section
-14. Slow E2E coverage
-15. Final review pass + cleanup
+6. `daemon/config.py` PID file path migration to `~/.claude-mnemos/` (one-shot move from `~/.mnemos/` if present)
+7. `daemon/process.py` (settings consumption, build_scheduler extension) + tests
+8. CLI `mnemos project` subgroup + tests
+9. CLI `mnemos settings` subgroup + tests
+10. CLI migration: existing subgroups `--vault PATH` → `--project NAME` + tests update
+11. `hooks/session_end.py` resolver integration + tests
+12. `mcp/__main__.py` + `mcp/config.py` (`--auto-resolve` / `--project` / degraded mode) + tests
+13. `.mcp.json` plugin manifest update
+14. README + CHANGELOG migration section
+15. Slow E2E coverage
 
 Каждый шаг — отдельный task в Plan doc с acceptance check.
