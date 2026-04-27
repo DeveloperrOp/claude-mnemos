@@ -42,10 +42,18 @@ async def client(app):
         yield c
 
 
-async def test_post_creates_job(client):
+@pytest.fixture
+def transcript_file(tmp_path: Path) -> str:
+    """Real on-disk transcript path so POST /jobs validation passes."""
+    p = tmp_path / "session.jsonl"
+    p.write_text("[]", encoding="utf-8")
+    return str(p)
+
+
+async def test_post_creates_job(client, transcript_file):
     r = await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": "/x.jsonl"}},
+        json={"kind": "ingest", "payload": {"transcript_path": transcript_file}},
     )
     assert r.status_code == 201
     body = r.json()
@@ -54,14 +62,18 @@ async def test_post_creates_job(client):
     assert body["id"]
 
 
-async def test_get_lists_jobs(client):
+async def test_get_lists_jobs(client, tmp_path: Path):
+    a = tmp_path / "a.jsonl"
+    a.write_text("[]", encoding="utf-8")
+    b = tmp_path / "b.jsonl"
+    b.write_text("[]", encoding="utf-8")
     await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": "/a"}},
+        json={"kind": "ingest", "payload": {"transcript_path": str(a)}},
     )
     await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": "/b"}},
+        json={"kind": "ingest", "payload": {"transcript_path": str(b)}},
     )
     r = await client.get("/jobs")
     assert r.status_code == 200
@@ -77,9 +89,9 @@ async def test_get_filters_by_status(client):
     assert body["jobs"] == []
 
 
-async def test_get_by_id(client):
+async def test_get_by_id(client, transcript_file):
     create = await client.post(
-        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": "/x"}}
+        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": transcript_file}}
     )
     job_id = create.json()["id"]
     r = await client.get(f"/jobs/{job_id}")
@@ -92,9 +104,9 @@ async def test_get_by_id_404(client):
     assert r.status_code == 404
 
 
-async def test_delete_cancels_queued(client):
+async def test_delete_cancels_queued(client, transcript_file):
     create = await client.post(
-        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": "/x"}}
+        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": transcript_file}}
     )
     job_id = create.json()["id"]
     r = await client.delete(f"/jobs/{job_id}")
@@ -107,3 +119,33 @@ async def test_delete_nonqueued_returns_409(client, daemon):
     daemon.job_store.claim_next_ready(now=datetime.now(UTC))
     r = await client.delete(f"/jobs/{job.id}")
     assert r.status_code == 409
+
+
+async def test_post_rejects_missing_transcript_path(client):
+    r = await client.post(
+        "/jobs", json={"kind": "ingest", "payload": {}}
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "missing_transcript_path"
+
+
+async def test_post_rejects_nonexistent_transcript(client):
+    r = await client.post(
+        "/jobs",
+        json={"kind": "ingest", "payload": {"transcript_path": "/no/such/file.jsonl"}},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "transcript_not_found"
+
+
+async def test_post_accepts_existing_transcript(client, tmp_path: Path):
+    transcript = tmp_path / "session.jsonl"
+    transcript.write_text("[]", encoding="utf-8")
+    r = await client.post(
+        "/jobs",
+        json={
+            "kind": "ingest",
+            "payload": {"transcript_path": str(transcript)},
+        },
+    )
+    assert r.status_code == 201

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -32,6 +33,23 @@ async def create_job(request: Request, body: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail={"error": "payload_must_be_object"}
         )
+    if kind == "ingest":
+        transcript_path = payload.get("transcript_path")
+        if not isinstance(transcript_path, str) or not transcript_path:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "missing_transcript_path", "kind": kind},
+            )
+        # File-existence check is best-effort — daemon may run on a different
+        # machine than the caller in future; for now we're single-host.
+        if not Path(transcript_path).is_file():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "transcript_not_found",
+                    "transcript_path": transcript_path,
+                },
+            )
     job = store.create(kind=kind, payload=payload)
     if hasattr(request.app.state.daemon, "job_worker"):
         worker = request.app.state.daemon.job_worker
