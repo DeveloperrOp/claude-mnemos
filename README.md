@@ -6,7 +6,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 
 ## Статус
 
-`0.0.1` — Plans #1-#11 в `main`. Готовы:
+`0.0.1` — Plans #1-#12 в `main`. Готовы:
 
 - **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
 - **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
@@ -18,6 +18,7 @@ Long-term structured per-project knowledge base for Claude Code sessions.
 - **Watchdog real-time** (Plan #9): daemon наблюдает `wiki/*.md` через Python `watchdog`, отличает self-writes от human edits через in-memory `OurWritesTracker` (TTL set + paused() context). При external modify помечает страницу `agent_written: false` + `last_human_edit: <ts>` + пишет activity entry `human_edit_detected`. Alerts buffer (in-memory, cap 200) + endpoints `GET /alerts` / `DELETE /alerts/{id}`. `HealthResponse` расширен `watchdog_running` + `alerts_count`.
 - **Lint** (Plan #10): 8 structural rules + 1 synthetic (`page_parse_failed`) — `wikilinks_broken` (with Levenshtein-typo autofix), `orphan_pages`, `stale_pages`, `duplicate_titles`, `provenance_inferred_high`, `provenance_ambiguous_high`, `trailing_whitespace`, `missing_required_frontmatter`. Cached report in `<vault>/.lint-results.json`. Safe autofix whitelist runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. CLI `mnemos lint {run, results, autofix}`, REST `POST /lint/run|autofix` + `GET /lint/results`, MCP `run_lint` + `get_lint_results` (12→14 tools).
 - **Jobs queue + Dead-letter** (Plan #11): persistent SQLite-backed queue at `<vault>/.jobs.db` (excluded from snapshots). `IngestHandler` runs the existing sync ingest in `asyncio.to_thread`, with retry policy 4 attempts × backoff 30s/2min/20min. SessionEnd hook now prefers `POST /jobs` over the detached subprocess (closes Plan #9 watchdog false-positive). REST `POST/GET/DELETE /jobs`, `GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`. CLI `mnemos jobs {list, show, cancel, retry-dead, dismiss}`. Health response gains `jobs_queued/running/dead_letter/jobs_alert` (alert at >10 dead-letter).
+- **Page edit + Trash** (Plan #12): direct page mutations (edit/verify/archive/delete) and trash management (list/restore/dismiss/empty). All mutations route through `StagingTransaction` with pre-op snapshot — undo via `mnemos undo` reverts everything. `.trash/<id>/.metadata.json` carries `original_path` so restore puts content back to its original location. REST `PATCH/POST/DELETE /pages/{ref:path}` + `GET/POST/DELETE /trash`. CLI `mnemos page {edit, verify, archive, delete}` and `mnemos trash {list, restore, dismiss, empty}`. New activity types: `manual_edit`, `manual_delete` (undoable), `manual_restore_trash` (undoable), `trash_dismissed`, `trash_emptied` (audit-only).
 
 ## Установка
 
@@ -256,9 +257,29 @@ the existing detached `mnemos ingest` subprocess. Concurrent CLI ingest with the
 daemon running no longer triggers the watchdog false-positive
 `human_edit_detected` (Plan #9 known limitation closed).
 
+## Pages + Trash
+
+Direct page edit/verify/archive/delete + trash management with snapshot+undo.
+
+```bash
+mnemos page edit wiki/entities/foo --vault <path> --frontmatter '{"status":"verified","tags":["important"]}'
+mnemos page verify wiki/entities/foo --vault <path>
+mnemos page archive wiki/entities/foo --vault <path>
+mnemos page delete wiki/entities/foo --vault <path>      # → trash, undoable
+
+mnemos trash list --vault <path>
+mnemos trash restore <trash-id> --vault <path>           # back to original location
+mnemos trash dismiss <trash-id> --vault <path>           # hard delete (no undo)
+mnemos trash empty --vault <path> [--yes]                # empty all trash entries
+```
+
+REST: PATCH/POST/DELETE on `/pages/{page_ref:path}{,/verify,/archive}` + GET/POST/DELETE on `/trash`. Activity entries: `manual_edit`, `manual_delete` (undoable via `mnemos undo`), `manual_restore_trash`, `trash_dismissed`, `trash_emptied` (audit-only).
+
+Trash entries with `.metadata.json` (`original_path`, `operation_id`, etc.) are restorable. Old trash dirs from before Plan #12 (no metadata) are listed but not restorable.
+
 ## Запуск всех тестов
 
 ```bash
-pytest -q              # быстрые (~756 тестов)
-pytest -q -m slow      # медленные E2E (~10 тестов: subprocess daemon + watchdog + jobs E2E)
+pytest -q              # быстрые (~830 тестов)
+pytest -q -m slow      # медленные E2E (~10 тестов: subprocess daemon + watchdog + jobs + pages E2E)
 ```

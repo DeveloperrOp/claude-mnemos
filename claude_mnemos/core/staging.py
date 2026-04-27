@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import shutil
 import time
 from contextlib import nullcontext
@@ -165,13 +166,24 @@ class StagingTransaction:
                 continue
             slug = Path(rel).stem or "page"
             ts = datetime.now(UTC).strftime("%Y-%m-%d-%H-%M-%S")
-            trash_dir = (
-                self.vault / TRASH_DIRNAME / f"deleted-{slug}-{ts}-{self.operation_id[:8]}"
-            )
+            trash_dir_name = f"deleted-{slug}-{ts}-{self.operation_id[:8]}"
+            trash_dir = self.vault / TRASH_DIRNAME / trash_dir_name
             trash_dir.mkdir(parents=True, exist_ok=True)
             shutil.move(str(src), str(trash_dir / src.name))
             (trash_dir / ".reason.txt").write_text(
                 f"deleted via {self.operation_type} operation {self.operation_id}",
+                encoding="utf-8",
+            )
+            metadata = {
+                "version": 1,
+                "trash_id": trash_dir_name,
+                "original_path": rel,
+                "deleted_at": datetime.now(UTC).isoformat(),
+                "operation_id": self.operation_id,
+                "operation_type": self.operation_type,
+            }
+            (trash_dir / ".metadata.json").write_text(
+                json.dumps(metadata, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
 
