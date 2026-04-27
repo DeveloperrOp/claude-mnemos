@@ -164,9 +164,14 @@ def apply_soft_delete(
 ) -> DeleteResult:
     """Soft-delete a page to .trash/ via StagingTransaction.
 
-    The trash_id is now passed through to StagingTransaction.delete so the
-    returned DeleteResult.trash_id is authoritative — exactly matches the
-    on-disk directory name created by _apply_deletes.
+    Snapshot+activity make this undoable via mnemos undo <activity_id>.
+    After undo, the originating .trash/<id>/ dir REMAINS as an orphan with
+    stale metadata pointing at the now-restored page. List/dismiss/empty
+    commands handle these orphans normally; trying to restore one will 409
+    because the original_path is now occupied.
+
+    Caller-pinned trash_id ensures the returned DeleteResult.trash_id is
+    authoritative (matches the on-disk dir).
     """
     cfg = cfg or Config.from_env()
     rel = page_path.relative_to(vault).as_posix()
