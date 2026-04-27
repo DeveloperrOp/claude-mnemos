@@ -41,6 +41,50 @@ from claude_mnemos.state.ontology import (
     generate_suggestion_id,
 )
 
+_EXIT_PROJECT_NOT_FOUND = 97
+
+
+def _resolve_vault_from_project_arg(
+    project_name: str | None, *, ctx: str
+) -> Path | None:
+    """Map ``--project NAME`` to ``vault_root`` via project-map; auto-resolve
+    from cwd when ``project_name`` is None. Returns None and prints to stderr
+    on miss.
+    """
+    from claude_mnemos.mapping.resolver import (
+        ProjectResolver,
+        ResolverAmbiguityError,
+    )
+    from claude_mnemos.state.projects import ProjectStore
+
+    resolver = ProjectResolver()
+    if project_name is not None:
+        entry = resolver.resolve_by_name(project_name)
+        if entry is None:
+            registered = sorted(e.name for e in ProjectStore().list_all())
+            names_hint = ", ".join(registered) if registered else "(none)"
+            print(
+                f"{ctx}: project {project_name!r} not registered; "
+                f"registered projects: {names_hint}",
+                file=sys.stderr,
+            )
+            return None
+        return Path(entry.vault_root)
+    try:
+        entry = resolver.resolve_by_cwd(Path.cwd())
+    except ResolverAmbiguityError as exc:
+        print(f"{ctx}: ambiguous project for cwd: {exc}", file=sys.stderr)
+        return None
+    if entry is None:
+        print(
+            f"{ctx}: --project NAME required, or run from a registered project. "
+            "Add one: mnemos project add --name NAME --vault PATH "
+            "--cwd-pattern PATTERN",
+            file=sys.stderr,
+        )
+        return None
+    return Path(entry.vault_root)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos")
@@ -48,7 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("ingest", help="Ingest a Claude Code JSONL session into a vault")
     p.add_argument("jsonl", type=Path, help="Path to the session JSONL file")
-    p.add_argument("vault", type=Path, help="Path to the vault root")
+    p.add_argument(
+        "--project",
+        default=None,
+        help="Project name in project-map (auto-resolves from cwd if omitted)",
+    )
     p.add_argument("--model", type=str, default=None, help="Model id or alias (sonnet/haiku/opus)")
     p.add_argument(
         "--language-hint",
@@ -78,12 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
         "activity",
         help="Show recent activity entries from the vault's activity log",
     )
-    activity_p.add_argument(
-        "--vault",
-        type=Path,
-        default=Path.cwd(),
-        help="Path to the vault root (default: current directory)",
-    )
+    activity_p.add_argument("--project", default=None)
     activity_p.add_argument(
         "--limit",
         type=int,
@@ -106,12 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Undo the most recent undoable operation",
     )
-    undo_p.add_argument(
-        "--vault",
-        type=Path,
-        default=Path.cwd(),
-        help="Path to the vault root (default: current directory)",
-    )
+    undo_p.add_argument("--project", default=None)
 
     daemon_p = sub.add_parser("daemon", help="Manage the mnemos daemon")
     daemon_sub = daemon_p.add_subparsers(dest="daemon_cmd", required=True)
@@ -140,7 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     ontology_sub = ontology_p.add_subparsers(dest="ontology_cmd", required=True)
 
     list_p = ontology_sub.add_parser("list", help="List suggestions (default: pending)")
-    list_p.add_argument("--vault", type=Path, default=Path.cwd())
+    list_p.add_argument("--project", default=None)
     list_p.add_argument(
         "--all",
         action="store_true",
@@ -150,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     for cmd in ("approve", "reject", "defer"):
         sp = ontology_sub.add_parser(cmd)
         sp.add_argument("suggestion_id", type=str)
-        sp.add_argument("--vault", type=Path, default=Path.cwd())
+        sp.add_argument("--project", default=None)
 
     propose_p = ontology_sub.add_parser(
         "propose", help="Create a new suggestion manually"
@@ -165,30 +203,30 @@ def build_parser() -> argparse.ArgumentParser:
     merge_p.add_argument("--target", required=True)
     merge_p.add_argument("--reason", default="")
     merge_p.add_argument("--confidence", type=float, default=0.7)
-    merge_p.add_argument("--vault", type=Path, default=Path.cwd())
+    merge_p.add_argument("--project", default=None)
 
     rename_p = propose_sub.add_parser("rename")
     rename_p.add_argument("--source", required=True)
     rename_p.add_argument("--target", required=True)
     rename_p.add_argument("--reason", default="")
     rename_p.add_argument("--confidence", type=float, default=0.7)
-    rename_p.add_argument("--vault", type=Path, default=Path.cwd())
+    rename_p.add_argument("--project", default=None)
 
     delete_p = propose_sub.add_parser("delete")
     delete_p.add_argument("--source", required=True)
     delete_p.add_argument("--reason", default="")
     delete_p.add_argument("--confidence", type=float, default=0.7)
-    delete_p.add_argument("--vault", type=Path, default=Path.cwd())
+    delete_p.add_argument("--project", default=None)
 
     # ─── lint ─────────────────────────────────────────────────────────────
     lint_parser = sub.add_parser("lint", help="Health-check the wiki vault")
     lint_subs = lint_parser.add_subparsers(dest="lint_cmd", required=True)
 
     lint_run_p = lint_subs.add_parser("run", help="Run all lint rules")
-    lint_run_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lint_run_p.add_argument("--project", default=None)
 
     lint_results_p = lint_subs.add_parser("results", help="Show last cached lint report")
-    lint_results_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lint_results_p.add_argument("--project", default=None)
     lint_results_p.add_argument(
         "--severity",
         choices=["error", "warning", "info"],
@@ -197,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     lint_autofix_p = lint_subs.add_parser("autofix", help="Apply safe autofixes")
-    lint_autofix_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lint_autofix_p.add_argument("--project", default=None)
     lint_autofix_p.add_argument(
         "--dry-run", action="store_true", help="Print planned fixes without applying"
     )
@@ -207,7 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
     jobs_subs = jobs_parser.add_subparsers(dest="jobs_cmd", required=True)
 
     jobs_list_p = jobs_subs.add_parser("list", help="List jobs (filtered by status)")
-    jobs_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_list_p.add_argument("--project", default=None)
     jobs_list_p.add_argument(
         "--status",
         choices=["queued", "running", "succeeded", "failed", "dead_letter"],
@@ -217,23 +255,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     jobs_show_p = jobs_subs.add_parser("show", help="Show one job by id")
     jobs_show_p.add_argument("job_id")
-    jobs_show_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_show_p.add_argument("--project", default=None)
 
     jobs_cancel_p = jobs_subs.add_parser("cancel", help="Cancel a queued job")
     jobs_cancel_p.add_argument("job_id")
-    jobs_cancel_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_cancel_p.add_argument("--project", default=None)
 
     jobs_retry_p = jobs_subs.add_parser(
         "retry-dead", help="Restore a dead-letter job to the queue"
     )
     jobs_retry_p.add_argument("job_id")
-    jobs_retry_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_retry_p.add_argument("--project", default=None)
 
     jobs_dismiss_p = jobs_subs.add_parser(
         "dismiss", help="Permanently delete a dead-letter job"
     )
     jobs_dismiss_p.add_argument("job_id")
-    jobs_dismiss_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    jobs_dismiss_p.add_argument("--project", default=None)
 
     # ─── page ─────────────────────────────────────────────────────────────
     page_parser = sub.add_parser(
@@ -245,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
         "edit", help="Patch frontmatter and/or body of a page (via daemon)"
     )
     page_edit_p.add_argument("page_ref")
-    page_edit_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    page_edit_p.add_argument("--project", default=None)
     page_edit_p.add_argument(
         "--frontmatter",
         default=None,
@@ -261,7 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
     for cmd in ("verify", "archive", "delete"):
         sp = page_subs.add_parser(cmd, help=f"{cmd.title()} a page (via daemon)")
         sp.add_argument("page_ref")
-        sp.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+        sp.add_argument("--project", default=None)
 
     # ─── trash ────────────────────────────────────────────────────────────
     trash_parser = sub.add_parser(
@@ -270,17 +308,17 @@ def build_parser() -> argparse.ArgumentParser:
     trash_subs = trash_parser.add_subparsers(dest="trash_cmd", required=True)
 
     trash_list_p = trash_subs.add_parser("list", help="List trash entries (direct DB read)")
-    trash_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    trash_list_p.add_argument("--project", default=None)
 
     for cmd in ("restore", "dismiss"):
         sp = trash_subs.add_parser(cmd, help=f"{cmd.title()} a trash entry (via daemon)")
         sp.add_argument("trash_id")
-        sp.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+        sp.add_argument("--project", default=None)
 
     trash_empty_p = trash_subs.add_parser(
         "empty", help="Permanently delete all trash entries (via daemon)"
     )
-    trash_empty_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    trash_empty_p.add_argument("--project", default=None)
     trash_empty_p.add_argument(
         "--yes",
         action="store_true",
@@ -296,7 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
     sessions_list_p = sessions_subs.add_parser(
         "list", help="List sessions (succeeded + queued + dead-letter)"
     )
-    sessions_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    sessions_list_p.add_argument("--project", default=None)
     sessions_list_p.add_argument(
         "--status",
         choices=["succeeded", "queued", "running", "failed", "dead_letter"],
@@ -308,14 +346,14 @@ def build_parser() -> argparse.ArgumentParser:
         "show", help="Show one session view by id"
     )
     sessions_show_p.add_argument("session_id")
-    sessions_show_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    sessions_show_p.add_argument("--project", default=None)
 
     sessions_ingest_p = sessions_subs.add_parser(
         "ingest", help="Enqueue an ingest job for a transcript (via daemon)"
     )
     sessions_ingest_p.add_argument("transcript_path")
     sessions_ingest_p.add_argument(
-        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+        "--project", default=None
     )
 
     # ─── lost-sessions ────────────────────────────────────────────────────
@@ -328,24 +366,24 @@ def build_parser() -> argparse.ArgumentParser:
     lost_list_p = lost_subs.add_parser(
         "list", help="List lost transcripts (direct scan)"
     )
-    lost_list_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lost_list_p.add_argument("--project", default=None)
 
     lost_scan_p = lost_subs.add_parser(
         "scan", help="Force a daemon-side rescan of lost transcripts"
     )
-    lost_scan_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lost_scan_p.add_argument("--project", default=None)
 
     lost_import_p = lost_subs.add_parser(
         "import", help="Enqueue an ingest job for a lost session (via daemon)"
     )
     lost_import_p.add_argument("session_id")
-    lost_import_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lost_import_p.add_argument("--project", default=None)
 
     lost_ignore_p = lost_subs.add_parser(
         "ignore", help="Mark a lost session as ignored (via daemon)"
     )
     lost_ignore_p.add_argument("session_id")
-    lost_ignore_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    lost_ignore_p.add_argument("--project", default=None)
     lost_ignore_p.add_argument("--reason", default=None)
 
     # ─── metrics ──────────────────────────────────────────────────────────
@@ -358,21 +396,21 @@ def build_parser() -> argparse.ArgumentParser:
         "usage", help="Show token totals over a rolling window"
     )
     metrics_usage_p.add_argument(
-        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+        "--project", default=None
     )
     metrics_usage_p.add_argument("--period", default="30d")
 
     metrics_top_p = metrics_subs.add_parser(
         "top-sessions", help="List heaviest sessions by combined tokens"
     )
-    metrics_top_p.add_argument("--vault", default=os.environ.get("MNEMOS_VAULT_ROOT"))
+    metrics_top_p.add_argument("--project", default=None)
     metrics_top_p.add_argument("--limit", type=int, default=10)
 
     metrics_timeline_p = metrics_subs.add_parser(
         "timeline", help="Show per-day session+token bucket timeline"
     )
     metrics_timeline_p.add_argument(
-        "--vault", default=os.environ.get("MNEMOS_VAULT_ROOT")
+        "--project", default=None
     )
     metrics_timeline_p.add_argument("--period", default="30d")
 
@@ -472,6 +510,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
         return 2
 
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ingest")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
+
     try:
         cfg = Config.from_env().with_overrides(
             model=args.model,
@@ -494,7 +536,7 @@ def main(argv: list[str] | None = None) -> int:
 
         result = ingest(
             args.jsonl,
-            args.vault,
+            vault,
             cfg=cfg,
             llm_client=llm_client,
             extract=extract,
@@ -554,8 +596,11 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _cmd_activity(args: argparse.Namespace) -> int:
+    vault = _resolve_vault_from_project_arg(args.project, ctx="activity")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
     try:
-        log = ActivityLog.load(args.vault)
+        log = ActivityLog.load(vault)
     except ActivityCorruptError as exc:
         print(f"error: activity log corrupt: {exc}", file=sys.stderr)
         return 74
@@ -602,8 +647,12 @@ def _cmd_undo(args: argparse.Namespace) -> int:
         print("error: provide op_id or --last", file=sys.stderr)
         return 2
 
+    vault = _resolve_vault_from_project_arg(args.project, ctx="undo")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
+
     try:
-        log = ActivityLog.load(args.vault)
+        log = ActivityLog.load(vault)
     except ActivityCorruptError as exc:
         print(f"error: activity log corrupt: {exc}", file=sys.stderr)
         return 74
@@ -629,7 +678,7 @@ def _cmd_undo(args: argparse.Namespace) -> int:
         op_id = matches[0].id
 
     try:
-        result = undo(args.vault, op_id)
+        result = undo(vault, op_id)
     except UndoError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 77
@@ -840,8 +889,11 @@ def _cmd_ontology(args: argparse.Namespace) -> int:
 
 
 def _cmd_ontology_list(args: argparse.Namespace) -> int:
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ontology list")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
     try:
-        store = SuggestionStore(args.vault)
+        store = SuggestionStore(vault)
         items = store.list(include_archive=args.all)
     except OntologyCorruptError as exc:
         print(f"error: ontology corrupt: {exc}", file=sys.stderr)
@@ -863,8 +915,11 @@ def _cmd_ontology_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_ontology_approve(args: argparse.Namespace) -> int:
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ontology approve")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
     try:
-        result = apply_suggestion(args.vault, args.suggestion_id)
+        result = apply_suggestion(vault, args.suggestion_id)
     except OntologyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 81
@@ -885,8 +940,11 @@ def _cmd_ontology_approve(args: argparse.Namespace) -> int:
 
 
 def _cmd_ontology_reject(args: argparse.Namespace) -> int:
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ontology reject")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
     try:
-        store = SuggestionStore(args.vault)
+        store = SuggestionStore(vault)
         existing = store.get(args.suggestion_id)
         if existing is None:
             print(f"error: suggestion not found: {args.suggestion_id}", file=sys.stderr)
@@ -908,8 +966,11 @@ def _cmd_ontology_reject(args: argparse.Namespace) -> int:
 
 
 def _cmd_ontology_defer(args: argparse.Namespace) -> int:
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ontology defer")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
     try:
-        store = SuggestionStore(args.vault)
+        store = SuggestionStore(vault)
         existing = store.get(args.suggestion_id)
         if existing is None:
             print(f"error: suggestion not found: {args.suggestion_id}", file=sys.stderr)
@@ -954,12 +1015,16 @@ def _cmd_ontology_propose(args: argparse.Namespace) -> int:
     }
     operation = operation_map[op]
 
+    vault = _resolve_vault_from_project_arg(args.project, ctx="ontology propose")
+    if vault is None:
+        return _EXIT_PROJECT_NOT_FOUND
+
     # Validate sources exist
     for src in affected:
-        if not (args.vault / src).is_file():
+        if not (vault / src).is_file():
             print(f"error: source page missing: {src}", file=sys.stderr)
             return 81
-    if target is not None and (args.vault / target).exists():
+    if target is not None and (vault / target).exists():
         print(f"error: target already exists: {target}", file=sys.stderr)
         return 81
 
@@ -977,7 +1042,7 @@ def _cmd_ontology_propose(args: argparse.Namespace) -> int:
         ),
         body=args.reason,
     )
-    store = SuggestionStore(args.vault)
+    store = SuggestionStore(vault)
     try:
         store.create(suggestion)
     except ValueError as exc:
@@ -1010,7 +1075,7 @@ def _cmd_lint_run(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         report = LintRunner(vault).run()
         save_report(vault, report)
@@ -1031,7 +1096,7 @@ def _cmd_lint_results(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         report = load_last_report(vault)
     except LintCorruptError as exc:
@@ -1058,7 +1123,7 @@ def _cmd_lint_autofix(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     report = load_last_report(vault)
     if report is None:
         print("no lint run yet — run `mnemos lint run` first", file=sys.stderr)
@@ -1090,15 +1155,10 @@ def _cmd_lint_autofix(args: argparse.Namespace) -> int:
     return 0
 
 
-def _resolve_vault(args: argparse.Namespace) -> Path | None:
-    """Resolve --vault arg or MNEMOS_VAULT_ROOT env. Mirrors existing cli helpers."""
-    raw = getattr(args, "vault", None)
-    if not raw:
-        print(
-            "vault not provided (--vault or MNEMOS_VAULT_ROOT)", file=sys.stderr
-        )
-        return None
-    return Path(raw)
+def _resolve_vault(args: argparse.Namespace, *, ctx: str = "command") -> Path | None:
+    """Resolve --project NAME (or auto-resolve from cwd) to a vault root."""
+    project = getattr(args, "project", None)
+    return _resolve_vault_from_project_arg(project, ctx=ctx)
 
 
 # ─── jobs ──────────────────────────────────────────────────────────────
@@ -1124,7 +1184,7 @@ def _cmd_jobs_list(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         with JobStore(vault / JOBS_DB_FILENAME) as store:
             jobs = store.list_by_status(args.status, limit=args.limit)
@@ -1150,7 +1210,7 @@ def _cmd_jobs_show(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         with JobStore(vault / JOBS_DB_FILENAME) as store:
             job = store.get_by_id(args.job_id)
@@ -1271,7 +1331,7 @@ def _cmd_page(args: argparse.Namespace) -> int:
 
 def _cmd_page_edit(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
 
     fm_patch: dict[str, object] | None = None
     if args.frontmatter is not None:
@@ -1309,7 +1369,7 @@ def _cmd_page_edit(args: argparse.Namespace) -> int:
 
 def _cmd_page_verify(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "POST", f"/pages/{args.page_ref}/verify"
     )
@@ -1323,7 +1383,7 @@ def _cmd_page_verify(args: argparse.Namespace) -> int:
 
 def _cmd_page_archive(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "POST", f"/pages/{args.page_ref}/archive"
     )
@@ -1337,7 +1397,7 @@ def _cmd_page_archive(args: argparse.Namespace) -> int:
 
 def _cmd_page_delete(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "DELETE", f"/pages/{args.page_ref}"
     )
@@ -1370,7 +1430,7 @@ def _cmd_trash_list(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
 
     entries = list_trash(vault)
     if not entries:
@@ -1391,7 +1451,7 @@ def _cmd_trash_list(args: argparse.Namespace) -> int:
 
 def _cmd_trash_restore(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "POST", f"/trash/{args.trash_id}/restore"
     )
@@ -1405,7 +1465,7 @@ def _cmd_trash_restore(args: argparse.Namespace) -> int:
 
 def _cmd_trash_dismiss(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "DELETE", f"/trash/{args.trash_id}"
     )
@@ -1419,7 +1479,7 @@ def _cmd_trash_dismiss(args: argparse.Namespace) -> int:
 
 def _cmd_trash_empty(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
 
     if not args.yes:
         print("Type 'delete' to confirm: ", end="", flush=True)
@@ -1456,7 +1516,7 @@ def _cmd_sessions_list(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         items = list_sessions(vault)
     except ManifestCorruptError as exc:
@@ -1493,7 +1553,7 @@ def _cmd_sessions_show(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         session = get_session(vault, args.session_id)
     except ManifestCorruptError as exc:
@@ -1509,7 +1569,7 @@ def _cmd_sessions_show(args: argparse.Namespace) -> int:
 
 def _cmd_sessions_ingest(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
 
     transcript = Path(args.transcript_path)
     if not transcript.is_file():
@@ -1550,7 +1610,7 @@ def _cmd_lost_sessions_list(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         items = scan_lost_sessions(vault)
     except ManifestCorruptError as exc:
@@ -1572,7 +1632,7 @@ def _cmd_lost_sessions_list(args: argparse.Namespace) -> int:
 
 def _cmd_lost_sessions_scan(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon("POST", "/lost-sessions/scan")
     if response is None:
         return err or 1
@@ -1584,7 +1644,7 @@ def _cmd_lost_sessions_scan(args: argparse.Namespace) -> int:
 
 def _cmd_lost_sessions_import(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     response, err = _http_request_to_daemon(
         "POST",
         f"/lost-sessions/{args.session_id}/import",
@@ -1606,7 +1666,7 @@ def _cmd_lost_sessions_import(args: argparse.Namespace) -> int:
 
 def _cmd_lost_sessions_ignore(args: argparse.Namespace) -> int:
     if _resolve_vault(args) is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     body: dict[str, object] = {}
     if args.reason is not None:
         body["reason"] = args.reason
@@ -1660,7 +1720,7 @@ def _cmd_metrics_usage(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     days = _parse_period_days(args.period)
     if days is None:
         print(
@@ -1694,7 +1754,7 @@ def _cmd_metrics_top_sessions(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     try:
         items = top_sessions(vault, limit=args.limit)
     except ManifestCorruptError as exc:
@@ -1721,7 +1781,7 @@ def _cmd_metrics_timeline(args: argparse.Namespace) -> int:
 
     vault = _resolve_vault(args)
     if vault is None:
-        return 1
+        return _EXIT_PROJECT_NOT_FOUND
     days = _parse_period_days(args.period)
     if days is None:
         print(

@@ -14,14 +14,14 @@ from claude_mnemos.cli import build_parser, main
 # ─── parser tests ─────────────────────────────────────────────────────────
 
 
-def test_parser_page_edit(tmp_path: Path) -> None:
+def test_parser_page_edit() -> None:
     args = build_parser().parse_args(
         [
             "page",
             "edit",
             "wiki/entities/foo",
-            "--vault",
-            str(tmp_path),
+            "--project",
+            "p",
             "--frontmatter",
             '{"status": "verified"}',
         ]
@@ -41,8 +41,8 @@ def test_parser_page_edit_with_body_file(tmp_path: Path) -> None:
             "page",
             "edit",
             "foo",
-            "--vault",
-            str(tmp_path),
+            "--project",
+            "p",
             "--body-file",
             str(body),
         ]
@@ -51,24 +51,24 @@ def test_parser_page_edit_with_body_file(tmp_path: Path) -> None:
     assert args.body_file == body
 
 
-def test_parser_page_verify(tmp_path: Path) -> None:
+def test_parser_page_verify() -> None:
     args = build_parser().parse_args(
-        ["page", "verify", "foo", "--vault", str(tmp_path)]
+        ["page", "verify", "foo", "--project", "p"]
     )
     assert args.page_cmd == "verify"
     assert args.page_ref == "foo"
 
 
-def test_parser_page_archive(tmp_path: Path) -> None:
+def test_parser_page_archive() -> None:
     args = build_parser().parse_args(
-        ["page", "archive", "foo", "--vault", str(tmp_path)]
+        ["page", "archive", "foo", "--project", "p"]
     )
     assert args.page_cmd == "archive"
 
 
-def test_parser_page_delete(tmp_path: Path) -> None:
+def test_parser_page_delete() -> None:
     args = build_parser().parse_args(
-        ["page", "delete", "foo", "--vault", str(tmp_path)]
+        ["page", "delete", "foo", "--project", "p"]
     )
     assert args.page_cmd == "delete"
 
@@ -84,8 +84,12 @@ def _mock_response(status_code: int = 200, json_body: Any = None, text: str = ""
     return resp
 
 
-def test_main_page_edit_with_frontmatter_json(tmp_path: Path, capsys) -> None:
+def test_main_page_edit_with_frontmatter_json(
+    tmp_path: Path, capsys, register_project
+) -> None:
     """`--frontmatter '{"status": "verified"}'` parses JSON and PATCHes daemon."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -102,8 +106,8 @@ def test_main_page_edit_with_frontmatter_json(tmp_path: Path, capsys) -> None:
                 "page",
                 "edit",
                 "wiki/entities/foo",
-                "--vault",
-                str(tmp_path),
+                "--project",
+                "p",
                 "--frontmatter",
                 '{"status": "verified"}',
             ]
@@ -115,8 +119,12 @@ def test_main_page_edit_with_frontmatter_json(tmp_path: Path, capsys) -> None:
     assert captured["json"] == {"frontmatter": {"status": "verified"}, "body": None}
 
 
-def test_main_page_edit_with_body_file(tmp_path: Path, capsys) -> None:
+def test_main_page_edit_with_body_file(
+    tmp_path: Path, capsys, register_project
+) -> None:
     """`--body-file` reads content from disk and includes in PATCH body."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
     body = tmp_path / "new.md"
     body.write_text("hello body\n", encoding="utf-8")
 
@@ -132,8 +140,8 @@ def test_main_page_edit_with_body_file(tmp_path: Path, capsys) -> None:
                 "page",
                 "edit",
                 "foo",
-                "--vault",
-                str(tmp_path),
+                "--project",
+                "p",
                 "--body-file",
                 str(body),
             ]
@@ -143,15 +151,19 @@ def test_main_page_edit_with_body_file(tmp_path: Path, capsys) -> None:
     assert captured["json"] == {"frontmatter": None, "body": "hello body\n"}
 
 
-def test_main_page_edit_invalid_frontmatter_json(tmp_path: Path, capsys) -> None:
+def test_main_page_edit_invalid_frontmatter_json(
+    tmp_path: Path, capsys, register_project
+) -> None:
     """Bad JSON in --frontmatter exits with rc=90 (validation)."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
     rc = main(
         [
             "page",
             "edit",
             "foo",
-            "--vault",
-            str(tmp_path),
+            "--project",
+            "p",
             "--frontmatter",
             "not json",
         ]
@@ -160,7 +172,9 @@ def test_main_page_edit_invalid_frontmatter_json(tmp_path: Path, capsys) -> None
     assert "frontmatter" in capsys.readouterr().err.lower()
 
 
-def test_main_page_verify(tmp_path: Path, capsys) -> None:
+def test_main_page_verify(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -169,14 +183,16 @@ def test_main_page_verify(tmp_path: Path, capsys) -> None:
         return _mock_response(200, {"success": True, "activity_id": "a1"})
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["page", "verify", "foo", "--vault", str(tmp_path)])
+        rc = main(["page", "verify", "foo", "--project", "p"])
 
     assert rc == 0
     assert captured["method"] == "POST"
     assert captured["url"].endswith("/pages/foo/verify")
 
 
-def test_main_page_archive(tmp_path: Path, capsys) -> None:
+def test_main_page_archive(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -184,13 +200,15 @@ def test_main_page_archive(tmp_path: Path, capsys) -> None:
         return _mock_response(200, {"success": True, "activity_id": "a2"})
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["page", "archive", "foo", "--vault", str(tmp_path)])
+        rc = main(["page", "archive", "foo", "--project", "p"])
 
     assert rc == 0
     assert captured["url"].endswith("/pages/foo/archive")
 
 
-def test_main_page_delete(tmp_path: Path, capsys) -> None:
+def test_main_page_delete(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -201,7 +219,7 @@ def test_main_page_delete(tmp_path: Path, capsys) -> None:
         )
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["page", "delete", "foo", "--vault", str(tmp_path)])
+        rc = main(["page", "delete", "foo", "--project", "p"])
 
     assert rc == 0
     assert captured["method"] == "DELETE"
@@ -210,34 +228,40 @@ def test_main_page_delete(tmp_path: Path, capsys) -> None:
     assert "deleted-foo-x" in out
 
 
-def test_main_page_daemon_offline(tmp_path: Path, capsys) -> None:
+def test_main_page_daemon_offline(tmp_path: Path, capsys, register_project) -> None:
     """If daemon unreachable, exit 87."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
 
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         raise httpx.ConnectError("connection refused")
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["page", "verify", "foo", "--vault", str(tmp_path)])
+        rc = main(["page", "verify", "foo", "--project", "p"])
 
     assert rc == 87
     err = capsys.readouterr().err
     assert "daemon" in err.lower()
 
 
-def test_main_page_404_pageref(tmp_path: Path, capsys) -> None:
+def test_main_page_404_pageref(tmp_path: Path, capsys, register_project) -> None:
     """If daemon returns 404, exit 88 (PageRefError)."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
 
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(404, {"error": "not_found"}, text='{"error":"not_found"}')
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["page", "verify", "nope", "--vault", str(tmp_path)])
+        rc = main(["page", "verify", "nope", "--project", "p"])
 
     assert rc == 88
 
 
-def test_main_page_422_validation(tmp_path: Path, capsys) -> None:
+def test_main_page_422_validation(tmp_path: Path, capsys, register_project) -> None:
     """If daemon returns 422, exit 90 (ValidationError)."""
+    vault = tmp_path / "v"
+    register_project("p", vault)
 
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(422, {"error": "invalid"}, text='{"error":"invalid"}')
@@ -248,8 +272,8 @@ def test_main_page_422_validation(tmp_path: Path, capsys) -> None:
                 "page",
                 "edit",
                 "foo",
-                "--vault",
-                str(tmp_path),
+                "--project",
+                "p",
                 "--frontmatter",
                 '{"status": "weird"}',
             ]

@@ -11,26 +11,26 @@ from claude_mnemos.state.manifest import IngestRecord, Manifest
 # ─── parser tests ─────────────────────────────────────────────────────────
 
 
-def test_parser_metrics_usage(tmp_path: Path) -> None:
+def test_parser_metrics_usage() -> None:
     args = build_parser().parse_args(
-        ["metrics", "usage", "--vault", str(tmp_path), "--period", "7d"]
+        ["metrics", "usage", "--project", "p", "--period", "7d"]
     )
     assert args.command == "metrics"
     assert args.metrics_cmd == "usage"
     assert args.period == "7d"
 
 
-def test_parser_metrics_top_sessions(tmp_path: Path) -> None:
+def test_parser_metrics_top_sessions() -> None:
     args = build_parser().parse_args(
-        ["metrics", "top-sessions", "--vault", str(tmp_path), "--limit", "3"]
+        ["metrics", "top-sessions", "--project", "p", "--limit", "3"]
     )
     assert args.metrics_cmd == "top-sessions"
     assert args.limit == 3
 
 
-def test_parser_metrics_timeline_default_period(tmp_path: Path) -> None:
+def test_parser_metrics_timeline_default_period() -> None:
     args = build_parser().parse_args(
-        ["metrics", "timeline", "--vault", str(tmp_path)]
+        ["metrics", "timeline", "--project", "p"]
     )
     assert args.metrics_cmd == "timeline"
     assert args.period == "30d"
@@ -90,8 +90,10 @@ def _seed_manifest(vault: Path) -> None:
 # ─── usage ────────────────────────────────────────────────────────────────
 
 
-def test_main_metrics_usage_empty(tmp_path: Path, capsys) -> None:
-    rc = main(["metrics", "usage", "--vault", str(tmp_path)])
+def test_main_metrics_usage_empty(tmp_path: Path, capsys, register_project) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["metrics", "usage", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "period_days: 30" in out
@@ -100,9 +102,13 @@ def test_main_metrics_usage_empty(tmp_path: Path, capsys) -> None:
     assert "tokens_per_byte: —" in out
 
 
-def test_main_metrics_usage_with_seeded_manifest(tmp_path: Path, capsys) -> None:
-    _seed_manifest(tmp_path)
-    rc = main(["metrics", "usage", "--vault", str(tmp_path)])
+def test_main_metrics_usage_with_seeded_manifest(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    _seed_manifest(vault)
+    rc = main(["metrics", "usage", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "sessions_covered: 2" in out
@@ -112,19 +118,23 @@ def test_main_metrics_usage_with_seeded_manifest(tmp_path: Path, capsys) -> None
 
 
 def test_main_metrics_usage_invalid_period_returns_90(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, register_project
 ) -> None:
-    rc = main(["metrics", "usage", "--vault", str(tmp_path), "--period", "bogus"])
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["metrics", "usage", "--project", "p", "--period", "bogus"])
     assert rc == 90
     err = capsys.readouterr().err
     assert "period" in err.lower()
 
 
 def test_main_metrics_usage_corrupt_manifest_returns_93(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, register_project
 ) -> None:
-    (tmp_path / ".manifest.json").write_text("{not valid", encoding="utf-8")
-    rc = main(["metrics", "usage", "--vault", str(tmp_path)])
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    (vault / ".manifest.json").write_text("{not valid", encoding="utf-8")
+    rc = main(["metrics", "usage", "--project", "p"])
     assert rc == 93
     err = capsys.readouterr().err
     assert "manifest" in err.lower()
@@ -133,17 +143,25 @@ def test_main_metrics_usage_corrupt_manifest_returns_93(
 # ─── top-sessions ─────────────────────────────────────────────────────────
 
 
-def test_main_metrics_top_sessions_empty(tmp_path: Path, capsys) -> None:
-    rc = main(["metrics", "top-sessions", "--vault", str(tmp_path)])
+def test_main_metrics_top_sessions_empty(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["metrics", "top-sessions", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "no sessions" in out
 
 
-def test_main_metrics_top_sessions_sorted(tmp_path: Path, capsys) -> None:
-    _seed_manifest(tmp_path)
+def test_main_metrics_top_sessions_sorted(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    _seed_manifest(vault)
     rc = main(
-        ["metrics", "top-sessions", "--vault", str(tmp_path), "--limit", "5"]
+        ["metrics", "top-sessions", "--project", "p", "--limit", "5"]
     )
     assert rc == 0
     out = capsys.readouterr().out
@@ -159,9 +177,13 @@ def test_main_metrics_top_sessions_sorted(tmp_path: Path, capsys) -> None:
 # ─── timeline ─────────────────────────────────────────────────────────────
 
 
-def test_main_metrics_timeline_prints_period_days(tmp_path: Path, capsys) -> None:
+def test_main_metrics_timeline_prints_period_days(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     rc = main(
-        ["metrics", "timeline", "--vault", str(tmp_path), "--period", "5d"]
+        ["metrics", "timeline", "--project", "p", "--period", "5d"]
     )
     assert rc == 0
     out = capsys.readouterr().out
@@ -171,7 +193,9 @@ def test_main_metrics_timeline_prints_period_days(tmp_path: Path, capsys) -> Non
 
 
 def test_main_metrics_timeline_invalid_period_returns_90(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, register_project
 ) -> None:
-    rc = main(["metrics", "timeline", "--vault", str(tmp_path), "--period", "x"])
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    rc = main(["metrics", "timeline", "--project", "p", "--period", "x"])
     assert rc == 90

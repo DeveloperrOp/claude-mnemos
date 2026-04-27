@@ -15,37 +15,37 @@ from claude_mnemos.cli import build_parser, main
 # ─── parser tests ─────────────────────────────────────────────────────────
 
 
-def test_parser_lost_sessions_list(tmp_path: Path) -> None:
+def test_parser_lost_sessions_list() -> None:
     args = build_parser().parse_args(
-        ["lost-sessions", "list", "--vault", str(tmp_path)]
+        ["lost-sessions", "list", "--project", "p"]
     )
     assert args.command == "lost-sessions"
     assert args.lost_cmd == "list"
 
 
-def test_parser_lost_sessions_scan(tmp_path: Path) -> None:
+def test_parser_lost_sessions_scan() -> None:
     args = build_parser().parse_args(
-        ["lost-sessions", "scan", "--vault", str(tmp_path)]
+        ["lost-sessions", "scan", "--project", "p"]
     )
     assert args.lost_cmd == "scan"
 
 
-def test_parser_lost_sessions_import(tmp_path: Path) -> None:
+def test_parser_lost_sessions_import() -> None:
     args = build_parser().parse_args(
-        ["lost-sessions", "import", "abc-sid", "--vault", str(tmp_path)]
+        ["lost-sessions", "import", "abc-sid", "--project", "p"]
     )
     assert args.lost_cmd == "import"
     assert args.session_id == "abc-sid"
 
 
-def test_parser_lost_sessions_ignore_with_reason(tmp_path: Path) -> None:
+def test_parser_lost_sessions_ignore_with_reason() -> None:
     args = build_parser().parse_args(
         [
             "lost-sessions",
             "ignore",
             "xyz-sid",
-            "--vault",
-            str(tmp_path),
+            "--project",
+            "p",
             "--reason",
             "test data",
         ]
@@ -78,24 +78,32 @@ def _seed_transcript(root: Path, project: str, name: str, content: bytes) -> tup
 # ─── direct-read: list ────────────────────────────────────────────────────
 
 
-def test_main_lost_sessions_list_empty(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_main_lost_sessions_list_empty(
+    tmp_path: Path, capsys, monkeypatch, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     transcripts_root = tmp_path / "transcripts"
     transcripts_root.mkdir()
     monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(transcripts_root))
 
-    rc = main(["lost-sessions", "list", "--vault", str(tmp_path)])
+    rc = main(["lost-sessions", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "no lost sessions" in out
 
 
-def test_main_lost_sessions_list_with_lost(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_main_lost_sessions_list_with_lost(
+    tmp_path: Path, capsys, monkeypatch, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     transcripts_root = tmp_path / "transcripts"
     transcripts_root.mkdir()
     _, _sha = _seed_transcript(transcripts_root, "proj-a", "lonely-sid", b"alpha\n")
     monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(transcripts_root))
 
-    rc = main(["lost-sessions", "list", "--vault", str(tmp_path)])
+    rc = main(["lost-sessions", "list", "--project", "p"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "lonely-sid" in out
@@ -103,10 +111,15 @@ def test_main_lost_sessions_list_with_lost(tmp_path: Path, capsys, monkeypatch) 
 
 
 def test_main_lost_sessions_list_corrupt_manifest_returns_93(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, monkeypatch, register_project
 ) -> None:
-    (tmp_path / ".manifest.json").write_text("{not valid", encoding="utf-8")
-    rc = main(["lost-sessions", "list", "--vault", str(tmp_path)])
+    vault = tmp_path / "v"
+    register_project("p", vault)
+    transcripts_root = tmp_path / "transcripts"
+    transcripts_root.mkdir()
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(transcripts_root))
+    (vault / ".manifest.json").write_text("{not valid", encoding="utf-8")
+    rc = main(["lost-sessions", "list", "--project", "p"])
     assert rc == 93
     err = capsys.readouterr().err
     assert "manifest" in err.lower()
@@ -115,7 +128,11 @@ def test_main_lost_sessions_list_corrupt_manifest_returns_93(
 # ─── scan (via daemon) ────────────────────────────────────────────────────
 
 
-def test_main_lost_sessions_scan_posts_to_daemon(tmp_path: Path, capsys) -> None:
+def test_main_lost_sessions_scan_posts_to_daemon(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -124,7 +141,7 @@ def test_main_lost_sessions_scan_posts_to_daemon(tmp_path: Path, capsys) -> None
         return _mock_response(200, {"sessions": [], "total": 0})
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["lost-sessions", "scan", "--vault", str(tmp_path)])
+        rc = main(["lost-sessions", "scan", "--project", "p"])
 
     assert rc == 0
     assert captured["method"] == "POST"
@@ -132,13 +149,16 @@ def test_main_lost_sessions_scan_posts_to_daemon(tmp_path: Path, capsys) -> None
 
 
 def test_main_lost_sessions_scan_daemon_offline_returns_87(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, register_project
 ) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         raise httpx.ConnectError("refused")
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
-        rc = main(["lost-sessions", "scan", "--vault", str(tmp_path)])
+        rc = main(["lost-sessions", "scan", "--project", "p"])
 
     assert rc == 87
 
@@ -146,7 +166,11 @@ def test_main_lost_sessions_scan_daemon_offline_returns_87(
 # ─── import (via daemon) ──────────────────────────────────────────────────
 
 
-def test_main_lost_sessions_import_posts_to_daemon(tmp_path: Path, capsys) -> None:
+def test_main_lost_sessions_import_posts_to_daemon(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -156,7 +180,7 @@ def test_main_lost_sessions_import_posts_to_daemon(tmp_path: Path, capsys) -> No
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["lost-sessions", "import", "lonely-sid", "--vault", str(tmp_path)]
+            ["lost-sessions", "import", "lonely-sid", "--project", "p"]
         )
 
     assert rc == 0
@@ -164,7 +188,12 @@ def test_main_lost_sessions_import_posts_to_daemon(tmp_path: Path, capsys) -> No
     assert captured["url"].endswith("/lost-sessions/lonely-sid/import")
 
 
-def test_main_lost_sessions_import_404_returns_92(tmp_path: Path, capsys) -> None:
+def test_main_lost_sessions_import_404_returns_92(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(
             404,
@@ -174,7 +203,7 @@ def test_main_lost_sessions_import_404_returns_92(tmp_path: Path, capsys) -> Non
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["lost-sessions", "import", "ghost-sid", "--vault", str(tmp_path)]
+            ["lost-sessions", "import", "ghost-sid", "--project", "p"]
         )
 
     assert rc == 92
@@ -185,7 +214,11 @@ def test_main_lost_sessions_import_404_returns_92(tmp_path: Path, capsys) -> Non
 # ─── ignore (via daemon) ──────────────────────────────────────────────────
 
 
-def test_main_lost_sessions_ignore_posts_to_daemon(tmp_path: Path, capsys) -> None:
+def test_main_lost_sessions_ignore_posts_to_daemon(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
     captured: dict[str, Any] = {}
 
     def fake_request(method: str, url: str, **kwargs: Any) -> MagicMock:
@@ -200,8 +233,8 @@ def test_main_lost_sessions_ignore_posts_to_daemon(tmp_path: Path, capsys) -> No
                 "lost-sessions",
                 "ignore",
                 "lonely-sid",
-                "--vault",
-                str(tmp_path),
+                "--project",
+                "p",
                 "--reason",
                 "noise",
             ]
@@ -215,7 +248,12 @@ def test_main_lost_sessions_ignore_posts_to_daemon(tmp_path: Path, capsys) -> No
     assert body.get("reason") == "noise"
 
 
-def test_main_lost_sessions_ignore_404_returns_92(tmp_path: Path, capsys) -> None:
+def test_main_lost_sessions_ignore_404_returns_92(
+    tmp_path: Path, capsys, register_project
+) -> None:
+    vault = tmp_path / "v"
+    register_project("p", vault)
+
     def fake_request(*args: Any, **kwargs: Any) -> MagicMock:
         return _mock_response(
             404,
@@ -225,7 +263,7 @@ def test_main_lost_sessions_ignore_404_returns_92(tmp_path: Path, capsys) -> Non
 
     with patch("claude_mnemos.cli.httpx.request", side_effect=fake_request):
         rc = main(
-            ["lost-sessions", "ignore", "ghost-sid", "--vault", str(tmp_path)]
+            ["lost-sessions", "ignore", "ghost-sid", "--project", "p"]
         )
 
     assert rc == 92
