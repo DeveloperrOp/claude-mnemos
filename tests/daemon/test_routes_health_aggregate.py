@@ -142,3 +142,26 @@ def test_health_watchdog_running_in_vault_entry(
     # With a real mounted vault the watchdog should be running
     assert body["vaults"]["alpha"]["watchdog_running"] is True
     assert body["vaults"]["beta"]["watchdog_running"] is True
+
+
+def test_health_status_ok_when_all_healthy(
+    daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
+) -> None:
+    """Status is 'ok' when all watchdogs are up and dead-letter count is low."""
+    _daemon, client = daemon_with_two_vaults_health
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+
+
+def test_health_status_degraded_when_watchdog_down(
+    daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Status becomes 'degraded' when any vault's watchdog is not running."""
+    daemon, client = daemon_with_two_vaults_health
+    observer = daemon.runtimes["alpha"].observer
+    assert observer is not None, "expected a running observer on alpha"
+    # Patch _observer to None so is_running returns False
+    monkeypatch.setattr(observer, "_observer", None)
+    body = client.get("/health").json()
+    assert body["status"] == "degraded", f"expected degraded, got {body['status']}"

@@ -51,14 +51,18 @@ async def health(request: Request) -> HealthResponse:
                 jobs_running=int(counts.get("running", 0)),
                 jobs_dead_letter=vh_dead,
             )
+    jobs_alert = total_dead_letter > 10
+    degraded = jobs_alert or any(
+        not v.watchdog_running for v in vaults.values()
+    )
     return HealthResponse(
-        status="ok",
+        status="degraded" if degraded else "ok",
         version=__version__,
         uptime_s=uptime_s,
         scheduler_jobs=jobs,
         alerts_count=alerts_count,
         vaults=vaults,
-        jobs_alert=total_dead_letter > 10,
+        jobs_alert=jobs_alert,
     )
 
 
