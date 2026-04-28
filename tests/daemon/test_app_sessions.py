@@ -34,11 +34,7 @@ class _FakeRuntime:
 class _FakeDaemon:
     def __init__(self, alpha_vault: Path) -> None:
         self._alpha_runtime = _FakeRuntime(alpha_vault)
-        # β2: get_runtime reads daemon.runtimes dict
         self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
-        # Legacy shim — kept so other routes that still use primary_runtime
-        # do not 503 when the full app test suite is run together.
-        self.primary_runtime = self._alpha_runtime
         self.started_at_monotonic = 0.0
 
     def scheduler_jobs_info(self) -> list[Any]:
@@ -64,8 +60,7 @@ def daemon(alpha_vault: Path) -> _FakeDaemon:  # type: ignore[misc]
 
 @pytest.fixture
 def app(daemon: _FakeDaemon) -> Any:
-    # vault_root=None: β2 routes resolve vault via project name, not app.state
-    return create_app(vault_root=None, daemon=daemon)
+    return create_app(daemon=daemon)
 
 
 @pytest.fixture

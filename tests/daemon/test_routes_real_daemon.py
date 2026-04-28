@@ -1,8 +1,7 @@
-"""Tests that routes read per-vault state from daemon.primary_runtime.
+"""Tests that routes read per-vault state via get_runtime(daemon, project).
 
-These tests exercise each previously-affected endpoint against a REAL
-MnemosDaemon with one mounted vault, confirming they return sensible
-responses (not 503) after the primary_runtime fix.
+These tests exercise each endpoint against a REAL MnemosDaemon with one
+mounted vault, confirming they return sensible responses (not 503).
 """
 
 from __future__ import annotations
@@ -165,17 +164,17 @@ def test_health_jobs_counters_with_real_daemon(
 
 # ── /pages (tracker wiring) ───────────────────────────────────────────────────
 
-def test_pages_patch_uses_tracker_from_primary_runtime(
+def test_pages_patch_uses_tracker_from_runtime(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     """PATCH /pages must succeed and the route must have received a non-None
-    tracker from primary_runtime (not silently None due to the old daemon.*
-    attribute lookup that was removed).
+    tracker from the vault runtime (resolved via get_runtime, not via
+    the removed primary_runtime attribute).
 
     The tracker.writing() context manager is ephemeral — entries are removed
     after the write completes — so we verify correctness by:
       1. Confirming the request returns 200 (i.e. the apply_patch ran fully).
-      2. Confirming primary_runtime.tracker is the real OurWritesTracker (not
+      2. Confirming the runtime's tracker is the real OurWritesTracker (not
          None), meaning the route wired it through correctly.
     """
     daemon, client, vault = daemon_with_one_vault
@@ -205,9 +204,9 @@ def test_pages_patch_uses_tracker_from_primary_runtime(
     )
     assert r.status_code == 200, r.text
 
-    # Confirm the primary_runtime's tracker is wired (non-None) so that
-    # apply_patch received it and the watchdog won't misfire on our writes.
-    primary = daemon.primary_runtime
-    assert primary is not None
+    # Confirm the runtime's tracker is wired (non-None) so that apply_patch
+    # received it and the watchdog won't misfire on our writes.
+    runtime = daemon.runtimes.get("alpha")
+    assert runtime is not None
     from claude_mnemos.daemon.our_writes import OurWritesTracker
-    assert isinstance(primary.tracker, OurWritesTracker)
+    assert isinstance(runtime.tracker, OurWritesTracker)

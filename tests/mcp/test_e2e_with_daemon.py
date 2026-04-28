@@ -61,7 +61,7 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
+    # Pre-register project so the daemon mounts the vault at startup;
     # and vault-root-dependent routes (/snapshots) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()

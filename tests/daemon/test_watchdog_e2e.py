@@ -57,7 +57,7 @@ def test_watchdog_e2e_external_modify_detected(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
+    # Pre-register project so the daemon mounts the vault at startup;
     # and vault-root-dependent routes (/activity, /alerts) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()

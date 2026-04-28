@@ -35,7 +35,6 @@ class _FakeDaemon:
     def __init__(self, alpha_vault: Path) -> None:
         self._alpha_runtime = _FakeRuntime(alpha_vault)
         self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
-        self.primary_runtime = self._alpha_runtime
         self.started_at_monotonic = 0.0
 
     def scheduler_jobs_info(self) -> list[Any]:
@@ -56,7 +55,7 @@ def daemon(alpha_vault: Path) -> _FakeDaemon:
 
 @pytest.fixture
 def app(daemon: _FakeDaemon) -> Any:
-    return create_app(vault_root=None, daemon=daemon)
+    return create_app(daemon=daemon)
 
 
 @pytest.fixture

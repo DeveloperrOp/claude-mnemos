@@ -33,7 +33,6 @@ class _FakeDaemon:
     def __init__(self, alpha_vault: Path) -> None:
         self._alpha_runtime = _FakeRuntime(alpha_vault)
         self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
-        self.primary_runtime = self._alpha_runtime
         self.started_at_monotonic = 0.0
 
     def scheduler_jobs_info(self) -> list[Any]:
@@ -54,7 +53,7 @@ def daemon(alpha_vault: Path) -> _FakeDaemon:
 
 @pytest.fixture
 def app(daemon: _FakeDaemon) -> Any:
-    return create_app(vault_root=None, daemon=daemon)
+    return create_app(daemon=daemon)
 
 
 @pytest.fixture
@@ -150,7 +149,7 @@ async def test_list_activity_returns_entries(alpha_vault: Path, daemon: _FakeDae
     log.append(e2)
     log.save(alpha_vault)
 
-    app = create_app(vault_root=None, daemon=daemon)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/activity/alpha")
@@ -176,7 +175,7 @@ async def test_list_activity_pagination(alpha_vault: Path, daemon: _FakeDaemon) 
         )
     log.save(alpha_vault)
 
-    app = create_app(vault_root=None, daemon=daemon)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/activity/alpha?limit=2&offset=1")
@@ -214,7 +213,7 @@ async def test_get_activity_known_id(alpha_vault: Path, daemon: _FakeDaemon) -> 
     log.append(e)
     log.save(alpha_vault)
 
-    app = create_app(vault_root=None, daemon=daemon)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/activity/alpha/abcdef")
@@ -252,11 +251,10 @@ async def test_undo_activity_success(tmp_path: Path) -> None:
     runtime = _FakeRuntime(vault)
     daemon_mock: Any = MagicMock()
     daemon_mock.runtimes = {"myvault": runtime}
-    daemon_mock.primary_runtime = runtime
     daemon_mock.started_at_monotonic = 0.0
     daemon_mock.scheduler_jobs_info.return_value = []
 
-    app = create_app(vault_root=None, daemon=daemon_mock)
+    app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.post(f"/activity/myvault/{op_id}/undo")
@@ -291,11 +289,10 @@ async def test_undo_activity_already_undone_returns_409(tmp_path: Path) -> None:
     runtime = _FakeRuntime(vault)
     daemon_mock: Any = MagicMock()
     daemon_mock.runtimes = {"myvault": runtime}
-    daemon_mock.primary_runtime = runtime
     daemon_mock.started_at_monotonic = 0.0
     daemon_mock.scheduler_jobs_info.return_value = []
 
-    app = create_app(vault_root=None, daemon=daemon_mock)
+    app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r1 = await c.post(f"/activity/myvault/{op_id}/undo")

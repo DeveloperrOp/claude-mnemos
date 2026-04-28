@@ -22,7 +22,7 @@ from claude_mnemos.daemon.app import create_app
 
 @pytest.fixture
 def client():
-    app = create_app(vault_root=None, daemon=None)
+    app = create_app(daemon=None)
     return TestClient(app)
 
 

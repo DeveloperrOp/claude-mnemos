@@ -12,7 +12,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     vault = tmp_path / "vault"
     vault.mkdir()
-    app = create_app(vault, daemon=None)
+    app = create_app(daemon=None)
     return TestClient(app), tmp_path
 
 

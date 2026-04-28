@@ -12,7 +12,7 @@ from claude_mnemos.daemon.schemas import SchedulerJobInfo
 
 @pytest.fixture
 def app(tmp_path: Path):
-    return create_app(tmp_path)
+    return create_app()
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ async def test_health_returns_ok(client):
 
 
 async def test_health_includes_version(tmp_path: Path):
-    app = create_app(tmp_path)
+    app = create_app()
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
@@ -60,7 +60,7 @@ async def test_health_includes_scheduler_jobs_when_daemon_attached(tmp_path: Pat
                 )
             ]
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
@@ -120,7 +120,7 @@ async def test_health_reports_running_observer(tmp_path: Path):
         detected_at=datetime(2026, 4, 27, 14, 0, tzinfo=UTC),
     )
 
-    app = create_app(tmp_path, daemon=daemon)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
@@ -150,7 +150,7 @@ async def test_health_reports_observer_not_alive(tmp_path: Path):
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return []
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
@@ -193,7 +193,7 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
         def scheduler_jobs_info(self) -> list:
             return []
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")

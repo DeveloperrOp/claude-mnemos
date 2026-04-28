@@ -14,7 +14,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     vault = tmp_path / "vault"
     vault.mkdir()
-    app = create_app(vault, daemon=None)
+    app = create_app(daemon=None)
     return TestClient(app), tmp_path
 
 
@@ -66,7 +66,7 @@ def test_patch_settings_triggers_daemon_reload_project_settings(tmp_path, monkey
     vault.mkdir()
     fake_daemon = MagicMock()
     fake_daemon.reload_project_settings = AsyncMock()
-    app = create_app(vault, daemon=fake_daemon)
+    app = create_app(daemon=fake_daemon)
     c = TestClient(app)
     r = c.patch("/settings/foo", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200
@@ -84,7 +84,7 @@ def test_patch_settings_triggers_reload_regardless_of_vault(tmp_path, monkeypatc
     vault.mkdir()
     fake_daemon = MagicMock()
     fake_daemon.reload_project_settings = AsyncMock()
-    app = create_app(vault, daemon=fake_daemon)
+    app = create_app(daemon=fake_daemon)
     c = TestClient(app)
     r = c.patch("/settings/bar", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200

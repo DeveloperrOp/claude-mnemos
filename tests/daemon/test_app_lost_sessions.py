@@ -57,7 +57,7 @@ def daemon(tmp_path: Path):
 
 @pytest.fixture
 def app(tmp_path: Path, daemon: _FakeDaemon):
-    return create_app(tmp_path, daemon=daemon)
+    return create_app(daemon=daemon)
 
 
 @pytest.fixture

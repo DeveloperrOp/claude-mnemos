@@ -25,7 +25,7 @@ def daemon() -> _FakeDaemon:
 
 @pytest.fixture
 def app(tmp_path: Path, daemon: _FakeDaemon):
-    return create_app(tmp_path, daemon=daemon)
+    return create_app(daemon=daemon)
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ async def test_delete_missing_returns_404(client):
 
 
 async def test_alerts_no_daemon_returns_empty(tmp_path: Path):
-    app = create_app(tmp_path, daemon=None)
+    app = create_app(daemon=None)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/alerts")
@@ -95,7 +95,7 @@ async def test_alerts_no_daemon_returns_empty(tmp_path: Path):
 
 
 async def test_alerts_no_daemon_delete_returns_404(tmp_path: Path):
-    app = create_app(tmp_path, daemon=None)
+    app = create_app(daemon=None)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.delete("/alerts/anything")

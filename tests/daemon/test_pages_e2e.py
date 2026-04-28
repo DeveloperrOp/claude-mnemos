@@ -63,8 +63,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
-    # and vault-root-dependent routes (/pages, /trash) work.
+    # Pre-register project so vault-root-dependent routes (/pages, /trash) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()

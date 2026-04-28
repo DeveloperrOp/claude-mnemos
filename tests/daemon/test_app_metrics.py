@@ -83,7 +83,7 @@ def daemon_with_one_vault(
 @pytest.fixture
 def no_vault_app(tmp_path: Path):
     """App with daemon=None, used only for period-validation tests."""
-    return create_app(tmp_path, daemon=None)
+    return create_app(daemon=None)
 
 
 @pytest.fixture

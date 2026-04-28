@@ -201,25 +201,20 @@ def test_lock_key_stable_across_root_creation(tmp_path: Path):
     assert s_after._lock is lock_before
 
 
-def test_global_settings_primary_project_default_none(tmp_path, monkeypatch):
+def test_global_settings_ignores_unknown_fields(tmp_path, monkeypatch):
+    """extra='ignore' must silently absorb β1-written files that contain primary_project."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    from claude_mnemos.state.settings import SettingsStore
+    import json as _json
+    from claude_mnemos.state.settings import GlobalSettings, SettingsStore, global_settings_path
+
+    # Write a β1-style file with primary_project still present.
+    path = global_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        _json.dumps({"version": 1, "primary_project": "old-vault", "daemon_port": 5757}),
+        encoding="utf-8",
+    )
     g = SettingsStore().get_global()
-    assert g.primary_project is None
-
-
-def test_global_settings_primary_project_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    from claude_mnemos.state.settings import GlobalSettings, SettingsStore
-    store = SettingsStore()
-    store.set_global(GlobalSettings(primary_project="claude-mnemos"))
-    g = store.get_global()
-    assert g.primary_project == "claude-mnemos"
-
-
-def test_global_settings_primary_project_pattern():
-    from claude_mnemos.state.settings import GlobalSettings
-    g = GlobalSettings(primary_project="a-b-c")
-    assert g.primary_project == "a-b-c"
+    assert not hasattr(g, "primary_project")
+    assert g.daemon_port == 5757

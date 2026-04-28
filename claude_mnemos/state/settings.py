@@ -110,7 +110,8 @@ class ProjectSettings(BaseModel):
 
 
 class GlobalSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # extra="ignore": forward-compat — silently absorbs β1 files with primary_project.
+    model_config = ConfigDict(extra="ignore")
     version: Literal[1] = 1
     locale: Literal["uk", "ru", "en"] = "uk"
     daemon_port: int = Field(default=5757, ge=1, le=65535)
@@ -118,7 +119,7 @@ class GlobalSettings(BaseModel):
     default_language_hint: Literal["auto", "uk", "ru", "en"] = "auto"
     default_max_input_tokens: int = Field(default=150_000, ge=1024)
     default_retention_days: int = Field(default=180, ge=1)
-    primary_project: str | None = None
+    # primary_project removed in β2.
 
 
 def get_by_dot_path(obj: BaseModel, key: str) -> Any:
