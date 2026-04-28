@@ -16,6 +16,8 @@ def test_parser_daemon_start_minimal(tmp_path: Path):
 
 
 def test_parser_daemon_foreground_with_overrides(tmp_path: Path):
+    # --retention-days removed from DaemonConfig (Task 10); per-project retention
+    # lives in settings.  TODO(Task 22): full foreground rewrite.
     args = build_parser().parse_args(
         [
             "daemon",
@@ -26,15 +28,12 @@ def test_parser_daemon_foreground_with_overrides(tmp_path: Path):
             "8080",
             "--host",
             "127.0.0.1",
-            "--retention-days",
-            "30",
             "--log-level",
             "debug",
         ]
     )
     assert args.daemon_cmd == "foreground"
     assert args.port == 8080
-    assert args.retention_days == 30
     assert args.log_level == "debug"
 
 

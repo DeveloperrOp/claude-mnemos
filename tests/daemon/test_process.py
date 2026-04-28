@@ -9,12 +9,10 @@ from claude_mnemos.daemon.process import MnemosDaemon
 @pytest.fixture
 def daemon(tmp_path: Path) -> MnemosDaemon:
     config = DaemonConfig(
-        vault_root=tmp_path,
         port=15757,
-        retention_days=180,
         pid_file=tmp_path / "daemon.pid",
     )
-    return MnemosDaemon(config)
+    return MnemosDaemon(config, vault_root=tmp_path)
 
 
 def test_daemon_initializes_scheduler_and_app(daemon: MnemosDaemon):

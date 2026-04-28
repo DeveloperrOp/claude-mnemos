@@ -13,10 +13,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos.daemon")
     sub = parser.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run", help="Run the daemon in foreground")
+    # TODO(Task 22): --vault becomes optional once multi-vault boot from
+    # project-map is wired; --retention-days is removed entirely (per-project
+    # retention lives in settings, not DaemonConfig).
     run.add_argument("--vault", type=Path, required=True)
     run.add_argument("--host", default="127.0.0.1")
     run.add_argument("--port", type=int, default=5757)
-    run.add_argument("--retention-days", type=int, default=180)
     run.add_argument(
         "--log-level",
         default=DEFAULT_LOG_LEVEL,
@@ -30,15 +32,14 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.cmd != "run":
         return 1
+    # TODO(Task 22): vault_root wiring moves to VaultRuntime / multi-vault boot.
     config = DaemonConfig(
-        vault_root=args.vault,
         host=args.host,
         port=args.port,
-        retention_days=args.retention_days,
         log_level=args.log_level,
         pid_file=args.pid_file,
     )
-    daemon = MnemosDaemon(config)
+    daemon = MnemosDaemon(config, vault_root=args.vault)
     try:
         asyncio.run(daemon.run())
     except KeyboardInterrupt:

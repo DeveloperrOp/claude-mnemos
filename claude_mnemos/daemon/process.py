@@ -7,6 +7,7 @@ import signal
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -37,8 +38,16 @@ class MnemosDaemon:
     real-time vault watchdog (Plan #9) + jobs queue worker (Plan #11).
     """
 
-    def __init__(self, config: DaemonConfig) -> None:
+    def __init__(
+        self,
+        config: DaemonConfig,
+        vault_root: Path,  # TODO(Task 12): fold into multi-vault VaultRuntime
+    ) -> None:
         self.config = config
+        # TODO(Task 12): vault_root moves to VaultRuntime; DaemonConfig no longer
+        # carries a single vault.  Until then keep it as an explicit arg so that
+        # DaemonConfig no longer needs the field but process.py stays importable.
+        self.vault_root: Path = vault_root
         self.tracker = OurWritesTracker()
         self.alerts = Alerts()
         self.project_store = ProjectStore()
@@ -47,13 +56,13 @@ class MnemosDaemon:
         self.project_entry: ProjectMapEntry | None = None
         try:
             self.project_entry = ProjectResolver(self.project_store).resolve_by_vault(
-                config.vault_root
+                vault_root
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("project resolver failed at startup")
             self.alerts.add(
                 kind="handler_error",
-                path=str(config.vault_root),
+                path=str(vault_root),
                 message=f"project resolver failed: {exc}",
                 detected_at=datetime.now(UTC),
             )
@@ -61,9 +70,9 @@ class MnemosDaemon:
             self.project_settings: ProjectSettings = ProjectSettings()
             self.alerts.add(
                 kind="handler_error",
-                path=str(config.vault_root),
+                path=str(vault_root),
                 message=(
-                    f"daemon vault {config.vault_root} not registered in "
+                    f"daemon vault {vault_root} not registered in "
                     "project-map; using built-in defaults"
                 ),
                 detected_at=datetime.now(UTC),
@@ -73,13 +82,13 @@ class MnemosDaemon:
                 self.project_entry.name
             )
         self.scheduler: AsyncIOScheduler = build_empty_scheduler()
-        self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
+        self.job_store: JobStore = JobStore(vault_root / JOBS_DB_FILENAME)
         self.job_worker: JobWorker | None = None
         # Plan #13a: TTL-cached lost-sessions list owned by the daemon, so the
         # GET /lost-sessions endpoint doesn't re-hash every transcript on each
         # request. Invalidated by /lost-sessions/scan and /lost-sessions/*/ignore.
         self.lost_sessions_cache: LostSessionsCache = LostSessionsCache()
-        self.app: FastAPI = create_app(config.vault_root, daemon=self)
+        self.app: FastAPI = create_app(vault_root, daemon=self)
         self.started_at_monotonic: float = 0.0
         self._server: uvicorn.Server | None = None
         self.observer: VaultObserver | None = None
@@ -128,16 +137,16 @@ class MnemosDaemon:
         """
         try:
             handler = VaultChangeHandler(
-                self.config.vault_root, self.tracker, self.alerts
+                self.vault_root, self.tracker, self.alerts
             )
-            observer = VaultObserver(self.config.vault_root, handler)
+            observer = VaultObserver(self.vault_root, handler)
             observer.start()
             self.observer = observer
         except Exception as exc:
             logger.exception("failed to start watchdog observer")
             self.alerts.add(
                 kind="handler_error",
-                path=str(self.config.vault_root),
+                path=str(self.vault_root),
                 message=f"failed to start watchdog observer: {exc}",
                 detected_at=datetime.now(UTC),
             )
@@ -175,7 +184,7 @@ class MnemosDaemon:
 
             handlers: dict[JobKind, JobHandler] = {
                 "ingest": IngestHandler(
-                    vault=self.config.vault_root,
+                    vault=self.vault_root,
                     cfg_factory=cfg_factory,
                     llm_factory=llm_factory,
                 )
@@ -191,7 +200,7 @@ class MnemosDaemon:
             logger.exception("failed to start jobs subsystem")
             self.alerts.add(
                 kind="handler_error",
-                path=str(self.config.vault_root),
+                path=str(self.vault_root),
                 message=f"jobs subsystem failed to start: {exc}",
                 detected_at=datetime.now(UTC),
             )
@@ -234,7 +243,7 @@ class MnemosDaemon:
                     "cron",
                     hour=4,
                     minute=0,
-                    args=[self.config.vault_root],
+                    args=[self.vault_root],
                     id="daily_snapshot",
                     replace_existing=True,
                 )
@@ -248,7 +257,7 @@ class MnemosDaemon:
             self.scheduler.modify_job(
                 "backups_cleanup",
                 args=[
-                    self.config.vault_root,
+                    self.vault_root,
                     new_settings.snapshots.retention_days,
                 ],
             )

@@ -10,7 +10,6 @@ LogLevel = Literal["debug", "info", "warning", "error"]
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5757
-DEFAULT_RETENTION_DAYS = 180
 DEFAULT_LOG_LEVEL: LogLevel = "info"
 
 LEGACY_HOME_DIRNAME = ".mnemos"
@@ -26,11 +25,7 @@ def default_runtime_config_file() -> Path:
 
 
 def migrate_legacy_dotmnemos() -> bool:
-    """One-shot: move pid/config from ~/.mnemos to ~/.claude-mnemos.
-
-    Returns True if any file was moved. Files that already exist in the
-    new location are never overwritten (presumed authoritative).
-    """
+    """One-shot move from ~/.mnemos to ~/.claude-mnemos. Unchanged from α."""
     legacy_dir = Path.home() / LEGACY_HOME_DIRNAME
     if not legacy_dir.is_dir():
         return False
@@ -50,23 +45,32 @@ def migrate_legacy_dotmnemos() -> bool:
     return moved
 
 
+class BootFilter(BaseModel):
+    """Selects which projects daemon mounts at startup.
+
+    None / all=True == every registered project.
+    names=[...] == subset by project name; missing names alerted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    all: bool = False
+    names: list[str] = Field(default_factory=list)
+
+
 class DaemonConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vault_root: Path
     host: str = DEFAULT_HOST
     port: int = Field(default=DEFAULT_PORT, ge=1, le=65535)
-    retention_days: int = Field(default=DEFAULT_RETENTION_DAYS, ge=1)
     log_level: LogLevel = DEFAULT_LOG_LEVEL
     pid_file: Path = Field(default_factory=default_pid_file)
+    boot_filter: BootFilter | None = None
 
     @classmethod
-    def from_env(cls, vault_root: Path) -> DaemonConfig:
+    def from_env(cls) -> DaemonConfig:
         host = os.environ.get("MNEMOS_DAEMON_HOST", DEFAULT_HOST)
         port_str = os.environ.get("MNEMOS_DAEMON_PORT")
         port = int(port_str) if port_str else DEFAULT_PORT
-        retention_str = os.environ.get("MNEMOS_RETENTION_DAYS")
-        retention_days = int(retention_str) if retention_str else DEFAULT_RETENTION_DAYS
         log_level_raw = os.environ.get("MNEMOS_DAEMON_LOG", DEFAULT_LOG_LEVEL).lower()
         if log_level_raw not in ("debug", "info", "warning", "error"):
             raise ValueError(
@@ -76,11 +80,4 @@ class DaemonConfig(BaseModel):
         log_level: LogLevel = log_level_raw  # type: ignore[assignment]
         pid_file_str = os.environ.get("MNEMOS_DAEMON_PID")
         pid_file = Path(pid_file_str) if pid_file_str else default_pid_file()
-        return cls(
-            vault_root=vault_root,
-            host=host,
-            port=port,
-            retention_days=retention_days,
-            log_level=log_level,
-            pid_file=pid_file,
-        )
+        return cls(host=host, port=port, log_level=log_level, pid_file=pid_file)
