@@ -21,15 +21,27 @@ them precisely without touching other vaults' jobs.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from claude_mnemos.config import Config
 from claude_mnemos.core.lost_sessions import LostSessionsCache
+from claude_mnemos.daemon.alerts import Alerts
+from claude_mnemos.daemon.jobs.handlers import IngestHandler
 from claude_mnemos.daemon.our_writes import OurWritesTracker
+from claude_mnemos.daemon.tasks import backups_cleanup_task, daily_snapshot_task
+from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
+from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry
 from claude_mnemos.state.settings import ProjectSettings
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +91,8 @@ class VaultRuntime:
         self._mounted: bool = False
 
         # Set on mount(); needed for reload_settings.
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
         self._scheduler: AsyncIOScheduler | None = None
-        self._alerts: object | None = None  # claude_mnemos.daemon.alerts.Alerts
+        self._alerts: Alerts | None = None
 
     @property
     def name(self) -> str:
@@ -91,3 +101,154 @@ class VaultRuntime:
     @property
     def is_mounted(self) -> bool:
         return self._mounted
+
+    async def mount(
+        self,
+        *,
+        scheduler: AsyncIOScheduler,
+        alerts: Alerts,
+    ) -> None:
+        """Start observer, register cron jobs, start JobWorker.
+
+        On any sub-step failure: best-effort rollback + raise VaultMountError.
+        """
+        if self._mounted:
+            raise VaultMountError(f"vault {self.name!r} already mounted")
+
+        self._scheduler = scheduler
+        self._alerts = alerts
+        try:
+            # 1. Recover zombies left by previous crash.
+            self.job_store.recover_zombie_running()
+
+            # 2. Watchdog observer.
+            handler = VaultChangeHandler(self.vault_root, self.tracker, alerts)
+            observer = VaultObserver(self.vault_root, handler)
+            observer.start()
+            self.observer = observer
+
+            # 3. Cron jobs in shared scheduler.
+            if self.settings.snapshots.daily_enabled:
+                scheduler.add_job(
+                    daily_snapshot_task,
+                    "cron",
+                    hour=4,
+                    minute=0,
+                    args=[self.vault_root],
+                    id=f"daily_snapshot:{self.name}",
+                    replace_existing=True,
+                )
+            scheduler.add_job(
+                backups_cleanup_task,
+                "cron",
+                hour=5,
+                minute=0,
+                args=[self.vault_root, self.settings.snapshots.retention_days],
+                id=f"backups_cleanup:{self.name}",
+                replace_existing=True,
+            )
+
+            # 4. Jobs subsystem.
+            from claude_mnemos.daemon.jobs.worker import JobWorker
+
+            def cfg_factory() -> Config:
+                return Config.from_env()
+
+            def llm_factory(cfg: Config) -> LLMClient | None:
+                if not cfg.api_key:
+                    return None
+                return LLMClient(cfg)
+
+            from claude_mnemos.daemon.jobs.handlers import JobHandler
+            from claude_mnemos.state.jobs import JobKind
+
+            handlers: dict[JobKind, JobHandler] = {
+                "ingest": IngestHandler(
+                    vault=self.vault_root,
+                    cfg_factory=cfg_factory,
+                    llm_factory=llm_factory,
+                )
+            }
+            worker = JobWorker(
+                store=self.job_store,
+                handlers=handlers,
+                scheduler=scheduler,
+            )
+            await worker.start()
+            self.job_worker = worker
+
+            self._mounted = True
+        except Exception as exc:
+            await self._rollback_mount(error=str(exc))
+            raise VaultMountError(
+                f"failed to mount vault {self.name!r}: {exc}"
+            ) from exc
+
+    async def _rollback_mount(self, *, error: str) -> None:
+        if self.job_worker is not None:
+            try:
+                await self.job_worker.stop(timeout=5.0)
+            except Exception:
+                logger.exception("rollback: worker stop failed")
+            self.job_worker = None
+
+        if self._scheduler is not None:
+            for jid in (
+                f"daily_snapshot:{self.name}",
+                f"backups_cleanup:{self.name}",
+            ):
+                with contextlib.suppress(Exception):
+                    self._scheduler.remove_job(jid)
+
+        if self.observer is not None:
+            try:
+                self.observer.stop()
+            except Exception:
+                logger.exception("rollback: observer stop failed")
+            self.observer = None
+
+        if self._alerts is not None:
+            try:
+                self._alerts.add(
+                    kind="handler_error",
+                    path=str(self.vault_root),
+                    message=f"vault {self.name!r} mount failed: {error}",
+                    detected_at=datetime.now(UTC),
+                )
+            except Exception:
+                logger.exception("rollback: alerts.add failed")
+
+    async def unmount(self, *, timeout: float = 10.0, force: bool = False) -> None:  # noqa: ARG002
+        """Stop worker, remove cron jobs, stop observer, close store.
+
+        Minimal implementation; busy/force semantics added in Task 8.
+        ``force`` is accepted for API compatibility but not yet acted on.
+        """
+        if self.job_worker is not None:
+            try:
+                await self.job_worker.stop(timeout=timeout)
+            except Exception:
+                logger.exception("unmount: worker stop failed")
+            self.job_worker = None
+
+        if self._scheduler is not None:
+            for jid in (
+                f"daily_snapshot:{self.name}",
+                f"backups_cleanup:{self.name}",
+            ):
+                with contextlib.suppress(Exception):
+                    self._scheduler.remove_job(jid)
+
+        if self.observer is not None:
+            try:
+                self.observer.stop()
+            except Exception:
+                logger.exception("unmount: observer stop failed")
+            self.observer = None
+
+        try:
+            self.job_store.close()
+        except Exception:
+            logger.exception("unmount: job_store close failed")
+
+        self._mounted = False
