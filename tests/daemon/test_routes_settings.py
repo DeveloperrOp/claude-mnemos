@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -58,43 +58,38 @@ def test_patch_global_persists(client):
     assert r.json()["locale"] == "en"
 
 
-def test_patch_settings_triggers_daemon_reload_when_matching_vault(tmp_path, monkeypatch):
+def test_patch_settings_triggers_daemon_reload_project_settings(tmp_path, monkeypatch):
+    """PATCH /settings/{name} calls daemon.reload_project_settings for any project."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     vault = tmp_path / "vault"
     vault.mkdir()
-    from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
-    ProjectStore().add(ProjectMapEntry(name="foo", vault_root=vault, cwd_patterns=[]))
     fake_daemon = MagicMock()
-    fake_daemon.reload_settings = MagicMock()
-    fake_daemon.config = MagicMock()
-    fake_daemon.config.vault_root = vault
+    fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(vault, daemon=fake_daemon)
     c = TestClient(app)
     r = c.patch("/settings/foo", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200
-    fake_daemon.reload_settings.assert_called_once()
+    fake_daemon.reload_project_settings.assert_called_once()
+    call_args = fake_daemon.reload_project_settings.call_args
+    assert call_args.args[0] == "foo"
 
 
-def test_patch_other_project_settings_does_not_trigger_reload(tmp_path, monkeypatch):
+def test_patch_settings_triggers_reload_regardless_of_vault(tmp_path, monkeypatch):
+    """reload_project_settings is called for any project name — vault-path
+    filtering is the daemon's responsibility, not the route's."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     vault = tmp_path / "vault"
     vault.mkdir()
-    other_vault = tmp_path / "other_vault"
-    other_vault.mkdir()
-    from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
-    s = ProjectStore()
-    s.add(ProjectMapEntry(name="foo", vault_root=vault, cwd_patterns=[]))
-    s.add(ProjectMapEntry(name="bar", vault_root=other_vault, cwd_patterns=[]))
     fake_daemon = MagicMock()
-    fake_daemon.reload_settings = MagicMock()
-    fake_daemon.config = MagicMock()
-    fake_daemon.config.vault_root = vault
+    fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(vault, daemon=fake_daemon)
     c = TestClient(app)
-    c.patch("/settings/bar", json={"snapshots": {"daily_enabled": False}})
-    fake_daemon.reload_settings.assert_not_called()
+    r = c.patch("/settings/bar", json={"snapshots": {"daily_enabled": False}})
+    assert r.status_code == 200
+    fake_daemon.reload_project_settings.assert_called_once()
+    assert fake_daemon.reload_project_settings.call_args.args[0] == "bar"
 
 
 def test_corrupt_global_returns_503(client):
