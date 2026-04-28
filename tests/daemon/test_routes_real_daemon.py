@@ -1,8 +1,7 @@
-"""Tests that routes read per-vault state from daemon.primary_runtime.
+"""Tests that routes read per-vault state via get_runtime(daemon, project).
 
-These tests exercise each previously-affected endpoint against a REAL
-MnemosDaemon with one mounted vault, confirming they return sensible
-responses (not 503) after the primary_runtime fix.
+These tests exercise each endpoint against a REAL MnemosDaemon with one
+mounted vault, confirming they return sensible responses (not 503).
 """
 
 from __future__ import annotations
@@ -70,15 +69,15 @@ def test_dead_letter_dismiss_unknown_returns_404(
     assert r.status_code == 404, r.text
 
 
-# ── /sessions/{sid}/ingest ────────────────────────────────────────────────────
+# ── /sessions/{project}/{sid}/ingest ─────────────────────────────────────────
 
 def test_sessions_ingest_bad_path_returns_400_not_503(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    # valid daemon + primary → reaches the body validation, not the 503 guard
+    # valid daemon + known project → reaches body validation, not 404/503
     r = client.post(
-        "/sessions/some-sid/ingest",
+        "/sessions/alpha/some-sid/ingest",
         json={"transcript_path": "/does/not/exist.jsonl"},
     )
     assert r.status_code == 400, r.text
@@ -93,7 +92,7 @@ def test_sessions_ingest_enqueues_job(
     transcript = tmp_path / "t.jsonl"
     transcript.write_text("{}")
     r = client.post(
-        "/sessions/some-sid/ingest",
+        "/sessions/alpha/some-sid/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 201, r.text
@@ -127,8 +126,12 @@ def test_lost_sessions_import_unknown_returns_404_not_503(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.post("/lost-sessions/nonexistent/import", json={})
-    # 404 (not found in scan), not 503
+    # β2: project_name is required in body; "alpha" is the mounted project.
+    # Session "nonexistent" is not in the scan → 404 (not 503).
+    r = client.post(
+        "/lost-sessions/nonexistent/import",
+        json={"project_name": "alpha"},
+    )
     assert r.status_code == 404, r.text
 
 
@@ -141,7 +144,8 @@ def test_health_watchdog_running_with_real_daemon(
     r = client.get("/health")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["watchdog_running"] is True
+    # Per-vault dict shape: watchdog state lives under vaults["alpha"]
+    assert body["vaults"]["alpha"]["watchdog_running"] is True
 
 
 def test_health_jobs_counters_with_real_daemon(
@@ -151,25 +155,26 @@ def test_health_jobs_counters_with_real_daemon(
     r = client.get("/health")
     assert r.status_code == 200, r.text
     body = r.json()
-    # Counters are present and numeric (not stuck at 0 due to missing job_store)
-    assert isinstance(body["jobs_queued"], int)
-    assert isinstance(body["jobs_running"], int)
-    assert isinstance(body["jobs_dead_letter"], int)
+    # Counters live under vaults["alpha"] (not stuck at 0 due to missing job_store)
+    vault_alpha = body["vaults"]["alpha"]
+    assert isinstance(vault_alpha["jobs_queued"], int)
+    assert isinstance(vault_alpha["jobs_running"], int)
+    assert isinstance(vault_alpha["jobs_dead_letter"], int)
 
 
 # ── /pages (tracker wiring) ───────────────────────────────────────────────────
 
-def test_pages_patch_uses_tracker_from_primary_runtime(
+def test_pages_patch_uses_tracker_from_runtime(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     """PATCH /pages must succeed and the route must have received a non-None
-    tracker from primary_runtime (not silently None due to the old daemon.*
-    attribute lookup that was removed).
+    tracker from the vault runtime (resolved via get_runtime, not via
+    the removed primary_runtime attribute).
 
     The tracker.writing() context manager is ephemeral — entries are removed
     after the write completes — so we verify correctness by:
       1. Confirming the request returns 200 (i.e. the apply_patch ran fully).
-      2. Confirming primary_runtime.tracker is the real OurWritesTracker (not
+      2. Confirming the runtime's tracker is the real OurWritesTracker (not
          None), meaning the route wired it through correctly.
     """
     daemon, client, vault = daemon_with_one_vault
@@ -194,14 +199,14 @@ def test_pages_patch_uses_tracker_from_primary_runtime(
     )
 
     r = client.patch(
-        "/pages/pages/test-page.md",
+        "/pages/alpha/pages/test-page.md",
         json={"frontmatter": {"status": "verified"}},
     )
     assert r.status_code == 200, r.text
 
-    # Confirm the primary_runtime's tracker is wired (non-None) so that
-    # apply_patch received it and the watchdog won't misfire on our writes.
-    primary = daemon.primary_runtime
-    assert primary is not None
+    # Confirm the runtime's tracker is wired (non-None) so that apply_patch
+    # received it and the watchdog won't misfire on our writes.
+    runtime = daemon.runtimes.get("alpha")
+    assert runtime is not None
     from claude_mnemos.daemon.our_writes import OurWritesTracker
-    assert isinstance(primary.tracker, OurWritesTracker)
+    assert isinstance(runtime.tracker, OurWritesTracker)

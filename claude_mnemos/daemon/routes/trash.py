@@ -1,17 +1,23 @@
-"""REST routes for trash list/get/restore/dismiss/empty.
+"""REST routes for trash list / restore / dismiss / empty.
 
-Read paths (`GET /trash`, `GET /trash/{id}`) use `core.trash.list_trash`
-directly. Write paths route through `core.page_apply` operations under
-`pipeline_lock`. `TrashEntryNotFoundError` and `PageRestoreCollisionError`
-become 404 / 409 via app-level handlers (Task 8).
+Per-project routes resolve the target VaultRuntime via
+``get_runtime(request, project)`` (404 on unknown project) and use
+``runtime.vault_root`` for filesystem operations and ``runtime.tracker``
+for our-writes registration.
+
+URL structure::
+
+    GET    /trash/{project}               — list trash entries
+    POST   /trash/{project}/{id}/restore  — restore a trash entry
+    DELETE /trash/{project}/{id}          — permanently delete (dismiss) entry
+    DELETE /trash/{project}               — empty trash (Tier 2)
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Request, Response
 
 from claude_mnemos.core.page_apply import (
     EmptyTrashResult,
@@ -21,34 +27,12 @@ from claude_mnemos.core.page_apply import (
     empty_trash,
 )
 from claude_mnemos.core.trash import (
-    TRASH_DIRNAME,
     TrashEntry,
     list_trash,
 )
+from claude_mnemos.daemon.routes._helpers import get_runtime
 
 router = APIRouter()
-
-
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
-
-
-def _tracker(request: Request) -> Any:
-    daemon = request.app.state.daemon
-    if daemon is None:
-        return None
-    primary = getattr(daemon, "primary_runtime", None)
-    return primary.tracker if primary is not None else None
 
 
 def _entry_to_dict(entry: TrashEntry) -> dict[str, Any]:
@@ -73,9 +57,10 @@ def _empty_result_to_dict(result: EmptyTrashResult) -> dict[str, Any]:
     }
 
 
-@router.get("/trash")
-async def list_trash_endpoint(request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.get("/trash/{project}")
+async def list_trash_endpoint(project: str, request: Request) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     entries = list_trash(vault)
     return {
         "entries": [_entry_to_dict(e) for e in entries],
@@ -83,41 +68,33 @@ async def list_trash_endpoint(request: Request) -> dict[str, Any]:
     }
 
 
-@router.get("/trash/{trash_id}")
-async def get_trash_entry_endpoint(trash_id: str, request: Request) -> dict[str, Any]:
-    vault = _vault(request)
-    trash_dir = vault / TRASH_DIRNAME / trash_id
-    if not trash_dir.is_dir():
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "trash_id": trash_id}
-        )
-    for entry in list_trash(vault):
-        if entry.trash_id == trash_id:
-            return _entry_to_dict(entry)
-    # Defensive: dir exists but list_trash skipped it (e.g. unreadable).
-    raise HTTPException(
-        status_code=404, detail={"error": "not_found", "trash_id": trash_id}
-    )
-
-
-@router.post("/trash/{trash_id}/restore")
-async def restore_trash_endpoint(trash_id: str, request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.post("/trash/{project}/{trash_id}/restore")
+async def restore_trash_endpoint(
+    project: str, trash_id: str, request: Request
+) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     result = apply_restore_from_trash(
-        vault, trash_id, tracker=_tracker(request)
+        vault, trash_id, tracker=runtime.tracker
     )
     return _restore_result_to_dict(result)
 
 
-@router.delete("/trash/{trash_id}", status_code=204)
-async def dismiss_trash_endpoint(trash_id: str, request: Request) -> Response:
-    vault = _vault(request)
+@router.delete("/trash/{project}/{trash_id}", status_code=204)
+async def dismiss_trash_endpoint(
+    project: str, trash_id: str, request: Request
+) -> Response:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     dismiss_trash_entry(vault, trash_id)
     return Response(status_code=204)
 
 
-@router.delete("/trash")
-async def empty_trash_endpoint(request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.delete("/trash/{project}")
+async def empty_trash_endpoint(
+    project: str, request: Request
+) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     result = empty_trash(vault)
     return _empty_result_to_dict(result)

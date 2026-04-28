@@ -1,17 +1,15 @@
-"""REST routes for lost-sessions discovery + import + ignore (Plan #13a Task 7).
+"""REST routes for lost-sessions discovery + import + ignore (Plan #13b-β2 Task 10).
 
-A "lost" session is a transcript file under the transcripts root whose SHA-256
-isn't recorded in the manifest and isn't on the user-maintained ignore list.
-These routes let the dashboard:
+Cross-vault aggregation: every mounted vault is scanned; results carry
+``project_name`` for attribution.  Import and ignore operations require an
+explicit ``project_name`` in the request body so the daemon knows which
+vault's job-store / ignore-list to update.
 
-* GET  /lost-sessions                   list current lost sessions (cached)
-* POST /lost-sessions/scan              force a rescan, return fresh list
-* POST /lost-sessions/{id}/import       enqueue an ingest job for a lost session
-* POST /lost-sessions/{id}/ignore       add the session's SHA to the ignore list
-
-When the daemon is present it owns a TTL'd :class:`LostSessionsCache`;
-without one (e.g. tests with a leaner FakeDaemon) the routes scan
-synchronously every call.
+Endpoints (URLs unchanged from β1/α; behaviour is now cross-vault):
+* GET  /lost-sessions                   list lost sessions from ALL vaults
+* POST /lost-sessions/scan              invalidate all vault caches + rescan
+* POST /lost-sessions/{id}/import       body: {"project_name": "...", ...}
+* POST /lost-sessions/{id}/ignore       body: {"project_name": "..."}
 """
 
 from __future__ import annotations
@@ -22,67 +20,49 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core import lost_sessions as core_lost_sessions
+from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 from claude_mnemos.state.jobs import JobStore
 
 router = APIRouter()
 
 
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
+def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
+    """Cross-vault scan with project attribution.
+
+    For each mounted runtime, read from its LostSessionsCache (preferred) or
+    run a synchronous scan.  Every returned item is serialised to a dict and
+    annotated with ``project_name``.
+    """
+    out: list[dict[str, Any]] = []
+    for runtime in all_runtimes(request):
+        cache = runtime.lost_sessions_cache
+        items = (
+            cache.get_or_scan(runtime.vault_root)
+            if cache is not None
+            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
         )
-    assert isinstance(vault, Path)
-    return vault
-
-
-def _primary(request: Request) -> Any:
-    daemon = request.app.state.daemon
-    if daemon is None:
-        return None
-    return getattr(daemon, "primary_runtime", None)
-
-
-def _scan_via_cache_or_direct(request: Request) -> list[core_lost_sessions.LostSession]:
-    """Return current lost sessions, preferring the daemon cache when available."""
-    primary = _primary(request)
-    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
-    if cache is None:
-        return core_lost_sessions.scan_lost_sessions(_vault(request))
-    items: list[core_lost_sessions.LostSession] = cache.get_or_scan(_vault(request))
-    return items
+        for item in items:
+            d = item.model_dump(mode="json")
+            d["project_name"] = runtime.name
+            out.append(d)
+    return out
 
 
 @router.get("/lost-sessions")
 async def list_lost_route(request: Request) -> dict[str, Any]:
-    items = _scan_via_cache_or_direct(request)
-    return {
-        "sessions": [s.model_dump(mode="json") for s in items],
-        "total": len(items),
-    }
+    sessions = _scan_all_vaults(request)
+    return {"sessions": sessions, "total": len(sessions)}
 
 
 @router.post("/lost-sessions/scan")
 async def rescan_route(request: Request) -> dict[str, Any]:
-    """Invalidate the cache (if any) and run a fresh synchronous scan."""
-    primary = _primary(request)
-    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
-    if cache is not None:
-        cache.invalidate()
-    # Re-populate the cache via get_or_scan so subsequent GETs benefit.
-    if cache is not None:
-        items = cache.get_or_scan(_vault(request))
-    else:
-        items = core_lost_sessions.scan_lost_sessions(_vault(request))
-    return {
-        "sessions": [s.model_dump(mode="json") for s in items],
-        "total": len(items),
-    }
+    """Invalidate caches in every mounted vault, then rescan."""
+    for runtime in all_runtimes(request):
+        cache = runtime.lost_sessions_cache
+        if cache is not None:
+            cache.invalidate()
+    sessions = _scan_all_vaults(request)
+    return {"sessions": sessions, "total": len(sessions)}
 
 
 @router.post("/lost-sessions/{session_id}/import", status_code=201)
@@ -91,15 +71,27 @@ async def import_route(
     request: Request,
     body: dict[str, Any],
 ) -> dict[str, Any]:
-    """Enqueue an ingest job for a lost session.
+    """Enqueue an ingest job for a lost session in a specific project vault.
 
-    Body may carry ``transcript_path`` directly; otherwise we resolve it via
-    the scan. 404 if no matching lost session exists; 503 if the jobs
-    subsystem isn't available.
+    Body must contain ``project_name``.  ``transcript_path`` may optionally be
+    supplied directly; otherwise it is resolved via the target vault's scan.
     """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=400, detail={"error": "missing_project_name"}
+        )
+    runtime = get_runtime(request, project_name)
+
     transcript_path = body.get("transcript_path")
     if not isinstance(transcript_path, str) or not transcript_path:
-        items = _scan_via_cache_or_direct(request)
+        # Resolve via the target vault's cache / scan.
+        cache = runtime.lost_sessions_cache
+        items = (
+            cache.get_or_scan(runtime.vault_root)
+            if cache is not None
+            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+        )
         match = next((i for i in items if i.session_id == session_id), None)
         if match is None:
             raise HTTPException(
@@ -107,35 +99,28 @@ async def import_route(
                 detail={
                     "error": "lost_session_not_found",
                     "session_id": session_id,
+                    "project_name": project_name,
                 },
             )
         transcript_path = match.transcript_path
-    else:
-        # Body-supplied path: validate the file exists before queuing,
-        # mirroring /jobs and /sessions/{sid}/ingest. Without this the
-        # worker would dead-letter after MAX_ATTEMPTS retries.
-        if not Path(transcript_path).is_file():
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "transcript_not_found",
-                    "transcript_path": transcript_path,
-                },
-            )
-    primary = _primary(request)
-    if primary is None or primary.job_store is None:
+    elif not Path(transcript_path).is_file():
         raise HTTPException(
-            status_code=503,
+            status_code=400,
             detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
+                "error": "transcript_not_found",
+                "transcript_path": transcript_path,
             },
         )
-    store: JobStore = primary.job_store
+
+    if runtime.job_store is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "vault_unavailable", "project_name": project_name},
+        )
+    store: JobStore = runtime.job_store
     job = store.create(kind="ingest", payload={"transcript_path": transcript_path})
-    worker = primary.job_worker
-    if worker is not None:
-        worker.signal_wakeup()
+    if runtime.job_worker is not None:
+        runtime.job_worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")
     return dumped
 
@@ -146,10 +131,26 @@ async def ignore_route(
     request: Request,
     body: dict[str, Any],
 ) -> dict[str, Any]:
-    """Add a SHA to the ignore list. Resolves SHA via scan when not provided."""
+    """Add a SHA to the ignore list in a specific project vault.
+
+    Body must contain ``project_name``.  ``sha`` may optionally be supplied
+    directly; otherwise it is resolved via the target vault's scan.
+    """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=400, detail={"error": "missing_project_name"}
+        )
+    runtime = get_runtime(request, project_name)
+
     sha = body.get("sha")
     if not isinstance(sha, str) or not sha:
-        items = _scan_via_cache_or_direct(request)
+        cache = runtime.lost_sessions_cache
+        items = (
+            cache.get_or_scan(runtime.vault_root)
+            if cache is not None
+            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+        )
         match = next((i for i in items if i.session_id == session_id), None)
         if match is None:
             raise HTTPException(
@@ -157,14 +158,15 @@ async def ignore_route(
                 detail={
                     "error": "lost_session_not_found",
                     "session_id": session_id,
+                    "project_name": project_name,
                 },
             )
         sha = match.sha
-    primary = _primary(request)
-    tracker = getattr(primary, "tracker", None) if primary is not None else None
-    ignore = core_lost_sessions.add_to_ignore(_vault(request), sha, tracker=tracker)
-    # Invalidate the cache so the now-ignored session disappears from /list.
-    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
+
+    ignore = core_lost_sessions.add_to_ignore(
+        runtime.vault_root, sha, tracker=runtime.tracker
+    )
+    cache = runtime.lost_sessions_cache
     if cache is not None:
         cache.invalidate()
     return {"ignored_count": len(ignore.ignored_shas)}

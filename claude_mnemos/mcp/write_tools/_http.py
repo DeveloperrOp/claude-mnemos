@@ -44,13 +44,24 @@ async def call_daemon(
     try:
         body = response.json()
         if isinstance(body, dict):
-            error = body.get("error")
             detail_field = body.get("detail")
-            detail = (
-                detail_field
-                if isinstance(detail_field, str)
-                else (str(detail_field) if detail_field is not None else None)
-            )
+            if isinstance(detail_field, dict):
+                # FastAPI HTTPException(detail={"error": "...", ...}) nests the
+                # structured payload under "detail".  Extract the "error" key
+                # from there; use "hint" or the whole dict-str as human-readable
+                # detail.
+                error = detail_field.get("error") or body.get("error")
+                detail = (
+                    detail_field.get("detail")
+                    or detail_field.get("hint")
+                    or str(detail_field)
+                )
+            elif isinstance(detail_field, str):
+                error = body.get("error")
+                detail = detail_field
+            else:
+                error = body.get("error")
+                detail = None
     except ValueError:
         detail = response.text or None
 

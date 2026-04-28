@@ -67,7 +67,10 @@ def test_list_suggestions_status_all(tmp_path: Path):
 async def test_apply_ontology_suggestion_happy():
     def handler(request):
         assert request.method == "POST"
-        assert request.url.path == "/suggestions/ont-2026-04-26-aaaaaa/approve"
+        assert (
+            request.url.path
+            == "/ontology/myproject/suggestions/ont-2026-04-26-aaaaaa/approve"
+        )
         return httpx.Response(
             200,
             json={
@@ -83,10 +86,34 @@ async def test_apply_ontology_suggestion_happy():
 
     async with _client(handler) as client:
         result = await apply_ontology_suggestion(
-            client, "http://daemon", "ont-2026-04-26-aaaaaa"
+            client, "http://daemon", "myproject", "ont-2026-04-26-aaaaaa"
         )
     assert result["success"] is True
     assert result["operation"] == "merge_entities"
+
+
+async def test_apply_ontology_suggestion_url_includes_project():
+    """URL must embed the project segment."""
+    captured: dict[str, str] = {}
+
+    def handler(request):
+        captured["path"] = request.url.path
+        return httpx.Response(
+            200,
+            json={
+                "success": True,
+                "operation": "merge_entities",
+                "suggestion_id": "ont-x",
+                "activity_id": "abc",
+                "target_path": "",
+                "affected_pages": [],
+                "wikilinks_rewritten": 0,
+            },
+        )
+
+    async with _client(handler) as client:
+        await apply_ontology_suggestion(client, "http://daemon", "alpha", "ont-x")
+    assert "/alpha/" in captured["path"]
 
 
 async def test_apply_ontology_suggestion_409():
@@ -102,7 +129,7 @@ async def test_apply_ontology_suggestion_409():
     async with _client(handler) as client:
         with pytest.raises(DaemonRefusedError) as exc_info:
             await apply_ontology_suggestion(
-                client, "http://daemon", "ont-2026-04-26-aaaaaa"
+                client, "http://daemon", "myproject", "ont-2026-04-26-aaaaaa"
             )
     assert exc_info.value.status_code == 409
 
@@ -114,12 +141,12 @@ async def test_apply_ontology_suggestion_unreachable():
     async with _client(handler) as client:
         with pytest.raises(DaemonUnreachableError):
             await apply_ontology_suggestion(
-                client, "http://daemon", "ont-2026-04-26-aaaaaa"
+                client, "http://daemon", "myproject", "ont-2026-04-26-aaaaaa"
             )
 
 
 async def test_propose_ontology_change_happy():
-    captured = {}
+    captured: dict[str, object] = {}
 
     def handler(request):
         captured["body"] = json.loads(request.content.decode())
@@ -140,6 +167,7 @@ async def test_propose_ontology_change_happy():
         result = await propose_ontology_change(
             client,
             "http://daemon",
+            project="myproject",
             operation="merge_entities",
             affected_pages=["wiki/entities/foo.md", "wiki/entities/bar.md"],
             proposed_target="wiki/entities/foobar.md",
@@ -147,10 +175,34 @@ async def test_propose_ontology_change_happy():
             confidence=0.85,
         )
     assert result["frontmatter"]["id"] == "ont-2026-04-26-aaaaaa"
-    assert captured["path"] == "/suggestions"
-    assert captured["body"]["operation"] == "merge_entities"
-    assert captured["body"]["proposed_target"] == "wiki/entities/foobar.md"
-    assert captured["body"]["confidence"] == 0.85
+    assert captured["path"] == "/ontology/myproject/suggestions"
+    assert captured["body"]["operation"] == "merge_entities"  # type: ignore[index]
+    assert captured["body"]["proposed_target"] == "wiki/entities/foobar.md"  # type: ignore[index]
+    assert captured["body"]["confidence"] == 0.85  # type: ignore[index]
+
+
+async def test_propose_ontology_change_url_includes_project():
+    captured: dict[str, str] = {}
+
+    def handler(request):
+        captured["path"] = request.url.path
+        return httpx.Response(
+            201,
+            json={
+                "frontmatter": {"id": "ont-x", "operation": "delete_page", "status": "pending"},
+                "body": "",
+            },
+        )
+
+    async with _client(handler) as client:
+        await propose_ontology_change(
+            client,
+            "http://daemon",
+            project="alpha",
+            operation="delete_page",
+            affected_pages=["wiki/entities/orphan.md"],
+        )
+    assert "/alpha/" in captured["path"]
 
 
 async def test_propose_ontology_change_no_target():
@@ -166,6 +218,7 @@ async def test_propose_ontology_change_no_target():
         await propose_ontology_change(
             client,
             "http://daemon",
+            project="myproject",
             operation="delete_page",
             affected_pages=["wiki/entities/orphan.md"],
         )
@@ -195,7 +248,9 @@ async def test_call_list_suggestions_via_server(tmp_path: Path):
     assert len(parsed) == 1
 
 
-async def test_call_apply_ontology_suggestion_daemon_unreachable(tmp_path: Path, monkeypatch):
+async def test_call_apply_ontology_suggestion_daemon_unreachable(
+    tmp_path: Path, monkeypatch
+):
     server = build_server(MCPConfig(vault_root=tmp_path, daemon_url="http://daemon"))
 
     class FakeClient:
@@ -210,15 +265,19 @@ async def test_call_apply_ontology_suggestion_daemon_unreachable(tmp_path: Path,
     monkeypatch.setattr("claude_mnemos.mcp.server.httpx.AsyncClient", FakeClient)
 
     result = await _call_tool(
-        server, "apply_ontology_suggestion", {"suggestion_id": "ont-x"}
+        server,
+        "apply_ontology_suggestion",
+        {"project": "myproject", "suggestion_id": "ont-x"},
     )
     text = result.content[0].text
     assert "daemon not reachable" in text
 
 
-async def test_call_propose_ontology_change_routes_correctly(tmp_path: Path, monkeypatch):
+async def test_call_propose_ontology_change_routes_correctly(
+    tmp_path: Path, monkeypatch
+):
     server = build_server(MCPConfig(vault_root=tmp_path, daemon_url="http://daemon"))
-    captured = {}
+    captured: dict[str, object] = {}
 
     class FakeClient:
         def __init__(self, *_, **__): ...
@@ -248,11 +307,12 @@ async def test_call_propose_ontology_change_routes_correctly(tmp_path: Path, mon
         server,
         "propose_ontology_change",
         {
+            "project": "myproject",
             "operation": "delete_page",
             "affected_pages": ["wiki/entities/orphan.md"],
         },
     )
     parsed = json.loads(result.content[0].text)
     assert parsed["frontmatter"]["id"] == "ont-2026-04-26-zzzzzz"
-    assert "/suggestions" in captured["url"]
-    assert captured["body"]["operation"] == "delete_page"
+    assert "/suggestions" in str(captured["url"])
+    assert captured["body"]["operation"] == "delete_page"  # type: ignore[index]

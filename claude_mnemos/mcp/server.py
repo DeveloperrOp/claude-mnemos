@@ -148,7 +148,7 @@ TOOL_DEFS: list[types.Tool] = [
     types.Tool(
         name="run_lint",
         description=(
-            "Run lint check across the vault via the daemon (POST /lint/run). "
+            "Run lint check across the vault via the daemon (POST /lint/{project}/run). "
             "Saves results to <vault>/.lint-results.json. Daemon must be running."
         ),
         inputSchema=schemas.RUN_LINT,
@@ -223,34 +223,51 @@ async def _dispatch_write(
     name: str, arguments: dict[str, Any], config: MCPConfig
 ) -> list[types.TextContent]:
     if name == "run_lint":
-        return await run_lint(config.daemon_url, timeout_s=config.daemon_timeout_s)
+        return await run_lint(
+            config.daemon_url,
+            project=arguments["project"],
+            timeout_s=config.daemon_timeout_s,
+        )
     timeout = httpx.Timeout(config.daemon_timeout_s)
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             if name == "undo_operation":
                 result = await undo_operation(
-                    client, config.daemon_url, arguments["op_id"]
+                    client, config.daemon_url, arguments["project"], arguments["op_id"]
                 )
             elif name == "create_snapshot":
                 result = await create_snapshot(
-                    client, config.daemon_url, label=arguments.get("label")
+                    client,
+                    config.daemon_url,
+                    project=arguments["project"],
+                    label=arguments.get("label"),
                 )
             elif name == "restore_snapshot":
                 result = await restore_snapshot(
-                    client, config.daemon_url, arguments["name"]
+                    client,
+                    config.daemon_url,
+                    project=arguments["project"],
+                    name=arguments["name"],
                 )
             elif name == "delete_snapshot":
                 result = await delete_snapshot(
-                    client, config.daemon_url, arguments["name"]
+                    client,
+                    config.daemon_url,
+                    project=arguments["project"],
+                    name=arguments["name"],
                 )
             elif name == "apply_ontology_suggestion":
                 result = await apply_ontology_suggestion(
-                    client, config.daemon_url, arguments["suggestion_id"]
+                    client,
+                    config.daemon_url,
+                    arguments["project"],
+                    arguments["suggestion_id"],
                 )
             elif name == "propose_ontology_change":
                 result = await propose_ontology_change(
                     client,
                     config.daemon_url,
+                    project=arguments["project"],
                     operation=arguments["operation"],
                     affected_pages=arguments["affected_pages"],
                     proposed_target=arguments.get("proposed_target"),

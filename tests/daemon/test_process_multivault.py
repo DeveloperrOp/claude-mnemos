@@ -8,7 +8,7 @@ import pytest
 from claude_mnemos.daemon.config import BootFilter, DaemonConfig
 from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
-from claude_mnemos.state.settings import GlobalSettings, SettingsStore
+from claude_mnemos.state.settings import GlobalSettings
 
 
 def _setup_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,96 +24,6 @@ def test_init_empty_runtimes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     _setup_home(tmp_path, monkeypatch)
     daemon = MnemosDaemon(_config(tmp_path))
     assert daemon.runtimes == {}
-    assert daemon.primary_runtime is None
-    assert daemon.app.state.vault_root is None
-
-
-def test_recompute_primary_alphabetical_first(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _setup_home(tmp_path, monkeypatch)
-    daemon = MnemosDaemon(_config(tmp_path))
-
-    from claude_mnemos.daemon.vault_runtime import VaultRuntime
-    from claude_mnemos.state.settings import ProjectSettings
-
-    for name in ("zeta", "alpha", "mike"):
-        v = tmp_path / name
-        v.mkdir()
-        rt = VaultRuntime(
-            project=ProjectMapEntry(name=name, vault_root=v, cwd_patterns=[]),
-            settings=ProjectSettings(),
-        )
-        daemon.runtimes[name] = rt
-        rt.job_store.close()  # we won't mount here — just test selection
-
-    daemon._recompute_primary()
-    assert daemon.primary_runtime is not None
-    assert daemon.primary_runtime.name == "alpha"
-    assert daemon.app.state.vault_root == tmp_path / "alpha"
-
-
-def test_recompute_primary_pinned(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _setup_home(tmp_path, monkeypatch)
-
-    SettingsStore().set_global(GlobalSettings(primary_project="mike"))
-
-    daemon = MnemosDaemon(_config(tmp_path))
-
-    from claude_mnemos.daemon.vault_runtime import VaultRuntime
-    from claude_mnemos.state.settings import ProjectSettings
-
-    for name in ("zeta", "alpha", "mike"):
-        v = tmp_path / name
-        v.mkdir()
-        rt = VaultRuntime(
-            project=ProjectMapEntry(name=name, vault_root=v, cwd_patterns=[]),
-            settings=ProjectSettings(),
-        )
-        daemon.runtimes[name] = rt
-        rt.job_store.close()
-
-    daemon._recompute_primary()
-    assert daemon.primary_runtime is not None
-    assert daemon.primary_runtime.name == "mike"
-
-
-def test_recompute_primary_pinned_missing_falls_back(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _setup_home(tmp_path, monkeypatch)
-    SettingsStore().set_global(GlobalSettings(primary_project="absent"))
-
-    daemon = MnemosDaemon(_config(tmp_path))
-
-    from claude_mnemos.daemon.vault_runtime import VaultRuntime
-    from claude_mnemos.state.settings import ProjectSettings
-
-    for name in ("alpha", "beta"):
-        v = tmp_path / name
-        v.mkdir()
-        rt = VaultRuntime(
-            project=ProjectMapEntry(name=name, vault_root=v, cwd_patterns=[]),
-            settings=ProjectSettings(),
-        )
-        daemon.runtimes[name] = rt
-        rt.job_store.close()
-
-    daemon._recompute_primary()
-    assert daemon.primary_runtime is not None
-    assert daemon.primary_runtime.name == "alpha"  # alphabetical first
-
-
-def test_recompute_primary_empty_runtimes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _setup_home(tmp_path, monkeypatch)
-    daemon = MnemosDaemon(_config(tmp_path))
-    daemon._recompute_primary()
-    assert daemon.primary_runtime is None
-    assert daemon.app.state.vault_root is None
 
 
 # ─── Task 13: _select_boot_entries + _bootstrap_runtimes ──────────────────────
@@ -387,30 +297,17 @@ async def test_reload_project_settings_for_unmounted_no_op(
 
 
 @pytest.mark.asyncio
-async def test_reload_global_settings_repicks_primary(
+async def test_reload_global_settings_updates_in_memory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup_home(tmp_path, monkeypatch)
-    _add_project("alpha", tmp_path / "a")
-    _add_project("beta", tmp_path / "b")
-
     daemon = MnemosDaemon(_config(tmp_path))
     daemon.scheduler.start()
     try:
-        await daemon._bootstrap_runtimes()
-        daemon._recompute_primary()
-        assert daemon.primary_runtime is not None
-        assert daemon.primary_runtime.name == "alpha"
-
-        new_global = GlobalSettings(primary_project="beta")
+        new_global = GlobalSettings(daemon_port=9999)
         await daemon.reload_global_settings(new_global)
-        assert daemon.primary_runtime is not None
-        assert daemon.primary_runtime.name == "beta"
+        assert daemon.global_settings.daemon_port == 9999
     finally:
-        async with daemon._runtimes_lock:
-            for rt in list(daemon.runtimes.values()):
-                await rt.unmount(timeout=2.0, force=True)
-            daemon.runtimes.clear()
         daemon.scheduler.shutdown(wait=False)
 
 
@@ -436,5 +333,4 @@ async def test_shutdown_unmounts_all_with_force(
     await daemon._shutdown_runtimes()
 
     assert daemon.runtimes == {}
-    assert daemon.primary_runtime is None
     daemon.scheduler.shutdown(wait=False)

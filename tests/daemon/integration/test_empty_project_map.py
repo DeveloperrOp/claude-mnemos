@@ -2,7 +2,7 @@
 
 Boots a real daemon with no pre-registered projects, then asserts:
 - GET /projects returns 200 with an empty list
-- GET /snapshots returns 503 with no_vault_registered error
+- GET /snapshots/{project} returns 404 unknown_project when no projects are registered
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ PORT = 5762
 
 
 @pytest.mark.slow
-def test_empty_bootstrap_serves_projects_and_503_for_vault_routes(
+def test_empty_bootstrap_serves_projects_and_404_for_unknown_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
@@ -76,11 +76,11 @@ def test_empty_bootstrap_serves_projects_and_503_for_vault_routes(
         assert r.status_code == 200, r.text
         assert r.json() == [], f"expected empty list, got: {r.json()}"
 
-        # GET /snapshots should 503 because no primary vault is registered.
-        r = httpx.get(f"{base}/snapshots", timeout=5.0)
-        assert r.status_code == 503, r.text
+        # GET /snapshots/{project} with no registered projects → 404 unknown_project.
+        r = httpx.get(f"{base}/snapshots/ghost", timeout=5.0)
+        assert r.status_code == 404, r.text
         body = r.json()
-        assert body.get("detail", {}).get("error") == "no_vault_registered", body
+        assert body.get("detail", {}).get("error") == "unknown_project", body
     finally:
         proc.terminate()
         try:

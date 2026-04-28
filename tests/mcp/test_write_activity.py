@@ -17,7 +17,7 @@ def _client(handler) -> httpx.AsyncClient:
 async def test_undo_happy_path():
     def handler(request):
         assert request.method == "POST"
-        assert request.url.path == "/activity/abc123/undo"
+        assert request.url.path == "/activity/myproject/abc123/undo"
         return httpx.Response(
             200,
             json={
@@ -29,7 +29,7 @@ async def test_undo_happy_path():
         )
 
     async with _client(handler) as client:
-        result = await undo_operation(client, "http://daemon", "abc123")
+        result = await undo_operation(client, "http://daemon", "myproject", "abc123")
     assert result["success"] is True
     assert result["new_entry_id"] == "newid"
 
@@ -43,7 +43,7 @@ async def test_undo_409_raises_refused():
 
     async with _client(handler) as client:
         with pytest.raises(DaemonRefusedError) as exc_info:
-            await undo_operation(client, "http://daemon", "abc")
+            await undo_operation(client, "http://daemon", "myproject", "abc")
     assert exc_info.value.status_code == 409
     assert exc_info.value.error == "undo_failed"
     assert "already undone" in exc_info.value.detail
@@ -55,7 +55,7 @@ async def test_undo_connect_error_raises_unreachable():
 
     async with _client(handler) as client:
         with pytest.raises(DaemonUnreachableError):
-            await undo_operation(client, "http://daemon", "abc")
+            await undo_operation(client, "http://daemon", "myproject", "abc")
 
 
 async def test_undo_timeout_raises_timeout():
@@ -64,7 +64,7 @@ async def test_undo_timeout_raises_timeout():
 
     async with _client(handler) as client:
         with pytest.raises(DaemonTimeoutError):
-            await undo_operation(client, "http://daemon", "abc")
+            await undo_operation(client, "http://daemon", "myproject", "abc")
 
 
 async def test_undo_unknown_5xx_raises_refused():
@@ -73,5 +73,5 @@ async def test_undo_unknown_5xx_raises_refused():
 
     async with _client(handler) as client:
         with pytest.raises(DaemonRefusedError) as exc_info:
-            await undo_operation(client, "http://daemon", "abc")
+            await undo_operation(client, "http://daemon", "myproject", "abc")
     assert exc_info.value.status_code == 500

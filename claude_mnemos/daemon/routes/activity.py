@@ -1,39 +1,26 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from claude_mnemos.core.undo import undo
+from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.daemon.schemas import UndoApiResult
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 
 router = APIRouter()
 
 
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
-
-
-@router.get("/activity")
+@router.get("/activity/{project}")
 async def list_activity(
+    project: str,
     request: Request,
     limit: int = Query(default=20, ge=0, le=10000),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    vault = _vault(request)
-    log = ActivityLog.load(vault)
+    runtime = get_runtime(request, project)
+    log = ActivityLog.load(runtime.vault_root)
     entries = list(reversed(log.entries))  # newest first
     total = len(entries)
     sliced = entries[offset:] if limit == 0 else entries[offset : offset + limit]
@@ -43,10 +30,10 @@ async def list_activity(
     }
 
 
-@router.get("/activity/{op_id}", response_model=ActivityEntry)
-async def get_activity(op_id: str, request: Request) -> ActivityEntry:
-    vault = _vault(request)
-    log = ActivityLog.load(vault)
+@router.get("/activity/{project}/{op_id}", response_model=ActivityEntry)
+async def get_activity(project: str, op_id: str, request: Request) -> ActivityEntry:
+    runtime = get_runtime(request, project)
+    log = ActivityLog.load(runtime.vault_root)
     entry = log.find_by_id(op_id)
     if entry is None:
         raise HTTPException(
@@ -55,10 +42,10 @@ async def get_activity(op_id: str, request: Request) -> ActivityEntry:
     return entry
 
 
-@router.post("/activity/{op_id}/undo", response_model=UndoApiResult)
-def undo_activity(op_id: str, request: Request) -> UndoApiResult:
-    vault = _vault(request)
-    result = undo(vault, op_id)  # raises UndoError / LockTimeoutError → handled in app
+@router.post("/activity/{project}/{op_id}/undo", response_model=UndoApiResult)
+def undo_activity(project: str, op_id: str, request: Request) -> UndoApiResult:
+    runtime = get_runtime(request, project)
+    result = undo(runtime.vault_root, op_id)  # raises UndoError / LockTimeoutError → handled in app
     return UndoApiResult(
         success=result.success,
         op_id=op_id,

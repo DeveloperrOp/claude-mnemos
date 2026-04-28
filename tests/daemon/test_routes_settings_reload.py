@@ -55,32 +55,13 @@ def test_patch_project_settings_reloads_runtime(
     assert daemon.scheduler.get_job("daily_snapshot:alpha") is None
 
 
-def test_patch_global_settings_repicks_primary(
+def test_patch_global_settings_updates_daemon_global_settings(
     daemon_with_app: tuple[MnemosDaemon, TestClient],
-    tmp_path: Path,
 ) -> None:
-    """PATCH /settings/global with primary_project=beta must switch the
-    daemon's primary_runtime to beta and update app.state.vault_root."""
+    """PATCH /settings/global must update daemon.global_settings in-memory."""
     daemon, client = daemon_with_app
-    a = tmp_path / "a"
-    b = tmp_path / "b"
-    a.mkdir()
-    b.mkdir()
-    client.post(
-        "/projects",
-        json={"name": "alpha", "vault_root": str(a), "cwd_patterns": []},
-    )
-    client.post(
-        "/projects",
-        json={"name": "beta", "vault_root": str(b), "cwd_patterns": []},
-    )
-    # Alphabetically "alpha" is primary before explicit pinning.
-    assert daemon.primary_runtime is not None
-    assert daemon.primary_runtime.name == "alpha"
 
-    r = client.patch("/settings/global", json={"primary_project": "beta"})
+    r = client.patch("/settings/global", json={"daemon_port": 9876})
     assert r.status_code == 200, r.text
 
-    assert daemon.primary_runtime is not None
-    assert daemon.primary_runtime.name == "beta"
-    assert daemon.app.state.vault_root == b
+    assert daemon.global_settings.daemon_port == 9876

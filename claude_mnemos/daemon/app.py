@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -39,12 +38,8 @@ from claude_mnemos.state.projects import ProjectMapCorruptError, ProjectMapError
 from claude_mnemos.state.settings import SettingsCorruptError
 
 
-def create_app(vault_root: Path | None = None, daemon: Any | None = None) -> FastAPI:
+def create_app(daemon: Any | None = None) -> FastAPI:
     app = FastAPI(title="claude-mnemos daemon", version=__version__)
-    # vault_root may be None when no vaults are mounted yet (multi-vault daemon
-    # with empty runtimes); _recompute_primary updates it when a primary is
-    # selected.
-    app.state.vault_root = vault_root
     app.state.daemon = daemon
 
     app.include_router(health_router)

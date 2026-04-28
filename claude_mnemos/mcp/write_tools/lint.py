@@ -1,4 +1,4 @@
-"""MCP write tool: run_lint — POST /lint/run via daemon REST."""
+"""MCP write tool: run_lint — POST /lint/{project}/run via daemon REST."""
 
 from __future__ import annotations
 
@@ -14,20 +14,23 @@ from claude_mnemos.mcp.write_tools._http import call_daemon
 
 
 async def run_lint(
-    daemon_url: str, *, timeout_s: float = 30.0
+    daemon_url: str, *, project: str, timeout_s: float = 30.0
 ) -> list[types.TextContent]:
-    """POST <daemon_url>/lint/run and surface daemon errors as TextContent."""
+    """POST <daemon_url>/lint/{project}/run and surface daemon errors as TextContent."""
     timeout = httpx.Timeout(timeout_s)
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            body = await call_daemon(client, "POST", f"{daemon_url}/lint/run")
+            body = await call_daemon(
+                client, "POST", f"{daemon_url.rstrip('/')}/lint/{project}/run"
+            )
     except DaemonUnreachableError as exc:
         return [
             types.TextContent(
                 type="text",
                 text=(
                     f"daemon unreachable: {exc}. "
-                    "Start it with: mnemos daemon start --vault <path>"
+                    "Start it with: mnemos daemon start "
+                    "(after registering the project via mnemos project add NAME --vault PATH)"
                 ),
             )
         ]

@@ -12,7 +12,7 @@ from claude_mnemos.daemon.schemas import SchedulerJobInfo
 
 @pytest.fixture
 def app(tmp_path: Path):
-    return create_app(tmp_path)
+    return create_app()
 
 
 @pytest.fixture
@@ -29,24 +29,27 @@ async def test_health_returns_ok(client):
     assert body["status"] == "ok"
 
 
-async def test_health_includes_version_and_vault(tmp_path: Path):
-    app = create_app(tmp_path)
+async def test_health_includes_version(tmp_path: Path):
+    app = create_app()
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
     body = r.json()
     assert body["version"] == __version__
-    assert body["vault"] == str(tmp_path)
     assert "uptime_s" in body
     assert body["scheduler_jobs"] == []
+    # vault field is gone; vaults dict is present and empty (no daemon attached)
+    assert "vault" not in body
+    assert body["vaults"] == {}
 
 
 async def test_health_includes_scheduler_jobs_when_daemon_attached(tmp_path: Path):
     class FakeDaemon:
         started_at_monotonic = 0.0
+        runtimes: dict = {}
 
         def __init__(self) -> None:
-            self.primary_runtime = None
+            pass
 
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return [
@@ -57,7 +60,7 @@ async def test_health_includes_scheduler_jobs_when_daemon_attached(tmp_path: Pat
                 )
             ]
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
@@ -80,10 +83,11 @@ async def test_unknown_endpoint_returns_404(client):
     assert r.status_code == 404
 
 
-async def test_health_default_watchdog_fields(client):
+async def test_health_default_empty_vaults(client):
+    """No daemon attached → vaults dict is empty, alerts_count is 0."""
     r = await client.get("/health")
     body = r.json()
-    assert body["watchdog_running"] is False
+    assert body["vaults"] == {}
     assert body["alerts_count"] == 0
 
 
@@ -93,15 +97,17 @@ async def test_health_reports_running_observer(tmp_path: Path):
     class FakeObserver:
         is_running = True
 
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self.observer = FakeObserver()
+            self.job_store = None
+
     class FakeDaemon:
         started_at_monotonic = 0.0
         alerts = Alerts()
 
         def __init__(self) -> None:
-            self.observer = FakeObserver()
-            self.job_store = None
-            # primary_runtime is self so the route finds observer/job_store here.
-            self.primary_runtime = self
+            self.runtimes = {"alpha": FakeRuntime()}
 
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return []
@@ -114,12 +120,12 @@ async def test_health_reports_running_observer(tmp_path: Path):
         detected_at=datetime(2026, 4, 27, 14, 0, tzinfo=UTC),
     )
 
-    app = create_app(tmp_path, daemon=daemon)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
     body = r.json()
-    assert body["watchdog_running"] is True
+    assert body["vaults"]["alpha"]["watchdog_running"] is True
     assert body["alerts_count"] == 1
 
 
@@ -129,32 +135,34 @@ async def test_health_reports_observer_not_alive(tmp_path: Path):
     class StoppedObserver:
         is_running = False
 
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self.observer = StoppedObserver()
+            self.job_store = None
+
     class FakeDaemon:
         started_at_monotonic = 0.0
         alerts = Alerts()
 
         def __init__(self) -> None:
-            self.observer = StoppedObserver()
-            self.job_store = None
-            self.primary_runtime = self
+            self.runtimes = {"alpha": FakeRuntime()}
 
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return []
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
     body = r.json()
-    assert body["watchdog_running"] is False
+    assert body["vaults"]["alpha"]["watchdog_running"] is False
 
 
 async def test_health_jobs_counts_default(client):
+    """No daemon → vaults empty, jobs_alert false."""
     r = await client.get("/health")
     body = r.json()
-    assert body["jobs_queued"] == 0
-    assert body["jobs_running"] == 0
-    assert body["jobs_dead_letter"] == 0
+    assert body["vaults"] == {}
     assert body["jobs_alert"] is False
 
 
@@ -170,24 +178,26 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
             "UPDATE jobs SET status='dead_letter' WHERE id=?", (job.id,)
         )
 
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self.observer = None
+            self.job_store = store
+
     class FakeDaemon:
         started_at_monotonic = 0.0
-        observer = None
         alerts = Alerts()
-        job_store = store
 
         def __init__(self) -> None:
-            # primary_runtime is self so route finds job_store here.
-            self.primary_runtime = self
+            self.runtimes = {"alpha": FakeRuntime()}
 
         def scheduler_jobs_info(self) -> list:
             return []
 
-    app = create_app(tmp_path, daemon=FakeDaemon())
+    app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/health")
     store.close()
     body = r.json()
-    assert body["jobs_dead_letter"] == 11
+    assert body["vaults"]["alpha"]["jobs_dead_letter"] == 11
     assert body["jobs_alert"] is True

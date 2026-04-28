@@ -16,23 +16,10 @@ from claude_mnemos.core.snapshots import (
     parse_snapshot_name,
     restore_from_snapshot,
 )
+from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 
 router = APIRouter()
-
-
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
 
 
 class CreateSnapshotRequest(BaseModel):
@@ -65,17 +52,20 @@ def _validate_snapshot_name(name: str) -> None:
         )
 
 
-@router.get("/snapshots")
-async def list_snapshots_endpoint(request: Request) -> dict[str, list[SnapshotInfo]]:
-    vault = _vault(request)
-    return {"snapshots": list_snapshots(vault)}
+@router.get("/snapshots/{project}")
+async def list_snapshots_endpoint(
+    project: str, request: Request
+) -> dict[str, list[SnapshotInfo]]:
+    runtime = get_runtime(request, project)
+    return {"snapshots": list_snapshots(runtime.vault_root)}
 
 
-@router.post("/snapshots", response_model=SnapshotInfo, status_code=201)
+@router.post("/snapshots/{project}", response_model=SnapshotInfo, status_code=201)
 def create_snapshot_endpoint(
-    body: CreateSnapshotRequest, request: Request
+    project: str, body: CreateSnapshotRequest, request: Request
 ) -> SnapshotInfo:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     try:
         with pipeline_lock(vault):
             try:
@@ -101,9 +91,12 @@ def create_snapshot_endpoint(
     )
 
 
-@router.delete("/snapshots/{name}")
-def delete_snapshot_endpoint(name: str, request: Request) -> dict[str, str]:
-    vault = _vault(request)
+@router.delete("/snapshots/{project}/{name}")
+def delete_snapshot_endpoint(
+    project: str, name: str, request: Request
+) -> dict[str, str]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     _validate_snapshot_name(name)
     with pipeline_lock(vault):
         try:
@@ -120,10 +113,13 @@ def delete_snapshot_endpoint(name: str, request: Request) -> dict[str, str]:
 
 
 @router.post(
-    "/snapshots/{name}/restore", response_model=RestoreSnapshotResponse
+    "/snapshots/{project}/{name}/restore", response_model=RestoreSnapshotResponse
 )
-def restore_snapshot_endpoint(name: str, request: Request) -> RestoreSnapshotResponse:
-    vault = _vault(request)
+def restore_snapshot_endpoint(
+    project: str, name: str, request: Request
+) -> RestoreSnapshotResponse:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     _validate_snapshot_name(name)
     snap_path = vault / ".backups" / name
     if not snap_path.is_dir():

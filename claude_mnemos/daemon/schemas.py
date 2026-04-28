@@ -12,6 +12,7 @@ __all__ = [
     "SchedulerJobInfo",
     "SnapshotInfo",
     "UndoApiResult",
+    "VaultHealth",
     "VaultInfo",
     "VersionResponse",
     "WatchdogAlertResponse",
@@ -26,19 +27,24 @@ class SchedulerJobInfo(BaseModel):
     trigger: str
 
 
+class VaultHealth(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    watchdog_running: bool
+    jobs_queued: int
+    jobs_running: int
+    jobs_dead_letter: int
+
+
 class HealthResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: Literal["ok", "degraded"]
     version: str
-    vault: str
     uptime_s: float = Field(ge=0.0)
     scheduler_jobs: list[SchedulerJobInfo] = Field(default_factory=list)
-    watchdog_running: bool = False
     alerts_count: int = Field(default=0, ge=0)
-    jobs_queued: int = Field(default=0, ge=0)
-    jobs_running: int = Field(default=0, ge=0)
-    jobs_dead_letter: int = Field(default=0, ge=0)
+    vaults: dict[str, VaultHealth] = Field(default_factory=dict)
     jobs_alert: bool = False
 
 

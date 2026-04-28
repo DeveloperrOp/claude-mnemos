@@ -1,5 +1,10 @@
+"""REST tests for /activity/{project}/... routes (Plan #13b-β2 Task 8)."""
+
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -15,6 +20,47 @@ from claude_mnemos.ingest.pipeline import ingest
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "sample_session.jsonl"
+
+
+class _FakeRuntime:
+    """Minimal VaultRuntime shim for activity route tests."""
+
+    def __init__(self, vault: Path) -> None:
+        self.vault_root = vault
+
+
+class _FakeDaemon:
+    def __init__(self, alpha_vault: Path) -> None:
+        self._alpha_runtime = _FakeRuntime(alpha_vault)
+        self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
+        self.started_at_monotonic = 0.0
+
+    def scheduler_jobs_info(self) -> list[Any]:
+        return []
+
+
+@pytest.fixture
+def alpha_vault(tmp_path: Path) -> Path:
+    vault = tmp_path / "alpha"
+    vault.mkdir()
+    return vault
+
+
+@pytest.fixture
+def daemon(alpha_vault: Path) -> _FakeDaemon:
+    return _FakeDaemon(alpha_vault)
+
+
+@pytest.fixture
+def app(daemon: _FakeDaemon) -> Any:
+    return create_app(daemon=daemon)
+
+
+@pytest.fixture
+async def client(app: Any) -> Any:
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 def _cfg() -> Config:
@@ -55,10 +101,10 @@ def _stub_extractor():
 
 
 @pytest.fixture
-def vault_with_ingested(tmp_path: Path):
-    vault = tmp_path / "vault"
+def vault_with_ingested(tmp_path: Path) -> Path:
     from datetime import date
 
+    vault = tmp_path / "vault"
     ingest(
         FIXTURE,
         vault,
@@ -70,24 +116,18 @@ def vault_with_ingested(tmp_path: Path):
     return vault
 
 
-@pytest.fixture
-async def client(tmp_path: Path):
-    app = create_app(tmp_path)
-    transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c, tmp_path
+# ---------------------------------------------------------------------------
+# List
+# ---------------------------------------------------------------------------
 
 
-async def test_list_activity_empty(client):
-    c, _ = client
-    r = await c.get("/activity")
+async def test_list_activity_empty(client: Any) -> None:
+    r = await client.get("/activity/alpha")
     assert r.status_code == 200
     assert r.json() == {"entries": [], "total": 0}
 
 
-async def test_list_activity_returns_entries(tmp_path: Path):
-    vault = tmp_path / "vault"
-    vault.mkdir()
+async def test_list_activity_returns_entries(alpha_vault: Path, daemon: _FakeDaemon) -> None:
     log = ActivityLog()
     e1 = ActivityEntry(
         id=uuid4().hex,
@@ -107,12 +147,12 @@ async def test_list_activity_returns_entries(tmp_path: Path):
     )
     log.append(e1)
     log.append(e2)
-    log.save(vault)
+    log.save(alpha_vault)
 
-    app = create_app(vault)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity")
+        r = await c.get("/activity/alpha")
     body = r.json()
     assert body["total"] == 2
     # Newest first
@@ -120,9 +160,7 @@ async def test_list_activity_returns_entries(tmp_path: Path):
     assert body["entries"][1]["id"] == e1.id
 
 
-async def test_list_activity_pagination(tmp_path: Path):
-    vault = tmp_path / "vault"
-    vault.mkdir()
+async def test_list_activity_pagination(alpha_vault: Path, daemon: _FakeDaemon) -> None:
     log = ActivityLog()
     for hour in range(5):
         log.append(
@@ -135,26 +173,34 @@ async def test_list_activity_pagination(tmp_path: Path):
                 can_undo=True,
             )
         )
-    log.save(vault)
+    log.save(alpha_vault)
 
-    app = create_app(vault)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity?limit=2&offset=1")
+        r = await c.get("/activity/alpha?limit=2&offset=1")
     body = r.json()
     assert body["total"] == 5
     assert len(body["entries"]) == 2
 
 
-async def test_get_activity_unknown_id(client):
-    c, _ = client
-    r = await c.get("/activity/does-not-exist")
+async def test_list_activity_unknown_project_404(client: Any) -> None:
+    r = await client.get("/activity/ghost")
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"
+
+
+# ---------------------------------------------------------------------------
+# Get by ID
+# ---------------------------------------------------------------------------
+
+
+async def test_get_activity_unknown_id(client: Any) -> None:
+    r = await client.get("/activity/alpha/does-not-exist")
     assert r.status_code == 404
 
 
-async def test_get_activity_known_id(tmp_path: Path):
-    vault = tmp_path / "vault"
-    vault.mkdir()
+async def test_get_activity_known_id(alpha_vault: Path, daemon: _FakeDaemon) -> None:
     log = ActivityLog()
     e = ActivityEntry(
         id="abcdef",
@@ -165,26 +211,53 @@ async def test_get_activity_known_id(tmp_path: Path):
         can_undo=True,
     )
     log.append(e)
-    log.save(vault)
+    log.save(alpha_vault)
 
-    app = create_app(vault)
+    app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity/abcdef")
+        r = await c.get("/activity/alpha/abcdef")
     assert r.status_code == 200
     assert r.json()["id"] == "abcdef"
 
 
-async def test_undo_activity_success(vault_with_ingested):
-    vault = vault_with_ingested
+async def test_get_activity_unknown_project_404(client: Any) -> None:
+    r = await client.get("/activity/ghost/some-id")
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"
+
+
+# ---------------------------------------------------------------------------
+# Undo
+# ---------------------------------------------------------------------------
+
+
+async def test_undo_activity_success(tmp_path: Path) -> None:
+    from datetime import date
+
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=date(2026, 4, 26),
+    )
     log = ActivityLog.load(vault)
     assert len(log.entries) == 1
     op_id = log.entries[0].id
 
-    app = create_app(vault)
+    runtime = _FakeRuntime(vault)
+    daemon_mock: Any = MagicMock()
+    daemon_mock.runtimes = {"myvault": runtime}
+    daemon_mock.started_at_monotonic = 0.0
+    daemon_mock.scheduler_jobs_info.return_value = []
+
+    app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.post(f"/activity/{op_id}/undo")
+        r = await c.post(f"/activity/myvault/{op_id}/undo")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True
@@ -198,23 +271,44 @@ async def test_undo_activity_success(vault_with_ingested):
     assert any(e.operation_type == "manual_restore" for e in log_after.entries)
 
 
-async def test_undo_activity_already_undone_returns_409(vault_with_ingested):
-    vault = vault_with_ingested
+async def test_undo_activity_already_undone_returns_409(tmp_path: Path) -> None:
+    from datetime import date
+
+    vault = tmp_path / "vault"
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_stub_extractor(),
+        today=date(2026, 4, 26),
+    )
     log = ActivityLog.load(vault)
     op_id = log.entries[0].id
 
-    app = create_app(vault)
+    runtime = _FakeRuntime(vault)
+    daemon_mock: Any = MagicMock()
+    daemon_mock.runtimes = {"myvault": runtime}
+    daemon_mock.started_at_monotonic = 0.0
+    daemon_mock.scheduler_jobs_info.return_value = []
+
+    app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r1 = await c.post(f"/activity/{op_id}/undo")
+        r1 = await c.post(f"/activity/myvault/{op_id}/undo")
         assert r1.status_code == 200
-        r2 = await c.post(f"/activity/{op_id}/undo")
+        r2 = await c.post(f"/activity/myvault/{op_id}/undo")
     assert r2.status_code == 409
     assert r2.json()["error"] == "undo_failed"
 
 
-async def test_undo_unknown_id_returns_409(client):
-    c, _ = client
-    r = await c.post("/activity/no-such-entry/undo")
+async def test_undo_unknown_id_returns_409(client: Any) -> None:
+    r = await client.post("/activity/alpha/no-such-entry/undo")
     assert r.status_code == 409
     assert r.json()["error"] == "undo_failed"
+
+
+async def test_undo_unknown_project_404(client: Any) -> None:
+    r = await client.post("/activity/ghost/some-id/undo")
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"

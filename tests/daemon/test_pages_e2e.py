@@ -63,8 +63,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
-    # and vault-root-dependent routes (/pages, /trash) work.
+    # Pre-register project so vault-root-dependent routes (/pages, /trash) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()
@@ -114,7 +113,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
 
         # 2. PATCH frontmatter -> status verified.
         r = httpx.patch(
-            f"{base}/pages/{page_rel}",
+            f"{base}/pages/main/{page_rel}",
             json={"frontmatter": {"status": "verified"}, "body": None},
             timeout=5.0,
         )
@@ -129,7 +128,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert "status: verified" in contents
 
         # 4. DELETE page -> 200 with trash_id.
-        r = httpx.delete(f"{base}/pages/{page_rel}", timeout=5.0)
+        r = httpx.delete(f"{base}/pages/main/{page_rel}", timeout=5.0)
         assert r.status_code == 200, r.text
         delete_body = r.json()
         assert delete_body["success"] is True
@@ -137,8 +136,8 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert trash_id
         assert not page_path.exists()
 
-        # 5. GET /trash sees the entry with original_path.
-        r = httpx.get(f"{base}/trash", timeout=5.0)
+        # 5. GET /trash/main sees the entry with original_path.
+        r = httpx.get(f"{base}/trash/main", timeout=5.0)
         assert r.status_code == 200, r.text
         trash_payload = r.json()
         match = next(
@@ -149,8 +148,8 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert match["original_path"] == page_rel
         assert match["restorable"] is True
 
-        # 6. POST /trash/{id}/restore -> 200, page is back at original location.
-        r = httpx.post(f"{base}/trash/{trash_id}/restore", timeout=5.0)
+        # 6. POST /trash/main/{id}/restore -> 200, page is back at original location.
+        r = httpx.post(f"{base}/trash/main/{trash_id}/restore", timeout=5.0)
         assert r.status_code == 200, r.text
         restore_body = r.json()
         assert restore_body["success"] is True

@@ -155,7 +155,9 @@ async def test_call_write_tool_daemon_unreachable(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr("claude_mnemos.mcp.server.httpx.AsyncClient", FakeClient)
 
-    result = await _call_tool(server, "undo_operation", {"op_id": "abc"})
+    result = await _call_tool(
+        server, "undo_operation", {"project": "myproject", "op_id": "abc"}
+    )
     text = result.content[0].text
     assert "daemon not reachable" in text
     assert "mnemos daemon start" in text
@@ -178,7 +180,9 @@ async def test_call_write_tool_daemon_4xx(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr("claude_mnemos.mcp.server.httpx.AsyncClient", FakeClient)
 
-    result = await _call_tool(server, "undo_operation", {"op_id": "abc"})
+    result = await _call_tool(
+        server, "undo_operation", {"project": "myproject", "op_id": "abc"}
+    )
     text = result.content[0].text
     assert "409" in text
     assert "undo_failed" in text
@@ -203,7 +207,7 @@ async def test_call_write_tool_happy_path(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr("claude_mnemos.mcp.server.httpx.AsyncClient", FakeClient)
 
-    result = await _call_tool(server, "create_snapshot", {})
+    result = await _call_tool(server, "create_snapshot", {"project": "myproject"})
     parsed = json.loads(result.content[0].text)
     assert parsed["name"] == "manual-x"
 
@@ -227,3 +231,14 @@ def test_every_tool_has_input_schema(name):
     tool = next(t for t in TOOL_DEFS if t.name == name)
     assert isinstance(tool.inputSchema, dict)
     assert tool.inputSchema["type"] == "object"
+
+
+def test_run_lint_description_references_correct_url() -> None:
+    """run_lint tool description must reference POST /lint/{project}/run, not /lint/run."""
+    tool = next(t for t in TOOL_DEFS if t.name == "run_lint")
+    assert "/lint/{project}/run" in tool.description, (
+        f"Expected '/lint/{{project}}/run' in description, got: {tool.description!r}"
+    )
+    assert "/lint/run" not in tool.description.replace("/lint/{project}/run", ""), (
+        "Description should not contain the old stale '/lint/run' URL"
+    )

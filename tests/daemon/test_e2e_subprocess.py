@@ -47,8 +47,8 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
-    # and vault-root-dependent routes (/vault/info, /activity, /snapshots) work.
+    # Pre-register project so vault-root-dependent routes
+    # (/vault/{project}, /activity, /snapshots) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()
@@ -57,7 +57,7 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     child_env.pop("MNEMOS_VAULT_ROOT", None)
 
     # Write project-map.json into the isolated home before spawning so that
-    # the daemon's primary_runtime is set and vault-root routes work.
+    # vault-root routes work once the project is registered.
     import json as _json
     (isolated_home / ".claude-mnemos").mkdir(parents=True, exist_ok=True)
     (isolated_home / ".claude-mnemos" / "project-map.json").write_text(
@@ -96,11 +96,11 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
         # Endpoints respond
         r = httpx.get(f"http://127.0.0.1:{port}/version", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/vault/info", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/vault/main", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/activity", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/activity/main", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/snapshots", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/snapshots/main", timeout=2.0)
         assert r.status_code == 200
 
     finally:

@@ -86,8 +86,13 @@ GET_RECENT_ACTIVITY: dict[str, Any] = {
 
 UNDO_OPERATION: dict[str, Any] = {
     "type": "object",
-    "required": ["op_id"],
+    "required": ["project", "op_id"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "op_id": {
             "type": "string",
             "minLength": 1,
@@ -99,7 +104,13 @@ UNDO_OPERATION: dict[str, Any] = {
 
 CREATE_SNAPSHOT: dict[str, Any] = {
     "type": "object",
+    "required": ["project"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "label": {
             "type": "string",
             "maxLength": 128,
@@ -111,8 +122,13 @@ CREATE_SNAPSHOT: dict[str, Any] = {
 
 RESTORE_SNAPSHOT: dict[str, Any] = {
     "type": "object",
-    "required": ["name"],
+    "required": ["project", "name"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "name": {
             "type": "string",
             "minLength": 1,
@@ -122,7 +138,23 @@ RESTORE_SNAPSHOT: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-DELETE_SNAPSHOT: dict[str, Any] = RESTORE_SNAPSHOT
+DELETE_SNAPSHOT: dict[str, Any] = {
+    "type": "object",
+    "required": ["project", "name"],
+    "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Snapshot directory name to delete",
+        },
+    },
+    "additionalProperties": False,
+}
 
 LIST_SUGGESTIONS: dict[str, Any] = {
     "type": "object",
@@ -138,8 +170,13 @@ LIST_SUGGESTIONS: dict[str, Any] = {
 
 APPLY_ONTOLOGY_SUGGESTION: dict[str, Any] = {
     "type": "object",
-    "required": ["suggestion_id"],
+    "required": ["project", "suggestion_id"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "suggestion_id": {
             "type": "string",
             "minLength": 1,
@@ -151,8 +188,13 @@ APPLY_ONTOLOGY_SUGGESTION: dict[str, Any] = {
 
 PROPOSE_ONTOLOGY_CHANGE: dict[str, Any] = {
     "type": "object",
-    "required": ["operation", "affected_pages"],
+    "required": ["project", "operation", "affected_pages"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "operation": {
             "type": "string",
             "enum": ["merge_entities", "rename_entity", "delete_page"],
@@ -186,6 +228,13 @@ GET_LINT_RESULTS: dict[str, Any] = {
 
 RUN_LINT: dict[str, Any] = {
     "type": "object",
+    "required": ["project"],
     "additionalProperties": False,
-    "properties": {},
+    "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
+    },
 }
