@@ -32,14 +32,17 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.cmd != "run":
         return 1
-    # TODO(Task 22): vault_root wiring moves to VaultRuntime / multi-vault boot.
+    # TODO(Task 22): drop ``--vault`` entirely once multi-vault boot from
+    # project-map is wired (Tasks 13-16). Until then ``args.vault`` is parsed
+    # for backward-compat but ignored — ``MnemosDaemon`` now selects vaults
+    # from ``project-map.json`` filtered by ``DaemonConfig.boot_filter``.
     config = DaemonConfig(
         host=args.host,
         port=args.port,
         log_level=args.log_level,
         pid_file=args.pid_file,
     )
-    daemon = MnemosDaemon(config, vault_root=args.vault)
+    daemon = MnemosDaemon(config)
     try:
         asyncio.run(daemon.run())
     except KeyboardInterrupt:

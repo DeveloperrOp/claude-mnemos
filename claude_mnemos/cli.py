@@ -794,9 +794,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_foreground(args: argparse.Namespace) -> int:
-    # TODO(Task 22): full rewrite for multi-vault; vault passed via args.vault
-    # because DaemonConfig no longer carries vault_root.
-    vault_root: Path = args.vault
+    # TODO(Task 22): full rewrite for multi-vault; ``args.vault`` is currently
+    # ignored because ``MnemosDaemon`` now boots from project-map. Task 16
+    # wires ``MnemosDaemon.run()``; Task 22 reshapes the CLI surface.
     config = _resolve_daemon_config(args)
     pid = is_daemon_running(config.pid_file)
     if pid is not None:
@@ -810,7 +810,7 @@ def _cmd_daemon_foreground(args: argparse.Namespace) -> int:
         port=config.port,
         pid_file=config.pid_file,
     ).save()
-    daemon = MnemosDaemon(config, vault_root=vault_root)
+    daemon = MnemosDaemon(config)
     try:
         asyncio.run(daemon.run())
     except KeyboardInterrupt:

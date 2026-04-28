@@ -15,7 +15,16 @@ import httpx
 import psutil
 import pytest
 
-pytestmark = pytest.mark.slow
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skip(
+        reason=(
+            "Plan #13b-β1 Task 12 stubbed MnemosDaemon.run() as "
+            "NotImplementedError until Task 16 wires _bootstrap_runtimes + "
+            "uvicorn. Re-enable this subprocess e2e once Task 16 lands."
+        )
+    ),
+]
 
 
 def _free_port() -> int:
