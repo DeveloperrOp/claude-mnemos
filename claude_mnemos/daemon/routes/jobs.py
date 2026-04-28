@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
@@ -11,51 +12,74 @@ router = APIRouter()
 
 
 def _store(request: Request) -> JobStore:
+    """Used by GET / DELETE handlers — returns primary runtime's JobStore.
+
+    Returns 503 when no primary runtime is registered.
+    """
     daemon = request.app.state.daemon
-    if daemon is None or getattr(daemon, "job_store", None) is None:
-        raise HTTPException(
-            status_code=503, detail={"error": "jobs_subsystem_unavailable"}
-        )
-    store: JobStore = daemon.job_store
+    if daemon is None:
+        raise HTTPException(503, detail={"error": "jobs_subsystem_unavailable"})
+    primary = getattr(daemon, "primary_runtime", None)
+    if primary is None or getattr(primary, "job_store", None) is None:
+        raise HTTPException(503, detail={"error": "no_vault_registered"})
+    store: JobStore = primary.job_store
     return store
 
 
 @router.post("/jobs", status_code=201)
 async def create_job(request: Request, body: dict[str, Any]) -> dict[str, Any]:
-    store = _store(request)
+    daemon = request.app.state.daemon
+    if daemon is None:
+        raise HTTPException(503, detail={"error": "daemon_unavailable"})
+
     kind = body.get("kind")
     payload = body.get("payload", {})
-    if kind not in ("ingest",):
-        raise HTTPException(
-            status_code=400, detail={"error": "unknown_kind", "kind": kind}
-        )
+    if kind != "ingest":
+        raise HTTPException(400, detail={"error": "unknown_kind", "kind": kind})
     if not isinstance(payload, dict):
+        raise HTTPException(400, detail={"error": "payload_must_be_object"})
+
+    project_name = payload.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(400, detail={"error": "missing_project_name"})
+
+    runtimes = getattr(daemon, "runtimes", None)
+    if runtimes is None:
+        raise HTTPException(503, detail={"error": "jobs_subsystem_unavailable"})
+
+    runtime = runtimes.get(project_name)
+    if runtime is None:
         raise HTTPException(
-            status_code=400, detail={"error": "payload_must_be_object"}
+            400,
+            detail={"error": "unknown_project", "project_name": project_name},
         )
-    if kind == "ingest":
-        transcript_path = payload.get("transcript_path")
-        if not isinstance(transcript_path, str) or not transcript_path:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "missing_transcript_path", "kind": kind},
-            )
-        # File-existence check is best-effort — daemon may run on a different
-        # machine than the caller in future; for now we're single-host.
-        if not Path(transcript_path).is_file():
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "transcript_not_found",
-                    "transcript_path": transcript_path,
-                },
-            )
-    job = store.create(kind=kind, payload=payload)
-    if hasattr(request.app.state.daemon, "job_worker"):
-        worker = request.app.state.daemon.job_worker
-        if worker is not None:
-            worker.signal_wakeup()
-    return job.model_dump(mode="json")
+
+    transcript_path = payload.get("transcript_path")
+    if not isinstance(transcript_path, str) or not transcript_path:
+        raise HTTPException(400, detail={"error": "missing_transcript_path"})
+    if not Path(transcript_path).is_file():
+        raise HTTPException(
+            400,
+            detail={
+                "error": "transcript_not_found",
+                "transcript_path": transcript_path,
+            },
+        )
+
+    try:
+        job = runtime.job_store.create(kind=kind, payload=payload)
+    except sqlite3.ProgrammingError as exc:
+        raise HTTPException(
+            503,
+            detail={
+                "error": "vault_unavailable",
+                "project_name": project_name,
+                "detail": str(exc),
+            },
+        ) from exc
+    if runtime.job_worker is not None:
+        runtime.job_worker.signal_wakeup()
+    return cast(dict[str, Any], job.model_dump(mode="json"))
 
 
 @router.get("/jobs")

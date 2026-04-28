@@ -10,14 +10,34 @@ from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 
+# Project name used throughout the existing tests.
+_PROJECT = "test-vault"
+
+
+class _FakeRuntime:
+    """Minimal stand-in for VaultRuntime — only the job-related attributes."""
+
+    def __init__(self, vault: Path) -> None:
+        self.job_store = JobStore(vault / JOBS_DB_FILENAME)
+        self.job_worker = None
+
 
 class _FakeDaemon:
     def __init__(self, vault: Path) -> None:
         self.alerts = Alerts()
         self.tracker = OurWritesTracker(ttl_s=60.0)
-        self.job_store = JobStore(vault / JOBS_DB_FILENAME)
         self.started_at_monotonic = 0.0
-        self.job_worker = None
+
+        runtime = _FakeRuntime(vault)
+        # primary_runtime satisfies GET/DELETE routing (_store helper).
+        self.primary_runtime: _FakeRuntime = runtime
+        # runtimes dict satisfies POST routing by project_name.
+        self.runtimes: dict[str, _FakeRuntime] = {_PROJECT: runtime}
+
+    @property
+    def job_store(self) -> JobStore:
+        """Convenience for tests that create jobs directly on the daemon."""
+        return self.primary_runtime.job_store
 
     def scheduler_jobs_info(self):
         return []
@@ -27,7 +47,7 @@ class _FakeDaemon:
 def daemon(tmp_path: Path):
     d = _FakeDaemon(tmp_path)
     yield d
-    d.job_store.close()
+    d.primary_runtime.job_store.close()
 
 
 @pytest.fixture
@@ -53,7 +73,10 @@ def transcript_file(tmp_path: Path) -> str:
 async def test_post_creates_job(client, transcript_file):
     r = await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": transcript_file}},
+        json={
+            "kind": "ingest",
+            "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
+        },
     )
     assert r.status_code == 201
     body = r.json()
@@ -69,11 +92,17 @@ async def test_get_lists_jobs(client, tmp_path: Path):
     b.write_text("[]", encoding="utf-8")
     await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": str(a)}},
+        json={
+            "kind": "ingest",
+            "payload": {"project_name": _PROJECT, "transcript_path": str(a)},
+        },
     )
     await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": str(b)}},
+        json={
+            "kind": "ingest",
+            "payload": {"project_name": _PROJECT, "transcript_path": str(b)},
+        },
     )
     r = await client.get("/jobs")
     assert r.status_code == 200
@@ -91,7 +120,11 @@ async def test_get_filters_by_status(client):
 
 async def test_get_by_id(client, transcript_file):
     create = await client.post(
-        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": transcript_file}}
+        "/jobs",
+        json={
+            "kind": "ingest",
+            "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
+        },
     )
     job_id = create.json()["id"]
     r = await client.get(f"/jobs/{job_id}")
@@ -106,7 +139,11 @@ async def test_get_by_id_404(client):
 
 async def test_delete_cancels_queued(client, transcript_file):
     create = await client.post(
-        "/jobs", json={"kind": "ingest", "payload": {"transcript_path": transcript_file}}
+        "/jobs",
+        json={
+            "kind": "ingest",
+            "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
+        },
     )
     job_id = create.json()["id"]
     r = await client.delete(f"/jobs/{job_id}")
@@ -121,9 +158,35 @@ async def test_delete_nonqueued_returns_409(client, daemon):
     assert r.status_code == 409
 
 
+async def test_post_rejects_missing_project_name(client, transcript_file):
+    # New contract: project_name is required in POST payload.
+    r = await client.post(
+        "/jobs",
+        json={"kind": "ingest", "payload": {"transcript_path": transcript_file}},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "missing_project_name"
+
+
+async def test_post_rejects_unknown_project(client, transcript_file):
+    r = await client.post(
+        "/jobs",
+        json={
+            "kind": "ingest",
+            "payload": {
+                "project_name": "no-such-project",
+                "transcript_path": transcript_file,
+            },
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "unknown_project"
+
+
 async def test_post_rejects_missing_transcript_path(client):
     r = await client.post(
-        "/jobs", json={"kind": "ingest", "payload": {}}
+        "/jobs",
+        json={"kind": "ingest", "payload": {"project_name": _PROJECT}},
     )
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_transcript_path"
@@ -132,7 +195,13 @@ async def test_post_rejects_missing_transcript_path(client):
 async def test_post_rejects_nonexistent_transcript(client):
     r = await client.post(
         "/jobs",
-        json={"kind": "ingest", "payload": {"transcript_path": "/no/such/file.jsonl"}},
+        json={
+            "kind": "ingest",
+            "payload": {
+                "project_name": _PROJECT,
+                "transcript_path": "/no/such/file.jsonl",
+            },
+        },
     )
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "transcript_not_found"
@@ -145,7 +214,10 @@ async def test_post_accepts_existing_transcript(client, tmp_path: Path):
         "/jobs",
         json={
             "kind": "ingest",
-            "payload": {"transcript_path": str(transcript)},
+            "payload": {
+                "project_name": _PROJECT,
+                "transcript_path": str(transcript),
+            },
         },
     )
     assert r.status_code == 201
