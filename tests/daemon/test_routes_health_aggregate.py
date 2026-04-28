@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.process import MnemosDaemon
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

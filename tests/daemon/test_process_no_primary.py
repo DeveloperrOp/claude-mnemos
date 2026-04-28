@@ -7,8 +7,8 @@ from __future__ import annotations
 def test_daemon_has_no_primary_runtime_property(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    from claude_mnemos.daemon.process import MnemosDaemon
     from claude_mnemos.daemon.config import DaemonConfig
+    from claude_mnemos.daemon.process import MnemosDaemon
 
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     assert not hasattr(daemon, "primary_runtime")

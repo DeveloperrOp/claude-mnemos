@@ -206,7 +206,8 @@ def test_global_settings_ignores_unknown_fields(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     import json as _json
-    from claude_mnemos.state.settings import GlobalSettings, SettingsStore, global_settings_path
+
+    from claude_mnemos.state.settings import SettingsStore, global_settings_path
 
     # Write a β1-style file with primary_project still present.
     path = global_settings_path()

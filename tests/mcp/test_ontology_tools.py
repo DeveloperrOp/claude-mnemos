@@ -188,7 +188,10 @@ async def test_propose_ontology_change_url_includes_project():
         captured["path"] = request.url.path
         return httpx.Response(
             201,
-            json={"frontmatter": {"id": "ont-x", "operation": "delete_page", "status": "pending"}, "body": ""},
+            json={
+                "frontmatter": {"id": "ont-x", "operation": "delete_page", "status": "pending"},
+                "body": "",
+            },
         )
 
     async with _client(handler) as client:

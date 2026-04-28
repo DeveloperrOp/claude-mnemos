@@ -25,7 +25,6 @@ from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

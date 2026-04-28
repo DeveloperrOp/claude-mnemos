@@ -47,7 +47,8 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
-    # Pre-register project so vault-root-dependent routes (/vault/{project}, /activity, /snapshots) work.
+    # Pre-register project so vault-root-dependent routes
+    # (/vault/{project}, /activity, /snapshots) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()

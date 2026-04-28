@@ -30,7 +30,6 @@ from fastapi.testclient import TestClient
 from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.process import MnemosDaemon
 
-
 # ---------------------------------------------------------------------------
 # Shared fixture: two-vault real MnemosDaemon (same pattern as
 # test_routes_jobs_routing.py)
