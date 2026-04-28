@@ -58,6 +58,22 @@ async def test_run_lint_daemon_unreachable() -> None:
     assert "daemon" in out[0].text.lower()
 
 
+async def test_run_lint_unreachable_message_has_project_add_hint(monkeypatch) -> None:
+    """Unreachable error message references 'mnemos project add' instead of --vault."""
+    import httpx
+
+    async def fake_call_daemon(_client, _method, _url, *, json_body=None):  # noqa: ARG001
+        raise __import__(
+            "claude_mnemos.mcp.errors", fromlist=["DaemonUnreachableError"]
+        ).DaemonUnreachableError("connection refused")
+
+    monkeypatch.setattr("claude_mnemos.mcp.write_tools.lint.call_daemon", fake_call_daemon)
+    out = await run_lint("http://daemon", project="myproject", timeout_s=5.0)
+    text = out[0].text
+    assert "mnemos project add" in text, f"expected 'mnemos project add' in: {text}"
+    assert "PATH" in text, f"expected 'PATH' in: {text}"
+
+
 async def test_run_lint_url_includes_project(monkeypatch) -> None:
     """POST URL must embed the project segment: /lint/{project}/run."""
     captured: dict[str, str] = {}

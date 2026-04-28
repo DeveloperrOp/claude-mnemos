@@ -29,7 +29,7 @@ async def run_lint(
                 type="text",
                 text=(
                     f"daemon unreachable: {exc}. "
-                    "Start it with: mnemos daemon start --vault <path>"
+                    "Start it with: mnemos daemon start (after registering the project via mnemos project add NAME --vault PATH)"
                 ),
             )
         ]
