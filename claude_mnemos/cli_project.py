@@ -137,17 +137,9 @@ def _pretty(view: Mapping[str, object]) -> str:
 
 
 def _handle_update(args: argparse.Namespace) -> int:
-    try:
-        entry = ProjectStore().get(args.name)
-    except ProjectNotFoundError:
-        print(f"project {args.name!r} not found", file=sys.stderr)
-        return EXIT_PROJECT_NOT_FOUND
-    new_patterns = list(entry.cwd_patterns)
-    for p in args.add_cwd_pattern:
-        if p not in new_patterns:
-            new_patterns.append(p)
-    new_patterns = [p for p in new_patterns if p not in args.remove_cwd_pattern]
-    body: dict[str, object] = {"cwd_patterns": new_patterns}
+    body: dict[str, object] = {}
+    if args.add_cwd_pattern:
+        body["cwd_patterns"] = list(args.add_cwd_pattern)
     if args.vault is not None:
         body["vault_root"] = str(args.vault)
     try:
@@ -155,10 +147,14 @@ def _handle_update(args: argparse.Namespace) -> int:
         if r.status_code == 200:
             print(f"updated project {args.name!r}")
             return 0
+        if r.status_code == 404:
+            print(f"project {args.name!r} not found", file=sys.stderr)
+            return EXIT_PROJECT_NOT_FOUND
         print(f"daemon error {r.status_code}: {r.text}", file=sys.stderr)
         return EXIT_PROJECT_MAP_ERROR
     except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError):
         try:
+            new_patterns = list(args.add_cwd_pattern) if args.add_cwd_pattern else None
             ProjectStore().update(
                 args.name,
                 vault_root=args.vault,
@@ -166,6 +162,9 @@ def _handle_update(args: argparse.Namespace) -> int:
             )
             print(f"updated project {args.name!r} (offline)")
             return 0
+        except ProjectNotFoundError:
+            print(f"project {args.name!r} not found", file=sys.stderr)
+            return EXIT_PROJECT_NOT_FOUND
         except Exception as exc:  # noqa: BLE001
             print(f"update failed: {exc}", file=sys.stderr)
             return EXIT_PROJECT_MAP_ERROR

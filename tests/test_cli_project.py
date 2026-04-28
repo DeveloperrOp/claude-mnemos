@@ -87,6 +87,47 @@ def test_project_update_replaces_cwd_patterns(tmp_path):
     assert e.cwd_patterns == ["~/new"]
 
 
+def test_update_does_not_pre_read(monkeypatch, tmp_path):
+    """_handle_update must build PATCH body purely from CLI args (no pre-GET)."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
+    vault = tmp_path / "v"
+    vault.mkdir()
+    ProjectStore().add(ProjectMapEntry(name="x", vault_root=vault, cwd_patterns=[]))
+
+    calls: list[str] = []
+    real_get = ProjectStore.get
+
+    def spy_get(self: ProjectStore, name: str) -> object:
+        calls.append(name)
+        return real_get(self, name)
+
+    monkeypatch.setattr(ProjectStore, "get", spy_get)
+
+    import httpx
+    captured: dict[str, object] = {}
+
+    def fake_patch(_url: str, json: object, **kw: object) -> httpx.Response:
+        captured["json"] = json
+        return httpx.Response(
+            200,
+            json={"name": "x", "vault_root": str(vault), "cwd_patterns": ["p"]},
+        )
+
+    monkeypatch.setattr(httpx, "patch", fake_patch)
+
+    import argparse
+
+    from claude_mnemos.cli_project import _handle_update
+
+    ns = argparse.Namespace(name="x", vault=None, add_cwd_pattern=["p"], remove_cwd_pattern=[])
+    _handle_update(ns)
+
+    assert "x" not in calls  # no pre-read of the entry
+    assert captured["json"] == {"cwd_patterns": ["p"]}
+
+
 def test_project_remove_cleans_settings(tmp_path):
     from claude_mnemos.state.projects import project_settings_path
     cli_main(["project", "add", "--name", "x",
