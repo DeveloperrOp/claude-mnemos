@@ -29,9 +29,26 @@ from claude_mnemos.core.trash import (
 router = APIRouter()
 
 
+def _vault(request: Request) -> Path:
+    vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
+    assert isinstance(vault, Path)
+    return vault
+
+
 def _tracker(request: Request) -> Any:
     daemon = request.app.state.daemon
-    return getattr(daemon, "tracker", None) if daemon is not None else None
+    if daemon is None:
+        return None
+    primary = getattr(daemon, "primary_runtime", None)
+    return primary.tracker if primary is not None else None
 
 
 def _entry_to_dict(entry: TrashEntry) -> dict[str, Any]:
@@ -58,7 +75,7 @@ def _empty_result_to_dict(result: EmptyTrashResult) -> dict[str, Any]:
 
 @router.get("/trash")
 async def list_trash_endpoint(request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     entries = list_trash(vault)
     return {
         "entries": [_entry_to_dict(e) for e in entries],
@@ -68,7 +85,7 @@ async def list_trash_endpoint(request: Request) -> dict[str, Any]:
 
 @router.get("/trash/{trash_id}")
 async def get_trash_entry_endpoint(trash_id: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     trash_dir = vault / TRASH_DIRNAME / trash_id
     if not trash_dir.is_dir():
         raise HTTPException(
@@ -85,7 +102,7 @@ async def get_trash_entry_endpoint(trash_id: str, request: Request) -> dict[str,
 
 @router.post("/trash/{trash_id}/restore")
 async def restore_trash_endpoint(trash_id: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     result = apply_restore_from_trash(
         vault, trash_id, tracker=_tracker(request)
     )
@@ -94,13 +111,13 @@ async def restore_trash_endpoint(trash_id: str, request: Request) -> dict[str, A
 
 @router.delete("/trash/{trash_id}", status_code=204)
 async def dismiss_trash_endpoint(trash_id: str, request: Request) -> Response:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     dismiss_trash_entry(vault, trash_id)
     return Response(status_code=204)
 
 
 @router.delete("/trash")
 async def empty_trash_endpoint(request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     result = empty_trash(vault)
     return _empty_result_to_dict(result)

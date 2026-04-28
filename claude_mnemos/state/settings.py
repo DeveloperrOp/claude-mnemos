@@ -118,6 +118,7 @@ class GlobalSettings(BaseModel):
     default_language_hint: Literal["auto", "uk", "ru", "en"] = "auto"
     default_max_input_tokens: int = Field(default=150_000, ge=1024)
     default_retention_days: int = Field(default=180, ge=1)
+    primary_project: str | None = None
 
 
 def get_by_dot_path(obj: BaseModel, key: str) -> Any:
@@ -264,6 +265,16 @@ class SettingsStore:
                 json.dumps(validated.model_dump(mode="json"), indent=2) + "\n",
             )
             return validated
+
+    def set_global(self, settings: GlobalSettings) -> GlobalSettings:
+        """Overwrite the global settings file with *settings* (full replace)."""
+        with self._lock:
+            self._global_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(
+                self._global_path,
+                json.dumps(settings.model_dump(mode="json"), indent=2) + "\n",
+            )
+            return settings
 
     def reset_global(self) -> None:
         with self._lock:

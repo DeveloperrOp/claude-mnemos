@@ -27,12 +27,13 @@ async def health(request: Request) -> HealthResponse:
             uptime_s = max(0.0, time.monotonic() - daemon.started_at_monotonic)
         if hasattr(daemon, "scheduler_jobs_info"):
             jobs = daemon.scheduler_jobs_info()
-        observer = getattr(daemon, "observer", None)
+        primary = getattr(daemon, "primary_runtime", None)
+        observer = primary.observer if primary is not None else None
         watchdog_running = bool(observer is not None and observer.is_running)
         alerts = getattr(daemon, "alerts", None)
         if alerts is not None:
             alerts_count = len(alerts.list())
-        store = getattr(daemon, "job_store", None)
+        store = primary.job_store if primary is not None else None
         if store is not None:
             try:
                 counts = store.count_by_status()

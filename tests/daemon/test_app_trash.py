@@ -19,6 +19,8 @@ class _FakeDaemon:
         self.alerts = Alerts()
         self.tracker = OurWritesTracker(ttl_s=60.0)
         self.started_at_monotonic = 0.0
+        # Routes read tracker from primary_runtime; self-shim preserves behaviour.
+        self.primary_runtime = self
 
     def scheduler_jobs_info(self):
         return []

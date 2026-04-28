@@ -7,6 +7,7 @@ Run via `pytest -m slow` or `pytest -m "slow"`.
 from __future__ import annotations
 
 import contextlib
+import os
 import socket
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from pathlib import Path
 import httpx
 import psutil
 import pytest
+
+pytestmark = pytest.mark.slow
 
 
 def _free_port() -> int:
@@ -44,19 +47,36 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
+    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
+    # and vault-root-dependent routes (/vault/info, /activity, /snapshots) work.
+    isolated_home = tmp_path / "home"
+    isolated_home.mkdir()
+    child_env = os.environ.copy()
+    child_env["HOME"] = str(isolated_home)
+    child_env["USERPROFILE"] = str(isolated_home)
+    child_env.pop("MNEMOS_VAULT_ROOT", None)
+
+    # Write project-map.json into the isolated home before spawning so that
+    # the daemon's primary_runtime is set and vault-root routes work.
+    import json as _json
+    (isolated_home / ".claude-mnemos").mkdir(parents=True, exist_ok=True)
+    (isolated_home / ".claude-mnemos" / "project-map.json").write_text(
+        _json.dumps({"projects": [{"name": "main", "vault_root": str(vault), "cwd_patterns": []}]}),
+        encoding="utf-8",
+    )
+
     proc = subprocess.Popen(
         [
             sys.executable,
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",
             str(pid_file),
         ],
+        env=child_env,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

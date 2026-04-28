@@ -97,6 +97,43 @@ def test_store_update_partial(tmp_path: Path, monkeypatch):
     assert updated.vault_root == tmp_path / "vx"
 
 
+def test_store_update_add_cwd_patterns(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    store = ProjectStore()
+    store.add(ProjectMapEntry(name="x", vault_root=tmp_path / "vx", cwd_patterns=["a", "b"]))
+    updated = store.update("x", add_cwd_patterns=["c"])
+    assert updated.cwd_patterns == ["a", "b", "c"]
+
+
+def test_store_update_add_cwd_patterns_deduplicates(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    store = ProjectStore()
+    store.add(ProjectMapEntry(name="x", vault_root=tmp_path / "vx", cwd_patterns=["a", "b"]))
+    updated = store.update("x", add_cwd_patterns=["b", "c"])
+    assert updated.cwd_patterns == ["a", "b", "c"]
+
+
+def test_store_update_remove_cwd_patterns(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    store = ProjectStore()
+    store.add(ProjectMapEntry(name="x", vault_root=tmp_path / "vx", cwd_patterns=["a", "b"]))
+    updated = store.update("x", remove_cwd_patterns=["a"])
+    assert updated.cwd_patterns == ["b"]
+
+
+def test_store_update_add_and_remove_cwd_patterns(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    store = ProjectStore()
+    store.add(ProjectMapEntry(name="x", vault_root=tmp_path / "vx", cwd_patterns=["a", "b"]))
+    updated = store.update("x", add_cwd_patterns=["c"], remove_cwd_patterns=["a"])
+    # add runs first (a, b, c), then remove strips a → [b, c]
+    assert updated.cwd_patterns == ["b", "c"]
+
+
 def test_store_remove_removes_entry(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))

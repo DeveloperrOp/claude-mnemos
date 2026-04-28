@@ -17,6 +17,14 @@ router = APIRouter()
 
 def _vault(request: Request) -> Path:
     vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
     assert isinstance(vault, Path)
     return vault
 
@@ -25,8 +33,8 @@ def _tracker(request: Request) -> OurWritesTracker | None:
     daemon = request.app.state.daemon
     if daemon is None:
         return None
-    tracker = getattr(daemon, "tracker", None)
-    return tracker
+    primary = getattr(daemon, "primary_runtime", None)
+    return primary.tracker if primary is not None else None
 
 
 @router.post("/lint/run")

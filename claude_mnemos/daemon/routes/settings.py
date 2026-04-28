@@ -2,20 +2,21 @@
 
 Uses bare paths (no /api/ prefix) per existing daemon convention.
 
-Daemon reload trigger: when PATCH /settings/{project} updates the
-project whose vault matches the daemon's own ``config.vault_root``, the
-daemon's ``reload_settings`` method is invoked with the new instance so
-schedulers/observers pick up the change without restart.
+Daemon reload trigger: after a successful PATCH the daemon's hot-reload
+methods are called so in-memory scheduler jobs and primary-runtime
+selection update immediately without restart.
+
+  PATCH /settings/{name}   → daemon.reload_project_settings(name, new)
+  PATCH /settings/global   → daemon.reload_global_settings(new)
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import ValidationError
 
-from claude_mnemos.state.projects import ProjectStore
 from claude_mnemos.state.settings import (
     GlobalSettings,
     ProjectSettings,
@@ -29,10 +30,6 @@ def _settings_store() -> SettingsStore:
     return SettingsStore()
 
 
-def _project_store() -> ProjectStore:
-    return ProjectStore()
-
-
 # IMPORTANT: /settings/global must be declared BEFORE /settings/{name}
 # so FastAPI's path matcher does not capture "global" as a project name.
 
@@ -43,8 +40,21 @@ def get_global_settings() -> GlobalSettings:
 
 
 @router.patch("/settings/global", response_model=GlobalSettings)
-def patch_global_settings(body: dict[str, Any]) -> GlobalSettings:
-    return _settings_store().patch_global(body)
+async def patch_global_settings(
+    request: Request, body: dict[str, Any]
+) -> GlobalSettings:
+    store = _settings_store()
+    try:
+        new = store.patch_global(body)
+    except ValidationError as exc:
+        raise HTTPException(
+            422, detail={"error": "validation_error", "detail": exc.errors()}
+        ) from exc
+
+    daemon = request.app.state.daemon
+    if daemon is not None:
+        await daemon.reload_global_settings(new)
+    return new
 
 
 @router.get("/settings/{name}", response_model=ProjectSettings)
@@ -53,21 +63,18 @@ def get_project_settings(name: str) -> ProjectSettings:
 
 
 @router.patch("/settings/{name}", response_model=ProjectSettings)
-def patch_project_settings(
-    name: str, body: dict[str, Any], request: Request,
+async def patch_project_settings(
+    name: str, request: Request, body: dict[str, Any]
 ) -> ProjectSettings:
-    updated = _settings_store().patch_project(name, body)
+    store = _settings_store()
+    try:
+        new = store.patch_project(name, body)
+    except ValidationError as exc:
+        raise HTTPException(
+            422, detail={"error": "validation_error", "detail": exc.errors()}
+        ) from exc
+
     daemon = request.app.state.daemon
     if daemon is not None:
-        try:
-            entry = _project_store().get(name)
-        except Exception:  # noqa: BLE001
-            entry = None
-        if (
-            entry is not None
-            and Path(entry.vault_root).expanduser().resolve()
-            == Path(daemon.config.vault_root).expanduser().resolve()
-            and hasattr(daemon, "reload_settings")
-        ):
-            daemon.reload_settings(updated)
-    return updated
+        await daemon.reload_project_settings(name, new)
+    return new

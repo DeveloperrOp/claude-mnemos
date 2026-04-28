@@ -11,9 +11,9 @@ from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
 from claude_mnemos import __version__
+from claude_mnemos.daemon_url import daemon_base_url
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.mcp.config import (
-    DEFAULT_DAEMON_URL,
     DEFAULT_LOG_LEVEL,
     DEFAULT_TIMEOUT_S,
     MCPConfig,
@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--auto-resolve", action="store_true",
         help="Resolve vault from cwd via project-map.json (default)",
     )
-    parser.add_argument("--daemon-url", default=DEFAULT_DAEMON_URL)
+    parser.add_argument("--daemon-url", default=daemon_base_url())
     parser.add_argument(
         "--daemon-timeout",
         type=float,

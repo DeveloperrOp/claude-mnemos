@@ -51,7 +51,14 @@ class JobWorker:
             try:
                 await asyncio.wait_for(self._task, timeout=timeout)
             except TimeoutError:
-                logger.warning("JobWorker stop timed out")
+                # Task is wedged inside a handler — cancel it so we don't
+                # leak the asyncio task across daemon shutdown / unmount.
+                # Underlying threads (asyncio.to_thread) may finish later,
+                # but their results are discarded.
+                self._task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):  # noqa: BLE001
+                    await self._task
+                logger.warning("JobWorker stop timed out, task cancelled")
 
     def signal_wakeup(self) -> None:
         """Schedule wakeup (called by APScheduler trigger or external signal)."""

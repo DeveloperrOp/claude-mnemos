@@ -7,86 +7,54 @@ import signal
 import sys
 import time
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 
-from claude_mnemos.core.lost_sessions import LostSessionsCache
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
-from claude_mnemos.daemon.jobs.worker import JobWorker
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
-from claude_mnemos.daemon.our_writes import OurWritesTracker
-from claude_mnemos.daemon.scheduler import build_scheduler
+from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
-from claude_mnemos.daemon.tasks import daily_snapshot_task
-from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
-from claude_mnemos.daemon.watchdog_observer import VaultObserver
-from claude_mnemos.mapping.resolver import ProjectResolver
-from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 from claude_mnemos.state.settings import GlobalSettings, ProjectSettings, SettingsStore
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.vault_runtime import VaultRuntime
 
 logger = logging.getLogger(__name__)
 
 
 class MnemosDaemon:
-    """Long-running daemon: FastAPI server + APScheduler housekeeping +
-    real-time vault watchdog (Plan #9) + jobs queue worker (Plan #11).
+    """Multi-vault daemon: hosts every project in ``project-map.json``
+    (filtered by ``config.boot_filter``) inside one process. Each vault has
+    a self-contained ``VaultRuntime``; the scheduler and alerts are shared.
+
+    This class is the orchestrator only — vault-specific state (watchdog,
+    job queue, tracker, lost-sessions cache, project settings) lives inside
+    each ``VaultRuntime`` and is keyed by project name in ``self.runtimes``.
     """
 
     def __init__(self, config: DaemonConfig) -> None:
         self.config = config
-        self.tracker = OurWritesTracker()
         self.alerts = Alerts()
         self.project_store = ProjectStore()
         self.settings_store = SettingsStore()
         self.global_settings: GlobalSettings = self.settings_store.get_global()
-        self.project_entry: ProjectMapEntry | None = None
-        try:
-            self.project_entry = ProjectResolver(self.project_store).resolve_by_vault(
-                config.vault_root
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("project resolver failed at startup")
-            self.alerts.add(
-                kind="handler_error",
-                path=str(config.vault_root),
-                message=f"project resolver failed: {exc}",
-                detected_at=datetime.now(UTC),
-            )
-        if self.project_entry is None:
-            self.project_settings: ProjectSettings = ProjectSettings()
-            self.alerts.add(
-                kind="handler_error",
-                path=str(config.vault_root),
-                message=(
-                    f"daemon vault {config.vault_root} not registered in "
-                    "project-map; using built-in defaults"
-                ),
-                detected_at=datetime.now(UTC),
-            )
-        else:
-            self.project_settings = self.settings_store.get_project(
-                self.project_entry.name
-            )
-        self.scheduler: AsyncIOScheduler = build_scheduler(
-            config.vault_root,
-            self.project_settings.snapshots.retention_days,
-            snapshots_enabled=self.project_settings.snapshots.daily_enabled,
-        )
-        self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
-        self.job_worker: JobWorker | None = None
-        # Plan #13a: TTL-cached lost-sessions list owned by the daemon, so the
-        # GET /lost-sessions endpoint doesn't re-hash every transcript on each
-        # request. Invalidated by /lost-sessions/scan and /lost-sessions/*/ignore.
-        self.lost_sessions_cache: LostSessionsCache = LostSessionsCache()
-        self.app: FastAPI = create_app(config.vault_root, daemon=self)
+
+        self.scheduler: AsyncIOScheduler = build_empty_scheduler(timezone="UTC")
+        self.runtimes: dict[str, VaultRuntime] = {}
+        self._runtimes_lock = asyncio.Lock()
+        self._primary_runtime: VaultRuntime | None = None
+
+        self.app: FastAPI = create_app(vault_root=None, daemon=self)
         self.started_at_monotonic: float = 0.0
         self._server: uvicorn.Server | None = None
-        self.observer: VaultObserver | None = None
+
+    # ─── Scheduler info (used by /scheduler/jobs) ──────────────────
 
     def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
         # `next_run_time` attribute exists only after scheduler.start() resolves
@@ -100,162 +68,81 @@ class MnemosDaemon:
             for j in self.scheduler.get_jobs()
         ]
 
+    # ─── Primary selection ─────────────────────────────────────────
+
+    @property
+    def primary_runtime(self) -> VaultRuntime | None:
+        """Currently-selected primary runtime, or None if no runtimes mounted.
+
+        Recomputed by ``_recompute_primary`` whenever ``self.runtimes`` changes
+        (mount/unmount in Task 14) or whenever the pinned primary changes in
+        global settings.
+        """
+        return self._primary_runtime
+
+    def _recompute_primary(self) -> None:
+        """Pick the primary VaultRuntime and propagate it to ``app.state``.
+
+        Selection rule:
+          1. ``global_settings.primary_project`` if it names a mounted runtime.
+          2. Otherwise alphabetically-first runtime by project name.
+          3. None when no runtimes are mounted.
+
+        Synchronous; only mutates in-memory state.
+        """
+        primary: VaultRuntime | None = None
+        pinned = self.global_settings.primary_project
+        if pinned and pinned in self.runtimes:
+            primary = self.runtimes[pinned]
+        elif self.runtimes:
+            primary = self.runtimes[min(self.runtimes.keys())]
+        self._primary_runtime = primary
+        self.app.state.vault_root = primary.vault_root if primary else None
+
+    # ─── Lifecycle ────────────────────────────────────────────────
+
     async def run(self) -> None:
+        """Run the daemon: write PID, bootstrap runtimes, start FastAPI/uvicorn,
+        install signal handlers, then on shutdown unmount all runtimes and clean up.
+        """
         write_pid_file(self.config.pid_file, os.getpid())
         self.started_at_monotonic = time.monotonic()
         try:
-            self._start_observer()
-            await self._start_jobs_subsystem()
+            await self._bootstrap_runtimes()
+            self._recompute_primary()
             self.scheduler.start()
-            uconfig = uvicorn.Config(
-                app=self.app,
-                host=self.config.host,
-                port=self.config.port,
-                log_level=self.config.log_level,
-                lifespan="on",
-            )
-            self._server = uvicorn.Server(uconfig)
-            self._install_signal_handlers()
-            await self._server.serve()
+            await self._serve_uvicorn()
         finally:
-            await self._stop_jobs_subsystem()
-            self._stop_observer()
+            await self._shutdown_runtimes()
             try:
                 self.scheduler.shutdown(wait=False)
             except Exception:
                 logger.exception("scheduler shutdown failed")
             cleanup_pid_file(self.config.pid_file)
 
-    def _start_observer(self) -> None:
-        """Start the watchdog observer. On failure, log an alert and continue —
-        the daemon is still useful as REST + scheduler even without watchdog.
-        """
-        try:
-            handler = VaultChangeHandler(
-                self.config.vault_root, self.tracker, self.alerts
-            )
-            observer = VaultObserver(self.config.vault_root, handler)
-            observer.start()
-            self.observer = observer
-        except Exception as exc:
-            logger.exception("failed to start watchdog observer")
-            self.alerts.add(
-                kind="handler_error",
-                path=str(self.config.vault_root),
-                message=f"failed to start watchdog observer: {exc}",
-                detected_at=datetime.now(UTC),
-            )
-            self.observer = None
+    async def _serve_uvicorn(self) -> None:
+        uconfig = uvicorn.Config(
+            app=self.app,
+            host=self.config.host,
+            port=self.config.port,
+            log_level=self.config.log_level,
+            lifespan="on",
+        )
+        self._server = uvicorn.Server(uconfig)
+        self._install_signal_handlers()
+        await self._server.serve()
 
-    def _stop_observer(self) -> None:
-        if self.observer is None:
-            return
-        try:
-            self.observer.stop()
-        except Exception:
-            logger.exception("observer stop failed")
-        finally:
-            self.observer = None
-
-    async def _start_jobs_subsystem(self) -> None:
-        """Recover zombies, then spawn JobWorker. Failure surfaces as alert —
-        the daemon keeps running without the worker.
-        """
-        try:
-            from claude_mnemos.config import Config
-            from claude_mnemos.daemon.jobs.handlers import IngestHandler, JobHandler
-            from claude_mnemos.ingest.llm import LLMClient
-            from claude_mnemos.state.jobs import JobKind
-
-            self.job_store.recover_zombie_running()
-
-            def cfg_factory() -> Config:
-                return Config.from_env()
-
-            def llm_factory(cfg: Config) -> LLMClient | None:
-                if not cfg.api_key:
-                    return None
-                return LLMClient(cfg)
-
-            handlers: dict[JobKind, JobHandler] = {
-                "ingest": IngestHandler(
-                    vault=self.config.vault_root,
-                    cfg_factory=cfg_factory,
-                    llm_factory=llm_factory,
-                )
-            }
-            worker = JobWorker(
-                store=self.job_store,
-                handlers=handlers,
-                scheduler=self.scheduler,
-            )
-            await worker.start()
-            self.job_worker = worker
-        except Exception as exc:
-            logger.exception("failed to start jobs subsystem")
-            self.alerts.add(
-                kind="handler_error",
-                path=str(self.config.vault_root),
-                message=f"jobs subsystem failed to start: {exc}",
-                detected_at=datetime.now(UTC),
-            )
-            self.job_worker = None
-
-    async def _stop_jobs_subsystem(self) -> None:
-        if self.job_worker is not None:
-            try:
-                await self.job_worker.stop(timeout=10.0)
-            except Exception:
-                logger.exception("job worker stop failed")
-            finally:
-                self.job_worker = None
-        try:
-            self.job_store.close()
-        except Exception:
-            logger.exception("job store close failed")
-
-    def reload_settings(self, new_settings: ProjectSettings) -> None:
-        """Apply new settings; reschedule snapshot jobs as needed.
-
-        Called by PATCH /settings/{project} when the patched project's
-        vault matches our own. Lint-schedule reload is deferred to
-        Plan #11+ when the scheduled lint runner exists.
-
-        Thread-safety: this method assumes the daemon runs uvicorn
-        with a single worker (default), so concurrent PATCH requests
-        are serialised on the event loop. Multi-worker deployment is
-        out of scope for Plan #13b-α; #13b-β multi-vault refactor
-        will revisit synchronisation when needed.
-        """
-        old = self.project_settings
-        self.project_settings = new_settings
-
-        if old.snapshots.daily_enabled != new_settings.snapshots.daily_enabled:
-            existing = self.scheduler.get_job("daily_snapshot")
-            if new_settings.snapshots.daily_enabled and existing is None:
-                self.scheduler.add_job(
-                    daily_snapshot_task,
-                    "cron",
-                    hour=4,
-                    minute=0,
-                    args=[self.config.vault_root],
-                    id="daily_snapshot",
-                    replace_existing=True,
-                )
-            elif not new_settings.snapshots.daily_enabled and existing is not None:
-                self.scheduler.remove_job("daily_snapshot")
-
-        if old.snapshots.retention_days != new_settings.snapshots.retention_days:
-            # APScheduler's add_job(replace_existing=True) is a no-op for jobs
-            # in the pending list (scheduler not started yet) — modify_job
-            # works for both pending and live jobs.
-            self.scheduler.modify_job(
-                "backups_cleanup",
-                args=[
-                    self.config.vault_root,
-                    new_settings.snapshots.retention_days,
-                ],
-            )
+    async def _shutdown_runtimes(self) -> None:
+        async with self._runtimes_lock:
+            tasks = [
+                rt.unmount(timeout=5.0, force=True)
+                for rt in list(self.runtimes.values())
+            ]
+            self.runtimes.clear()
+            self._primary_runtime = None
+            self.app.state.vault_root = None
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     def _install_signal_handlers(self) -> None:
         try:
@@ -266,9 +153,137 @@ class MnemosDaemon:
             try:
                 loop.add_signal_handler(sig, self._request_shutdown)
             except (NotImplementedError, ValueError):
-                # Windows ProactorEventLoop / non-main thread: fallback
                 if sys.platform != "win32":
                     signal.signal(sig, lambda *_: self._request_shutdown())
+
+    # ─── Boot selection + runtime bootstrap ───────────────────────
+
+    def _select_boot_entries(self) -> list[ProjectMapEntry]:
+        """Return entries to mount at startup, filtered by ``config.boot_filter``.
+
+        - ``boot_filter is None`` or ``boot_filter.all`` → all registered projects,
+          sorted alphabetically by name.
+        - ``boot_filter.names`` → only those names (sorted); names absent from the
+          project-map generate a ``handler_error`` alert and are silently skipped.
+        """
+        all_entries = sorted(
+            self.project_store.list_all(), key=lambda e: e.name
+        )
+        flt = self.config.boot_filter
+        if flt is None or flt.all:
+            return all_entries
+        wanted = set(flt.names or [])
+        present = {e.name for e in all_entries}
+        missing = wanted - present
+        for m in sorted(missing):
+            self.alerts.add(
+                kind="handler_error",
+                path="",
+                message=f"--project asked for {m!r}, not in project-map; skipped",
+                detected_at=datetime.now(UTC),
+            )
+        return [e for e in all_entries if e.name in wanted]
+
+    async def _bootstrap_runtimes(self) -> None:
+        """Mount every selected project. Failures degrade to alerts."""
+        from claude_mnemos.daemon.vault_runtime import VaultMountError, VaultRuntime
+
+        entries = self._select_boot_entries()
+        for entry in entries:
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            try:
+                await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            except VaultMountError as exc:
+                logger.warning("vault %s mount failed: %s", entry.name, exc)
+                continue
+            self.runtimes[entry.name] = runtime
+
+    # ─── Dynamic vault management (Task 14) ───────────────────────
+
+    async def mount_vault(self, entry: ProjectMapEntry) -> VaultRuntime:
+        """Mount a new vault and add it to ``self.runtimes``.
+
+        Raises ``VaultMountError`` if a runtime with the same name is already
+        mounted. Holds ``_runtimes_lock`` for the entire lifecycle so no
+        concurrent CRUD-mid-mount race is possible.
+        """
+        async with self._runtimes_lock:
+            if entry.name in self.runtimes:
+                from claude_mnemos.daemon.vault_runtime import VaultMountError
+
+                raise VaultMountError(f"{entry.name!r} already mounted")
+            from claude_mnemos.daemon.vault_runtime import VaultRuntime
+
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            self.runtimes[entry.name] = runtime
+            self._recompute_primary()
+            return runtime
+
+    async def unmount_vault(
+        self,
+        name: str,
+        *,
+        force: bool = False,
+        drain_timeout: float = 10.0,
+    ) -> None:
+        """Unmount and remove ``name`` from ``self.runtimes``.
+
+        Raises ``KeyError`` if no such runtime is mounted.
+        Raises ``VaultBusyError`` when ``force=False`` and jobs are in-flight.
+        """
+        async with self._runtimes_lock:
+            runtime = self.runtimes.get(name)
+            if runtime is None:
+                raise KeyError(name)
+            await runtime.unmount(timeout=drain_timeout, force=force)
+            del self.runtimes[name]
+            self._recompute_primary()
+
+    async def remount_vault(self, entry: ProjectMapEntry) -> VaultRuntime:
+        """Unmount the existing runtime for ``entry.name`` (if any) and mount a
+        fresh one with the new ``entry`` (e.g. after vault_root changes).
+
+        If the old vault is busy (active jobs) ``VaultBusyError`` is raised and
+        ``self.runtimes`` is left unchanged — the caller should convert to 409.
+        """
+        async with self._runtimes_lock:
+            old = self.runtimes.get(entry.name)
+            if old is not None:
+                await old.unmount(timeout=10.0, force=False)
+                del self.runtimes[entry.name]
+            from claude_mnemos.daemon.vault_runtime import VaultRuntime
+
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            self.runtimes[entry.name] = runtime
+            self._recompute_primary()
+            return runtime
+
+    # ─── Settings hot-reload (Task 15) ────────────────────────────
+
+    async def reload_project_settings(
+        self, name: str, new: ProjectSettings,
+    ) -> None:
+        """Apply *new* settings to the named runtime, if it is mounted.
+
+        If the runtime is not mounted the call is a no-op (the settings file
+        remains the source of truth for the next mount).
+        """
+        async with self._runtimes_lock:
+            runtime = self.runtimes.get(name)
+            if runtime is None:
+                return  # not mounted; settings file is the source of truth
+            runtime.reload_settings(new)
+
+    async def reload_global_settings(self, new: GlobalSettings) -> None:
+        """Replace the in-memory global settings and recompute the primary runtime."""
+        async with self._runtimes_lock:
+            self.global_settings = new
+            self._recompute_primary()
 
     def _request_shutdown(self) -> None:
         if self._server is not None:

@@ -22,12 +22,12 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 JOBS_DB_FILENAME = ".jobs.db"
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 MAX_ATTEMPTS = 4
 RETRY_DELAYS_S: list[float] = [30.0, 120.0, 1200.0]
 
-JobStatus = Literal["queued", "running", "succeeded", "failed", "dead_letter"]
+JobStatus = Literal["queued", "running", "succeeded", "failed", "dead_letter", "cancelled"]
 JobKind = Literal["ingest"]
 
 
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     finished_at     REAL,
     error           TEXT,
     error_traceback TEXT,
-    CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter')),
+    CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter', 'cancelled')),
     CHECK (attempt >= 0)
 );
 
@@ -83,6 +83,61 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status_next_at ON jobs (status, next_attempt
 CREATE INDEX IF NOT EXISTS idx_jobs_kind ON jobs (kind);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs (created_at);
 """
+
+# SQL fragments used by the v1→v2 migration (separate from _SCHEMA_SQL so they
+# can be executed inside a manual transaction rather than via executescript).
+_MIGRATION_V1_V2_NEW_TABLE = """
+CREATE TABLE jobs_new (
+    id              TEXT PRIMARY KEY,
+    kind            TEXT NOT NULL,
+    payload_json    TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    attempt         INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at REAL NOT NULL,
+    created_at      REAL NOT NULL,
+    started_at      REAL,
+    finished_at     REAL,
+    error           TEXT,
+    error_traceback TEXT,
+    CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter', 'cancelled')),
+    CHECK (attempt >= 0)
+)
+"""
+
+_MIGRATION_V1_V2_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_jobs_status_next_at ON jobs (status, next_attempt_at)",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_kind ON jobs (kind)",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs (created_at)",
+]
+
+
+def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """In-place upgrade of a v1 .jobs.db to v2.
+
+    SQLite does not support ALTER TABLE … DROP CONSTRAINT, so we
+    recreate the table with the new CHECK constraint via the standard
+    rename-dance: create jobs_new, copy data, drop old table, rename.
+    """
+    try:
+        conn.execute("BEGIN")
+        conn.execute(_MIGRATION_V1_V2_NEW_TABLE)
+        conn.execute(
+            "INSERT INTO jobs_new SELECT "
+            "id, kind, payload_json, status, attempt, next_attempt_at, "
+            "created_at, started_at, finished_at, error, error_traceback "
+            "FROM jobs"
+        )
+        conn.execute("DROP TABLE jobs")
+        conn.execute("ALTER TABLE jobs_new RENAME TO jobs")
+        for idx_sql in _MIGRATION_V1_V2_INDEXES:
+            conn.execute(idx_sql)
+        conn.execute(
+            "UPDATE schema_meta SET value='2' WHERE key='version'"
+        )
+        conn.execute("COMMIT")
+    except Exception as exc:
+        conn.execute("ROLLBACK")
+        raise JobsCorruptError(f"migration v1→v2 failed: {exc}") from exc
 
 
 def _ts(dt: datetime) -> float:
@@ -132,7 +187,7 @@ class JobStore:
             conn.close()
             raise JobsCorruptError(f"schema init failed for {db_path}: {exc}") from exc
 
-        # Version check / write
+        # Version check / write / migrate
         cur = conn.execute("SELECT value FROM schema_meta WHERE key='version'")
         row = cur.fetchone()
         if row is None:
@@ -140,6 +195,13 @@ class JobStore:
                 "INSERT INTO schema_meta (key, value) VALUES ('version', ?)",
                 (SCHEMA_VERSION,),
             )
+        elif row[0] == "1":
+            # α→β1 one-step migration: extend CHECK constraint to include 'cancelled'
+            try:
+                _migrate_v1_to_v2(conn)
+            except JobsCorruptError:
+                conn.close()
+                raise
         elif row[0] != SCHEMA_VERSION:
             conn.close()
             raise JobsCorruptError(
@@ -380,6 +442,20 @@ class JobStore:
                     )
                     requeued += 1
         return RecoveryResult(requeued=requeued, moved_to_dead_letter=moved)
+
+    def cancel_all_queued(self) -> int:
+        """Mark every 'queued' job as 'cancelled'. Returns count cancelled.
+
+        Used by VaultRuntime.unmount(force=True) to drain pending work.
+        """
+        with self._tx_lock:
+            cur = self._conn.execute(
+                "UPDATE jobs SET status='cancelled', finished_at=? "
+                "WHERE status='queued'",
+                (_ts(datetime.now(UTC)),),
+            )
+            self._conn.commit()
+            return cur.rowcount
 
     def cancel_queued(self, job_id: str) -> bool:
         with self._tx_lock:

@@ -12,13 +12,27 @@ from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 router = APIRouter()
 
 
+def _vault(request: Request) -> Path:
+    vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
+    assert isinstance(vault, Path)
+    return vault
+
+
 @router.get("/activity")
 async def list_activity(
     request: Request,
     limit: int = Query(default=20, ge=0, le=10000),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     log = ActivityLog.load(vault)
     entries = list(reversed(log.entries))  # newest first
     total = len(entries)
@@ -31,7 +45,7 @@ async def list_activity(
 
 @router.get("/activity/{op_id}", response_model=ActivityEntry)
 async def get_activity(op_id: str, request: Request) -> ActivityEntry:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     log = ActivityLog.load(vault)
     entry = log.find_by_id(op_id)
     if entry is None:
@@ -43,7 +57,7 @@ async def get_activity(op_id: str, request: Request) -> ActivityEntry:
 
 @router.post("/activity/{op_id}/undo", response_model=UndoApiResult)
 def undo_activity(op_id: str, request: Request) -> UndoApiResult:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     result = undo(vault, op_id)  # raises UndoError / LockTimeoutError → handled in app
     return UndoApiResult(
         success=result.success,

@@ -6,36 +6,44 @@ from claude_mnemos.cli import build_parser
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
 
 
-def test_parser_daemon_start_minimal(tmp_path: Path):
-    args = build_parser().parse_args(["daemon", "start", "--vault", str(tmp_path)])
+def test_parser_daemon_start_minimal():
+    args = build_parser().parse_args(["daemon", "start"])
     assert args.command == "daemon"
     assert args.daemon_cmd == "start"
-    assert args.vault == tmp_path
     assert args.host is None
     assert args.port is None
 
 
-def test_parser_daemon_foreground_with_overrides(tmp_path: Path):
+def test_parser_daemon_start_vault_flag_rejected(tmp_path: Path):
+    """--vault PATH must now hard-exit with code 2 (legacy hard-cut, Task 22)."""
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["daemon", "start", "--vault", str(tmp_path)])
+    assert exc.value.code == 2
+
+
+def test_parser_daemon_foreground_with_overrides():
     args = build_parser().parse_args(
         [
             "daemon",
             "foreground",
-            "--vault",
-            str(tmp_path),
             "--port",
             "8080",
             "--host",
             "127.0.0.1",
-            "--retention-days",
-            "30",
             "--log-level",
             "debug",
         ]
     )
     assert args.daemon_cmd == "foreground"
     assert args.port == 8080
-    assert args.retention_days == 30
     assert args.log_level == "debug"
+
+
+def test_parser_daemon_foreground_vault_flag_rejected(tmp_path: Path):
+    """--vault PATH must hard-exit on foreground too (Task 22)."""
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["daemon", "foreground", "--vault", str(tmp_path)])
+    assert exc.value.code == 2
 
 
 def test_parser_daemon_stop_default_timeout():
@@ -79,7 +87,6 @@ def test_status_when_no_runtime_state_prints_stopped(capsys, monkeypatch, tmp_pa
 
 def test_runtime_state_roundtrip(tmp_path: Path):
     state = DaemonRuntimeState(
-        vault_root=tmp_path / "vault",
         host="127.0.0.1",
         port=5757,
         pid_file=tmp_path / "daemon.pid",

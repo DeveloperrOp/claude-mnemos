@@ -9,14 +9,16 @@ from claude_mnemos.daemon.config import default_runtime_config_file
 
 
 class DaemonRuntimeState(BaseModel):
-    """Snapshot of the running daemon's effective config — used by `mnemos daemon
-    status` and `mnemos daemon stop` to find host/port/pid_file without re-parsing
-    env vars in the controlling shell.
+    """Snapshot of the running daemon's effective config — used by
+    `mnemos daemon status` / `stop`. After β1 the daemon is multi-vault,
+    so vault_root is no longer part of the state.
+
+    `extra='ignore'` lets us silently absorb α-written files that contain
+    a now-defunct `vault_root` field.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
-    vault_root: Path
     host: str
     port: int = Field(ge=1, le=65535)
     pid_file: Path

@@ -23,6 +23,9 @@ class _FakeDaemon:
         self.job_store = JobStore(vault / JOBS_DB_FILENAME)
         self.started_at_monotonic = 0.0
         self.job_worker = None
+        # Routes read per-vault state from primary_runtime; self-shim preserves
+        # existing test behaviour without changing test structure.
+        self.primary_runtime = self
 
     def scheduler_jobs_info(self):
         return []

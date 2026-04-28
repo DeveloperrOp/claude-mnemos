@@ -23,9 +23,26 @@ from claude_mnemos.core.pages import page_ref_to_path
 router = APIRouter()
 
 
+def _vault(request: Request) -> Path:
+    vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
+    assert isinstance(vault, Path)
+    return vault
+
+
 def _tracker(request: Request) -> Any:
     daemon = request.app.state.daemon
-    return getattr(daemon, "tracker", None) if daemon is not None else None
+    if daemon is None:
+        return None
+    primary = getattr(daemon, "primary_runtime", None)
+    return primary.tracker if primary is not None else None
 
 
 def _patch_result_to_dict(result: PatchResult) -> dict[str, Any]:
@@ -72,7 +89,7 @@ def _validate_patch_body(body: Any) -> tuple[dict[str, Any] | None, str | None]:
 
 @router.patch("/pages/{page_ref:path}")
 async def patch_page(page_ref: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     page_path = page_ref_to_path(vault, page_ref)
     body = await request.json()
     fm_patch, body_text = _validate_patch_body(body)
@@ -88,7 +105,7 @@ async def patch_page(page_ref: str, request: Request) -> dict[str, Any]:
 
 @router.post("/pages/{page_ref:path}/verify")
 async def verify_page(page_ref: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     page_path = page_ref_to_path(vault, page_ref)
     result = apply_patch(
         vault,
@@ -102,7 +119,7 @@ async def verify_page(page_ref: str, request: Request) -> dict[str, Any]:
 
 @router.post("/pages/{page_ref:path}/archive")
 async def archive_page(page_ref: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     page_path = page_ref_to_path(vault, page_ref)
     result = apply_patch(
         vault,
@@ -116,7 +133,7 @@ async def archive_page(page_ref: str, request: Request) -> dict[str, Any]:
 
 @router.delete("/pages/{page_ref:path}")
 async def delete_page(page_ref: str, request: Request) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     page_path = page_ref_to_path(vault, page_ref)
     result = apply_soft_delete(
         vault,
