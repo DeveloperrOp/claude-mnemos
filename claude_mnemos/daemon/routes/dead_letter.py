@@ -15,17 +15,28 @@ router = APIRouter()
 async def list_dead_letter(
     request: Request, limit: int = 50, offset: int = 0
 ) -> dict[str, Any]:
+    # Per-store offset is meaningless when dead-letter jobs from different vaults
+    # interleave in the global sort.  Load all dead-letter items from every
+    # store, sort globally, then apply (offset, limit) to the merged list.
+    # _CROSS_VAULT_MAX is a safety cap; dead-letter queues stay small in
+    # practice.
+    _CROSS_VAULT_MAX = 100_000
     aggregated: list[dict[str, Any]] = []
     for runtime in all_runtimes(request):
         store = runtime.job_store
         if store is None:
             continue
-        for j in store.list_by_status("dead_letter", limit=limit, offset=offset):
+        for j in store.list_by_status("dead_letter", limit=_CROSS_VAULT_MAX, offset=0):
             d = j.model_dump(mode="json")
             d["project_name"] = runtime.name
             aggregated.append(d)
-    aggregated.sort(key=lambda x: x.get("finished_at") or "", reverse=True)
-    return {"jobs": aggregated[:limit]}
+    # Secondary sort on id ensures a fully deterministic order when finished_at
+    # timestamps tie (e.g. jobs seeded with the same datetime.now() value).
+    aggregated.sort(
+        key=lambda x: (x.get("finished_at") or "", x.get("id") or ""),
+        reverse=True,
+    )
+    return {"jobs": aggregated[offset : offset + limit]}
 
 
 def _find_dead_letter_owner(request: Request, job_id: str) -> tuple[VaultRuntime, Job]:

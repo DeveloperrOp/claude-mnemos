@@ -95,22 +95,30 @@ async def list_jobs(
         }
 
     # Cross-vault aggregation.
+    # Per-store offset is meaningless when the cross-vault sort key can order
+    # items from different vaults interleaved.  We must load all items from
+    # every store, merge, sort globally, then apply (offset, limit) to the
+    # combined list.  _CROSS_VAULT_MAX is a safety cap; real-world job queues
+    # are small, so this is acceptable.
+    _CROSS_VAULT_MAX = 100_000
     aggregated_jobs: list[dict[str, Any]] = []
     aggregated_counts: dict[str, int] = {}
     for runtime in all_runtimes(request):
         store = runtime.job_store
         if store is None:
             continue
-        jobs = store.list_by_status(status, limit=limit, offset=offset)  # type: ignore[arg-type]
+        jobs = store.list_by_status(status, limit=_CROSS_VAULT_MAX, offset=0)  # type: ignore[arg-type]
         for j in jobs:
             d = j.model_dump(mode="json")
             d["project_name"] = runtime.name
             aggregated_jobs.append(d)
         for k, v in store.count_by_status().items():
             aggregated_counts[k] = aggregated_counts.get(k, 0) + v
-    aggregated_jobs.sort(key=lambda x: x["created_at"], reverse=True)
+    # Secondary sort on id ensures a fully deterministic order when created_at
+    # timestamps tie (sub-microsecond races during seeding or rapid creation).
+    aggregated_jobs.sort(key=lambda x: (x["created_at"], x["id"]), reverse=True)
     return {
-        "jobs": aggregated_jobs[:limit],
+        "jobs": aggregated_jobs[offset : offset + limit],
         "counts": aggregated_counts,
     }
 
