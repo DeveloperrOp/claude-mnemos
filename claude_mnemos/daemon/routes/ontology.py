@@ -1,16 +1,34 @@
+"""REST routes for ontology HITL suggestions.
+
+Per-project routes resolve the target VaultRuntime via
+``get_runtime(request, project)`` (404 on unknown project) and use
+``runtime.vault_root`` for filesystem operations.
+
+URL structure::
+
+    POST   /ontology/{project}/run                         — trigger HITL run (no-op stub)
+    GET    /ontology/{project}/suggestions                 — list suggestions
+    POST   /ontology/{project}/suggestions                 — create suggestion
+    POST   /ontology/{project}/suggestions/{id}/approve    — approve and apply
+    POST   /ontology/{project}/suggestions/{id}/reject     — reject
+    POST   /ontology/{project}/suggestions/{id}/defer      — defer
+    PATCH  /ontology/{project}/suggestions/{id}            — update mutable fields
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.core.ontology_apply import (
     OntologyError,
     apply_suggestion,
 )
+from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.state.ontology import (
     Suggestion,
     SuggestionFrontmatter,
@@ -19,20 +37,6 @@ from claude_mnemos.state.ontology import (
 )
 
 router = APIRouter()
-
-
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
 
 
 class CreateSuggestionRequest(BaseModel):
@@ -45,17 +49,43 @@ class CreateSuggestionRequest(BaseModel):
     confidence: float = Field(default=0.7, ge=0.0, le=1.0)
 
 
+class PatchSuggestionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    body: str | None = None
+
+
 def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
     fm = s.frontmatter.model_dump(mode="json")
     return {"frontmatter": fm, "body": s.body}
 
 
-@router.get("/suggestions")
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/run
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ontology/{project}/run")
+def ontology_run(project: str, request: Request) -> dict[str, Any]:
+    get_runtime(request, project)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# GET /ontology/{project}/suggestions
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ontology/{project}/suggestions")
 def list_suggestions_endpoint(
+    project: str,
     request: Request,
     status: str = Query(default="pending"),
 ) -> dict[str, Any]:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     store = SuggestionStore(vault)
     include_archive = status in ("all", "approved", "rejected")
     items = store.list(include_archive=include_archive)
@@ -67,25 +97,19 @@ def list_suggestions_endpoint(
     }
 
 
-@router.get("/suggestions/{suggestion_id}")
-def get_suggestion_endpoint(
-    suggestion_id: str, request: Request
-) -> dict[str, Any]:
-    vault = _vault(request)
-    store = SuggestionStore(vault)
-    s = store.get(suggestion_id)
-    if s is None:
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "id": suggestion_id}
-        )
-    return _suggestion_to_dict(s)
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/suggestions  (create)
+# ---------------------------------------------------------------------------
 
 
-@router.post("/suggestions", status_code=201)
+@router.post("/ontology/{project}/suggestions", status_code=201)
 def create_suggestion_endpoint(
-    body: CreateSuggestionRequest, request: Request
+    project: str,
+    body: CreateSuggestionRequest,
+    request: Request,
 ) -> dict[str, Any]:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     store = SuggestionStore(vault)
 
     def _bad(error: str, detail: str) -> HTTPException:
@@ -129,11 +153,19 @@ def create_suggestion_endpoint(
     return _suggestion_to_dict(suggestion)
 
 
-@router.post("/suggestions/{suggestion_id}/approve")
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/suggestions/{id}/approve
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ontology/{project}/suggestions/{suggestion_id}/approve")
 def approve_suggestion_endpoint(
-    suggestion_id: str, request: Request
+    project: str,
+    suggestion_id: str,
+    request: Request,
 ) -> dict[str, Any]:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     result = apply_suggestion(vault, suggestion_id)
     return {
         "success": result.success,
@@ -146,11 +178,19 @@ def approve_suggestion_endpoint(
     }
 
 
-@router.post("/suggestions/{suggestion_id}/reject")
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/suggestions/{id}/reject
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ontology/{project}/suggestions/{suggestion_id}/reject")
 def reject_suggestion_endpoint(
-    suggestion_id: str, request: Request
+    project: str,
+    suggestion_id: str,
+    request: Request,
 ) -> dict[str, Any]:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
@@ -166,11 +206,19 @@ def reject_suggestion_endpoint(
     return {"success": True, "suggestion_id": suggestion_id, "status": "rejected"}
 
 
-@router.post("/suggestions/{suggestion_id}/defer")
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/suggestions/{id}/defer
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ontology/{project}/suggestions/{suggestion_id}/defer")
 def defer_suggestion_endpoint(
-    suggestion_id: str, request: Request
+    project: str,
+    suggestion_id: str,
+    request: Request,
 ) -> dict[str, Any]:
-    vault = _vault(request)
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
@@ -183,3 +231,38 @@ def defer_suggestion_endpoint(
         )
     store.update_status(suggestion_id, "deferred")
     return {"success": True, "suggestion_id": suggestion_id, "status": "deferred"}
+
+
+# ---------------------------------------------------------------------------
+# PATCH /ontology/{project}/suggestions/{id}
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/ontology/{project}/suggestions/{suggestion_id}")
+def patch_suggestion_endpoint(
+    project: str,
+    suggestion_id: str,
+    patch: PatchSuggestionRequest,
+    request: Request,
+) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
+    store = SuggestionStore(vault)
+    existing = store.get(suggestion_id)
+    if existing is None:
+        raise HTTPException(
+            status_code=404, detail={"error": "not_found", "id": suggestion_id}
+        )
+    updates: dict[str, object] = {}
+    if patch.reason is not None:
+        updates["reason"] = patch.reason
+    if patch.confidence is not None:
+        updates["confidence"] = patch.confidence
+    new_fm = existing.frontmatter.model_copy(update=updates)
+    new_body = patch.body if patch.body is not None else existing.body
+    new_suggestion = Suggestion(frontmatter=new_fm, body=new_body)
+    target = store._file_for(suggestion_id)  # noqa: SLF001
+    if not target.is_file():
+        target = store._archive_file_for(suggestion_id)  # noqa: SLF001
+    atomic_write(target, new_suggestion.serialize())
+    return _suggestion_to_dict(new_suggestion)
