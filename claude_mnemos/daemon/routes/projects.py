@@ -31,7 +31,9 @@ class ProjectCreate(BaseModel):
 class ProjectPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     vault_root: Path | None = None
-    cwd_patterns: list[str] | None = None
+    cwd_patterns: list[str] | None = None  # full replace
+    add_cwd_patterns: list[str] | None = None
+    remove_cwd_patterns: list[str] | None = None
 
 
 class ProjectView(BaseModel):
@@ -140,6 +142,8 @@ async def patch_project(
     daemon = request.app.state.daemon
     new_vault = body.vault_root
     new_patterns = body.cwd_patterns
+    add_patterns = body.add_cwd_patterns
+    remove_patterns = body.remove_cwd_patterns
 
     # Pre-flight busy check before touching the map (vault_root change only).
     if daemon is not None and name in daemon.runtimes and new_vault is not None:
@@ -161,7 +165,11 @@ async def patch_project(
 
     try:
         new_entry = ProjectStore().update(
-            name, vault_root=new_vault, cwd_patterns=new_patterns
+            name,
+            vault_root=new_vault,
+            cwd_patterns=new_patterns,
+            add_cwd_patterns=add_patterns,
+            remove_cwd_patterns=remove_patterns,
         )
     except ProjectNotFoundError as exc:
         raise HTTPException(

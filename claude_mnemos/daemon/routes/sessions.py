@@ -83,10 +83,19 @@ async def ingest_session_route(
     """
     del session_id  # currently informational only; payload carries the path
     daemon = request.app.state.daemon
-    if daemon is None or getattr(daemon, "job_store", None) is None:
+    if daemon is None:
         raise HTTPException(
             status_code=503,
             detail={"error": "jobs_subsystem_unavailable"},
+        )
+    primary = getattr(daemon, "primary_runtime", None)
+    if primary is None or primary.job_store is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
         )
     transcript_path = body.get("transcript_path")
     if (
@@ -98,9 +107,9 @@ async def ingest_session_route(
             status_code=400,
             detail={"error": "missing_or_invalid_transcript_path"},
         )
-    store: JobStore = daemon.job_store
+    store: JobStore = primary.job_store
     job = store.create(kind="ingest", payload={"transcript_path": transcript_path})
-    worker = getattr(daemon, "job_worker", None)
+    worker = primary.job_worker
     if worker is not None:
         worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")

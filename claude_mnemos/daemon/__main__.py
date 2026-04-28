@@ -14,6 +14,27 @@ from claude_mnemos.daemon.config import (
 from claude_mnemos.daemon.process import MnemosDaemon
 
 
+class _VaultDeprecated(argparse.Action):
+    """Hard-error for the removed ``--vault PATH`` flag."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        _namespace: argparse.Namespace,
+        _values: object,
+        _option_string: str | None = None,
+    ) -> None:
+        parser.exit(
+            2,
+            (
+                "--vault is no longer supported. Register the vault first:\n"
+                "    mnemos project add NAME --vault PATH\n"
+                "Then start daemon with `mnemos daemon start` (mounts all projects)\n"
+                "or `mnemos daemon start --project NAME`.\n"
+            ),
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos.daemon")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -36,6 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--project",
         default="",
         help="Comma-separated subset of project names to mount.",
+    )
+    run.add_argument(
+        "--vault", action=_VaultDeprecated, nargs="?", help=argparse.SUPPRESS
     )
     return parser
 

@@ -41,10 +41,17 @@ def _vault(request: Request) -> Path:
     return vault
 
 
+def _primary(request: Request) -> Any:
+    daemon = request.app.state.daemon
+    if daemon is None:
+        return None
+    return getattr(daemon, "primary_runtime", None)
+
+
 def _scan_via_cache_or_direct(request: Request) -> list[core_lost_sessions.LostSession]:
     """Return current lost sessions, preferring the daemon cache when available."""
-    daemon = request.app.state.daemon
-    cache = getattr(daemon, "lost_sessions_cache", None) if daemon else None
+    primary = _primary(request)
+    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
     if cache is None:
         return core_lost_sessions.scan_lost_sessions(_vault(request))
     items: list[core_lost_sessions.LostSession] = cache.get_or_scan(_vault(request))
@@ -63,8 +70,8 @@ async def list_lost_route(request: Request) -> dict[str, Any]:
 @router.post("/lost-sessions/scan")
 async def rescan_route(request: Request) -> dict[str, Any]:
     """Invalidate the cache (if any) and run a fresh synchronous scan."""
-    daemon = request.app.state.daemon
-    cache = getattr(daemon, "lost_sessions_cache", None) if daemon else None
+    primary = _primary(request)
+    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
     if cache is not None:
         cache.invalidate()
     # Re-populate the cache via get_or_scan so subsequent GETs benefit.
@@ -115,15 +122,18 @@ async def import_route(
                     "transcript_path": transcript_path,
                 },
             )
-    daemon = request.app.state.daemon
-    if daemon is None or getattr(daemon, "job_store", None) is None:
+    primary = _primary(request)
+    if primary is None or primary.job_store is None:
         raise HTTPException(
             status_code=503,
-            detail={"error": "jobs_subsystem_unavailable"},
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
         )
-    store: JobStore = daemon.job_store
+    store: JobStore = primary.job_store
     job = store.create(kind="ingest", payload={"transcript_path": transcript_path})
-    worker = getattr(daemon, "job_worker", None)
+    worker = primary.job_worker
     if worker is not None:
         worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")
@@ -150,11 +160,11 @@ async def ignore_route(
                 },
             )
         sha = match.sha
-    daemon = request.app.state.daemon
-    tracker = getattr(daemon, "tracker", None) if daemon else None
+    primary = _primary(request)
+    tracker = getattr(primary, "tracker", None) if primary is not None else None
     ignore = core_lost_sessions.add_to_ignore(_vault(request), sha, tracker=tracker)
     # Invalidate the cache so the now-ignored session disappears from /list.
-    cache = getattr(daemon, "lost_sessions_cache", None) if daemon else None
+    cache = getattr(primary, "lost_sessions_cache", None) if primary is not None else None
     if cache is not None:
         cache.invalidate()
     return {"ignored_count": len(ignore.ignored_shas)}

@@ -87,6 +87,30 @@ def test_project_update_replaces_cwd_patterns(tmp_path):
     assert e.cwd_patterns == ["~/new"]
 
 
+def test_project_update_add_cwd_pattern_appends(tmp_path):
+    """--add-cwd-pattern must append to existing patterns, not replace."""
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"),
+              "--cwd-pattern", "a", "--cwd-pattern", "b"])
+    rc = cli_main(["project", "update", "x", "--add-cwd-pattern", "x-new"])
+    assert rc == 0
+    from claude_mnemos.state.projects import ProjectStore
+    e = ProjectStore().get("x")
+    assert e.cwd_patterns == ["a", "b", "x-new"]
+
+
+def test_project_update_remove_cwd_pattern(tmp_path):
+    """--remove-cwd-pattern must remove the entry from existing patterns."""
+    cli_main(["project", "add", "--name", "x",
+              "--vault", str(tmp_path / "v"),
+              "--cwd-pattern", "a", "--cwd-pattern", "b"])
+    rc = cli_main(["project", "update", "x", "--remove-cwd-pattern", "a"])
+    assert rc == 0
+    from claude_mnemos.state.projects import ProjectStore
+    e = ProjectStore().get("x")
+    assert e.cwd_patterns == ["b"]
+
+
 def test_update_does_not_pre_read(monkeypatch, tmp_path):
     """_handle_update must build PATCH body purely from CLI args (no pre-GET)."""
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -125,7 +149,7 @@ def test_update_does_not_pre_read(monkeypatch, tmp_path):
     _handle_update(ns)
 
     assert "x" not in calls  # no pre-read of the entry
-    assert captured["json"] == {"cwd_patterns": ["p"]}
+    assert captured["json"] == {"add_cwd_patterns": ["p"]}
 
 
 def test_project_remove_cleans_settings(tmp_path):

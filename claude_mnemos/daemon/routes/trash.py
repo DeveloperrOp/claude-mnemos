@@ -45,7 +45,10 @@ def _vault(request: Request) -> Path:
 
 def _tracker(request: Request) -> Any:
     daemon = request.app.state.daemon
-    return getattr(daemon, "tracker", None) if daemon is not None else None
+    if daemon is None:
+        return None
+    primary = getattr(daemon, "primary_runtime", None)
+    return primary.tracker if primary is not None else None
 
 
 def _entry_to_dict(entry: TrashEntry) -> dict[str, Any]:

@@ -141,7 +141,9 @@ def _pretty(view: Mapping[str, object]) -> str:
 def _handle_update(args: argparse.Namespace) -> int:
     body: dict[str, object] = {}
     if args.add_cwd_pattern:
-        body["cwd_patterns"] = list(args.add_cwd_pattern)
+        body["add_cwd_patterns"] = list(args.add_cwd_pattern)
+    if args.remove_cwd_pattern:
+        body["remove_cwd_patterns"] = list(args.remove_cwd_pattern)
     if args.vault is not None:
         body["vault_root"] = str(args.vault)
     try:
@@ -156,11 +158,13 @@ def _handle_update(args: argparse.Namespace) -> int:
         return EXIT_PROJECT_MAP_ERROR
     except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError):
         try:
-            new_patterns = list(args.add_cwd_pattern) if args.add_cwd_pattern else None
+            add = list(args.add_cwd_pattern) if args.add_cwd_pattern else None
+            remove = list(args.remove_cwd_pattern) if args.remove_cwd_pattern else None
             ProjectStore().update(
                 args.name,
                 vault_root=args.vault,
-                cwd_patterns=new_patterns,
+                add_cwd_patterns=add,
+                remove_cwd_patterns=remove,
             )
             print(f"updated project {args.name!r} (offline)")
             return 0

@@ -144,22 +144,40 @@ class ProjectStore:
         *,
         vault_root: Path | None = None,
         cwd_patterns: list[str] | None = None,
+        add_cwd_patterns: list[str] | None = None,
+        remove_cwd_patterns: list[str] | None = None,
     ) -> ProjectMapEntry:
         """Update fields of an existing entry.
 
         ``None`` means "leave unchanged". Pass ``cwd_patterns=[]`` to clear
         all patterns. Raises ``ProjectNotFoundError`` if name absent.
+
+        ``cwd_patterns`` is a full replace.
+        ``add_cwd_patterns`` appends entries (preserving order, deduplicating).
+        ``remove_cwd_patterns`` removes specific entries.
+        Caller should pass either ``cwd_patterns`` OR ``add``/``remove``, not both.
         """
         with self._lock:
             pm = self._load()
             for i, e in enumerate(pm.projects):
                 if e.name == name:
+                    new_patterns = list(e.cwd_patterns)
+                    if cwd_patterns is not None:
+                        new_patterns = cwd_patterns
+                    else:
+                        if add_cwd_patterns:
+                            existing = list(new_patterns)
+                            for p in add_cwd_patterns:
+                                if p not in existing:
+                                    existing.append(p)
+                            new_patterns = existing
+                        if remove_cwd_patterns:
+                            remove_set = set(remove_cwd_patterns)
+                            new_patterns = [p for p in new_patterns if p not in remove_set]
                     new_e = e.model_copy(
                         update={
                             "vault_root": vault_root if vault_root is not None else e.vault_root,
-                            "cwd_patterns": (
-                                cwd_patterns if cwd_patterns is not None else e.cwd_patterns
-                            ),
+                            "cwd_patterns": new_patterns,
                         }
                     )
                     pm.projects[i] = new_e

@@ -45,6 +45,9 @@ async def test_health_includes_scheduler_jobs_when_daemon_attached(tmp_path: Pat
     class FakeDaemon:
         started_at_monotonic = 0.0
 
+        def __init__(self) -> None:
+            self.primary_runtime = None
+
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return [
                 SchedulerJobInfo(
@@ -92,8 +95,13 @@ async def test_health_reports_running_observer(tmp_path: Path):
 
     class FakeDaemon:
         started_at_monotonic = 0.0
-        observer = FakeObserver()
         alerts = Alerts()
+
+        def __init__(self) -> None:
+            self.observer = FakeObserver()
+            self.job_store = None
+            # primary_runtime is self so the route finds observer/job_store here.
+            self.primary_runtime = self
 
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return []
@@ -123,8 +131,12 @@ async def test_health_reports_observer_not_alive(tmp_path: Path):
 
     class FakeDaemon:
         started_at_monotonic = 0.0
-        observer = StoppedObserver()
         alerts = Alerts()
+
+        def __init__(self) -> None:
+            self.observer = StoppedObserver()
+            self.job_store = None
+            self.primary_runtime = self
 
         def scheduler_jobs_info(self) -> list[SchedulerJobInfo]:
             return []
@@ -163,6 +175,10 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
         observer = None
         alerts = Alerts()
         job_store = store
+
+        def __init__(self) -> None:
+            # primary_runtime is self so route finds job_store here.
+            self.primary_runtime = self
 
         def scheduler_jobs_info(self) -> list:
             return []

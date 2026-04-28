@@ -33,8 +33,8 @@ def _tracker(request: Request) -> OurWritesTracker | None:
     daemon = request.app.state.daemon
     if daemon is None:
         return None
-    tracker = getattr(daemon, "tracker", None)
-    return tracker
+    primary = getattr(daemon, "primary_runtime", None)
+    return primary.tracker if primary is not None else None
 
 
 @router.post("/lint/run")
