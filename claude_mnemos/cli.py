@@ -24,6 +24,7 @@ from claude_mnemos.daemon.config import BootFilter, DaemonConfig, default_pid_fi
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, is_daemon_running
 from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
+from claude_mnemos.daemon_url import daemon_base_url
 from claude_mnemos.ingest.llm import (
     LLMClient,
     LLMExtractionError,
@@ -1297,7 +1298,7 @@ def _cmd_jobs_dismiss(args: argparse.Namespace) -> int:
 def _post_or_delete_to_daemon(
     args: argparse.Namespace, *, method: str, path: str
 ) -> int:
-    daemon_url = os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+    daemon_url = os.environ.get("MNEMOS_DAEMON_URL") or daemon_base_url()
     try:
         r = httpx.request(method, f"{daemon_url}{path}", timeout=5.0)
     except httpx.HTTPError as exc:
@@ -1331,7 +1332,8 @@ _EXIT_MANIFEST_CORRUPT = 93
 
 
 def _daemon_url() -> str:
-    return os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+    env = os.environ.get("MNEMOS_DAEMON_URL")
+    return env if env is not None else daemon_base_url()
 
 
 def _http_request_to_daemon(

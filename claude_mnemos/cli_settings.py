@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel
 
+from claude_mnemos.daemon_url import daemon_base_url
 from claude_mnemos.state.settings import (
     GlobalSettings,
     ProjectSettings,
@@ -28,7 +29,8 @@ EXIT_SETTINGS_ERROR = 95
 
 
 def _daemon_url() -> str:
-    return os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+    env = os.environ.get("MNEMOS_DAEMON_URL")
+    return env if env is not None else daemon_base_url()
 
 
 def handle(args: argparse.Namespace) -> int:

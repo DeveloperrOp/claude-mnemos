@@ -17,6 +17,7 @@ from collections.abc import Mapping
 
 import httpx
 
+from claude_mnemos.daemon_url import daemon_base_url
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.state.projects import (
     ProjectMapEntry,
@@ -33,7 +34,8 @@ EXIT_DAEMON_UNREACHABLE = 84  # reused from jobs
 
 
 def _daemon_url() -> str:
-    return os.environ.get("MNEMOS_DAEMON_URL", "http://127.0.0.1:5757")
+    env = os.environ.get("MNEMOS_DAEMON_URL")
+    return env if env is not None else daemon_base_url()
 
 
 def handle(args: argparse.Namespace) -> int:
