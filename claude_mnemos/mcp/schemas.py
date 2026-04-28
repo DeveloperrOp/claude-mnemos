@@ -86,8 +86,13 @@ GET_RECENT_ACTIVITY: dict[str, Any] = {
 
 UNDO_OPERATION: dict[str, Any] = {
     "type": "object",
-    "required": ["op_id"],
+    "required": ["project", "op_id"],
     "properties": {
+        "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name (as registered in the daemon)",
+        },
         "op_id": {
             "type": "string",
             "minLength": 1,

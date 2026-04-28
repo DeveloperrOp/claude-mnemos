@@ -229,7 +229,7 @@ async def _dispatch_write(
         async with httpx.AsyncClient(timeout=timeout) as client:
             if name == "undo_operation":
                 result = await undo_operation(
-                    client, config.daemon_url, arguments["op_id"]
+                    client, config.daemon_url, arguments["project"], arguments["op_id"]
                 )
             elif name == "create_snapshot":
                 result = await create_snapshot(

@@ -24,7 +24,6 @@ def client():
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("GET", "/activity"),
         ("GET", "/lost-sessions"),
         ("GET", "/metrics/usage"),
         ("GET", "/vault/info"),
@@ -79,6 +78,14 @@ def test_lint_project_route_503_without_daemon(client: TestClient) -> None:
 def test_ontology_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /ontology/{project}/suggestions returns 503 when daemon is None."""
     r = client.get("/ontology/alpha/suggestions")
+    assert r.status_code == 503
+    body = r.json()
+    assert body.get("detail", {}).get("error") == "daemon_unavailable"
+
+
+def test_activity_project_route_503_without_daemon(client: TestClient) -> None:
+    """GET /activity/{project} returns 503 when daemon is None."""
+    r = client.get("/activity/alpha")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
