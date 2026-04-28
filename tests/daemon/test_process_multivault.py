@@ -341,3 +341,74 @@ async def test_remount_vault_swaps_root(
                 await rt.unmount(timeout=2.0, force=True)
             daemon.runtimes.clear()
         daemon.scheduler.shutdown(wait=False)
+
+
+# ─── Task 15: reload_project_settings / reload_global_settings ───────────────
+
+
+@pytest.mark.asyncio
+async def test_reload_project_settings_applies_to_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    e = _add_project("alpha", tmp_path / "a")
+
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        await daemon.mount_vault(e)
+        from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+        new = ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False))
+        await daemon.reload_project_settings("alpha", new)
+        assert daemon.runtimes["alpha"].settings.snapshots.daily_enabled is False
+        assert daemon.scheduler.get_job("daily_snapshot:alpha") is None
+    finally:
+        async with daemon._runtimes_lock:
+            for rt in list(daemon.runtimes.values()):
+                await rt.unmount(timeout=2.0, force=True)
+            daemon.runtimes.clear()
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_reload_project_settings_for_unmounted_no_op(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        from claude_mnemos.state.settings import ProjectSettings
+        # Should not raise even if "ghost" is unmounted (no runtime in dict).
+        await daemon.reload_project_settings("ghost", ProjectSettings())
+    finally:
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_reload_global_settings_repicks_primary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    _add_project("alpha", tmp_path / "a")
+    _add_project("beta", tmp_path / "b")
+
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        await daemon._bootstrap_runtimes()
+        daemon._recompute_primary()
+        assert daemon.primary_runtime is not None
+        assert daemon.primary_runtime.name == "alpha"
+
+        new_global = GlobalSettings(primary_project="beta")
+        await daemon.reload_global_settings(new_global)
+        assert daemon.primary_runtime is not None
+        assert daemon.primary_runtime.name == "beta"
+    finally:
+        async with daemon._runtimes_lock:
+            for rt in list(daemon.runtimes.values()):
+                await rt.unmount(timeout=2.0, force=True)
+            daemon.runtimes.clear()
+        daemon.scheduler.shutdown(wait=False)

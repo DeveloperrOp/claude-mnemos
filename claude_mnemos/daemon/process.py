@@ -15,7 +15,7 @@ from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
-from claude_mnemos.state.settings import GlobalSettings, SettingsStore
+from claude_mnemos.state.settings import GlobalSettings, ProjectSettings, SettingsStore
 
 if TYPE_CHECKING:
     from claude_mnemos.daemon.vault_runtime import VaultRuntime
@@ -211,6 +211,28 @@ class MnemosDaemon:
             self.runtimes[entry.name] = runtime
             self._recompute_primary()
             return runtime
+
+    # ─── Settings hot-reload (Task 15) ────────────────────────────
+
+    async def reload_project_settings(
+        self, name: str, new: ProjectSettings,
+    ) -> None:
+        """Apply *new* settings to the named runtime, if it is mounted.
+
+        If the runtime is not mounted the call is a no-op (the settings file
+        remains the source of truth for the next mount).
+        """
+        async with self._runtimes_lock:
+            runtime = self.runtimes.get(name)
+            if runtime is None:
+                return  # not mounted; settings file is the source of truth
+            runtime.reload_settings(new)
+
+    async def reload_global_settings(self, new: GlobalSettings) -> None:
+        """Replace the in-memory global settings and recompute the primary runtime."""
+        async with self._runtimes_lock:
+            self.global_settings = new
+            self._recompute_primary()
 
     def _request_shutdown(self) -> None:  # pragma: no cover - implemented in Task 16
         if self._server is not None:
