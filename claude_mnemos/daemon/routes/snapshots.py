@@ -21,6 +21,20 @@ from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 router = APIRouter()
 
 
+def _vault(request: Request) -> Path:
+    vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
+    assert isinstance(vault, Path)
+    return vault
+
+
 class CreateSnapshotRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: str | None = Field(default=None, max_length=128)
@@ -53,7 +67,7 @@ def _validate_snapshot_name(name: str) -> None:
 
 @router.get("/snapshots")
 async def list_snapshots_endpoint(request: Request) -> dict[str, list[SnapshotInfo]]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     return {"snapshots": list_snapshots(vault)}
 
 
@@ -61,7 +75,7 @@ async def list_snapshots_endpoint(request: Request) -> dict[str, list[SnapshotIn
 def create_snapshot_endpoint(
     body: CreateSnapshotRequest, request: Request
 ) -> SnapshotInfo:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     try:
         with pipeline_lock(vault):
             try:
@@ -89,7 +103,7 @@ def create_snapshot_endpoint(
 
 @router.delete("/snapshots/{name}")
 def delete_snapshot_endpoint(name: str, request: Request) -> dict[str, str]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     _validate_snapshot_name(name)
     with pipeline_lock(vault):
         try:
@@ -109,7 +123,7 @@ def delete_snapshot_endpoint(name: str, request: Request) -> dict[str, str]:
     "/snapshots/{name}/restore", response_model=RestoreSnapshotResponse
 )
 def restore_snapshot_endpoint(name: str, request: Request) -> RestoreSnapshotResponse:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     _validate_snapshot_name(name)
     snap_path = vault / ".backups" / name
     if not snap_path.is_dir():

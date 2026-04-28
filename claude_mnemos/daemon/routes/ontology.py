@@ -21,6 +21,20 @@ from claude_mnemos.state.ontology import (
 router = APIRouter()
 
 
+def _vault(request: Request) -> Path:
+    vault = request.app.state.vault_root
+    if vault is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_vault_registered",
+                "hint": "Register: mnemos project add NAME --vault PATH",
+            },
+        )
+    assert isinstance(vault, Path)
+    return vault
+
+
 class CreateSuggestionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -41,7 +55,7 @@ def list_suggestions_endpoint(
     request: Request,
     status: str = Query(default="pending"),
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     store = SuggestionStore(vault)
     include_archive = status in ("all", "approved", "rejected")
     items = store.list(include_archive=include_archive)
@@ -57,7 +71,7 @@ def list_suggestions_endpoint(
 def get_suggestion_endpoint(
     suggestion_id: str, request: Request
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     store = SuggestionStore(vault)
     s = store.get(suggestion_id)
     if s is None:
@@ -71,7 +85,7 @@ def get_suggestion_endpoint(
 def create_suggestion_endpoint(
     body: CreateSuggestionRequest, request: Request
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     store = SuggestionStore(vault)
 
     def _bad(error: str, detail: str) -> HTTPException:
@@ -119,7 +133,7 @@ def create_suggestion_endpoint(
 def approve_suggestion_endpoint(
     suggestion_id: str, request: Request
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     result = apply_suggestion(vault, suggestion_id)
     return {
         "success": result.success,
@@ -136,7 +150,7 @@ def approve_suggestion_endpoint(
 def reject_suggestion_endpoint(
     suggestion_id: str, request: Request
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
@@ -156,7 +170,7 @@ def reject_suggestion_endpoint(
 def defer_suggestion_endpoint(
     suggestion_id: str, request: Request
 ) -> dict[str, Any]:
-    vault: Path = request.app.state.vault_root
+    vault = _vault(request)
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
