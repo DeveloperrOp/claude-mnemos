@@ -2,28 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from claude_mnemos.core.snapshots import list_snapshots
+from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.daemon.schemas import VaultInfo
 from claude_mnemos.state.activity import ActivityLog
 from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
-
-
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
 
 
 def _count_md(root: Path) -> int:
@@ -45,9 +32,10 @@ def _vault_size(root: Path) -> int:
     return total
 
 
-@router.get("/vault/info", response_model=VaultInfo)
-def vault_info(request: Request) -> VaultInfo:
-    vault = _vault(request)
+@router.get("/vault/{project}", response_model=VaultInfo)
+def vault_info(project: str, request: Request) -> VaultInfo:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     activity = ActivityLog.load(vault)
     manifest = Manifest.load(vault)
     raw_chats = _count_md(vault / "raw" / "chats")

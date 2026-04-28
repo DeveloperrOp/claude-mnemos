@@ -48,7 +48,7 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     port = _free_port()
 
     # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
-    # and vault-root-dependent routes (/vault/info, /activity, /snapshots) work.
+    # and vault-root-dependent routes (/vault/{project}, /activity, /snapshots) work.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()
@@ -96,7 +96,7 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
         # Endpoints respond
         r = httpx.get(f"http://127.0.0.1:{port}/version", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/vault/info", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/vault/main", timeout=2.0)
         assert r.status_code == 200
         r = httpx.get(f"http://127.0.0.1:{port}/activity/main", timeout=2.0)
         assert r.status_code == 200

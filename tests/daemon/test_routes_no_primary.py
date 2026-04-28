@@ -2,9 +2,9 @@
 
 TDD test for Task 17 of Plan #13b-β1: _vault helpers must guard against None primary.
 
-Note: /trash, /lint, and /ontology routes now require a {project} path segment and are
-guarded by get_runtime (returns 503 when daemon is None), tested separately in
-test_app_trash.py, test_app_lint.py and test_app_ontology.py respectively.
+Note: /trash, /lint, /ontology, /activity and /vault routes now require a {project}
+path segment and are guarded by get_runtime (returns 503 when daemon is None), tested
+separately in their respective test_app_*.py files.
 """
 
 from __future__ import annotations
@@ -26,7 +26,6 @@ def client():
     [
         ("GET", "/lost-sessions"),
         ("GET", "/metrics/usage"),
-        ("GET", "/vault/info"),
     ],
 )
 def test_routes_return_503_when_no_primary(
@@ -40,6 +39,14 @@ def test_routes_return_503_when_no_primary(
         path,
         body,
     )
+
+
+def test_vault_project_route_503_without_daemon(client: TestClient) -> None:
+    """GET /vault/{project} returns 503 when daemon is None."""
+    r = client.get("/vault/alpha")
+    assert r.status_code == 503
+    body = r.json()
+    assert body.get("detail", {}).get("error") == "daemon_unavailable"
 
 
 def test_health_works_without_primary(client: TestClient) -> None:
