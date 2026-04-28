@@ -915,8 +915,25 @@ def _cmd_daemon_status(_args: argparse.Namespace) -> int:
     try:
         r = httpx.get(health_url, timeout=2.0)
         body = r.json()
-        body["pid"] = pid
-        print(json.dumps(body, indent=2))
+        print(f"daemon running on {state.host}:{state.port}  pid={pid}")
+        print(f"  status:  {body.get('status', 'unknown')}")
+        print(f"  version: {body.get('version', '?')}")
+        print(f"  uptime:  {body.get('uptime_s', 0.0):.1f}s")
+        print(f"  alerts:  {body.get('alerts_count', 0)}")
+        vaults: dict[str, dict[str, object]] = body.get("vaults") or {}
+        if not vaults:
+            print("  vaults:  (none mounted)")
+        else:
+            print("  vaults:")
+            for name in sorted(vaults):
+                v = vaults[name]
+                watchdog = "running" if v.get("watchdog_running") else "down"
+                print(
+                    f"    - {name}: watchdog={watchdog}"
+                    f"  queued={v.get('jobs_queued', 0)}"
+                    f"  running={v.get('jobs_running', 0)}"
+                    f"  dead-letter={v.get('jobs_dead_letter', 0)}"
+                )
         return 0
     except httpx.HTTPError as exc:
         print(
