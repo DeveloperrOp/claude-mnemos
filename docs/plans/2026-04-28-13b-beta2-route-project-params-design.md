@@ -77,8 +77,8 @@ DELETE /pages/{project}/{page_id}              — soft-delete
 GET    /trash/{project}                        — list trashed pages
 POST   /trash/{project}/{id}/restore           — restore from trash
 
-GET    /lint/{project}                         — list lint reports
-POST   /lint/{project}                         — run lint (was POST /lint)
+GET    /lint/{project}/results                 — lint reports
+POST   /lint/{project}/run                     — run lint (was POST /lint)
 POST   /lint/{project}/autofix                 — apply autofix
 
 GET    /ontology/{project}/suggestions         — pending suggestions
@@ -274,7 +274,7 @@ DELETE /trash/{project}                       — empty trash (Tier 2)
 
 **After:**
 ```
-POST   /lint/{project}                        — run lint
+POST   /lint/{project}/run                    — run lint
 GET    /lint/{project}/results                — lint reports
 POST   /lint/{project}/autofix                — apply autofix
 ```
@@ -455,7 +455,7 @@ Most CLI commands already accept `--project NAME`. The internal HTTP calls need 
 
 - `mnemos sessions list` (or similar) — calls `GET /sessions/{project}` instead of `/sessions`.
 - `mnemos snapshots list` — `GET /snapshots/{project}`.
-- `mnemos lint run` — `POST /lint/{project}`.
+- `mnemos lint run` — `POST /lint/{project}/run`.
 - `mnemos pages list` — `GET /pages/{project}`.
 - etc.
 
