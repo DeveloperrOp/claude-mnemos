@@ -24,9 +24,9 @@ def test_open_creates_db_with_schema(tmp_path: Path):
     db_path = tmp_path / JOBS_DB_FILENAME
     with JobStore(db_path) as store:
         assert db_path.is_file()
-        # schema_meta has version 1
+        # schema_meta has version 2 (added 'cancelled' status)
         cur = store._conn.execute("SELECT value FROM schema_meta WHERE key='version'")
-        assert cur.fetchone()[0] == "1"
+        assert cur.fetchone()[0] == "2"
 
 
 def test_create_returns_job_with_uuid(tmp_path: Path):

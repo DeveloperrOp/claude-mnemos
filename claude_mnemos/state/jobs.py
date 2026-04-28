@@ -22,7 +22,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 JOBS_DB_FILENAME = ".jobs.db"
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 MAX_ATTEMPTS = 4
 RETRY_DELAYS_S: list[float] = [30.0, 120.0, 1200.0]
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     finished_at     REAL,
     error           TEXT,
     error_traceback TEXT,
-    CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter')),
+    CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter', 'cancelled')),
     CHECK (attempt >= 0)
 );
 
@@ -380,6 +380,20 @@ class JobStore:
                     )
                     requeued += 1
         return RecoveryResult(requeued=requeued, moved_to_dead_letter=moved)
+
+    def cancel_all_queued(self) -> int:
+        """Mark every 'queued' job as 'cancelled'. Returns count cancelled.
+
+        Used by VaultRuntime.unmount(force=True) to drain pending work.
+        """
+        with self._tx_lock:
+            cur = self._conn.execute(
+                "UPDATE jobs SET status='cancelled', finished_at=? "
+                "WHERE status='queued'",
+                (_ts(datetime.now(UTC)),),
+            )
+            self._conn.commit()
+            return cur.rowcount
 
     def cancel_queued(self, job_id: str) -> bool:
         with self._tx_lock:
