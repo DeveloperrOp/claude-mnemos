@@ -60,7 +60,6 @@ async def test_run_lint_daemon_unreachable() -> None:
 
 async def test_run_lint_unreachable_message_has_project_add_hint(monkeypatch) -> None:
     """Unreachable error message references 'mnemos project add' instead of --vault."""
-    import httpx
 
     async def fake_call_daemon(_client, _method, _url, *, json_body=None):  # noqa: ARG001
         raise __import__(
