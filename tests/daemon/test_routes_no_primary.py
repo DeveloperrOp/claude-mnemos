@@ -60,11 +60,15 @@ def test_projects_works_without_primary(client: TestClient) -> None:
     assert r.status_code == 200
 
 
-def test_dead_letter_503_without_daemon(client: TestClient) -> None:
-    """dead-letter returns 503 for a different reason (no jobs subsystem),
-    which is fine — it already has its own guard."""
+def test_dead_letter_empty_without_daemon(client: TestClient) -> None:
+    """GET /dead-letter returns 200 + empty list when daemon is None.
+
+    Cross-vault aggregation via all_runtimes() gracefully returns [] when no
+    daemon is registered — no 503, consistent with /jobs behaviour.
+    """
     r = client.get("/dead-letter")
-    assert r.status_code == 503
+    assert r.status_code == 200
+    assert r.json() == {"jobs": []}
 
 
 def test_trash_project_route_503_without_daemon(client: TestClient) -> None:

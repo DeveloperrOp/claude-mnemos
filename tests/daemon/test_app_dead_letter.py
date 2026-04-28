@@ -9,17 +9,34 @@ from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 
+# Project name used throughout the existing tests.
+_PROJECT = "test-vault"
+
+
+class _FakeRuntime:
+    """Minimal stand-in for VaultRuntime — only the job-related attributes."""
+
+    def __init__(self, vault: Path, name: str) -> None:
+        self.name = name
+        self.job_store = JobStore(vault / JOBS_DB_FILENAME)
+        self.job_worker = None
+
 
 class _FakeDaemon:
     def __init__(self, vault: Path) -> None:
         self.alerts = Alerts()
         self.tracker = OurWritesTracker(ttl_s=60.0)
-        self.job_store = JobStore(vault / JOBS_DB_FILENAME)
         self.started_at_monotonic = 0.0
-        self.job_worker = None
-        # Routes read per-vault state from primary_runtime; self-shim preserves
-        # existing test behaviour without changing test structure.
-        self.primary_runtime = self
+
+        runtime = _FakeRuntime(vault, name=_PROJECT)
+        # runtimes dict satisfies both cross-vault aggregation via
+        # all_runtimes() and any per-project resolution via get_runtime().
+        self.runtimes: dict[str, _FakeRuntime] = {_PROJECT: runtime}
+
+    @property
+    def job_store(self) -> JobStore:
+        """Convenience for tests that create/inspect jobs directly."""
+        return self.runtimes[_PROJECT].job_store
 
     def scheduler_jobs_info(self):
         return []
