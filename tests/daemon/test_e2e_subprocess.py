@@ -100,7 +100,7 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
         assert r.status_code == 200
         r = httpx.get(f"http://127.0.0.1:{port}/activity", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/snapshots", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/snapshots/main", timeout=2.0)
         assert r.status_code == 200
 
     finally:

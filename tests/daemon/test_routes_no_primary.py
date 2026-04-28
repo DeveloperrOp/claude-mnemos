@@ -20,7 +20,6 @@ def client():
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("GET", "/snapshots"),
         ("GET", "/activity"),
         ("PATCH", "/pages/some-page"),  # pages has no GET; use PATCH
         ("GET", "/trash"),
