@@ -145,7 +145,8 @@ def test_health_watchdog_running_with_real_daemon(
     r = client.get("/health")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["watchdog_running"] is True
+    # Per-vault dict shape: watchdog state lives under vaults["alpha"]
+    assert body["vaults"]["alpha"]["watchdog_running"] is True
 
 
 def test_health_jobs_counters_with_real_daemon(
@@ -155,10 +156,11 @@ def test_health_jobs_counters_with_real_daemon(
     r = client.get("/health")
     assert r.status_code == 200, r.text
     body = r.json()
-    # Counters are present and numeric (not stuck at 0 due to missing job_store)
-    assert isinstance(body["jobs_queued"], int)
-    assert isinstance(body["jobs_running"], int)
-    assert isinstance(body["jobs_dead_letter"], int)
+    # Counters live under vaults["alpha"] (not stuck at 0 due to missing job_store)
+    vault_alpha = body["vaults"]["alpha"]
+    assert isinstance(vault_alpha["jobs_queued"], int)
+    assert isinstance(vault_alpha["jobs_running"], int)
+    assert isinstance(vault_alpha["jobs_dead_letter"], int)
 
 
 # ── /pages (tracker wiring) ───────────────────────────────────────────────────

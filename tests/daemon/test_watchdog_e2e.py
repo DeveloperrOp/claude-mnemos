@@ -19,13 +19,6 @@ import pytest
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skip(
-        reason=(
-            "TODO(β2 Plan #13b-β2): /health watchdog_running reads daemon.observer "
-            "(single-vault attr) — needs migration to primary_runtime.observer "
-            "before this e2e can pass."
-        )
-    ),
 ]
 
 
@@ -101,7 +94,9 @@ def test_watchdog_e2e_external_modify_detected(tmp_path: Path):
             f"daemon did not respond. "
             f"stderr: {proc.stderr.read().decode() if proc.stderr else ''}"
         )
-        assert health.get("watchdog_running") is True, (
+        # Per-vault dict shape: watchdog state lives under vaults["main"]
+        vaults = health.get("vaults", {})
+        assert vaults.get("main", {}).get("watchdog_running") is True, (
             f"watchdog not running. health={health}"
         )
 

@@ -8,14 +8,16 @@ from claude_mnemos.daemon.schemas import (
     SchedulerJobInfo,
     SnapshotInfo,
     UndoApiResult,
+    VaultHealth,
     VaultInfo,
     VersionResponse,
 )
 
 
 def test_health_response_minimal():
-    r = HealthResponse(status="ok", version="0.0.1", vault="/tmp/v", uptime_s=1.5)
+    r = HealthResponse(status="ok", version="0.0.1", uptime_s=1.5)
     assert r.scheduler_jobs == []
+    assert r.vaults == {}
 
 
 def test_health_response_with_jobs():
@@ -25,20 +27,37 @@ def test_health_response_with_jobs():
         trigger="cron[hour=4,minute=0]",
     )
     r = HealthResponse(
-        status="ok", version="0.0.1", vault="/v", uptime_s=0.1, scheduler_jobs=[job]
+        status="ok", version="0.0.1", uptime_s=0.1, scheduler_jobs=[job]
     )
     assert len(r.scheduler_jobs) == 1
     assert r.scheduler_jobs[0].id == "daily_snapshot"
 
 
+def test_health_response_with_vault_dict():
+    vh = VaultHealth(
+        watchdog_running=True,
+        jobs_queued=2,
+        jobs_running=1,
+        jobs_dead_letter=0,
+    )
+    r = HealthResponse(
+        status="ok",
+        version="0.0.1",
+        uptime_s=0.0,
+        vaults={"alpha": vh},
+    )
+    assert r.vaults["alpha"].watchdog_running is True
+    assert r.vaults["alpha"].jobs_queued == 2
+
+
 def test_health_response_invalid_status():
     with pytest.raises(ValidationError):
-        HealthResponse(status="weird", version="0", vault="/", uptime_s=0)  # type: ignore[arg-type]
+        HealthResponse(status="weird", version="0", uptime_s=0)  # type: ignore[arg-type]
 
 
 def test_health_response_negative_uptime():
     with pytest.raises(ValidationError):
-        HealthResponse(status="ok", version="0", vault="/", uptime_s=-1.0)
+        HealthResponse(status="ok", version="0", uptime_s=-1.0)
 
 
 def test_scheduler_job_no_next_run():
