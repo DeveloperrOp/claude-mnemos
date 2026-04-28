@@ -148,6 +148,70 @@ class MnemosDaemon:
                 continue
             self.runtimes[entry.name] = runtime
 
+    # ─── Dynamic vault management (Task 14) ───────────────────────
+
+    async def mount_vault(self, entry: ProjectMapEntry) -> VaultRuntime:
+        """Mount a new vault and add it to ``self.runtimes``.
+
+        Raises ``VaultMountError`` if a runtime with the same name is already
+        mounted. Holds ``_runtimes_lock`` for the entire lifecycle so no
+        concurrent CRUD-mid-mount race is possible.
+        """
+        async with self._runtimes_lock:
+            if entry.name in self.runtimes:
+                from claude_mnemos.daemon.vault_runtime import VaultMountError
+
+                raise VaultMountError(f"{entry.name!r} already mounted")
+            from claude_mnemos.daemon.vault_runtime import VaultRuntime
+
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            self.runtimes[entry.name] = runtime
+            self._recompute_primary()
+            return runtime
+
+    async def unmount_vault(
+        self,
+        name: str,
+        *,
+        force: bool = False,
+        drain_timeout: float = 10.0,
+    ) -> None:
+        """Unmount and remove ``name`` from ``self.runtimes``.
+
+        Raises ``KeyError`` if no such runtime is mounted.
+        Raises ``VaultBusyError`` when ``force=False`` and jobs are in-flight.
+        """
+        async with self._runtimes_lock:
+            runtime = self.runtimes.get(name)
+            if runtime is None:
+                raise KeyError(name)
+            await runtime.unmount(timeout=drain_timeout, force=force)
+            del self.runtimes[name]
+            self._recompute_primary()
+
+    async def remount_vault(self, entry: ProjectMapEntry) -> VaultRuntime:
+        """Unmount the existing runtime for ``entry.name`` (if any) and mount a
+        fresh one with the new ``entry`` (e.g. after vault_root changes).
+
+        If the old vault is busy (active jobs) ``VaultBusyError`` is raised and
+        ``self.runtimes`` is left unchanged — the caller should convert to 409.
+        """
+        async with self._runtimes_lock:
+            old = self.runtimes.get(entry.name)
+            if old is not None:
+                await old.unmount(timeout=10.0, force=False)
+                del self.runtimes[entry.name]
+            from claude_mnemos.daemon.vault_runtime import VaultRuntime
+
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            self.runtimes[entry.name] = runtime
+            self._recompute_primary()
+            return runtime
+
     def _request_shutdown(self) -> None:  # pragma: no cover - implemented in Task 16
         if self._server is not None:
             self._server.should_exit = True

@@ -238,3 +238,106 @@ async def test_bootstrap_runtimes_partial_failure_continues(
                 await rt.unmount(timeout=2.0, force=True)
             daemon.runtimes.clear()
         daemon.scheduler.shutdown(wait=False)
+
+
+# ─── Task 14: mount_vault / unmount_vault / remount_vault ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_mount_vault_appends_to_runtimes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    _add_project("alpha", tmp_path / "a")
+
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        new_entry = _add_project("beta", tmp_path / "b")
+        await daemon.mount_vault(new_entry)
+        assert "beta" in daemon.runtimes
+        assert daemon.runtimes["beta"].is_mounted
+    finally:
+        async with daemon._runtimes_lock:
+            for rt in list(daemon.runtimes.values()):
+                await rt.unmount(timeout=2.0, force=True)
+            daemon.runtimes.clear()
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_mount_vault_duplicate_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    e = _add_project("alpha", tmp_path / "a")
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        await daemon.mount_vault(e)
+        from claude_mnemos.daemon.vault_runtime import VaultMountError
+        with pytest.raises(VaultMountError):
+            await daemon.mount_vault(e)
+    finally:
+        async with daemon._runtimes_lock:
+            for rt in list(daemon.runtimes.values()):
+                await rt.unmount(timeout=2.0, force=True)
+            daemon.runtimes.clear()
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_unmount_vault_removes_from_dict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    e = _add_project("alpha", tmp_path / "a")
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        await daemon.mount_vault(e)
+        await daemon.unmount_vault("alpha")
+        assert "alpha" not in daemon.runtimes
+    finally:
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_unmount_vault_unknown_raises_keyerror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        with pytest.raises(KeyError):
+            await daemon.unmount_vault("ghost")
+    finally:
+        daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_remount_vault_swaps_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    e = _add_project("alpha", tmp_path / "a-old")
+
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    try:
+        await daemon.mount_vault(e)
+        old_observer = daemon.runtimes["alpha"].observer
+
+        new_root = tmp_path / "a-new"
+        new_root.mkdir()
+        new_entry = ProjectMapEntry(name="alpha", vault_root=new_root, cwd_patterns=[])
+        await daemon.remount_vault(new_entry)
+        assert daemon.runtimes["alpha"].vault_root == new_root
+        assert daemon.runtimes["alpha"].observer is not old_observer
+    finally:
+        async with daemon._runtimes_lock:
+            for rt in list(daemon.runtimes.values()):
+                await rt.unmount(timeout=2.0, force=True)
+            daemon.runtimes.clear()
+        daemon.scheduler.shutdown(wait=False)
