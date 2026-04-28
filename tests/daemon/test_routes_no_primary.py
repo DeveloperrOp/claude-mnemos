@@ -3,6 +3,9 @@
 TDD test for Task 17 of Plan #13b-β1: _vault helpers must guard against None primary.
 Updated in Task 10 of Plan #13b-β2: /lost-sessions is now cross-vault and returns
 200 with empty list when daemon is None (no runtimes to iterate).
+Updated in Task 13 of Plan #13b-β2: /metrics/* are now cross-vault and return
+200 with zero-totals / empty lists when daemon is None (consistent with other
+cross-vault endpoints).
 
 Note: /trash, /lint, /ontology, /activity and /vault routes now require a {project}
 path segment and are guarded by get_runtime (returns 503 when daemon is None), tested
@@ -23,12 +26,17 @@ def client():
     return TestClient(app)
 
 
-def test_metrics_usage_returns_503_when_no_daemon(client: TestClient) -> None:
-    """/metrics/usage still returns 503 when daemon is None (needs runtimes)."""
+def test_metrics_usage_returns_zeros_when_no_daemon(client: TestClient) -> None:
+    """/metrics/usage returns 200 with zero-totals when daemon is None.
+
+    β2 behaviour: cross-vault route iterates all_runtimes() which returns []
+    when daemon is None — no error, just an empty aggregation.
+    """
     r = client.get("/metrics/usage")
-    assert r.status_code == 503, r.text
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert body.get("detail", {}).get("error") == "no_vault_registered"
+    assert body["sessions_covered"] == 0
+    assert body["tokens_injected"] == 0
 
 
 def test_lost_sessions_returns_empty_when_no_daemon(client: TestClient) -> None:
