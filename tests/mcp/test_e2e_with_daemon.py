@@ -81,8 +81,6 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",

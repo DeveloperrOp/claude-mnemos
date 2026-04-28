@@ -94,8 +94,6 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",

@@ -84,8 +84,6 @@ def test_watchdog_e2e_external_modify_detected(tmp_path: Path):
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",

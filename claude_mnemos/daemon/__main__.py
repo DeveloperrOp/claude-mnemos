@@ -5,7 +5,12 @@ import asyncio
 import sys
 from pathlib import Path
 
-from claude_mnemos.daemon.config import DEFAULT_LOG_LEVEL, DaemonConfig, default_pid_file
+from claude_mnemos.daemon.config import (
+    DEFAULT_LOG_LEVEL,
+    BootFilter,
+    DaemonConfig,
+    default_pid_file,
+)
 from claude_mnemos.daemon.process import MnemosDaemon
 
 
@@ -13,10 +18,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos.daemon")
     sub = parser.add_subparsers(dest="cmd", required=True)
     run = sub.add_parser("run", help="Run the daemon in foreground")
-    # TODO(Task 22): --vault becomes optional once multi-vault boot from
-    # project-map is wired; --retention-days is removed entirely (per-project
-    # retention lives in settings, not DaemonConfig).
-    run.add_argument("--vault", type=Path, required=True)
     run.add_argument("--host", default="127.0.0.1")
     run.add_argument("--port", type=int, default=5757)
     run.add_argument(
@@ -25,23 +26,43 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["debug", "info", "warning", "error"],
     )
     run.add_argument("--pid-file", type=Path, default=default_pid_file())
+    grp = run.add_mutually_exclusive_group()
+    grp.add_argument(
+        "--all",
+        action="store_true",
+        help="Mount every project in project-map (default).",
+    )
+    grp.add_argument(
+        "--project",
+        default="",
+        help="Comma-separated subset of project names to mount.",
+    )
     return parser
+
+
+def _build_config(args: argparse.Namespace) -> DaemonConfig:
+    boot_filter: BootFilter | None
+    if args.project:
+        names = [n.strip() for n in args.project.split(",") if n.strip()]
+        boot_filter = BootFilter(all=False, names=names)
+    elif args.all:
+        boot_filter = BootFilter(all=True)
+    else:
+        boot_filter = None  # None == all by convention
+    return DaemonConfig(
+        host=args.host,
+        port=args.port,
+        log_level=args.log_level,
+        pid_file=args.pid_file,
+        boot_filter=boot_filter,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.cmd != "run":
         return 1
-    # TODO(Task 22): drop ``--vault`` entirely once multi-vault boot from
-    # project-map is wired (Tasks 13-16). Until then ``args.vault`` is parsed
-    # for backward-compat but ignored — ``MnemosDaemon`` now selects vaults
-    # from ``project-map.json`` filtered by ``DaemonConfig.boot_filter``.
-    config = DaemonConfig(
-        host=args.host,
-        port=args.port,
-        log_level=args.log_level,
-        pid_file=args.pid_file,
-    )
+    config = _build_config(args)
     daemon = MnemosDaemon(config)
     try:
         asyncio.run(daemon.run())

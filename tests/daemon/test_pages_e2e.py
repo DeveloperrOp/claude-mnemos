@@ -83,8 +83,6 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",

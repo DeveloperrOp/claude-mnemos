@@ -59,7 +59,7 @@ def _terminate(proc: subprocess.Popen[bytes]) -> None:
 
 
 def _spawn_daemon(
-    vault: Path, port: int, env: dict[str, str], pid_file: Path,
+    port: int, env: dict[str, str], pid_file: Path,
 ) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         [
@@ -67,8 +67,6 @@ def _spawn_daemon(
             "-m",
             "claude_mnemos.daemon",
             "run",
-            "--vault",
-            str(vault),
             "--port",
             str(port),
             "--pid-file",
@@ -104,7 +102,7 @@ def test_e2e_register_project_then_patch_settings(isolated_home: Path) -> None:
     port = _free_port()
     env = _child_env(home)
     pid_file = home / "daemon.pid"
-    proc = _spawn_daemon(vault, port, env, pid_file)
+    proc = _spawn_daemon(port, env, pid_file)
     try:
         url = f"http://127.0.0.1:{port}"
         _wait_until_ready(url)
@@ -210,7 +208,7 @@ def test_e2e_settings_persist_across_daemon_restart(isolated_home: Path) -> None
 
     port = _free_port()
     pid_file = home / "daemon.pid"
-    proc = _spawn_daemon(vault, port, env, pid_file)
+    proc = _spawn_daemon(port, env, pid_file)
     try:
         url = f"http://127.0.0.1:{port}"
         _wait_until_ready(url)
