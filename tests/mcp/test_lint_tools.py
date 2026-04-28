@@ -54,5 +54,23 @@ async def test_get_lint_results_with_file(tmp_path: Path) -> None:
 
 
 async def test_run_lint_daemon_unreachable() -> None:
-    out = await run_lint("http://127.0.0.1:1", timeout_s=0.5)
+    out = await run_lint("http://127.0.0.1:1", project="myproject", timeout_s=0.5)
     assert "daemon" in out[0].text.lower()
+
+
+async def test_run_lint_url_includes_project(monkeypatch) -> None:
+    """POST URL must embed the project segment: /lint/{project}/run."""
+    captured: dict[str, str] = {}
+
+    async def fake_call_daemon(_client, method, url, *, json_body=None):  # noqa: ARG001
+        captured["url"] = url
+        captured["method"] = method
+        return {"run_id": "r1", "summary": {"total": 0}}
+
+    monkeypatch.setattr(
+        "claude_mnemos.mcp.write_tools.lint.call_daemon", fake_call_daemon
+    )
+    out = await run_lint("http://daemon", project="alpha", timeout_s=5.0)
+    assert "/alpha" in captured.get("url", "")
+    assert captured.get("url", "").endswith("/lint/alpha/run")
+    assert "lint complete" in out[0].text.lower()

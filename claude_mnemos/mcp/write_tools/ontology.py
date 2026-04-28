@@ -10,12 +10,13 @@ from claude_mnemos.mcp.write_tools._http import call_daemon
 async def apply_ontology_suggestion(
     client: httpx.AsyncClient,
     daemon_url: str,
+    project: str,
     suggestion_id: str,
 ) -> dict[str, Any]:
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/suggestions/{suggestion_id}/approve",
+        f"{daemon_url.rstrip('/')}/ontology/{project}/suggestions/{suggestion_id}/approve",
     )
 
 
@@ -23,6 +24,7 @@ async def propose_ontology_change(
     client: httpx.AsyncClient,
     daemon_url: str,
     *,
+    project: str,
     operation: str,
     affected_pages: list[str],
     proposed_target: str | None = None,
@@ -40,6 +42,6 @@ async def propose_ontology_change(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/suggestions",
+        f"{daemon_url.rstrip('/')}/ontology/{project}/suggestions",
         json_body=body,
     )

@@ -102,9 +102,9 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
         )
         server = build_server(config)
 
-        # Create manual snapshot via MCP
+        # Create manual snapshot via MCP (project="main" registered above)
         result = await _call_tool(
-            server, "create_snapshot", {"label": "mcp-e2e"}
+            server, "create_snapshot", {"project": "main", "label": "mcp-e2e"}
         )
         body = json.loads(result.content[0].text)
         assert body["kind"] == "manual"
@@ -119,7 +119,7 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
 
         # Delete via MCP
         del_result = await _call_tool(
-            server, "delete_snapshot", {"name": snap_name}
+            server, "delete_snapshot", {"project": "main", "name": snap_name}
         )
         del_body = json.loads(del_result.content[0].text)
         assert del_body["deleted"] == snap_name
@@ -148,7 +148,9 @@ async def test_mcp_undo_unreachable_daemon_returns_helpful_error(tmp_path: Path)
         daemon_timeout_s=2.0,
     )
     server = build_server(config)
-    result = await _call_tool(server, "undo_operation", {"op_id": "abc"})
+    result = await _call_tool(
+        server, "undo_operation", {"project": "myproject", "op_id": "abc"}
+    )
     text = result.content[0].text
     # Either ConnectError ("not reachable") or timeout — both mean daemon offline
     assert "daemon" in text

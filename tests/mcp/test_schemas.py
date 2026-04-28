@@ -50,21 +50,45 @@ def test_get_recent_activity_limit():
 def test_undo_operation_requires_op_id():
     s = schemas.UNDO_OPERATION
     _is_valid_object_schema(s)
-    assert s["required"] == ["op_id"]
+    assert "project" in s["required"]
+    assert "op_id" in s["required"]
 
 
-def test_create_snapshot_label_optional():
+def test_create_snapshot_requires_project():
     s = schemas.CREATE_SNAPSHOT
     _is_valid_object_schema(s)
+    assert "project" in s.get("required", [])
     assert "label" in s["properties"]
-    assert "required" not in s
 
 
-def test_restore_snapshot_requires_name():
+def test_restore_snapshot_requires_name_and_project():
     s = schemas.RESTORE_SNAPSHOT
     _is_valid_object_schema(s)
-    assert s["required"] == ["name"]
+    assert "project" in s["required"]
+    assert "name" in s["required"]
 
 
-def test_delete_snapshot_same_as_restore():
-    assert schemas.DELETE_SNAPSHOT == schemas.RESTORE_SNAPSHOT
+def test_delete_snapshot_requires_name_and_project():
+    s = schemas.DELETE_SNAPSHOT
+    _is_valid_object_schema(s)
+    assert "project" in s["required"]
+    assert "name" in s["required"]
+
+
+def test_run_lint_requires_project():
+    s = schemas.RUN_LINT
+    _is_valid_object_schema(s)
+    assert "project" in s.get("required", [])
+
+
+def test_apply_ontology_suggestion_requires_project():
+    s = schemas.APPLY_ONTOLOGY_SUGGESTION
+    _is_valid_object_schema(s)
+    assert "project" in s["required"]
+    assert "suggestion_id" in s["required"]
+
+
+def test_propose_ontology_change_requires_project():
+    s = schemas.PROPOSE_ONTOLOGY_CHANGE
+    _is_valid_object_schema(s)
+    assert "project" in s["required"]
