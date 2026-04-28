@@ -6,24 +6,26 @@ from claude_mnemos.cli import build_parser
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
 
 
-def test_parser_daemon_start_minimal(tmp_path: Path):
-    args = build_parser().parse_args(["daemon", "start", "--vault", str(tmp_path)])
+def test_parser_daemon_start_minimal():
+    args = build_parser().parse_args(["daemon", "start"])
     assert args.command == "daemon"
     assert args.daemon_cmd == "start"
-    assert args.vault == tmp_path
     assert args.host is None
     assert args.port is None
 
 
-def test_parser_daemon_foreground_with_overrides(tmp_path: Path):
-    # --retention-days removed from DaemonConfig (Task 10); per-project retention
-    # lives in settings.  TODO(Task 22): full foreground rewrite.
+def test_parser_daemon_start_vault_flag_rejected(tmp_path: Path):
+    """--vault PATH must now hard-exit with code 2 (legacy hard-cut, Task 22)."""
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["daemon", "start", "--vault", str(tmp_path)])
+    assert exc.value.code == 2
+
+
+def test_parser_daemon_foreground_with_overrides():
     args = build_parser().parse_args(
         [
             "daemon",
             "foreground",
-            "--vault",
-            str(tmp_path),
             "--port",
             "8080",
             "--host",
@@ -35,6 +37,13 @@ def test_parser_daemon_foreground_with_overrides(tmp_path: Path):
     assert args.daemon_cmd == "foreground"
     assert args.port == 8080
     assert args.log_level == "debug"
+
+
+def test_parser_daemon_foreground_vault_flag_rejected(tmp_path: Path):
+    """--vault PATH must hard-exit on foreground too (Task 22)."""
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["daemon", "foreground", "--vault", str(tmp_path)])
+    assert exc.value.code == 2
 
 
 def test_parser_daemon_stop_default_timeout():

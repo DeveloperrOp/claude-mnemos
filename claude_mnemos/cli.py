@@ -10,6 +10,7 @@ import time
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -19,7 +20,7 @@ from claude_mnemos.core.locks import LockTimeoutError
 from claude_mnemos.core.ontology_apply import OntologyError, apply_suggestion
 from claude_mnemos.core.staging import StagingPromoteError
 from claude_mnemos.core.undo import UndoError, undo
-from claude_mnemos.daemon.config import DaemonConfig, default_pid_file
+from claude_mnemos.daemon.config import BootFilter, DaemonConfig, default_pid_file
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, is_daemon_running
 from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
@@ -42,6 +43,62 @@ from claude_mnemos.state.ontology import (
 )
 
 _EXIT_PROJECT_NOT_FOUND = 97
+
+
+# ── daemon argparse helpers ───────────────────────────────────────────────────
+
+
+class _VaultDeprecated(argparse.Action):
+    """Hard-error for the removed ``--vault PATH`` flag on daemon commands."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        _namespace: argparse.Namespace,
+        _values: object,
+        _option_string: str | None = None,
+    ) -> None:
+        parser.exit(
+            2,
+            (
+                "--vault is no longer supported. Register the vault first:\n"
+                "    mnemos project add NAME --vault PATH\n"
+                "Then start daemon with `mnemos daemon start` (mounts all projects)\n"
+                "or `mnemos daemon start --project NAME`.\n"
+            ),
+        )
+
+
+def _add_daemon_start_args(p: argparse.ArgumentParser) -> None:
+    """Add shared start/foreground flags to *p*."""
+    p.add_argument("--host", default=None)
+    p.add_argument("--port", type=int, default=None)
+    p.add_argument(
+        "--log-level",
+        default=None,
+        choices=["debug", "info", "warning", "error"],
+    )
+    p.add_argument("--pid-file", type=Path, default=None)
+    grp = p.add_mutually_exclusive_group()
+    grp.add_argument(
+        "--all",
+        action="store_true",
+        default=False,
+        help="Mount every registered project (default when no filter given)",
+    )
+    grp.add_argument(
+        "--project",
+        default="",
+        metavar="NAMES",
+        help="Comma-separated project names to mount",
+    )
+    # Hard-cut for the legacy --vault flag.
+    p.add_argument(
+        "--vault",
+        action=_VaultDeprecated,
+        nargs="?",
+        help=argparse.SUPPRESS,
+    )
 
 
 def _resolve_vault_from_project_arg(
@@ -155,17 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
     daemon_sub = daemon_p.add_subparsers(dest="daemon_cmd", required=True)
 
     for cmd in ("start", "foreground"):
-        sp = daemon_sub.add_parser(cmd)
-        # TODO(Task 22): --vault becomes optional when multi-vault boot is wired;
-        # --retention-days is removed (per-project retention lives in settings).
-        sp.add_argument("--vault", type=Path, default=Path.cwd())
-        sp.add_argument("--host", default=None)
-        sp.add_argument("--port", type=int, default=None)
-        sp.add_argument(
-            "--log-level",
-            default=None,
-            choices=["debug", "info", "warning", "error"],
-        )
+        _add_daemon_start_args(daemon_sub.add_parser(cmd))
 
     stop_p = daemon_sub.add_parser("stop")
     stop_p.add_argument("--timeout", type=float, default=10.0)
@@ -694,18 +741,27 @@ def _cmd_undo(args: argparse.Namespace) -> int:
 
 
 def _resolve_daemon_config(args: argparse.Namespace) -> DaemonConfig:
-    # TODO(Task 22): full daemon-start rewrite; vault_root moves out of DaemonConfig.
     base = DaemonConfig.from_env()
-    overrides: dict[str, object] = {}
-    if args.host is not None:
+    overrides: dict[str, Any] = {}
+    if getattr(args, "host", None) is not None:
         overrides["host"] = args.host
-    if args.port is not None:
+    if getattr(args, "port", None) is not None:
         overrides["port"] = args.port
-    if args.log_level is not None:
+    if getattr(args, "log_level", None) is not None:
         overrides["log_level"] = args.log_level
-    if overrides:
-        return base.model_copy(update=overrides)
-    return base
+    if getattr(args, "pid_file", None) is not None:
+        overrides["pid_file"] = args.pid_file
+
+    project = getattr(args, "project", "")
+    if project:
+        names = [n.strip() for n in project.split(",") if n.strip()]
+        overrides["boot_filter"] = BootFilter(all=False, names=names)
+    elif getattr(args, "all", False):
+        overrides["boot_filter"] = BootFilter(all=True)
+    else:
+        overrides["boot_filter"] = None
+
+    return base.model_copy(update=overrides)
 
 
 def _cmd_daemon(args: argparse.Namespace) -> int:
@@ -722,9 +778,6 @@ def _cmd_daemon(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
-    # TODO(Task 22): full rewrite for multi-vault; vault passed via args.vault
-    # because DaemonConfig no longer carries vault_root.
-    vault_root: Path = args.vault
     config = _resolve_daemon_config(args)
     pid = is_daemon_running(config.pid_file)
     if pid is not None:
@@ -739,8 +792,6 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         "-m",
         "claude_mnemos.daemon",
         "run",
-        "--vault",
-        str(vault_root),
         "--host",
         config.host,
         "--port",
@@ -750,6 +801,12 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         "--pid-file",
         str(config.pid_file),
     ]
+    if config.boot_filter is not None:
+        if config.boot_filter.all:
+            cmd.append("--all")
+        elif config.boot_filter.names:
+            cmd.extend(["--project", ",".join(config.boot_filter.names)])
+
     if sys.platform == "win32":
         flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
             subprocess, "DETACHED_PROCESS", 0
@@ -781,7 +838,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
             r = httpx.get(health_url, timeout=0.5)
             if r.status_code == 200:
                 print(
-                    f"daemon started: pid={proc.pid}, vault={vault_root}, "
+                    f"daemon started: pid={proc.pid}, "
                     f"http://{config.host}:{config.port}"
                 )
                 return 0
@@ -794,9 +851,6 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_foreground(args: argparse.Namespace) -> int:
-    # TODO(Task 22): full rewrite for multi-vault; ``args.vault`` is currently
-    # ignored because ``MnemosDaemon`` now boots from project-map. Task 16
-    # wires ``MnemosDaemon.run()``; Task 22 reshapes the CLI surface.
     config = _resolve_daemon_config(args)
     pid = is_daemon_running(config.pid_file)
     if pid is not None:
@@ -805,11 +859,7 @@ def _cmd_daemon_foreground(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 78
-    DaemonRuntimeState(
-        host=config.host,
-        port=config.port,
-        pid_file=config.pid_file,
-    ).save()
+    DaemonRuntimeState(host=config.host, port=config.port, pid_file=config.pid_file).save()
     daemon = MnemosDaemon(config)
     try:
         asyncio.run(daemon.run())
