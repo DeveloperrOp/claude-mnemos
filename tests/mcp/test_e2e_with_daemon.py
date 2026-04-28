@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -21,13 +22,7 @@ from mcp import types
 from claude_mnemos.mcp.config import MCPConfig
 from claude_mnemos.mcp.server import build_server
 
-pytestmark = pytest.mark.skip(
-    reason=(
-        "Plan #13b-β1 Task 12 stubbed MnemosDaemon.run() as NotImplementedError "
-        "until Task 16 wires _bootstrap_runtimes + uvicorn. Re-enable this "
-        "subprocess e2e once Task 16 lands."
-    )
-)
+pytestmark = pytest.mark.slow
 
 
 def _free_port() -> int:
@@ -66,6 +61,20 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
     pid_file = tmp_path / "daemon.pid"
     port = _free_port()
 
+    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
+    # and vault-root-dependent routes (/snapshots) work.
+    isolated_home = tmp_path / "home"
+    isolated_home.mkdir()
+    child_env = os.environ.copy()
+    child_env["HOME"] = str(isolated_home)
+    child_env["USERPROFILE"] = str(isolated_home)
+    child_env.pop("MNEMOS_VAULT_ROOT", None)
+    (isolated_home / ".claude-mnemos").mkdir(parents=True, exist_ok=True)
+    (isolated_home / ".claude-mnemos" / "project-map.json").write_text(
+        json.dumps({"projects": [{"name": "main", "vault_root": str(vault), "cwd_patterns": []}]}),
+        encoding="utf-8",
+    )
+
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -79,6 +88,7 @@ async def test_mcp_create_and_delete_snapshot_via_real_daemon(tmp_path: Path):
             "--pid-file",
             str(pid_file),
         ],
+        env=child_env,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

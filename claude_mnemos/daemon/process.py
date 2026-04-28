@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal
+import sys
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -12,6 +16,7 @@ from fastapi import FastAPI
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
+from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
@@ -94,16 +99,62 @@ class MnemosDaemon:
         self._primary_runtime = primary
         self.app.state.vault_root = primary.vault_root if primary else None
 
-    # ─── Lifecycle (added in later tasks) ──────────────────────────
+    # ─── Lifecycle ────────────────────────────────────────────────
 
-    async def run(self) -> None:  # pragma: no cover - implemented in Task 16
-        """Run the daemon: bootstrap runtimes, start FastAPI server, install
-        signal handlers, await shutdown.
-
-        Implemented in Task 16 alongside ``_bootstrap_runtimes`` (Task 13) and
-        ``mount_vault``/``unmount_vault`` (Task 14).
+    async def run(self) -> None:
+        """Run the daemon: write PID, bootstrap runtimes, start FastAPI/uvicorn,
+        install signal handlers, then on shutdown unmount all runtimes and clean up.
         """
-        raise NotImplementedError("MnemosDaemon.run() lands in Task 16")
+        write_pid_file(self.config.pid_file, os.getpid())
+        self.started_at_monotonic = time.monotonic()
+        try:
+            await self._bootstrap_runtimes()
+            self._recompute_primary()
+            self.scheduler.start()
+            await self._serve_uvicorn()
+        finally:
+            await self._shutdown_runtimes()
+            try:
+                self.scheduler.shutdown(wait=False)
+            except Exception:
+                logger.exception("scheduler shutdown failed")
+            cleanup_pid_file(self.config.pid_file)
+
+    async def _serve_uvicorn(self) -> None:
+        uconfig = uvicorn.Config(
+            app=self.app,
+            host=self.config.host,
+            port=self.config.port,
+            log_level=self.config.log_level,
+            lifespan="on",
+        )
+        self._server = uvicorn.Server(uconfig)
+        self._install_signal_handlers()
+        await self._server.serve()
+
+    async def _shutdown_runtimes(self) -> None:
+        async with self._runtimes_lock:
+            tasks = [
+                rt.unmount(timeout=5.0, force=True)
+                for rt in list(self.runtimes.values())
+            ]
+            self.runtimes.clear()
+            self._primary_runtime = None
+            self.app.state.vault_root = None
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    def _install_signal_handlers(self) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, self._request_shutdown)
+            except (NotImplementedError, ValueError):
+                if sys.platform != "win32":
+                    signal.signal(sig, lambda *_: self._request_shutdown())
 
     # ─── Boot selection + runtime bootstrap ───────────────────────
 
@@ -234,6 +285,6 @@ class MnemosDaemon:
             self.global_settings = new
             self._recompute_primary()
 
-    def _request_shutdown(self) -> None:  # pragma: no cover - implemented in Task 16
+    def _request_shutdown(self) -> None:
         if self._server is not None:
             self._server.should_exit = True

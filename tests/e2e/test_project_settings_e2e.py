@@ -19,9 +19,8 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.skip(
         reason=(
-            "Plan #13b-β1 Task 12 stubbed MnemosDaemon.run() as "
-            "NotImplementedError until Task 16 wires _bootstrap_runtimes + "
-            "uvicorn. Re-enable this subprocess e2e once Task 16 lands."
+            "TODO(β2 Plan #13b-β2): PATCH /settings/{name} reads daemon.config.vault_root "
+            "(removed in multivault refactor) — needs route migration before this e2e can pass."
         )
     ),
 ]

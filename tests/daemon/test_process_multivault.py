@@ -412,3 +412,29 @@ async def test_reload_global_settings_repicks_primary(
                 await rt.unmount(timeout=2.0, force=True)
             daemon.runtimes.clear()
         daemon.scheduler.shutdown(wait=False)
+
+
+# ─── Task 16: _shutdown_runtimes ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_shutdown_unmounts_all_with_force(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup_home(tmp_path, monkeypatch)
+    _add_project("alpha", tmp_path / "a")
+    _add_project("beta", tmp_path / "b")
+
+    daemon = MnemosDaemon(_config(tmp_path))
+    daemon.scheduler.start()
+    await daemon._bootstrap_runtimes()
+    # Enqueue a job in alpha so force=True path is exercised.
+    daemon.runtimes["alpha"].job_store.create(
+        kind="ingest", payload={"transcript_path": "x"}
+    )
+
+    await daemon._shutdown_runtimes()
+
+    assert daemon.runtimes == {}
+    assert daemon.primary_runtime is None
+    daemon.scheduler.shutdown(wait=False)
