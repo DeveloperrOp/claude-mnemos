@@ -17,12 +17,6 @@ import pytest
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skip(
-        reason=(
-            "TODO(β2 Plan #13b-β2): PATCH /settings/{name} reads daemon.config.vault_root "
-            "(removed in multivault refactor) — needs route migration before this e2e can pass."
-        )
-    ),
 ]
 
 
