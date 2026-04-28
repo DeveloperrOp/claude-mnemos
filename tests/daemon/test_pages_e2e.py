@@ -137,8 +137,8 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert trash_id
         assert not page_path.exists()
 
-        # 5. GET /trash sees the entry with original_path.
-        r = httpx.get(f"{base}/trash", timeout=5.0)
+        # 5. GET /trash/main sees the entry with original_path.
+        r = httpx.get(f"{base}/trash/main", timeout=5.0)
         assert r.status_code == 200, r.text
         trash_payload = r.json()
         match = next(
@@ -149,8 +149,8 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert match["original_path"] == page_rel
         assert match["restorable"] is True
 
-        # 6. POST /trash/{id}/restore -> 200, page is back at original location.
-        r = httpx.post(f"{base}/trash/{trash_id}/restore", timeout=5.0)
+        # 6. POST /trash/main/{id}/restore -> 200, page is back at original location.
+        r = httpx.post(f"{base}/trash/main/{trash_id}/restore", timeout=5.0)
         assert r.status_code == 200, r.text
         restore_body = r.json()
         assert restore_body["success"] is True

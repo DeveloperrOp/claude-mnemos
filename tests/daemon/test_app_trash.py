@@ -1,28 +1,35 @@
-"""Tests for Plan #12 REST /trash/* routes."""
+"""REST tests for /trash/{project}/... routes (Plan #13b-β2 Task 5)."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 from httpx import ASGITransport
 
 from claude_mnemos.core.page_apply import apply_soft_delete
-from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 
-class _FakeDaemon:
-    def __init__(self) -> None:
-        self.alerts = Alerts()
-        self.tracker = OurWritesTracker(ttl_s=60.0)
-        self.started_at_monotonic = 0.0
-        # Routes read tracker from primary_runtime; self-shim preserves behaviour.
-        self.primary_runtime = self
+class _FakeRuntime:
+    """Minimal VaultRuntime shim for trash route tests."""
 
-    def scheduler_jobs_info(self):
+    def __init__(self, vault: Path) -> None:
+        self.vault_root = vault
+        self.tracker = OurWritesTracker(ttl_s=60.0)
+
+
+class _FakeDaemon:
+    def __init__(self, alpha_vault: Path) -> None:
+        self._alpha_runtime = _FakeRuntime(alpha_vault)
+        self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
+        self.primary_runtime = self._alpha_runtime
+        self.started_at_monotonic = 0.0
+
+    def scheduler_jobs_info(self) -> list[Any]:
         return []
 
 
@@ -40,33 +47,45 @@ def _seed(vault: Path, rel: str = "wiki/entities/foo.md") -> Path:
 
 
 @pytest.fixture
-def daemon():
-    return _FakeDaemon()
+def alpha_vault(tmp_path: Path) -> Path:
+    vault = tmp_path / "alpha"
+    vault.mkdir()
+    return vault
 
 
 @pytest.fixture
-def app(tmp_path: Path, daemon: _FakeDaemon):
-    return create_app(tmp_path, daemon=daemon)
+def daemon(alpha_vault: Path) -> _FakeDaemon:
+    return _FakeDaemon(alpha_vault)
 
 
 @pytest.fixture
-async def client(app):
+def app(daemon: _FakeDaemon) -> Any:
+    return create_app(vault_root=None, daemon=daemon)
+
+
+@pytest.fixture
+async def client(app: Any) -> Any:
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
-async def test_get_empty_list(client):
-    r = await client.get("/trash")
+# ---------------------------------------------------------------------------
+# GET /trash/{project}
+# ---------------------------------------------------------------------------
+
+
+async def test_get_empty_list(client: Any) -> None:
+    r = await client.get("/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body == {"entries": [], "total": 0}
 
 
-async def test_get_with_entries(client, tmp_path: Path):
-    p = _seed(tmp_path)
-    apply_soft_delete(tmp_path, p)
-    r = await client.get("/trash")
+async def test_get_with_entries(client: Any, alpha_vault: Path) -> None:
+    p = _seed(alpha_vault)
+    apply_soft_delete(alpha_vault, p)
+    r = await client.get("/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
@@ -77,26 +96,21 @@ async def test_get_with_entries(client, tmp_path: Path):
     assert entry["restorable"] is True
 
 
-async def test_get_by_id(client, tmp_path: Path):
-    p = _seed(tmp_path)
-    delete = apply_soft_delete(tmp_path, p)
-    r = await client.get(f"/trash/{delete.trash_id}")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["trash_id"] == delete.trash_id
-    assert body["original_path"] == "wiki/entities/foo.md"
-
-
-async def test_get_by_id_404(client):
-    r = await client.get("/trash/deleted-nonexistent-2026-04-27-12-00-00-aaaaaaaa")
+async def test_get_unknown_project_404(client: Any) -> None:
+    r = await client.get("/trash/unknown_project")
     assert r.status_code == 404
 
 
-async def test_post_restore_success(client, tmp_path: Path):
-    p = _seed(tmp_path)
-    delete = apply_soft_delete(tmp_path, p)
+# ---------------------------------------------------------------------------
+# POST /trash/{project}/{id}/restore
+# ---------------------------------------------------------------------------
+
+
+async def test_post_restore_success(client: Any, alpha_vault: Path) -> None:
+    p = _seed(alpha_vault)
+    delete = apply_soft_delete(alpha_vault, p)
     assert not p.exists()
-    r = await client.post(f"/trash/{delete.trash_id}/restore")
+    r = await client.post(f"/trash/alpha/{delete.trash_id}/restore")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["success"] is True
@@ -104,39 +118,68 @@ async def test_post_restore_success(client, tmp_path: Path):
     assert body["activity_id"]
     # Page is back at original path; trash dir gone.
     assert p.exists()
-    assert not (tmp_path / ".trash" / delete.trash_id).exists()
+    assert not (alpha_vault / ".trash" / delete.trash_id).exists()
 
 
-async def test_post_restore_collision_returns_409(client, tmp_path: Path):
-    p = _seed(tmp_path)
-    delete = apply_soft_delete(tmp_path, p)
+async def test_post_restore_collision_returns_409(
+    client: Any, alpha_vault: Path
+) -> None:
+    p = _seed(alpha_vault)
+    delete = apply_soft_delete(alpha_vault, p)
     # Recreate at the original path so restore would collide.
-    _seed(tmp_path)
-    r = await client.post(f"/trash/{delete.trash_id}/restore")
+    _seed(alpha_vault)
+    r = await client.post(f"/trash/alpha/{delete.trash_id}/restore")
     assert r.status_code == 409, r.text
 
 
-async def test_delete_one_dismisses(client, tmp_path: Path):
-    p = _seed(tmp_path)
-    delete = apply_soft_delete(tmp_path, p)
-    r = await client.delete(f"/trash/{delete.trash_id}")
-    assert r.status_code == 204
-    assert not (tmp_path / ".trash" / delete.trash_id).exists()
-
-
-async def test_delete_one_404(client):
-    r = await client.delete("/trash/deleted-nonexistent-2026-04-27-12-00-00-aaaaaaaa")
+async def test_post_restore_unknown_project_404(client: Any) -> None:
+    r = await client.post("/trash/unknown_project/some-id/restore")
     assert r.status_code == 404
 
 
-async def test_delete_all_empties(client, tmp_path: Path):
-    p1 = _seed(tmp_path, "wiki/entities/foo.md")
-    p2 = _seed(tmp_path, "wiki/entities/bar.md")
-    apply_soft_delete(tmp_path, p1)
-    apply_soft_delete(tmp_path, p2)
-    r = await client.delete("/trash")
+# ---------------------------------------------------------------------------
+# DELETE /trash/{project}/{id}  — permanent delete (dismiss)
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_one_dismisses(client: Any, alpha_vault: Path) -> None:
+    p = _seed(alpha_vault)
+    delete = apply_soft_delete(alpha_vault, p)
+    r = await client.delete(f"/trash/alpha/{delete.trash_id}")
+    assert r.status_code == 204
+    assert not (alpha_vault / ".trash" / delete.trash_id).exists()
+
+
+async def test_delete_one_404(client: Any) -> None:
+    r = await client.delete(
+        "/trash/alpha/deleted-nonexistent-2026-04-27-12-00-00-aaaaaaaa"
+    )
+    assert r.status_code == 404
+
+
+async def test_delete_one_unknown_project_404(client: Any) -> None:
+    r = await client.delete("/trash/unknown_project/some-id")
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# DELETE /trash/{project}  — empty trash (Tier 2)
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_all_empties(client: Any, alpha_vault: Path) -> None:
+    p1 = _seed(alpha_vault, "wiki/entities/foo.md")
+    p2 = _seed(alpha_vault, "wiki/entities/bar.md")
+    apply_soft_delete(alpha_vault, p1)
+    apply_soft_delete(alpha_vault, p2)
+    r = await client.delete("/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["removed_count"] == 2
     assert len(body["removed_ids"]) == 2
     assert body["errors"] == []
+
+
+async def test_delete_all_unknown_project_404(client: Any) -> None:
+    r = await client.delete("/trash/unknown_project")
+    assert r.status_code == 404

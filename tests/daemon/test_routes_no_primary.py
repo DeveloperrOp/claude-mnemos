@@ -1,6 +1,10 @@
 """Test that every route returns 503 with no_vault_registered when vault_root is None.
 
 TDD test for Task 17 of Plan #13b-β1: _vault helpers must guard against None primary.
+
+Note: /trash routes now require a {project} path segment and are guarded by
+get_runtime (returns 503 when daemon is None), tested separately in
+test_app_trash.py.
 """
 
 from __future__ import annotations
@@ -21,7 +25,6 @@ def client():
     "method,path",
     [
         ("GET", "/activity"),
-        ("GET", "/trash"),
         ("GET", "/lint/results"),
         ("GET", "/suggestions"),
         ("GET", "/lost-sessions"),
@@ -57,3 +60,11 @@ def test_dead_letter_503_without_daemon(client: TestClient) -> None:
     which is fine — it already has its own guard."""
     r = client.get("/dead-letter")
     assert r.status_code == 503
+
+
+def test_trash_project_route_503_without_daemon(client: TestClient) -> None:
+    """GET /trash/{project} returns 503 when daemon is None."""
+    r = client.get("/trash/alpha")
+    assert r.status_code == 503
+    body = r.json()
+    assert body.get("detail", {}).get("error") == "daemon_unavailable"
