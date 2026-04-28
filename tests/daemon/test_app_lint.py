@@ -1,67 +1,115 @@
+"""REST tests for /lint/{project}/... routes (Plan #13b-β2 Task 6)."""
+
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 from httpx import ASGITransport
 
-from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 
-class _FakeDaemon:
-    def __init__(self) -> None:
-        self.alerts = Alerts()
-        self.tracker = OurWritesTracker(ttl_s=60.0)
-        self.started_at_monotonic = 0.0
-        # Routes read tracker from primary_runtime; self-shim preserves behaviour.
-        self.primary_runtime = self
+class _FakeRuntime:
+    """Minimal VaultRuntime shim for lint route tests."""
 
-    def scheduler_jobs_info(self):
+    def __init__(self, vault: Path) -> None:
+        self.vault_root = vault
+        self.tracker = OurWritesTracker(ttl_s=60.0)
+
+
+class _FakeDaemon:
+    def __init__(self, alpha_vault: Path) -> None:
+        self._alpha_runtime = _FakeRuntime(alpha_vault)
+        self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
+        self.primary_runtime = self._alpha_runtime
+        self.started_at_monotonic = 0.0
+
+    def scheduler_jobs_info(self) -> list[Any]:
         return []
 
 
 @pytest.fixture
-def daemon() -> _FakeDaemon:
-    return _FakeDaemon()
+def alpha_vault(tmp_path: Path) -> Path:
+    vault = tmp_path / "alpha"
+    vault.mkdir()
+    return vault
 
 
 @pytest.fixture
-def app(tmp_path: Path, daemon: _FakeDaemon):
-    return create_app(tmp_path, daemon=daemon)
+def daemon(alpha_vault: Path) -> _FakeDaemon:
+    return _FakeDaemon(alpha_vault)
 
 
 @pytest.fixture
-async def client(app):
+def app(daemon: _FakeDaemon) -> Any:
+    return create_app(vault_root=None, daemon=daemon)
+
+
+@pytest.fixture
+async def client(app: Any) -> Any:
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
-async def test_results_404_when_no_run(client):
-    r = await client.get("/lint/results")
+# ---------------------------------------------------------------------------
+# GET /lint/{project}/results
+# ---------------------------------------------------------------------------
+
+
+async def test_results_404_when_no_run(client: Any) -> None:
+    r = await client.get("/lint/alpha/results")
     assert r.status_code == 404
 
 
-async def test_run_then_results_round_trip(client, tmp_path: Path):
-    r = await client.post("/lint/run")
+async def test_results_unknown_project_404(client: Any) -> None:
+    r = await client.get("/lint/unknown_project/results")
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /lint/{project}/run
+# ---------------------------------------------------------------------------
+
+
+async def test_run_then_results_round_trip(client: Any) -> None:
+    r = await client.post("/lint/alpha/run")
     assert r.status_code == 200
     body = r.json()
     assert "run_id" in body
     assert "summary" in body
 
-    r = await client.get("/lint/results")
+    r = await client.get("/lint/alpha/results")
     assert r.status_code == 200
     assert r.json()["run_id"] == body["run_id"]
 
 
-async def test_autofix_409_without_cached_run(client):
-    r = await client.post("/lint/autofix")
+async def test_run_unknown_project_404(client: Any) -> None:
+    r = await client.post("/lint/unknown_project/run")
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /lint/{project}/autofix
+# ---------------------------------------------------------------------------
+
+
+async def test_autofix_409_without_cached_run(client: Any) -> None:
+    r = await client.post("/lint/alpha/autofix")
     assert r.status_code == 409
 
 
-async def test_autofix_after_run(client, tmp_path: Path):
-    p = tmp_path / "wiki/entities/foo.md"
+async def test_autofix_unknown_project_404(client: Any) -> None:
+    r = await client.post("/lint/unknown_project/autofix")
+    assert r.status_code == 404
+
+
+async def test_autofix_after_run(client: Any, alpha_vault: Path) -> None:
+    p = alpha_vault / "wiki/entities/foo.md"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
         "---\ntitle: T\ntype: entity\ncreated: 2026-04-26\nupdated: 2026-04-26\n"
@@ -69,13 +117,15 @@ async def test_autofix_after_run(client, tmp_path: Path):
         encoding="utf-8",
     )
 
-    r = await client.post("/lint/run")
+    r = await client.post("/lint/alpha/run")
     assert r.status_code == 200
 
-    r = await client.post("/lint/autofix")
+    r = await client.post("/lint/alpha/autofix")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True
     assert body["snapshot_path"]
     assert body["activity_id"]
-    assert "body  " not in (tmp_path / "wiki/entities/foo.md").read_text(encoding="utf-8")
+    assert "body  " not in (alpha_vault / "wiki/entities/foo.md").read_text(
+        encoding="utf-8"
+    )

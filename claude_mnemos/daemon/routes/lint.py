@@ -1,72 +1,64 @@
+"""REST routes for lint run / results / autofix.
+
+Per-project routes resolve the target VaultRuntime via
+``get_runtime(request, project)`` (404 on unknown project) and use
+``runtime.vault_root`` for filesystem operations and ``runtime.tracker``
+for our-writes registration.
+
+URL structure::
+
+    POST   /lint/{project}/run       — run lint across the vault
+    GET    /lint/{project}/results   — retrieve last lint report
+    POST   /lint/{project}/autofix   — apply autofix from cached report
+"""
+
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.lint.autofix import apply_autofix
 from claude_mnemos.lint.runner import LintRunner
 from claude_mnemos.lint.state import load_last_report, save_report
 
-if TYPE_CHECKING:
-    from claude_mnemos.daemon.our_writes import OurWritesTracker
-
 router = APIRouter()
 
 
-def _vault(request: Request) -> Path:
-    vault = request.app.state.vault_root
-    if vault is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "no_vault_registered",
-                "hint": "Register: mnemos project add NAME --vault PATH",
-            },
-        )
-    assert isinstance(vault, Path)
-    return vault
-
-
-def _tracker(request: Request) -> OurWritesTracker | None:
-    daemon = request.app.state.daemon
-    if daemon is None:
-        return None
-    primary = getattr(daemon, "primary_runtime", None)
-    return primary.tracker if primary is not None else None
-
-
-@router.post("/lint/run")
-async def lint_run(request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.post("/lint/{project}/run")
+async def lint_run(project: str, request: Request) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     report = LintRunner(vault).run()
-    save_report(vault, report, tracker=_tracker(request))
+    save_report(vault, report, tracker=runtime.tracker)
     return report.model_dump(mode="json")
 
 
-@router.get("/lint/results")
-async def lint_results(request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.get("/lint/{project}/results")
+async def lint_results(project: str, request: Request) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     report = load_last_report(vault)
     if report is None:
         raise HTTPException(status_code=404, detail={"error": "no_lint_run_yet"})
     return report.model_dump(mode="json")
 
 
-@router.post("/lint/autofix")
-async def lint_autofix(request: Request) -> dict[str, Any]:
-    vault = _vault(request)
+@router.post("/lint/{project}/autofix")
+async def lint_autofix(project: str, request: Request) -> dict[str, Any]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
     report = load_last_report(vault)
     if report is None:
         raise HTTPException(
             status_code=409,
             detail={
                 "error": "no_cached_report",
-                "hint": "POST /lint/run first to produce a report, then call /lint/autofix",
+                "hint": "POST /lint/{project}/run first, then call /lint/{project}/autofix",
             },
         )
-    result = apply_autofix(vault, report, tracker=_tracker(request))
+    result = apply_autofix(vault, report, tracker=runtime.tracker)
     return {
         "success": result.success,
         "snapshot_path": str(result.snapshot_path) if result.snapshot_path else None,

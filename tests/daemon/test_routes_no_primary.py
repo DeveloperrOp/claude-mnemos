@@ -2,9 +2,9 @@
 
 TDD test for Task 17 of Plan #13b-β1: _vault helpers must guard against None primary.
 
-Note: /trash routes now require a {project} path segment and are guarded by
-get_runtime (returns 503 when daemon is None), tested separately in
-test_app_trash.py.
+Note: /trash and /lint routes now require a {project} path segment and are
+guarded by get_runtime (returns 503 when daemon is None), tested separately in
+test_app_trash.py and test_app_lint.py respectively.
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ def client():
     "method,path",
     [
         ("GET", "/activity"),
-        ("GET", "/lint/results"),
         ("GET", "/suggestions"),
         ("GET", "/lost-sessions"),
         ("GET", "/metrics/usage"),
@@ -65,6 +64,14 @@ def test_dead_letter_503_without_daemon(client: TestClient) -> None:
 def test_trash_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /trash/{project} returns 503 when daemon is None."""
     r = client.get("/trash/alpha")
+    assert r.status_code == 503
+    body = r.json()
+    assert body.get("detail", {}).get("error") == "daemon_unavailable"
+
+
+def test_lint_project_route_503_without_daemon(client: TestClient) -> None:
+    """GET /lint/{project}/results returns 503 when daemon is None."""
+    r = client.get("/lint/alpha/results")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
