@@ -27,7 +27,6 @@ def client():
         ("GET", "/lint/results"),
         ("GET", "/suggestions"),
         ("GET", "/lost-sessions"),
-        ("GET", "/sessions"),
         ("GET", "/metrics/usage"),
         ("GET", "/vault/info"),
     ],

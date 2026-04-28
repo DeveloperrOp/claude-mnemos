@@ -70,15 +70,15 @@ def test_dead_letter_dismiss_unknown_returns_404(
     assert r.status_code == 404, r.text
 
 
-# ── /sessions/{sid}/ingest ────────────────────────────────────────────────────
+# ── /sessions/{project}/{sid}/ingest ─────────────────────────────────────────
 
 def test_sessions_ingest_bad_path_returns_400_not_503(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    # valid daemon + primary → reaches the body validation, not the 503 guard
+    # valid daemon + known project → reaches body validation, not 404/503
     r = client.post(
-        "/sessions/some-sid/ingest",
+        "/sessions/alpha/some-sid/ingest",
         json={"transcript_path": "/does/not/exist.jsonl"},
     )
     assert r.status_code == 400, r.text
@@ -93,7 +93,7 @@ def test_sessions_ingest_enqueues_job(
     transcript = tmp_path / "t.jsonl"
     transcript.write_text("{}")
     r = client.post(
-        "/sessions/some-sid/ingest",
+        "/sessions/alpha/some-sid/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 201, r.text
