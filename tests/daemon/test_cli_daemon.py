@@ -78,7 +78,6 @@ def test_status_when_no_runtime_state_prints_stopped(capsys, monkeypatch, tmp_pa
 
 def test_runtime_state_roundtrip(tmp_path: Path):
     state = DaemonRuntimeState(
-        vault_root=tmp_path / "vault",
         host="127.0.0.1",
         port=5757,
         pid_file=tmp_path / "daemon.pid",

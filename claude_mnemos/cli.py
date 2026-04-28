@@ -769,7 +769,6 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         )
 
     DaemonRuntimeState(
-        vault_root=vault_root,
         host=config.host,
         port=config.port,
         pid_file=config.pid_file,
@@ -807,7 +806,6 @@ def _cmd_daemon_foreground(args: argparse.Namespace) -> int:
         )
         return 78
     DaemonRuntimeState(
-        vault_root=vault_root,
         host=config.host,
         port=config.port,
         pid_file=config.pid_file,
