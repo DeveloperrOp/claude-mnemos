@@ -202,3 +202,76 @@ async def test_unmount_idempotent_when_not_mounted(tmp_path: Path) -> None:
     # No mount() call. unmount should be a silent no-op.
     await rt.unmount(timeout=1.0, force=False)
     assert rt.is_mounted is False
+
+
+@pytest.mark.asyncio
+async def test_reload_settings_disable_daily_snapshot(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(project=_entry(tmp_path, "rs1"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        assert scheduler.get_job("daily_snapshot:rs1") is not None
+        rt.reload_settings(
+            ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False))
+        )
+        assert scheduler.get_job("daily_snapshot:rs1") is None
+        assert scheduler.get_job("backups_cleanup:rs1") is not None
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_reload_settings_re_enable_daily_snapshot(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "rs2"),
+        settings=ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False)),
+    )
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        assert scheduler.get_job("daily_snapshot:rs2") is None
+        rt.reload_settings(
+            ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=True))
+        )
+        assert scheduler.get_job("daily_snapshot:rs2") is not None
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_reload_settings_updates_retention_days(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "rs3"),
+        settings=ProjectSettings(snapshots=SnapshotsSettings(retention_days=180)),
+    )
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        rt.reload_settings(
+            ProjectSettings(snapshots=SnapshotsSettings(retention_days=30))
+        )
+        job = scheduler.get_job("backups_cleanup:rs3")
+        assert job is not None
+        # args = [vault_root, retention_days]
+        assert job.args[1] == 30
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+def test_reload_settings_when_not_mounted_just_replaces(tmp_path: Path) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(project=_entry(tmp_path, "rs4"), settings=ProjectSettings())
+    new = ProjectSettings(snapshots=SnapshotsSettings(retention_days=7))
+    rt.reload_settings(new)
+    assert rt.settings.snapshots.retention_days == 7
+    rt.job_store.close()

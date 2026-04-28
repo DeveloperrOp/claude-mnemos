@@ -265,3 +265,38 @@ class VaultRuntime:
             logger.exception("job_store close failed")
 
         self._mounted = False
+
+    def reload_settings(self, new: ProjectSettings) -> None:
+        """Apply new settings; reschedule cron jobs as needed.
+
+        Caller MUST hold MnemosDaemon._runtimes_lock when applicable. Synchronous
+        (only APScheduler in-memory mutations + dict assignment).
+        """
+        if not self._mounted or self._scheduler is None:
+            self.settings = new
+            return
+
+        old = self.settings
+        self.settings = new
+
+        if old.snapshots.daily_enabled != new.snapshots.daily_enabled:
+            jid = f"daily_snapshot:{self.name}"
+            existing = self._scheduler.get_job(jid)
+            if new.snapshots.daily_enabled and existing is None:
+                self._scheduler.add_job(
+                    daily_snapshot_task,
+                    "cron",
+                    hour=4,
+                    minute=0,
+                    args=[self.vault_root],
+                    id=jid,
+                    replace_existing=True,
+                )
+            elif not new.snapshots.daily_enabled and existing is not None:
+                self._scheduler.remove_job(jid)
+
+        if old.snapshots.retention_days != new.snapshots.retention_days:
+            self._scheduler.modify_job(
+                f"backups_cleanup:{self.name}",
+                args=[self.vault_root, new.snapshots.retention_days],
+            )
