@@ -1,6 +1,8 @@
-"""Test that every route returns 503 with no_vault_registered when vault_root is None.
+"""Test route behaviour when vault_root is None / daemon is None.
 
 TDD test for Task 17 of Plan #13b-β1: _vault helpers must guard against None primary.
+Updated in Task 10 of Plan #13b-β2: /lost-sessions is now cross-vault and returns
+200 with empty list when daemon is None (no runtimes to iterate).
 
 Note: /trash, /lint, /ontology, /activity and /vault routes now require a {project}
 path segment and are guarded by get_runtime (returns 503 when daemon is None), tested
@@ -21,24 +23,23 @@ def client():
     return TestClient(app)
 
 
-@pytest.mark.parametrize(
-    "method,path",
-    [
-        ("GET", "/lost-sessions"),
-        ("GET", "/metrics/usage"),
-    ],
-)
-def test_routes_return_503_when_no_primary(
-    client: TestClient, method: str, path: str
-) -> None:
-    r = client.request(method, path, json={})
-    assert r.status_code == 503, (method, path, r.text)
+def test_metrics_usage_returns_503_when_no_daemon(client: TestClient) -> None:
+    """/metrics/usage still returns 503 when daemon is None (needs runtimes)."""
+    r = client.get("/metrics/usage")
+    assert r.status_code == 503, r.text
     body = r.json()
-    assert body.get("detail", {}).get("error") == "no_vault_registered", (
-        method,
-        path,
-        body,
-    )
+    assert body.get("detail", {}).get("error") == "no_vault_registered"
+
+
+def test_lost_sessions_returns_empty_when_no_daemon(client: TestClient) -> None:
+    """/lost-sessions returns 200 with empty list when daemon is None.
+
+    β2 behaviour: cross-vault route iterates all_runtimes() which returns []
+    when daemon is None — no error, just an empty result.
+    """
+    r = client.get("/lost-sessions")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"sessions": [], "total": 0}
 
 
 def test_vault_project_route_503_without_daemon(client: TestClient) -> None:

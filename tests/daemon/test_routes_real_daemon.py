@@ -127,8 +127,12 @@ def test_lost_sessions_import_unknown_returns_404_not_503(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.post("/lost-sessions/nonexistent/import", json={})
-    # 404 (not found in scan), not 503
+    # β2: project_name is required in body; "alpha" is the mounted project.
+    # Session "nonexistent" is not in the scan → 404 (not 503).
+    r = client.post(
+        "/lost-sessions/nonexistent/import",
+        json={"project_name": "alpha"},
+    )
     assert r.status_code == 404, r.text
 
 
