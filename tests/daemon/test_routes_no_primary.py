@@ -21,7 +21,6 @@ def client():
     "method,path",
     [
         ("GET", "/activity"),
-        ("PATCH", "/pages/some-page"),  # pages has no GET; use PATCH
         ("GET", "/trash"),
         ("GET", "/lint/results"),
         ("GET", "/suggestions"),

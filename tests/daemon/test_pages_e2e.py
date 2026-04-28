@@ -114,7 +114,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
 
         # 2. PATCH frontmatter -> status verified.
         r = httpx.patch(
-            f"{base}/pages/{page_rel}",
+            f"{base}/pages/main/{page_rel}",
             json={"frontmatter": {"status": "verified"}, "body": None},
             timeout=5.0,
         )
@@ -129,7 +129,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert "status: verified" in contents
 
         # 4. DELETE page -> 200 with trash_id.
-        r = httpx.delete(f"{base}/pages/{page_rel}", timeout=5.0)
+        r = httpx.delete(f"{base}/pages/main/{page_rel}", timeout=5.0)
         assert r.status_code == 200, r.text
         delete_body = r.json()
         assert delete_body["success"] is True

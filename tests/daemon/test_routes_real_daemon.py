@@ -194,7 +194,7 @@ def test_pages_patch_uses_tracker_from_primary_runtime(
     )
 
     r = client.patch(
-        "/pages/pages/test-page.md",
+        "/pages/alpha/pages/test-page.md",
         json={"frontmatter": {"status": "verified"}},
     )
     assert r.status_code == 200, r.text
