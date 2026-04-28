@@ -218,17 +218,30 @@ class VaultRuntime:
             except Exception:
                 logger.exception("rollback: alerts.add failed")
 
-    async def unmount(self, *, timeout: float = 10.0, force: bool = False) -> None:  # noqa: ARG002
-        """Stop worker, remove cron jobs, stop observer, close store.
+    async def unmount(self, *, timeout: float = 10.0, force: bool = False) -> None:
+        """Stop everything; close JobStore.
 
-        Minimal implementation; busy/force semantics added in Task 8.
-        ``force`` is accepted for API compatibility but not yet acted on.
+        force=False: VaultBusyError if any queued/running jobs.
+        force=True: cancel queued, wait running with timeout, then stop.
         """
+        if not self._mounted:
+            return
+
+        counts = self.job_store.count_by_status()
+        queued = int(counts.get("queued", 0))
+        running = int(counts.get("running", 0))
+
+        if (queued or running) and not force:
+            raise VaultBusyError(name=self.name, queued=queued, running=running)
+
+        if force and queued:
+            self.job_store.cancel_all_queued()
+
         if self.job_worker is not None:
             try:
                 await self.job_worker.stop(timeout=timeout)
             except Exception:
-                logger.exception("unmount: worker stop failed")
+                logger.exception("worker stop failed")
             self.job_worker = None
 
         if self._scheduler is not None:
@@ -243,12 +256,12 @@ class VaultRuntime:
             try:
                 self.observer.stop()
             except Exception:
-                logger.exception("unmount: observer stop failed")
+                logger.exception("observer stop failed")
             self.observer = None
 
         try:
             self.job_store.close()
         except Exception:
-            logger.exception("unmount: job_store close failed")
+            logger.exception("job_store close failed")
 
         self._mounted = False

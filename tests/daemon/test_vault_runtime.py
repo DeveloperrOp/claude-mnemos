@@ -143,3 +143,62 @@ async def test_mount_rollback_on_observer_failure(
     rt.job_store.close()
     snap = alerts.list()
     assert any("rb" in str(a.message) and "mount failed" in str(a.message) for a in snap)
+
+
+@pytest.mark.asyncio
+async def test_unmount_clean_path(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    rt = VaultRuntime(project=_entry(tmp_path, "u1"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    await rt.unmount(timeout=2.0, force=False)
+    assert rt.is_mounted is False
+    assert rt.observer is None
+    assert rt.job_worker is None
+    ids = {j.id for j in scheduler.get_jobs()}
+    assert "daily_snapshot:u1" not in ids
+    assert "backups_cleanup:u1" not in ids
+
+
+@pytest.mark.asyncio
+async def test_unmount_busy_raises_when_queued(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    rt = VaultRuntime(project=_entry(tmp_path, "u2"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        rt.job_store.create(kind="ingest", payload={"transcript_path": "x"})
+        with pytest.raises(VaultBusyError) as exc_info:
+            await rt.unmount(timeout=2.0, force=False)
+        assert exc_info.value.queued >= 1
+        assert rt.is_mounted is True  # still mounted
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_unmount_force_drains_queued(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    rt = VaultRuntime(project=_entry(tmp_path, "u3"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    rt.job_store.create(kind="ingest", payload={"transcript_path": "x"})
+    rt.job_store.create(kind="ingest", payload={"transcript_path": "y"})
+    await rt.unmount(timeout=2.0, force=True)
+    assert rt.is_mounted is False
+    # Underlying file is closed; can't query rt.job_store. Re-open to verify.
+    from claude_mnemos.state.jobs import JobStore
+    fresh = JobStore(rt.vault_root / ".jobs.db")
+    try:
+        statuses = [r["status"] for r in fresh._conn.execute("SELECT status FROM jobs").fetchall()]
+        assert all(s in ("cancelled", "succeeded", "failed") for s in statuses)
+    finally:
+        fresh.close()
+
+
+@pytest.mark.asyncio
+async def test_unmount_idempotent_when_not_mounted(tmp_path: Path) -> None:
+    rt = VaultRuntime(project=_entry(tmp_path, "u4"), settings=ProjectSettings())
+    # No mount() call. unmount should be a silent no-op.
+    await rt.unmount(timeout=1.0, force=False)
+    assert rt.is_mounted is False
