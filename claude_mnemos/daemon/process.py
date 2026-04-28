@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import uvicorn
@@ -13,7 +14,7 @@ from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
-from claude_mnemos.state.projects import ProjectStore
+from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 from claude_mnemos.state.settings import GlobalSettings, SettingsStore
 
 if TYPE_CHECKING:
@@ -103,6 +104,49 @@ class MnemosDaemon:
         ``mount_vault``/``unmount_vault`` (Task 14).
         """
         raise NotImplementedError("MnemosDaemon.run() lands in Task 16")
+
+    # ─── Boot selection + runtime bootstrap ───────────────────────
+
+    def _select_boot_entries(self) -> list[ProjectMapEntry]:
+        """Return entries to mount at startup, filtered by ``config.boot_filter``.
+
+        - ``boot_filter is None`` or ``boot_filter.all`` → all registered projects,
+          sorted alphabetically by name.
+        - ``boot_filter.names`` → only those names (sorted); names absent from the
+          project-map generate a ``handler_error`` alert and are silently skipped.
+        """
+        all_entries = sorted(
+            self.project_store.list_all(), key=lambda e: e.name
+        )
+        flt = self.config.boot_filter
+        if flt is None or flt.all:
+            return all_entries
+        wanted = set(flt.names or [])
+        present = {e.name for e in all_entries}
+        missing = wanted - present
+        for m in sorted(missing):
+            self.alerts.add(
+                kind="handler_error",
+                path="",
+                message=f"--project asked for {m!r}, not in project-map; skipped",
+                detected_at=datetime.now(UTC),
+            )
+        return [e for e in all_entries if e.name in wanted]
+
+    async def _bootstrap_runtimes(self) -> None:
+        """Mount every selected project. Failures degrade to alerts."""
+        from claude_mnemos.daemon.vault_runtime import VaultMountError, VaultRuntime
+
+        entries = self._select_boot_entries()
+        for entry in entries:
+            settings = self.settings_store.get_project(entry.name)
+            runtime = VaultRuntime(project=entry, settings=settings)
+            try:
+                await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
+            except VaultMountError as exc:
+                logger.warning("vault %s mount failed: %s", entry.name, exc)
+                continue
+            self.runtimes[entry.name] = runtime
 
     def _request_shutdown(self) -> None:  # pragma: no cover - implemented in Task 16
         if self._server is not None:
