@@ -20,13 +20,6 @@ import pytest
 
 pytestmark = [
     pytest.mark.slow,
-    pytest.mark.skip(
-        reason=(
-            "TODO(β2 Plan #13b-β2): /jobs route still reads daemon.job_store "
-            "(single-vault attr) — needs migration to primary_runtime.job_store "
-            "before this e2e can pass."
-        )
-    ),
 ]
 
 
@@ -74,8 +67,9 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
     transcript = tmp_path / "session.jsonl"
     transcript.write_text(_TRANSCRIPT_JSONL, encoding="utf-8")
 
-    # Multi-vault daemon ignores --vault; pre-register so primary_runtime is set
-    # and vault-root-dependent routes (/jobs) work.
+    # Pre-register the vault as project "main" in the project-map so the
+    # multi-vault daemon bootstraps a runtime for it and /jobs POST can route
+    # by project_name.
     isolated_home = tmp_path / "home"
     isolated_home.mkdir()
     child_env = os.environ.copy()
@@ -112,12 +106,13 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
             f"{proc.stderr.read().decode() if proc.stderr else ''}"
         )
 
-        # Force raw_only via payload (no API key needed)
+        # Force raw_only via payload (no API key needed); project_name required.
         r = httpx.post(
             f"http://127.0.0.1:{port}/jobs",
             json={
                 "kind": "ingest",
                 "payload": {
+                    "project_name": "main",
                     "transcript_path": str(transcript),
                     "extract": False,
                 },

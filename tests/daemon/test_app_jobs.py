@@ -17,7 +17,8 @@ _PROJECT = "test-vault"
 class _FakeRuntime:
     """Minimal stand-in for VaultRuntime — only the job-related attributes."""
 
-    def __init__(self, vault: Path) -> None:
+    def __init__(self, vault: Path, name: str) -> None:
+        self.name = name
         self.job_store = JobStore(vault / JOBS_DB_FILENAME)
         self.job_worker = None
 
@@ -28,16 +29,15 @@ class _FakeDaemon:
         self.tracker = OurWritesTracker(ttl_s=60.0)
         self.started_at_monotonic = 0.0
 
-        runtime = _FakeRuntime(vault)
-        # primary_runtime satisfies GET/DELETE routing (_store helper).
-        self.primary_runtime: _FakeRuntime = runtime
-        # runtimes dict satisfies POST routing by project_name.
+        runtime = _FakeRuntime(vault, name=_PROJECT)
+        # runtimes dict satisfies both POST routing (by project_name) and
+        # the cross-vault GET/DELETE aggregation via all_runtimes().
         self.runtimes: dict[str, _FakeRuntime] = {_PROJECT: runtime}
 
     @property
     def job_store(self) -> JobStore:
         """Convenience for tests that create jobs directly on the daemon."""
-        return self.primary_runtime.job_store
+        return self.runtimes[_PROJECT].job_store
 
     def scheduler_jobs_info(self):
         return []
@@ -47,7 +47,7 @@ class _FakeDaemon:
 def daemon(tmp_path: Path):
     d = _FakeDaemon(tmp_path)
     yield d
-    d.primary_runtime.job_store.close()
+    d.job_store.close()
 
 
 @pytest.fixture
