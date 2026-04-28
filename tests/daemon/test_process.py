@@ -30,9 +30,10 @@ def test_daemon_initializes_scheduler_and_app(daemon: MnemosDaemon):
 
 
 def test_daemon_scheduler_jobs_info(daemon: MnemosDaemon):
+    # Scheduler starts empty; per-vault jobs are added at VaultRuntime.mount()
+    # (Task 12). Until then, zero jobs is the expected state.
     jobs = daemon.scheduler_jobs_info()
-    assert len(jobs) == 2
-    assert {j.id for j in jobs} == {"daily_snapshot", "backups_cleanup"}
+    assert jobs == []
 
 
 def test_daemon_started_at_zero_before_run(daemon: MnemosDaemon):

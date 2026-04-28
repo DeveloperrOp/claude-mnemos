@@ -19,7 +19,7 @@ from claude_mnemos.daemon.config import DaemonConfig
 from claude_mnemos.daemon.jobs.worker import JobWorker
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.our_writes import OurWritesTracker
-from claude_mnemos.daemon.scheduler import build_scheduler
+from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
 from claude_mnemos.daemon.tasks import daily_snapshot_task
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
@@ -72,11 +72,7 @@ class MnemosDaemon:
             self.project_settings = self.settings_store.get_project(
                 self.project_entry.name
             )
-        self.scheduler: AsyncIOScheduler = build_scheduler(
-            config.vault_root,
-            self.project_settings.snapshots.retention_days,
-            snapshots_enabled=self.project_settings.snapshots.daily_enabled,
-        )
+        self.scheduler: AsyncIOScheduler = build_empty_scheduler()
         self.job_store: JobStore = JobStore(config.vault_root / JOBS_DB_FILENAME)
         self.job_worker: JobWorker | None = None
         # Plan #13a: TTL-cached lost-sessions list owned by the daemon, so the
