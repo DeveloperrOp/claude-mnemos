@@ -18,6 +18,7 @@
     "snapshots": "Snapshots",
     "health": "Health",
     "settings": "Settings",
+    "failed_jobs": "Failed jobs",
     "metrics": "Metrics",
     "help": "Help"
   },

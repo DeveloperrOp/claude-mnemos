@@ -10,6 +10,13 @@ import { Sessions } from "./pages/Sessions";
 import { SessionDetail } from "./pages/SessionDetail";
 import { ActivityCenter } from "./pages/ActivityCenter";
 import { ActivityDetail } from "./pages/ActivityDetail";
+import { Trash } from "./pages/Trash";
+import { Snapshots } from "./pages/Snapshots";
+import { Suggestions } from "./pages/Suggestions";
+import { Health } from "./pages/Health";
+import { LostSessions } from "./pages/LostSessions";
+import { DeadLetter } from "./pages/DeadLetter";
+import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 
 const router = createBrowserRouter([
   {
@@ -28,15 +35,17 @@ const router = createBrowserRouter([
           { path: "sessions/:sid", element: <SessionDetail /> },
           { path: "activity", element: <ActivityCenter /> },
           { path: "activity/:opId", element: <ActivityDetail /> },
-          { path: "suggestions", element: <Placeholder section="Suggestions" plan="#14b" /> },
-          { path: "trash", element: <Placeholder section="Trash" plan="#14b" /> },
-          { path: "snapshots", element: <Placeholder section="Snapshots" plan="#14b" /> },
-          { path: "health", element: <Placeholder section="Health" plan="#14b" /> },
+          { path: "suggestions", element: <Suggestions /> },
+          { path: "trash", element: <Trash /> },
+          { path: "snapshots", element: <Snapshots /> },
+          { path: "health", element: <Health /> },
           { path: "queue", element: <Placeholder section="Queue" plan="#14b" /> },
           { path: "settings", element: <Placeholder section="Settings" plan="#14c" /> },
         ],
       },
-      { path: "lost-sessions", element: <Placeholder section="Lost Sessions" plan="#14b" /> },
+      { path: "lost-sessions", element: <LostSessions /> },
+      { path: "dead-letter", element: <DeadLetter /> },
+      { path: "dead-letter/:jobId", element: <DeadLetterDetail /> },
       { path: "help", element: <Help /> },
       { path: "metrics", element: <Placeholder section="Metrics" plan="#14d" /> },
       { path: "settings/global", element: <Placeholder section="Global Settings" plan="#14c" /> },

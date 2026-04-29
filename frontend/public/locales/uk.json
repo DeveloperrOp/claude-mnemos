@@ -18,6 +18,7 @@
     "snapshots": "Знімки",
     "health": "Здоров'я",
     "settings": "Налаштування",
+    "failed_jobs": "Помилки",
     "metrics": "Метрики",
     "help": "Допомога"
   },
