@@ -33,6 +33,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 RECURSION_ENV = "MNEMOS_INJECT_RUNNING"
+# SessionStart payload `source` field — sources we silently skip:
+#   resume:  Claude is restoring an existing session; it already has prior
+#            context (re-injecting would duplicate).
+#   compact: Claude just ran context compaction; injecting would undo what
+#            the user asked for.
+#   edit:    PostToolUse-triggered partial source — not a fresh session, the
+#            model is mid-flight and any inject would land in an unpredictable
+#            position.
 SKIP_SOURCES = frozenset({"resume", "compact", "edit"})
 DEFAULT_MAX_CHARS = 40_000
 
@@ -40,10 +48,12 @@ DEFAULT_MAX_CHARS = 40_000
 def _log(msg: str) -> None:
     """Append a line to ~/.claude-mnemos/inject.log. Never raise."""
     try:
+        from datetime import UTC, datetime
+        ts = datetime.now(UTC).isoformat()
         log_path = Path.home() / ".claude-mnemos" / "inject.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("a", encoding="utf-8") as f:
-            f.write(f"{msg}\n")
+            f.write(f"{ts} {msg}\n")
     except Exception:  # noqa: BLE001
         pass
 
