@@ -13,12 +13,27 @@ import subprocess
 import sys
 import time
 from collections import deque
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+
+import httpx
+import psutil
 
 from claude_mnemos.daemon.lockfile import is_daemon_running
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class HealthSnapshot:
+    reachable: bool
+    projects_mounted: int = 0
+    uptime_seconds: float | None = None
+
+
+def _default_health_url() -> str:
+    return "http://localhost:5757/health"
 
 
 class RestartLimiter:
@@ -125,6 +140,9 @@ class Supervisor:
         self._proc: subprocess.Popen | None = None
         self._spawned: bool = False
         self._log_fh = None
+        self.last_health: HealthSnapshot | None = None
+        self.health_url = _default_health_url()
+        self._http: httpx.Client | None = None
 
     # ── liveness helper, mockable ───────────────────────────────
     def _is_existing_daemon_running(self) -> int | None:
@@ -219,6 +237,84 @@ class Supervisor:
         # bypassing the normal Restarting → Running edge until /health succeeds.
         self.state = SupervisorState.STARTING
         logger.info("[supervisor] restart spawned pid=%s, state=Starting", self._proc.pid)
+
+    def _http_client(self) -> httpx.Client:
+        if self._http is None:
+            self._http = httpx.Client(timeout=2.0)
+        return self._http
+
+    def _check_health(self) -> HealthSnapshot:
+        try:
+            resp = self._http_client().get(self.health_url)
+            if resp.status_code != 200:
+                return HealthSnapshot(reachable=False)
+            data = resp.json()
+            return HealthSnapshot(
+                reachable=True,
+                projects_mounted=int(data.get("projects_mounted", 0)),
+                uptime_seconds=data.get("uptime_seconds"),
+            )
+        except (httpx.HTTPError, ValueError):
+            return HealthSnapshot(reachable=False)
+
+    def _spawned_daemon_alive(self) -> bool:
+        return self._proc is not None and self._proc.poll() is None
+
+    def _adopted_daemon_alive(self) -> bool:
+        return self.daemon_pid is not None and psutil.pid_exists(self.daemon_pid)
+
+    def tick(self, *, now: float | None = None) -> None:
+        """Single iteration of the supervisor loop.
+
+        Called periodically (every ~5s). Polls subprocess liveness and
+        /health, drives state transitions.
+        """
+        now = time.monotonic() if now is None else now
+
+        # User-initiated Stopping → don't react to subprocess exit
+        if self.state in (SupervisorState.STOPPING, SupervisorState.STOPPED):
+            return
+        if self.state == SupervisorState.CRASHED:
+            return  # manual restart only
+
+        if self._spawned:
+            if not self._spawned_daemon_alive():
+                self._handle_crash(now)
+                return
+        else:
+            if not self._adopted_daemon_alive():
+                logger.warning(
+                    "[supervisor] adopted daemon pid=%s gone — entering Crashed",
+                    self.daemon_pid,
+                )
+                self.state = SupervisorState.CRASHED
+                return
+
+        snap = self._check_health()
+        self.last_health = snap
+
+        if self.state == SupervisorState.STARTING and snap.reachable:
+            self._transition(SupervisorState.RUNNING)
+
+    def _handle_crash(self, now: float) -> None:
+        self.limiter.record_crash(now=now)
+        if not self.limiter.should_restart(now=now):
+            logger.error(
+                "[supervisor] crash %d/%d in window — entering Crashed",
+                self.limiter.crash_count(now=now), self.limiter.max_crashes,
+            )
+            self.state = SupervisorState.CRASHED
+            return
+        backoff = self.limiter.next_backoff_seconds()
+        logger.warning(
+            "[supervisor] daemon crashed, backoff %.1fs (count=%d)",
+            backoff, self.limiter.crash_count(now=now),
+        )
+        time.sleep(backoff)
+        self._close_log_fh()
+        self._proc = self._spawn_daemon()
+        self.daemon_pid = self._proc.pid
+        self.state = SupervisorState.STARTING
 
     def _close_log_fh(self) -> None:
         if self._log_fh:
