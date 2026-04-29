@@ -460,7 +460,6 @@ class JobStore:
                 "WHERE status='queued'",
                 (_ts(datetime.now(UTC)),),
             )
-            self._conn.commit()
             return cur.rowcount
 
     def cancel_queued(self, job_id: str) -> bool:
