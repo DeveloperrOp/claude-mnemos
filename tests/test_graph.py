@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from claude_mnemos.core.graph import build_page_graph
+from claude_mnemos.core.graph import build_page_graph, pages_within_k_hops
 
 
 def _write_page(vault: Path, slug: str, body: str = "", related: list[str] | None = None) -> None:
@@ -75,3 +75,40 @@ def test_build_page_graph_skips_invalid_frontmatter(tmp_path: Path) -> None:
     graph = build_page_graph(tmp_path)
     assert "concepts/a" in graph
     assert "broken" not in graph
+
+
+def test_pages_within_k_hops_seeds_only_at_k0() -> None:
+    graph = {"a": {"b"}, "b": {"a", "c"}, "c": {"b"}}
+    out = pages_within_k_hops(graph, {"a"}, k=0)
+    assert out == {"a": 0}
+
+
+def test_pages_within_k_hops_one_hop() -> None:
+    graph = {"a": {"b"}, "b": {"a", "c"}, "c": {"b"}}
+    out = pages_within_k_hops(graph, {"a"}, k=1)
+    assert out == {"a": 0, "b": 1}
+
+
+def test_pages_within_k_hops_two_hops() -> None:
+    graph = {"a": {"b"}, "b": {"a", "c"}, "c": {"b"}}
+    out = pages_within_k_hops(graph, {"a"}, k=2)
+    assert out == {"a": 0, "b": 1, "c": 2}
+
+
+def test_pages_within_k_hops_multiple_seeds() -> None:
+    graph = {"a": {"x"}, "b": {"y"}, "x": {"a"}, "y": {"b"}}
+    out = pages_within_k_hops(graph, {"a", "b"}, k=1)
+    assert out == {"a": 0, "b": 0, "x": 1, "y": 1}
+
+
+def test_pages_within_k_hops_seed_not_in_graph_skipped() -> None:
+    graph = {"a": {"b"}, "b": {"a"}}
+    out = pages_within_k_hops(graph, {"missing"}, k=2)
+    assert out == {}
+
+
+def test_pages_within_k_hops_min_distance_wins() -> None:
+    # diamond: a→b, a→c, b→d, c→d. d is reachable in 2 hops via either path.
+    graph = {"a": {"b", "c"}, "b": {"a", "d"}, "c": {"a", "d"}, "d": {"b", "c"}}
+    out = pages_within_k_hops(graph, {"a"}, k=2)
+    assert out["d"] == 2

@@ -65,3 +65,38 @@ def build_page_graph(vault: Path) -> dict[str, set[str]]:
             graph.setdefault(r, set()).add(slug)
 
     return graph
+
+
+def pages_within_k_hops(
+    graph: dict[str, set[str]],
+    seeds: set[str],
+    *,
+    k: int = 2,
+) -> dict[str, int]:
+    """BFS from each seed; return slug → minimum hop distance for all
+    reachable pages within ``k`` hops. Seeds map to 0.
+
+    Seeds not present in ``graph`` are silently skipped. The minimum-distance
+    win is intentional: when a slug is reachable from multiple seeds, the
+    closest seed determines its hop value.
+    """
+    distances: dict[str, int] = {}
+    frontier: list[str] = []
+    for s in seeds:
+        if s in graph:
+            distances[s] = 0
+            frontier.append(s)
+
+    for hop in range(1, k + 1):
+        next_frontier: list[str] = []
+        for node in frontier:
+            for neighbor in graph.get(node, set()):
+                if neighbor in distances:
+                    continue
+                distances[neighbor] = hop
+                next_frontier.append(neighbor)
+        if not next_frontier:
+            break
+        frontier = next_frontier
+
+    return distances
