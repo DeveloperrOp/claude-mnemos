@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import fs from "node:fs";
 
 const DAEMON_URL = "http://127.0.0.1:5757";
 const PROXIED_PREFIXES = [
@@ -10,8 +11,19 @@ const PROXIED_PREFIXES = [
   "/alerts", "/settings",
 ];
 
+/** Restore .gitkeep after emptyOutDir wipes it so the dir stays tracked. */
+function restoreGitkeep(): import("vite").Plugin {
+  return {
+    name: "restore-gitkeep",
+    closeBundle() {
+      const gitkeep = path.resolve(__dirname, "../claude_mnemos/daemon/static/.gitkeep");
+      if (!fs.existsSync(gitkeep)) fs.writeFileSync(gitkeep, "");
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), restoreGitkeep()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },
