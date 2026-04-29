@@ -22,7 +22,7 @@ export function ChartContainer({
   );
 }
 
-export function ChartTooltipContent({ active, payload, label }: TooltipContentProps<number, string>) {
+export function ChartTooltipContent({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div className="rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-xs shadow-md">
