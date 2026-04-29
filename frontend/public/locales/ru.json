@@ -209,7 +209,16 @@
     "restore_disabled": "Восстановить (#14c)",
     "delete_permanently_disabled": "Удалить навсегда (#14c)",
     "no_entries": "Корзина пуста",
-    "showing_n": "{{count}} записей"
+    "showing_n": "{{count}} записей",
+    "restored_toast": "Восстановлено",
+    "permanently_deleted_toast": "Удалено навсегда",
+    "restore_modal_title": "Восстановить страницу?",
+    "restore_modal_desc": "Переместить {{name}} обратно.",
+    "restore_button": "Восстановить",
+    "delete_permanent_modal_title": "Удалить навсегда?",
+    "delete_permanent_modal_desc": "Это необратимо. Введите имя страницы для подтверждения.",
+    "delete_permanent_typed_label": "Введите имя страницы",
+    "delete_permanent_button": "Удалить навсегда"
   },
   "snapshots": {
     "title": "Снимки",

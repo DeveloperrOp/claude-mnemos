@@ -209,7 +209,16 @@
     "restore_disabled": "Restore (#14c)",
     "delete_permanently_disabled": "Delete permanently (#14c)",
     "no_entries": "Trash is empty",
-    "showing_n": "{{count}} entries"
+    "showing_n": "{{count}} entries",
+    "restored_toast": "Restored",
+    "permanently_deleted_toast": "Permanently deleted",
+    "restore_modal_title": "Restore page?",
+    "restore_modal_desc": "Move {{name}} back to its original location.",
+    "restore_button": "Restore",
+    "delete_permanent_modal_title": "Permanently delete?",
+    "delete_permanent_modal_desc": "This cannot be undone. Type the page name to confirm.",
+    "delete_permanent_typed_label": "Type the page name",
+    "delete_permanent_button": "Delete forever"
   },
   "snapshots": {
     "title": "Snapshots",

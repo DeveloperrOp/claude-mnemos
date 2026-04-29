@@ -209,7 +209,16 @@
     "restore_disabled": "Відновити (#14c)",
     "delete_permanently_disabled": "Видалити назавжди (#14c)",
     "no_entries": "Кошик порожній",
-    "showing_n": "{{count}} записів"
+    "showing_n": "{{count}} записів",
+    "restored_toast": "Відновлено",
+    "permanently_deleted_toast": "Видалено назавжди",
+    "restore_modal_title": "Відновити сторінку?",
+    "restore_modal_desc": "Перемістити {{name}} назад.",
+    "restore_button": "Відновити",
+    "delete_permanent_modal_title": "Видалити назавжди?",
+    "delete_permanent_modal_desc": "Це незворотно. Введіть назву сторінки для підтвердження.",
+    "delete_permanent_typed_label": "Введіть назву сторінки",
+    "delete_permanent_button": "Видалити назавжди"
   },
   "snapshots": {
     "title": "Знімки",

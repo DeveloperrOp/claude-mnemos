@@ -18,6 +18,20 @@ beforeAll(() => {
       delete_permanently_disabled: "Delete (#14c)",
       no_entries: "No trash",
       showing_n: "{{count}} entries",
+      restored_toast: "Restored",
+      permanently_deleted_toast: "Permanently deleted",
+      restore_modal_title: "Restore page?",
+      restore_modal_desc: "Move {{name}} back.",
+      restore_button: "Restore",
+      delete_permanent_modal_title: "Permanently delete?",
+      delete_permanent_modal_desc: "This cannot be undone.",
+      delete_permanent_typed_label: "Type the page name",
+      delete_permanent_button: "Delete forever",
+    },
+    confirm: {
+      cancel: "Cancel",
+      confirm: "Confirm",
+      working: "Working...",
     },
   }, true, true);
   void i18n.changeLanguage("en");
