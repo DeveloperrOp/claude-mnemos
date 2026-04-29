@@ -85,8 +85,9 @@ def test_tick_does_nothing_for_adopted_daemon_when_pid_alive(fake_pid_file: Path
     sv._spawned = False
     sv.state = SupervisorState.RUNNING
     sv.daemon_pid = 9999
+    snap = HealthSnapshot(reachable=True, projects_mounted=1)
     with patch("claude_mnemos.tray.supervisor.psutil") as psutil_mod, \
-         patch.object(sv, "_check_health", return_value=HealthSnapshot(reachable=True, projects_mounted=1)):
+         patch.object(sv, "_check_health", return_value=snap):
         psutil_mod.pid_exists.return_value = True
         sv.tick(now=1.0)
     assert sv.state == SupervisorState.RUNNING

@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import subprocess
 import sys
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -318,8 +317,6 @@ class Supervisor:
 
     def _close_log_fh(self) -> None:
         if self._log_fh:
-            try:
+            with contextlib.suppress(Exception):
                 self._log_fh.close()
-            except Exception:  # noqa: BLE001
-                pass
             self._log_fh = None

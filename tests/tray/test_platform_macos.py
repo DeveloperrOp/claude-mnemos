@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -29,7 +29,7 @@ def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_bundle_id_format() -> None:
     assert BUNDLE_ID == "com.claude-mnemos.tray"
-    assert PLIST_FILENAME == f"{BUNDLE_ID}.plist"
+    assert f"{BUNDLE_ID}.plist" == PLIST_FILENAME
 
 
 def test_status_absent(fake_home: Path) -> None:
