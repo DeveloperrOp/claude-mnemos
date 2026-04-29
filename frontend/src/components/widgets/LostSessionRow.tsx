@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProjectBadge } from "./ProjectBadge";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useLostSessionImport } from "@/hooks/useLostSessionImport";
+import { useLostSessionIgnore } from "@/hooks/useLostSessionIgnore";
 import type { LostSession } from "@/types/LostSession";
 
 function formatBytes(n: number): string {
@@ -13,30 +17,62 @@ function formatBytes(n: number): string {
 
 export function LostSessionRow({ session: s }: { session: LostSession }) {
   const { t } = useTranslation();
+  const [ignoreOpen, setIgnoreOpen] = useState(false);
+  const importMut = useLostSessionImport();
+  const ignoreMut = useLostSessionIgnore();
+
   return (
-    <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm">
-      <ProjectBadge name={s.project_name} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate font-mono text-xs" title={s.session_id}>
-            {s.session_id.slice(0, 12)}…
-          </span>
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
-            {t("lost_sessions.sha")}: <code>{s.sha.slice(0, 8)}</code>
-          </span>
+    <>
+      <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm">
+        <ProjectBadge name={s.project_name} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="truncate font-mono text-xs" title={s.session_id}>
+              {s.session_id.slice(0, 12)}…
+            </span>
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              {t("lost_sessions.sha")}: <code>{s.sha.slice(0, 8)}</code>
+            </span>
+          </div>
+          <div className="text-xs text-[hsl(var(--muted-foreground))]" title={s.transcript_path}>
+            {formatBytes(s.size_bytes)} · {s.mtime}
+          </div>
         </div>
-        <div className="text-xs text-[hsl(var(--muted-foreground))]" title={s.transcript_path}>
-          {formatBytes(s.size_bytes)} · {s.mtime}
-        </div>
+        <Button
+          size="sm" variant="outline"
+          disabled={importMut.isPending}
+          onClick={() => importMut.mutate({
+            session_id: s.session_id,
+            body: { project_name: s.project_name, transcript_path: s.transcript_path },
+          })}
+          title={t("lost_sessions.import_button")}
+        >
+          <Download className="mr-1 h-3 w-3" />
+          {t("lost_sessions.import_button")}
+        </Button>
+        <Button
+          size="sm" variant="outline"
+          disabled={ignoreMut.isPending}
+          onClick={() => setIgnoreOpen(true)}
+          title={t("lost_sessions.ignore_button")}
+        >
+          <EyeOff className="mr-1 h-3 w-3" />
+          {t("lost_sessions.ignore_button")}
+        </Button>
       </div>
-      <Button size="sm" variant="outline" disabled title={t("lost_sessions.import_disabled")}>
-        <Download className="mr-1 h-3 w-3" />
-        {t("lost_sessions.import_disabled")}
-      </Button>
-      <Button size="sm" variant="outline" disabled title={t("lost_sessions.ignore_disabled")}>
-        <EyeOff className="mr-1 h-3 w-3" />
-        {t("lost_sessions.ignore_disabled")}
-      </Button>
-    </div>
+
+      <ConfirmDialog
+        open={ignoreOpen}
+        onOpenChange={setIgnoreOpen}
+        title={t("lost_sessions.ignore_modal_title")}
+        description={t("lost_sessions.ignore_modal_desc")}
+        confirmLabel={t("lost_sessions.ignore_button")}
+        onConfirm={() => ignoreMut.mutate(
+          { session_id: s.session_id, body: { project_name: s.project_name, sha: s.sha } },
+          { onSettled: () => setIgnoreOpen(false) },
+        )}
+        isPending={ignoreMut.isPending}
+      />
+    </>
   );
 }

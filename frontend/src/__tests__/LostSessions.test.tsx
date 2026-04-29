@@ -16,7 +16,18 @@ beforeAll(() => {
       transcript: "transcript",
       no_lost: "All accounted for",
       showing_n: "{{count}} sessions",
-      import_disabled: "Import (#14c)", ignore_disabled: "Ignore (#14c)",
+      import_button: "Import",
+      ignore_button: "Ignore",
+      imported_toast: "Import queued",
+      ignored_toast: "Marked ignored",
+      ignore_modal_title: "Mark session as ignored?",
+      ignore_modal_desc: "This will hide the session from the lost-sessions list. The transcript file is not deleted.",
+    },
+    confirm: {
+      cancel: "Cancel",
+      confirm: "Confirm",
+      working: "Working...",
+      typed_confirm_input_placeholder: "Type {{phrase}} to confirm",
     },
   }, true, true);
   void i18n.changeLanguage("en");

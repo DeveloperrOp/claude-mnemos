@@ -264,8 +264,12 @@
     "transcript": "транскрипт",
     "no_lost": "Усі сесії обліковані",
     "showing_n": "{{count}} сесій",
-    "import_disabled": "Імпортувати (#14c)",
-    "ignore_disabled": "Ігнорувати (#14c)"
+    "import_button": "Імпортувати",
+    "ignore_button": "Ігнорувати",
+    "imported_toast": "Імпорт у черзі",
+    "ignored_toast": "Позначено як ігнорувати",
+    "ignore_modal_title": "Позначити сесію як ігнорувати?",
+    "ignore_modal_desc": "Це сховає сесію зі списку загублених. Файл транскрипту не видаляється."
   },
   "suggestions": {
     "title": "Пропозиції",
