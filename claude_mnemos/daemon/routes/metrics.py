@@ -12,8 +12,7 @@ error instead of a silent default.
 from __future__ import annotations
 
 import re
-from datetime import date as date_class
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -127,7 +126,7 @@ async def timeline_route(request: Request, period: str = "30d") -> dict[str, Any
     # When no runtimes are mounted produce a zero-filled timeline for the
     # requested window so callers always get a usable structure.
     if not by_date:
-        today = date_class.today()
+        today = datetime.now(UTC).date()
         start = today - timedelta(days=days - 1)
         for i in range(days):
             d_str = str(start + timedelta(days=i))
