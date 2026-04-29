@@ -3,6 +3,7 @@ from __future__ import annotations
 import platform
 import sys
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Request
 
@@ -13,6 +14,7 @@ from claude_mnemos.daemon.schemas import (
     VaultHealth,
     VersionResponse,
 )
+from claude_mnemos.ingest.llm.auth import check_claude_cli_auth
 
 router = APIRouter()
 
@@ -25,6 +27,7 @@ async def health(request: Request) -> HealthResponse:
     alerts_count = 0
     vaults: dict[str, VaultHealth] = {}
     total_dead_letter = 0
+    paused_until_set: list[datetime] = []
     if daemon is not None:
         if getattr(daemon, "started_at_monotonic", 0.0) > 0.0:
             uptime_s = max(0.0, time.monotonic() - daemon.started_at_monotonic)
@@ -43,6 +46,12 @@ async def health(request: Request) -> HealthResponse:
                     counts = store.count_by_status()
                 except Exception:
                     counts = {}
+                try:
+                    paused = store.paused_until()
+                except Exception:
+                    paused = None
+                if paused is not None:
+                    paused_until_set.append(paused)
             vh_dead = int(counts.get("dead_letter", 0))
             total_dead_letter += vh_dead
             vaults[name] = VaultHealth(
@@ -55,6 +64,7 @@ async def health(request: Request) -> HealthResponse:
     degraded = jobs_alert or any(
         not v.watchdog_running for v in vaults.values()
     )
+    queue_paused_until = max(paused_until_set) if paused_until_set else None
     return HealthResponse(
         status="degraded" if degraded else "ok",
         version=__version__,
@@ -63,7 +73,18 @@ async def health(request: Request) -> HealthResponse:
         alerts_count=alerts_count,
         vaults=vaults,
         jobs_alert=jobs_alert,
+        queue_paused_until=queue_paused_until,
     )
+
+
+@router.get("/health/claude-cli")
+def health_claude_cli() -> dict[str, object]:
+    s = check_claude_cli_auth()
+    return {
+        "installed": s.installed,
+        "authenticated": s.authenticated,
+        "binary_path": s.binary_path,
+    }
 
 
 @router.get("/version", response_model=VersionResponse)

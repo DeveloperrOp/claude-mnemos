@@ -28,6 +28,7 @@ dependencies = [
     "httpx>=0.27",
     "mcp>=1.12",
     "pystray>=0.19",
+    "tiktoken>=0.7",
     "watchdog>=4.0",
 ]
 

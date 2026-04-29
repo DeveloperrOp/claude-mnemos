@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useProjectCreate } from "@/hooks/useProjectCreate";
 import { getTrayStatus, installTray } from "@/api/tray.api";
 import type { TrayStatus } from "@/types/Tray";
+import { getClaudeCliAuth } from "@/api/claudeCli.api";
+import type { ClaudeCliAuth } from "@/types/ClaudeCliAuth";
 
 const NAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -22,12 +24,18 @@ export function Onboarding() {
   const [mountFailedDetail, setMountFailedDetail] = useState<string | null>(null);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [autostartChecked, setAutostartChecked] = useState<boolean>(true);
+  const [cliAuth, setCliAuth] = useState<ClaudeCliAuth | null>(null);
 
   // Fetch platform info on mount to decide whether to show the autostart
   // checkbox (hidden on Linux / unsupported per design §8). Errors are
   // ignored — checkbox stays hidden.
   useEffect(() => {
     getTrayStatus().then(setTrayStatus).catch(() => setTrayStatus(null));
+  }, []);
+
+  // Fetch Claude CLI auth status on mount to show install/login hints.
+  useEffect(() => {
+    getClaudeCliAuth().then(setCliAuth).catch(() => setCliAuth(null));
   }, []);
 
   const nameValid = NAME_REGEX.test(name);
@@ -156,6 +164,19 @@ export function Onboarding() {
           <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
             {t("onboarding.autostart_hint")}
           </p>
+        </div>
+      )}
+
+      {cliAuth && (
+        <div className="mt-4 rounded-md border bg-[hsl(var(--background))] p-3 text-sm">
+          <div className="font-medium">{t("onboarding.cli_check_label")}</div>
+          <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            {cliAuth.installed && cliAuth.authenticated
+              ? t("onboarding.cli_check_ok")
+              : !cliAuth.installed
+              ? t("onboarding.cli_check_not_installed")
+              : t("onboarding.cli_check_not_authenticated")}
+          </div>
         </div>
       )}
 

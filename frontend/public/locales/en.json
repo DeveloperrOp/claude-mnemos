@@ -44,7 +44,8 @@
     "daemon_down_title": "Daemon unavailable",
     "daemon_down_hint_cmd": "Start the daemon:",
     "daemon_down_hint_command": "mnemos daemon start",
-    "daemon_down_reconnect": "The dashboard will reconnect automatically."
+    "daemon_down_reconnect": "The dashboard will reconnect automatically.",
+    "rate_limited_until": "Rate limited — resumes at {{time}}"
   },
   "project_view": {
     "open_in_obsidian": "Open in Obsidian",
@@ -370,7 +371,11 @@
     "mount_failed_title": "Mount failed",
     "success_toast": "Project created",
     "autostart_label": "Auto-start mnemos on login",
-    "autostart_hint": "Adds a tray icon and starts the daemon automatically when you sign in."
+    "autostart_hint": "Adds a tray icon and starts the daemon automatically when you sign in.",
+    "cli_check_label": "Claude CLI status",
+    "cli_check_ok": "✓ Claude CLI installed and authenticated",
+    "cli_check_not_installed": "⚠ Claude CLI not found — install Claude Code from https://claude.ai/download",
+    "cli_check_not_authenticated": "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal"
   },
   "metrics": {
     "title": "Metrics",

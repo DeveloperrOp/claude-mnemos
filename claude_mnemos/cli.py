@@ -30,6 +30,7 @@ from claude_mnemos.ingest.llm import (
     LLMExtractionError,
     MissingApiKeyError,
     TranscriptTooLargeError,
+    make_llm_client,
 )
 from claude_mnemos.ingest.pipeline import ingest
 from claude_mnemos.ingest.transcript import EmptyTranscriptError
@@ -590,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if extract:
-            llm_client = LLMClient(cfg)
+            llm_client = make_llm_client(cfg)
 
         result = ingest(
             args.jsonl,

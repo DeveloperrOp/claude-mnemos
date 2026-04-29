@@ -32,6 +32,7 @@ beforeAll(async () => {
         daemon_down_hint_cmd: "Start the daemon:",
         daemon_down_hint_command: "mnemos daemon start",
         daemon_down_reconnect: "Dashboard will reconnect automatically.",
+        rate_limited_until: "Rate limited — resumes at {{time}}",
       },
       project_view: {
         stats: {
@@ -132,5 +133,107 @@ describe("Overview", () => {
     await waitFor(() =>
       expect(screen.getByText("alpha")).toBeInTheDocument(),
     );
+  });
+
+  it("shows rate-limit banner when queue_paused_until is in the future, hides when in the past", async () => {
+    const future = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/projects")
+        return {
+          data: [{ name: "alpha", vault_root: "/a", cwd_patterns: [] }],
+        };
+      if (url === "/health")
+        return {
+          data: {
+            status: "ok",
+            version: "0.1",
+            uptime_s: 0,
+            alerts_count: 0,
+            vaults: {
+              alpha: {
+                watchdog_running: true,
+                jobs_queued: 0,
+                jobs_running: 0,
+                jobs_dead_letter: 0,
+              },
+            },
+            jobs_alert: false,
+            scheduler_jobs: [],
+            queue_paused_until: future,
+          },
+        };
+      return { data: { projects: [] } };
+    });
+    render(wrap(<Overview />));
+    await waitFor(() =>
+      expect(screen.getByText(/rate limited/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("does not show rate-limit banner when queue_paused_until is null", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/projects")
+        return {
+          data: [{ name: "alpha", vault_root: "/a", cwd_patterns: [] }],
+        };
+      if (url === "/health")
+        return {
+          data: {
+            status: "ok",
+            version: "0.1",
+            uptime_s: 0,
+            alerts_count: 0,
+            vaults: {
+              alpha: {
+                watchdog_running: true,
+                jobs_queued: 0,
+                jobs_running: 0,
+                jobs_dead_letter: 0,
+              },
+            },
+            jobs_alert: false,
+            scheduler_jobs: [],
+            queue_paused_until: null,
+          },
+        };
+      return { data: { projects: [] } };
+    });
+    render(wrap(<Overview />));
+    await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
+    expect(screen.queryByText(/rate limited/i)).not.toBeInTheDocument();
+  });
+
+  it("does not show rate-limit banner when queue_paused_until is in the past", async () => {
+    const past = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/projects")
+        return {
+          data: [{ name: "alpha", vault_root: "/a", cwd_patterns: [] }],
+        };
+      if (url === "/health")
+        return {
+          data: {
+            status: "ok",
+            version: "0.1",
+            uptime_s: 0,
+            alerts_count: 0,
+            vaults: {
+              alpha: {
+                watchdog_running: true,
+                jobs_queued: 0,
+                jobs_running: 0,
+                jobs_dead_letter: 0,
+              },
+            },
+            jobs_alert: false,
+            scheduler_jobs: [],
+            queue_paused_until: past,
+          },
+        };
+      return { data: { projects: [] } };
+    });
+    render(wrap(<Overview />));
+    await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
+    expect(screen.queryByText(/rate limited/i)).not.toBeInTheDocument();
   });
 });

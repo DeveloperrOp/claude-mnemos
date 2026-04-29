@@ -44,7 +44,8 @@
     "daemon_down_title": "Демон недоступний",
     "daemon_down_hint_cmd": "Запустіть демон:",
     "daemon_down_hint_command": "mnemos daemon start",
-    "daemon_down_reconnect": "Дашборд автоматично перепідключиться."
+    "daemon_down_reconnect": "Дашборд автоматично перепідключиться.",
+    "rate_limited_until": "Rate limit — відновиться о {{time}}"
   },
   "project_view": {
     "open_in_obsidian": "Відкрити в Obsidian",
@@ -370,7 +371,11 @@
     "mount_failed_title": "Помилка монтування",
     "success_toast": "Проєкт створено",
     "autostart_label": "Запускати mnemos автоматично при вході",
-    "autostart_hint": "Додасть іконку в трей і запускатиме демона при вході в систему."
+    "autostart_hint": "Додасть іконку в трей і запускатиме демона при вході в систему.",
+    "cli_check_label": "Статус Claude CLI",
+    "cli_check_ok": "✓ Claude CLI встановлено й автентифіковано",
+    "cli_check_not_installed": "⚠ Claude CLI не знайдено — встановіть Claude Code з https://claude.ai/download",
+    "cli_check_not_authenticated": "⚠ Claude CLI встановлено, але не автентифіковано — виконайте `claude login` в терміналі"
   },
   "metrics": {
     "title": "Метрики",

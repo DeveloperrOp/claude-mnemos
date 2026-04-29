@@ -201,3 +201,54 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
     body = r.json()
     assert body["vaults"]["alpha"]["jobs_dead_letter"] == 11
     assert body["jobs_alert"] is True
+
+
+async def test_health_queue_paused_until_default_none(client):
+    """No daemon attached → queue_paused_until is None."""
+    r = await client.get("/health")
+    body = r.json()
+    assert body["queue_paused_until"] is None
+
+
+async def test_health_queue_paused_until_aggregates_max(tmp_path: Path):
+    """When multiple vaults are paused, /health returns max(paused_until)."""
+    from datetime import timedelta
+
+    from claude_mnemos.daemon.alerts import Alerts
+    from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
+
+    store_a = JobStore(tmp_path / "a" / JOBS_DB_FILENAME)
+    store_b = JobStore(tmp_path / "b" / JOBS_DB_FILENAME)
+    earlier = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+    later = earlier + timedelta(hours=3)
+    store_a.pause_queue(until=earlier)
+    store_b.pause_queue(until=later)
+
+    class FakeRuntime:
+        def __init__(self, store) -> None:
+            self.observer = None
+            self.job_store = store
+
+    class FakeDaemon:
+        started_at_monotonic = 0.0
+        alerts = Alerts()
+
+        def __init__(self) -> None:
+            self.runtimes = {
+                "alpha": FakeRuntime(store_a),
+                "beta": FakeRuntime(store_b),
+            }
+
+        def scheduler_jobs_info(self) -> list:
+            return []
+
+    app = create_app(daemon=FakeDaemon())
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/health")
+    store_a.close()
+    store_b.close()
+    body = r.json()
+    assert body["queue_paused_until"] is not None
+    parsed = datetime.fromisoformat(body["queue_paused_until"])
+    assert abs((parsed - later).total_seconds()) < 2

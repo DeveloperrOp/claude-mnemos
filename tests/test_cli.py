@@ -100,6 +100,9 @@ def test_cli_empty_jsonl_returns_data_error(project_env, tmp_path):
 
 def test_cli_extract_without_api_key_returns_66(project_env):
     vault, env = project_env
+    # Force explicit api provider so MissingApiKeyError still propagates.
+    # (Auto-detect now falls back to CliLLMClient when no key is present.)
+    env = {**env, "MNEMOS_INGEST_PROVIDER": "api"}
     res = _run("ingest", str(FIXTURE), "--project", "p", env=env)
     assert res.returncode == 66
     assert "api" in res.stderr.lower() or "anthropic_api_key" in res.stderr.lower()

@@ -35,7 +35,7 @@ from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.daemon.tasks import backups_cleanup_task, daily_snapshot_task
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
-from claude_mnemos.ingest.llm import LLMClient
+from claude_mnemos.ingest.llm import LLMClient, MissingApiKeyError, make_llm_client
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry
 from claude_mnemos.state.settings import ProjectSettings
@@ -155,9 +155,14 @@ class VaultRuntime:
                 return Config.from_env()
 
             def llm_factory(cfg: Config) -> LLMClient | None:
-                if not cfg.api_key:
+                """Resolve LLMClient via factory. Return None only if both
+                provider paths are unavailable (API key missing AND CLI
+                unavailable) — IngestHandler then falls back to --no-llm
+                behaviour (manual extraction skipped)."""
+                try:
+                    return make_llm_client(cfg)
+                except MissingApiKeyError:
                     return None
-                return LLMClient(cfg)
 
             from claude_mnemos.daemon.jobs.handlers import JobHandler
             from claude_mnemos.state.jobs import JobKind
@@ -167,6 +172,7 @@ class VaultRuntime:
                     vault=self.vault_root,
                     cfg_factory=cfg_factory,
                     llm_factory=llm_factory,
+                    job_store=self.job_store,
                 )
             }
             worker = JobWorker(

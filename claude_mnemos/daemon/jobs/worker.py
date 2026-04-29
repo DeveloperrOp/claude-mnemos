@@ -66,10 +66,21 @@ class JobWorker:
         with contextlib.suppress(RuntimeError):
             asyncio.get_event_loop().call_soon_threadsafe(self._wakeup.set)
 
+    def try_dequeue_one(self) -> Job | None:
+        """Single dequeue entrypoint — honours JobStore.is_paused().
+
+        Returns None when the queue is paused (rate-limited) so callers
+        leave queued jobs untouched. Otherwise delegates to
+        JobStore.claim_next_ready (atomic claim).
+        """
+        if self._store.is_paused():
+            return None
+        return self._store.claim_next_ready(now=datetime.now(UTC))
+
     async def _run_loop(self) -> None:
         while not self._stop.is_set():
             try:
-                job = self._store.claim_next_ready(now=datetime.now(UTC))
+                job = self.try_dequeue_one()
             except Exception:
                 logger.exception("job claim failed")
                 # The claim may have succeeded at SQL level (row marked

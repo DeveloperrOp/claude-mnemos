@@ -14,7 +14,7 @@ import pytest
 
 from claude_mnemos.config import Config
 from claude_mnemos.ingest.extraction import extract_wiki_pages
-from claude_mnemos.ingest.llm import LLMClient
+from claude_mnemos.ingest.llm import ApiLLMClient
 from claude_mnemos.ingest.transcript import TranscriptMessage
 
 pytestmark = [
@@ -28,7 +28,7 @@ pytestmark = [
 
 def test_real_extraction_yields_at_least_one_page():
     cfg = Config.from_env()
-    client = LLMClient(cfg)
+    client = ApiLLMClient(cfg)
 
     messages = [
         TranscriptMessage(
