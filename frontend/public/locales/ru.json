@@ -393,7 +393,9 @@
     "col_session": "Сессия",
     "col_ingested_at": "Ингест",
     "col_tokens_total": "Токены",
-    "empty": "Нет данных"
+    "empty": "Нет данных",
+    "inject_events": "{{count}} инъекций",
+    "avg_compression": "{{ratio}}× среднее сжатие"
   },
   "help": {
     "title": "Помощь",

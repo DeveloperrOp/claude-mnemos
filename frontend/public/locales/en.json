@@ -393,7 +393,9 @@
     "col_session": "Session",
     "col_ingested_at": "Ingested",
     "col_tokens_total": "Tokens",
-    "empty": "No data"
+    "empty": "No data",
+    "inject_events": "{{count}} inject events",
+    "avg_compression": "{{ratio}}× avg compression"
   },
   "help": {
     "title": "Help",
