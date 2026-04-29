@@ -76,7 +76,7 @@ describe("Onboarding", () => {
   });
 
   it("shows mount_failed callout on 500", async () => {
-    const err: any = new Error("Request failed");
+    const err = new Error("Request failed") as Error & { isAxiosError: boolean; response: { status: number; data: { error: string; detail: string } } };
     err.isAxiosError = true;
     err.response = { status: 500, data: { error: "mount_failed", detail: "Permission denied: /var/foo" } };
     vi.spyOn(apiClient, "post").mockRejectedValueOnce(err);
@@ -90,7 +90,7 @@ describe("Onboarding", () => {
   });
 
   it("shows inline name_taken on 409", async () => {
-    const err: any = new Error("Request failed");
+    const err = new Error("Request failed") as Error & { isAxiosError: boolean; response: { status: number; data: { error: string; detail: string } } };
     err.isAxiosError = true;
     err.response = { status: 409, data: { error: "name_conflict", detail: "Name already exists" } };
     vi.spyOn(apiClient, "post").mockRejectedValueOnce(err);
