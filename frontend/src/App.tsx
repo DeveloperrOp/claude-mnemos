@@ -4,6 +4,8 @@ import { Overview } from "./pages/Overview";
 import { ProjectView } from "./pages/ProjectView";
 import { Help } from "./pages/Help";
 import { Placeholder } from "./pages/Placeholder";
+import { PagesBrowser } from "./pages/PagesBrowser";
+import { PageDetail } from "./pages/PageDetail";
 import { Sessions } from "./pages/Sessions";
 import { SessionDetail } from "./pages/SessionDetail";
 import { ActivityCenter } from "./pages/ActivityCenter";
@@ -20,8 +22,8 @@ const router = createBrowserRouter([
         path: "project/:name",
         children: [
           { index: true, element: <ProjectView /> },
-          { path: "pages", element: <Placeholder section="Pages" plan="#14b" /> },
-          { path: "pages/:pageId", element: <Placeholder section="Page detail" plan="#14b" /> },
+          { path: "pages", element: <PagesBrowser /> },
+          { path: "pages/*", element: <PageDetail /> },
           { path: "sessions", element: <Sessions /> },
           { path: "sessions/:sid", element: <SessionDetail /> },
           { path: "activity", element: <ActivityCenter /> },
