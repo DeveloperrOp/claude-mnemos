@@ -82,6 +82,12 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_jobs_status_next_at ON jobs (status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_kind ON jobs (kind);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs (created_at);
+
+CREATE TABLE IF NOT EXISTS job_queue_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    paused_until TEXT
+);
+INSERT OR IGNORE INTO job_queue_state (id, paused_until) VALUES (1, NULL);
 """
 
 # SQL fragments used by the v1→v2 migration (separate from _SCHEMA_SQL so they
@@ -496,3 +502,35 @@ class JobStore:
                 "DELETE FROM jobs WHERE id=? AND status='dead_letter'", (job_id,)
             )
             return cur.rowcount > 0
+
+    # — queue pause (rate-limit) —
+
+    def pause_queue(self, *, until: datetime) -> None:
+        """Pause job dequeue until *until* (UTC). Existing pause is overwritten."""
+        iso = until.astimezone(UTC).isoformat()
+        with self._tx_lock:
+            self._conn.execute(
+                "UPDATE job_queue_state SET paused_until = ? WHERE id = 1",
+                (iso,),
+            )
+
+    def resume_queue(self) -> None:
+        with self._tx_lock:
+            self._conn.execute(
+                "UPDATE job_queue_state SET paused_until = NULL WHERE id = 1"
+            )
+
+    def paused_until(self) -> datetime | None:
+        row = self._conn.execute(
+            "SELECT paused_until FROM job_queue_state WHERE id = 1"
+        ).fetchone()
+        if row is None or row[0] is None:
+            return None
+        return datetime.fromisoformat(row[0])
+
+    def is_paused(self, *, now: datetime | None = None) -> bool:
+        until = self.paused_until()
+        if until is None:
+            return False
+        ref = now or datetime.now(UTC)
+        return until > ref
