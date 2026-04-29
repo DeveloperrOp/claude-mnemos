@@ -137,6 +137,8 @@
     "no_pages_created": "Страниц не создано",
     "showing_n_of_m": "{{shown}} из {{total}}",
     "ingest_disabled": "Повторная загрузка (появится в #14c)",
+    "ingest_button": "Ингест",
+    "ingested_toast": "Ингест в очереди",
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад"
   },
