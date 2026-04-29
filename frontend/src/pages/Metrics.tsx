@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUsageTimeline } from "@/hooks/useUsageTimeline";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
 import { useTopSessions } from "@/hooks/useTopSessions";
+import { useCompressionTimeline } from "@/hooks/useCompressionTimeline";
 import { UsageTimelineChart } from "@/components/widgets/UsageTimelineChart";
 import { UsageByProjectTable } from "@/components/widgets/UsageByProjectTable";
 import { TopSessionsTable } from "@/components/widgets/TopSessionsTable";
+import { CompressionTimelineChart } from "@/components/widgets/CompressionTimelineChart";
 import { cn } from "@/lib/utils";
 
 const PERIODS = ["7d", "30d", "90d", "1y"] as const;
@@ -18,6 +20,7 @@ function Metrics() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<Period>("30d");
   const timeline = useUsageTimeline(period);
+  const compressionTimeline = useCompressionTimeline(period);
   const byProject = useUsageByProject(period);
   const top = useTopSessions(10);
 
@@ -51,6 +54,19 @@ function Metrics() {
             <Skeleton className="h-72" />
           ) : (
             <UsageTimelineChart points={timeline.data ?? []} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("metrics.compression_timeline_title")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {compressionTimeline.isLoading ? (
+            <Skeleton className="h-72" />
+          ) : (
+            <CompressionTimelineChart points={compressionTimeline.data ?? []} />
           )}
         </CardContent>
       </Card>
