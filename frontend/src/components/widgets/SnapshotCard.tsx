@@ -9,6 +9,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { TypedConfirmDialog } from "./TypedConfirmDialog";
 import { useSnapshotDelete } from "@/hooks/useSnapshotDelete";
 import { useSnapshotRestore } from "@/hooks/useSnapshotRestore";
+import { formatDateTime } from "@/lib/datetime";
 import type { SnapshotInfo, SnapshotKind } from "@/types/Snapshot";
 
 const KIND_TONE: Record<SnapshotKind, KindTone> = {
@@ -25,7 +26,7 @@ function formatBytes(n: number): string {
 }
 
 export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { name: project } = useParams<{ name: string }>();
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -42,7 +43,7 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-1 text-xs">
-          <div className="text-[hsl(var(--muted-foreground))]">{s.timestamp}</div>
+          <div className="text-[hsl(var(--muted-foreground))]">{formatDateTime(s.timestamp, i18n.language)}</div>
           {s.label && (
             <div>
               <span className="text-[hsl(var(--muted-foreground))]">{t("snapshots.label")}: </span>

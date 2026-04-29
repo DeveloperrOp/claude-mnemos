@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 import type { SessionStatus, SessionView } from "@/types/Session";
 
 const STATUS_COLOR: Record<SessionStatus, string> = {
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export function SessionCard({ project, session: s }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <Card className="transition-colors hover:bg-[hsl(var(--muted))]">
       <CardHeader>
@@ -61,7 +62,7 @@ export function SessionCard({ project, session: s }: Props) {
         )}
         {s.ingested_at && (
           <div className="text-[hsl(var(--muted-foreground))]">
-            {t("sessions.ingested_at")}: {s.ingested_at}
+            {t("sessions.ingested_at")}: {formatDateTime(s.ingested_at, i18n.language)}
           </div>
         )}
         {s.error && (
