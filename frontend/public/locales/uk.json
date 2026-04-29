@@ -191,5 +191,23 @@
     "delete_permanently_disabled": "Видалити назавжди (#14c)",
     "no_entries": "Кошик порожній",
     "showing_n": "{{count}} записів"
+  },
+  "snapshots": {
+    "title": "Знімки",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Щоденний",
+      "manual": "Ручний",
+      "all": "Усі"
+    },
+    "filter_kind": "Тип",
+    "label": "мітка",
+    "op_id": "операція",
+    "op_type": "тип",
+    "size": "розмір",
+    "no_snapshots": "Немає знімків",
+    "showing_n": "{{count}} знімків",
+    "restore_disabled": "Відновити (#14c)",
+    "delete_disabled": "Видалити (#14c)"
   }
 }

@@ -191,5 +191,23 @@
     "delete_permanently_disabled": "Delete permanently (#14c)",
     "no_entries": "Trash is empty",
     "showing_n": "{{count}} entries"
+  },
+  "snapshots": {
+    "title": "Snapshots",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Daily",
+      "manual": "Manual",
+      "all": "All"
+    },
+    "filter_kind": "Kind",
+    "label": "label",
+    "op_id": "operation",
+    "op_type": "type",
+    "size": "size",
+    "no_snapshots": "No snapshots yet",
+    "showing_n": "{{count}} snapshots",
+    "restore_disabled": "Restore (#14c)",
+    "delete_disabled": "Delete (#14c)"
   }
 }

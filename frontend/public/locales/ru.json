@@ -191,5 +191,23 @@
     "delete_permanently_disabled": "Удалить навсегда (#14c)",
     "no_entries": "Корзина пуста",
     "showing_n": "{{count}} записей"
+  },
+  "snapshots": {
+    "title": "Снимки",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Ежедневный",
+      "manual": "Ручной",
+      "all": "Все"
+    },
+    "filter_kind": "Тип",
+    "label": "метка",
+    "op_id": "операция",
+    "op_type": "тип",
+    "size": "размер",
+    "no_snapshots": "Нет снимков",
+    "showing_n": "{{count}} снимков",
+    "restore_disabled": "Восстановить (#14c)",
+    "delete_disabled": "Удалить (#14c)"
   }
 }
