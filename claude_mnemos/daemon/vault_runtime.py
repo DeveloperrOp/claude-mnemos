@@ -35,7 +35,7 @@ from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.daemon.tasks import backups_cleanup_task, daily_snapshot_task
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
-from claude_mnemos.ingest.llm import LLMClient
+from claude_mnemos.ingest.llm import ApiLLMClient, LLMClient
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry
 from claude_mnemos.state.settings import ProjectSettings
@@ -157,7 +157,7 @@ class VaultRuntime:
             def llm_factory(cfg: Config) -> LLMClient | None:
                 if not cfg.api_key:
                     return None
-                return LLMClient(cfg)
+                return ApiLLMClient(cfg)
 
             from claude_mnemos.daemon.jobs.handlers import JobHandler
             from claude_mnemos.state.jobs import JobKind

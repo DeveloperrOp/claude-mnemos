@@ -26,6 +26,7 @@ from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
 from claude_mnemos.daemon_url import daemon_base_url
 from claude_mnemos.ingest.llm import (
+    ApiLLMClient,
     LLMClient,
     LLMExtractionError,
     MissingApiKeyError,
@@ -590,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if extract:
-            llm_client = LLMClient(cfg)
+            llm_client = ApiLLMClient(cfg)
 
         result = ingest(
             args.jsonl,

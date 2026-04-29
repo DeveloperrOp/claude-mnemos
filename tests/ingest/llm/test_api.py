@@ -4,7 +4,7 @@ import pytest
 
 from claude_mnemos.config import Config
 from claude_mnemos.ingest.llm import (
-    LLMClient,
+    ApiLLMClient,
     LLMExtractionError,
     MissingApiKeyError,
     TranscriptTooLargeError,
@@ -48,7 +48,7 @@ def _make_token_count(input_tokens: int):
 def test_missing_api_key_raises():
     cfg = _cfg(api_key=None)
     with pytest.raises(MissingApiKeyError):
-        LLMClient(cfg)
+        ApiLLMClient(cfg)
 
 
 def test_transcript_too_large_raises():
@@ -56,7 +56,7 @@ def test_transcript_too_large_raises():
     inner = MagicMock()
     inner.messages.count_tokens.return_value = _make_token_count(2000)
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
     with pytest.raises(TranscriptTooLargeError):
         client.extract(system="sys", user="usr", tool=_dummy_tool())
 
@@ -86,7 +86,7 @@ def test_successful_extract_returns_payload_and_usage():
     }
     inner.messages.create.return_value = _make_response_with_tool_use(valid_payload)
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
     result = client.extract(system="sys", user="usr", tool=_dummy_tool())
 
     assert result.payload == valid_payload
@@ -101,7 +101,7 @@ def test_tool_choice_forces_tool():
     inner.messages.count_tokens.return_value = _make_token_count(500)
     inner.messages.create.return_value = _make_response_with_tool_use({"summary": "x", "pages": []})
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
     client.extract(system="sys", user="usr", tool=_dummy_tool())
 
     kwargs = inner.messages.create.call_args.kwargs
@@ -123,7 +123,7 @@ def test_retries_once_on_validation_error_then_succeeds():
         _make_response_with_tool_use(valid),
     ]
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
 
     def validate_payload(p):
         if "pages" not in p:
@@ -153,7 +153,7 @@ def test_raises_after_two_validation_failures():
     bad = {"summary": "x"}
     inner.messages.create.return_value = _make_response_with_tool_use(bad)
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
 
     def validate_payload(p):
         raise ValueError("always fails")
@@ -177,7 +177,7 @@ def test_response_without_tool_use_block_raises():
     bad_resp.content = [block]
     inner.messages.create.return_value = bad_resp
 
-    client = LLMClient(cfg, _client=inner)
+    client = ApiLLMClient(cfg, _client=inner)
 
     with pytest.raises(LLMExtractionError):
         client.extract(system="sys", user="usr", tool=_dummy_tool())
