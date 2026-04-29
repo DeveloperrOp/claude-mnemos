@@ -14,6 +14,9 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 20% 98%;
     --radius: 0.5rem;
+    --chart-input: #3b82f6;
+    --chart-output: #10b981;
+    --chart-sessions: #f59e0b;
   }
 
   .dark {
@@ -28,6 +31,9 @@
     --card-foreground: 210 20% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 20% 98%;
+    --chart-input: #60a5fa;
+    --chart-output: #34d399;
+    --chart-sessions: #fbbf24;
   }
 
   body {
