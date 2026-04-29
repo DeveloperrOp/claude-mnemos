@@ -5,6 +5,8 @@ from dataclasses import dataclass, replace
 from typing import Literal, cast
 
 LanguageHint = Literal["auto", "uk", "ru", "en"]
+IngestProvider = Literal["cli", "api"]
+_VALID_PROVIDERS: set[str] = {"cli", "api"}
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_INPUT_TOKENS = 150_000
@@ -36,6 +38,7 @@ class Config:
     language_hint: LanguageHint
     max_input_tokens: int
     lock_timeout: float
+    ingest_provider: IngestProvider | None = None
 
     @classmethod
     def from_env(cls) -> Config:
@@ -72,12 +75,20 @@ class Config:
                     f"MNEMOS_LOCK_TIMEOUT={lock_raw!r}: expected float"
                 ) from exc
 
+        provider_raw = os.environ.get("MNEMOS_INGEST_PROVIDER")
+        if provider_raw is not None and provider_raw not in _VALID_PROVIDERS:
+            raise ValueError(
+                f"MNEMOS_INGEST_PROVIDER={provider_raw!r}; "
+                f"ingest_provider must be one of {sorted(_VALID_PROVIDERS)}"
+            )
+
         return cls(
             api_key=api_key,
             model=model,
             language_hint=cast(LanguageHint, hint_raw),
             max_input_tokens=max_tokens,
             lock_timeout=lock,
+            ingest_provider=cast("IngestProvider | None", provider_raw),
         )
 
     def with_overrides(
@@ -88,6 +99,7 @@ class Config:
         language_hint: LanguageHint | None = None,
         max_input_tokens: int | None = None,
         lock_timeout: float | None = None,
+        ingest_provider: IngestProvider | None = None,
     ) -> Config:
         if language_hint is not None and language_hint not in _VALID_HINTS:
             raise UnknownLanguageHintError(
@@ -102,4 +114,7 @@ class Config:
                 max_input_tokens if max_input_tokens is not None else self.max_input_tokens
             ),
             lock_timeout=lock_timeout if lock_timeout is not None else self.lock_timeout,
+            ingest_provider=(
+                ingest_provider if ingest_provider is not None else self.ingest_provider
+            ),
         )
