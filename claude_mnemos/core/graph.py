@@ -28,36 +28,11 @@ def build_page_graph(vault: Path) -> dict[str, set[str]]:
 
     Bidirectional. Bad pages are skipped. Targets not present as their own
     pages still appear as keys (empty neighbor set).
+
+    Thin wrapper around :func:`build_page_graph_with_pages` — see that
+    function for the variant that also returns parsed page bodies.
     """
-    graph: dict[str, set[str]] = {}
-    wiki_root = vault / "wiki"
-    if not wiki_root.is_dir():
-        return graph
-
-    for page_path in wiki_root.rglob("*.md"):
-        try:
-            parsed = read_page(page_path)
-        except PageParseError:
-            continue
-        slug = slug_from_page_path(vault, page_path)
-        graph.setdefault(slug, set())
-
-        # Body wikilinks
-        for link in extract_wikilinks(parsed.body):
-            target = link.target.strip()
-            if not target:
-                continue
-            graph[slug].add(target)
-            graph.setdefault(target, set()).add(slug)
-
-        # Frontmatter related[]
-        for related in parsed.frontmatter.related:
-            r = related.strip()
-            if not r:
-                continue
-            graph[slug].add(r)
-            graph.setdefault(r, set()).add(slug)
-
+    graph, _ = build_page_graph_with_pages(vault)
     return graph
 
 

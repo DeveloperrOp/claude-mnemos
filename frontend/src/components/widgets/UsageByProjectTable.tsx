@@ -28,6 +28,7 @@ export function UsageByProjectTable({ rows }: Props) {
                 <th className="py-1 text-right font-medium">{t("metrics.col_tokens_input")}</th>
                 <th className="py-1 text-right font-medium">{t("metrics.col_tokens_output")}</th>
                 <th className="py-1 text-right font-medium">{t("metrics.col_tokens_per_byte")}</th>
+                <th className="py-1 text-right font-medium">{t("metrics.col_compression")}</th>
               </tr>
             </thead>
             <tbody>
@@ -39,6 +40,11 @@ export function UsageByProjectTable({ rows }: Props) {
                   <td className="py-1.5 text-right font-mono text-xs">{r.tokens_output}</td>
                   <td className="py-1.5 text-right font-mono text-xs">
                     {r.tokens_per_byte === null ? "—" : r.tokens_per_byte.toFixed(3)}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-xs">
+                    {r.avg_compression_ratio !== null
+                      ? `${r.avg_compression_ratio.toFixed(1)}× (${r.valid_events_count})`
+                      : "—"}
                   </td>
                 </tr>
               ))}

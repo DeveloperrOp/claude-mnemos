@@ -16,7 +16,10 @@ bound disk on extreme usage.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -28,6 +31,9 @@ from claude_mnemos.core.atomic import atomic_write
 INJECT_METRICS_FILENAME = ".inject-metrics.json"
 RETENTION_DAYS = 365
 MAX_EVENTS = 10_000
+LOCK_FILENAME = ".inject-metrics.lock"
+LOCK_TIMEOUT_SECONDS = 5.0
+LOCK_POLL_INTERVAL = 0.05
 
 
 InjectMode = Literal["full", "trimmed", "empty"]
@@ -103,10 +109,38 @@ class InjectMetricsLog(BaseModel):
 
     @classmethod
     def append_to_vault(cls, vault_root: Path, event: InjectMetricEvent) -> None:
-        """Convenience: load → append → save."""
-        log = cls.load(vault_root)
-        log.append(event)
-        log.save(vault_root)
+        """Convenience: load → append → save, with a file lock to serialize
+        concurrent writers.
+
+        The lock is a vault-local file created with ``O_EXCL``. Other writers
+        poll up to ``LOCK_TIMEOUT_SECONDS``; if the timeout expires (e.g. a
+        stale lock from a crashed writer), this function falls back to
+        last-writer-wins so the hook never blocks the session.
+        """
+        lock_path = vault_root / LOCK_FILENAME
+        acquired = False
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            try:
+                fd = os.open(
+                    str(lock_path),
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                    0o600,
+                )
+                os.close(fd)
+                acquired = True
+                break
+            except FileExistsError:
+                time.sleep(LOCK_POLL_INTERVAL)
+
+        try:
+            log = cls.load(vault_root)
+            log.append(event)
+            log.save(vault_root)
+        finally:
+            if acquired:
+                with contextlib.suppress(FileNotFoundError):
+                    lock_path.unlink()
 
     def _apply_retention(self) -> None:
         cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
@@ -114,7 +148,8 @@ class InjectMetricsLog(BaseModel):
 
     def _apply_cap(self) -> None:
         if len(self.events) > MAX_EVENTS:
-            # Keep the most-recent MAX_EVENTS by drop-from-head (events list
-            # is ingest-order, not necessarily timestamp-sorted, but for our
-            # use case the difference is negligible).
+            # Sort by timestamp ascending and keep the most-recent MAX_EVENTS.
+            # Defensive: hooks normally append in chronological order, but a
+            # backfill / manual edit / future feature could violate that.
+            self.events.sort(key=lambda e: e.timestamp)
             self.events = self.events[-MAX_EVENTS:]

@@ -26,6 +26,9 @@ export const UsageByProjectEntrySchema = z.object({
   tokens_injected: z.number().int().nonnegative(),
   raw_bytes_total: z.number().int().nonnegative(),
   tokens_per_byte: z.number().nullable(),
+  avg_compression_ratio: z.number().nullable().default(null),
+  inject_events_count: z.number().int().nonnegative().default(0),
+  valid_events_count: z.number().int().nonnegative().default(0),
 });
 export type UsageByProjectEntry = z.infer<typeof UsageByProjectEntrySchema>;
 
