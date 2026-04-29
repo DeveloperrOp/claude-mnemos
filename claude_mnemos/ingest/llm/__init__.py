@@ -13,7 +13,7 @@ See docs/plans/2026-04-30-llm-cli-provider-design.md.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from claude_mnemos.ingest.llm.api import (
     ApiLLMClient,
@@ -22,6 +22,9 @@ from claude_mnemos.ingest.llm.api import (
     MissingApiKeyError,
     TranscriptTooLargeError,
 )
+
+if TYPE_CHECKING:
+    from claude_mnemos.config import Config
 
 
 @runtime_checkable
@@ -44,6 +47,28 @@ class LLMClient(Protocol):
     ) -> ExtractionRaw: ...
 
 
+def make_llm_client(cfg: Config) -> LLMClient:
+    """Resolve the LLMClient implementation based on cfg.ingest_provider.
+
+    Resolution rules:
+    - cfg.ingest_provider == "api"  → ApiLLMClient (raises MissingApiKeyError if no key)
+    - cfg.ingest_provider == "cli"  → CliLLMClient (no key needed)
+    - cfg.ingest_provider is None   → auto-detect:
+        - api_key set → ApiLLMClient (preserves existing behaviour)
+        - api_key not set → CliLLMClient
+    """
+    if cfg.ingest_provider == "api":
+        return ApiLLMClient(cfg)
+    if cfg.ingest_provider == "cli":
+        from claude_mnemos.ingest.llm.cli import CliLLMClient
+        return CliLLMClient(cfg)
+    # auto-detect
+    if cfg.api_key:
+        return ApiLLMClient(cfg)
+    from claude_mnemos.ingest.llm.cli import CliLLMClient
+    return CliLLMClient(cfg)
+
+
 __all__ = [
     "ApiLLMClient",
     "ExtractionRaw",
@@ -51,4 +76,5 @@ __all__ = [
     "LLMExtractionError",
     "MissingApiKeyError",
     "TranscriptTooLargeError",
+    "make_llm_client",
 ]
