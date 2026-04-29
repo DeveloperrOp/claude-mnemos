@@ -4,6 +4,8 @@ import { Overview } from "./pages/Overview";
 import { ProjectView } from "./pages/ProjectView";
 import { Help } from "./pages/Help";
 import { Placeholder } from "./pages/Placeholder";
+import { Sessions } from "./pages/Sessions";
+import { SessionDetail } from "./pages/SessionDetail";
 
 const router = createBrowserRouter([
   {
@@ -18,7 +20,8 @@ const router = createBrowserRouter([
           { index: true, element: <ProjectView /> },
           { path: "pages", element: <Placeholder section="Pages" plan="#14b" /> },
           { path: "pages/:pageId", element: <Placeholder section="Page detail" plan="#14b" /> },
-          { path: "sessions", element: <Placeholder section="Sessions" plan="#14b" /> },
+          { path: "sessions", element: <Sessions /> },
+          { path: "sessions/:sid", element: <SessionDetail /> },
           { path: "activity", element: <Placeholder section="Activity Center" plan="#14b" /> },
           { path: "suggestions", element: <Placeholder section="Suggestions" plan="#14b" /> },
           { path: "trash", element: <Placeholder section="Trash" plan="#14b" /> },
