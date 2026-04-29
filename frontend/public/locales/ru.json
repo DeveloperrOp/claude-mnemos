@@ -67,5 +67,118 @@
     "title": "{{section}}",
     "body": "Этот раздел появится в плане {{plan}}.",
     "back_link": "Вернуться в Обзор"
+  },
+  "pages": {
+    "filters": {
+      "title": "Фильтры",
+      "type": "Тип",
+      "flavor": "Категория",
+      "status": "Статус",
+      "sort": "Сортировка",
+      "sort_updated": "Последнее обновление",
+      "sort_created": "Дата создания",
+      "sort_title": "Название",
+      "search_placeholder": "Поиск страниц…",
+      "all": "Все",
+      "reset": "Сбросить фильтры"
+    },
+    "showing_n_of_m": "{{shown}} из {{total}}",
+    "open": "Открыть",
+    "open_in_obsidian": "Открыть в Obsidian",
+    "loading_frontmatter": "Загрузка…",
+    "no_pages": "Страниц не найдено",
+    "edit_disabled": "Редактирование появится в #14c",
+    "verify_disabled": "Подтверждение появится в #14c",
+    "delete_disabled": "Удаление появится в #14c",
+    "backlinks": "Обратные ссылки",
+    "no_backlinks": "Обратных ссылок нет",
+    "copy_wikilink": "Скопировать wikilink",
+    "not_found_title": "Страница не найдена",
+    "not_found_hint": "Вернуться назад"
+  },
+  "sessions": {
+    "title": "Сессии",
+    "open": "Открыть",
+    "no_sessions": "Сессий не найдено",
+    "filter_status": "Статус",
+    "limit": "Лимит",
+    "status": {
+      "succeeded": "Успешно",
+      "queued": "В очереди",
+      "running": "Выполняется",
+      "failed": "Ошибка",
+      "dead_letter": "Dead-letter"
+    },
+    "tokens_in": "Токенов вход",
+    "tokens_out": "Токенов выход",
+    "model": "Модель",
+    "ingested_at": "Загружено в",
+    "transcript": "Транскрипт",
+    "created_pages": "Созданные страницы",
+    "no_pages_created": "Страниц не создано",
+    "showing_n_of_m": "{{shown}} из {{total}}",
+    "ingest_disabled": "Повторная загрузка (появится в #14c)",
+    "not_found_title": "Сессия не найдена",
+    "not_found_hint": "Вернуться назад"
+  },
+  "activity": {
+    "title": "История",
+    "groups": {
+      "needs_attention": "Требует внимания",
+      "today": "Сегодня",
+      "yesterday": "Вчера",
+      "earlier_week": "На этой неделе",
+      "older": "Ранее"
+    },
+    "op": {
+      "ingest": "Импорт",
+      "ingest_extracted": "Импорт (извлечённый)",
+      "ingest_raw_only": "Импорт (только raw)",
+      "lint_autofix": "Автоисправление lint",
+      "lint_fix": "Исправление lint",
+      "ontology_apply": "Применение онтологии",
+      "manual_patch": "Ручное редактирование",
+      "manual_edit": "Ручное редактирование",
+      "manual_soft_delete": "Мягкое удаление",
+      "manual_delete": "Удаление",
+      "manual_restore": "Восстановление",
+      "manual_restore_trash": "Восстановление из корзины",
+      "human_edit_detected": "Обнаружено редактирование пользователем",
+      "manual_undo": "Отмена",
+      "trash_dismissed": "Корзина очищена",
+      "trash_emptied": "Корзина опустошена"
+    },
+    "affected_pages": "{{count}} страниц",
+    "detail": "Детали",
+    "undo_disabled": "Отмена (#14c)",
+    "no_activity": "Активности пока нет",
+    "metadata": "Метаданные",
+    "snapshot": "Снимок",
+    "can_undo": "Можно отменить",
+    "cannot_undo": "Нельзя отменить",
+    "undone": "Отменено",
+    "not_found_title": "Запись активности не найдена",
+    "not_found_hint": "Вернуться назад"
+  },
+  "wiki": {
+    "status": {
+      "draft": "Черновик",
+      "reviewed": "Просмотрено",
+      "verified": "Подтверждено",
+      "stale": "Устарело",
+      "archived": "В архиве"
+    },
+    "flavor": {
+      "pattern": "Паттерн",
+      "mistake": "Ошибка",
+      "decision": "Решение",
+      "lesson": "Урок",
+      "reference": "Ссылка"
+    },
+    "type": {
+      "entity": "Сущность",
+      "concept": "Концепт",
+      "source": "Источник"
+    }
   }
 }

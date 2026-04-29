@@ -67,5 +67,118 @@
     "title": "{{section}}",
     "body": "Цей розділ з'явиться в плані {{plan}}.",
     "back_link": "Повернутись до Огляду"
+  },
+  "pages": {
+    "filters": {
+      "title": "Фільтри",
+      "type": "Тип",
+      "flavor": "Категорія",
+      "status": "Статус",
+      "sort": "Сортування",
+      "sort_updated": "Останнє оновлення",
+      "sort_created": "Дата створення",
+      "sort_title": "Назва",
+      "search_placeholder": "Пошук сторінок…",
+      "all": "Усі",
+      "reset": "Скинути фільтри"
+    },
+    "showing_n_of_m": "{{shown}} з {{total}}",
+    "open": "Відкрити",
+    "open_in_obsidian": "Відкрити в Obsidian",
+    "loading_frontmatter": "Завантаження…",
+    "no_pages": "Сторінок не знайдено",
+    "edit_disabled": "Редагування з'явиться в #14c",
+    "verify_disabled": "Підтвердження з'явиться в #14c",
+    "delete_disabled": "Видалення з'явиться в #14c",
+    "backlinks": "Зворотні посилання",
+    "no_backlinks": "Зворотних посилань немає",
+    "copy_wikilink": "Скопіювати wikilink",
+    "not_found_title": "Сторінку не знайдено",
+    "not_found_hint": "Повернутись назад"
+  },
+  "sessions": {
+    "title": "Сесії",
+    "open": "Відкрити",
+    "no_sessions": "Сесій не знайдено",
+    "filter_status": "Статус",
+    "limit": "Ліміт",
+    "status": {
+      "succeeded": "Успішно",
+      "queued": "В черзі",
+      "running": "Виконується",
+      "failed": "Помилка",
+      "dead_letter": "Dead-letter"
+    },
+    "tokens_in": "Токенів вхід",
+    "tokens_out": "Токенів вихід",
+    "model": "Модель",
+    "ingested_at": "Завантажено о",
+    "transcript": "Транскрипт",
+    "created_pages": "Створені сторінки",
+    "no_pages_created": "Сторінок не створено",
+    "showing_n_of_m": "{{shown}} з {{total}}",
+    "ingest_disabled": "Повторно завантажити (з'явиться в #14c)",
+    "not_found_title": "Сесію не знайдено",
+    "not_found_hint": "Повернутись назад"
+  },
+  "activity": {
+    "title": "Активність",
+    "groups": {
+      "needs_attention": "Потребує уваги",
+      "today": "Сьогодні",
+      "yesterday": "Вчора",
+      "earlier_week": "Цього тижня",
+      "older": "Раніше"
+    },
+    "op": {
+      "ingest": "Імпорт",
+      "ingest_extracted": "Імпорт (вилучений)",
+      "ingest_raw_only": "Імпорт (тільки raw)",
+      "lint_autofix": "Автовиправлення lint",
+      "lint_fix": "Виправлення lint",
+      "ontology_apply": "Застосування онтології",
+      "manual_patch": "Ручне редагування",
+      "manual_edit": "Ручне редагування",
+      "manual_soft_delete": "М'яке видалення",
+      "manual_delete": "Видалення",
+      "manual_restore": "Відновлення",
+      "manual_restore_trash": "Відновлення з кошика",
+      "human_edit_detected": "Виявлено редагування користувачем",
+      "manual_undo": "Скасування",
+      "trash_dismissed": "Кошик очищено",
+      "trash_emptied": "Кошик спустошено"
+    },
+    "affected_pages": "{{count}} сторінок",
+    "detail": "Деталі",
+    "undo_disabled": "Скасування (#14c)",
+    "no_activity": "Активності поки немає",
+    "metadata": "Метадані",
+    "snapshot": "Знімок",
+    "can_undo": "Можна скасувати",
+    "cannot_undo": "Не можна скасувати",
+    "undone": "Скасовано",
+    "not_found_title": "Запис активності не знайдено",
+    "not_found_hint": "Повернутись назад"
+  },
+  "wiki": {
+    "status": {
+      "draft": "Чернетка",
+      "reviewed": "Переглянуто",
+      "verified": "Підтверджено",
+      "stale": "Застаріло",
+      "archived": "В архіві"
+    },
+    "flavor": {
+      "pattern": "Шаблон",
+      "mistake": "Помилка",
+      "decision": "Рішення",
+      "lesson": "Урок",
+      "reference": "Посилання"
+    },
+    "type": {
+      "entity": "Сутність",
+      "concept": "Концепт",
+      "source": "Джерело"
+    }
   }
 }
