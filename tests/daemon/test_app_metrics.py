@@ -307,3 +307,58 @@ def test_inject_timeline_empty_returns_zero_filled(
     assert len(points) == 7
     assert all(p["events_count"] == 0 for p in points)
     assert all(p["avg_compression_ratio"] is None for p in points)
+
+
+def test_by_project_includes_compression_fields(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    """/metrics/usage/by-project includes per-project compression fields."""
+    from claude_mnemos.state.inject_metrics import (
+        InjectMetricEvent,
+        InjectMetricsLog,
+    )
+
+    _daemon, client, vault = daemon_with_one_vault
+
+    log = InjectMetricsLog()
+    log.events.append(
+        InjectMetricEvent(
+            id="e1",
+            timestamp=datetime.now(UTC),
+            session_id="s1",
+            operation="session_start",
+            mode="full",
+            tokens_full=1000,
+            tokens_actual=200,
+            candidates_total=5,
+            candidates_packed=5,
+        )
+    )
+    log.save(vault)
+
+    r = client.get("/metrics/usage/by-project", params={"period": "30d"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "projects" in data
+    assert len(data["projects"]) >= 1
+    row = data["projects"][0]
+    assert "avg_compression_ratio" in row
+    assert "inject_events_count" in row
+    assert "valid_events_count" in row
+    assert row["avg_compression_ratio"] == 5.0
+    assert row["inject_events_count"] == 1
+    assert row["valid_events_count"] == 1
+
+
+def test_by_project_compression_null_when_no_events(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    _daemon, client, _vault = daemon_with_one_vault
+    r = client.get("/metrics/usage/by-project", params={"period": "30d"})
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["projects"]) >= 1
+    row = data["projects"][0]
+    assert row["avg_compression_ratio"] is None
+    assert row["inject_events_count"] == 0
+    assert row["valid_events_count"] == 0

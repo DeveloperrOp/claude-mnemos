@@ -112,8 +112,13 @@ async def by_project_route(request: Request, period: str = "30d") -> dict[str, A
     projects = []
     for runtime in all_runtimes(request):
         s = core_metrics.usage_summary(runtime.vault_root, period_days=days)
+        c = core_metrics.compression_summary(runtime.vault_root, period_days=days)
         entry: dict[str, Any] = {"project": runtime.name}
         entry.update(s.model_dump(mode="json"))
+        # Per-project compression fields (Plan #13e)
+        entry["avg_compression_ratio"] = c.avg_compression_ratio
+        entry["inject_events_count"] = c.events_count
+        entry["valid_events_count"] = c.valid_events_count
         projects.append(entry)
     return {"projects": projects}
 
