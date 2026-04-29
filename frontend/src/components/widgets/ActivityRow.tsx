@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useActivityUndo } from "@/hooks/useActivityUndo";
 import { cn } from "@/lib/utils";
 import type { ActivityEntry } from "@/types/Activity";
 
@@ -35,39 +38,60 @@ function EntryIcon({ entry }: { entry: ActivityEntry }) {
 
 export function ActivityRow({ project, entry: e }: Props) {
   const { t } = useTranslation();
+  const [undoOpen, setUndoOpen] = useState(false);
+  const undo = useActivityUndo();
+  const canUndo = e.can_undo && !e.undone;
 
   return (
-    <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2">
-      <EntryIcon entry={e} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium">
-            {t(`activity.op.${e.operation_type}`, e.operation_type)}
-          </span>
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
-            {e.timestamp}
-          </span>
-        </div>
-        {e.affected_pages.length > 0 && (
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
-            {t("activity.affected_pages", { count: e.affected_pages.length })}
+    <>
+      <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2">
+        <EntryIcon entry={e} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium">
+              {t(`activity.op.${e.operation_type}`, e.operation_type)}
+            </span>
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              {e.timestamp}
+            </span>
           </div>
-        )}
+          {e.affected_pages.length > 0 && (
+            <div className="text-xs text-[hsl(var(--muted-foreground))]">
+              {t("activity.affected_pages", { count: e.affected_pages.length })}
+            </div>
+          )}
+        </div>
+        <Button asChild size="sm" variant="ghost">
+          <Link to={`/project/${project}/activity/${e.id}`}>
+            {t("activity.detail")}
+            <ChevronRight className="ml-1 h-3 w-3" />
+          </Link>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!canUndo || undo.isPending}
+          onClick={() => setUndoOpen(true)}
+          title={t("activity.undo_button")}
+        >
+          <Undo2 className="mr-1 h-3 w-3" />
+          {t("activity.undo_button")}
+        </Button>
       </div>
-      <Button asChild size="sm" variant="ghost">
-        <Link to={`/project/${project}/activity/${e.id}`}>
-          {t("activity.detail")}
-          <ChevronRight className="ml-1 h-3 w-3" />
-        </Link>
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled
-        title={t("activity.undo_disabled")}
-      >
-        {t("activity.undo_disabled")}
-      </Button>
-    </div>
+
+      <ConfirmDialog
+        open={undoOpen}
+        onOpenChange={setUndoOpen}
+        title={t("activity.undo_modal_title")}
+        description={t("activity.undo_modal_desc")}
+        confirmLabel={t("activity.undo_button")}
+        destructive
+        onConfirm={() => undo.mutate(
+          { project, op_id: e.id },
+          { onSettled: () => setUndoOpen(false) },
+        )}
+        isPending={undo.isPending}
+      />
+    </>
   );
 }
