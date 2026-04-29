@@ -36,13 +36,16 @@ class UnsupportedAutostart:
         return AutostartStatus(installed=False, path=None)
 
 
-def get_autostart_manager(target_exe: str) -> AutostartManager:
+def get_autostart_manager(
+    target_exe: str,
+    target_args: list[str] | None = None,
+) -> AutostartManager:
     if sys.platform == "win32":
         from claude_mnemos.tray.platform.windows import WindowsAutostart
-        return WindowsAutostart(target_exe=target_exe)
+        return WindowsAutostart(target_exe=target_exe, target_args=target_args)
     if sys.platform == "darwin":
         from claude_mnemos.tray.platform.macos import MacOSAutostart
-        return MacOSAutostart(target_exe=target_exe)
+        return MacOSAutostart(target_exe=target_exe, target_args=target_args)
     return UnsupportedAutostart()
 
 

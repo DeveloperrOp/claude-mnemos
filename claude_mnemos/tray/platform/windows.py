@@ -29,8 +29,17 @@ def _startup_folder() -> Path:
 
 
 class WindowsAutostart(AutostartManager):
-    def __init__(self, target_exe: str) -> None:
+    def __init__(
+        self,
+        target_exe: str,
+        target_args: list[str] | None = None,
+    ) -> None:
         self.target_exe = target_exe
+        # `target_args` are the .lnk's Arguments field. Default ["run"] preserves
+        # the convention that Target is the mnemos-tray binary; for the fallback
+        # "python -m claude_mnemos.tray" path the caller passes ["-m",
+        # "claude_mnemos.tray", "run"] with target_exe=sys.executable.
+        self.target_args = target_args if target_args is not None else ["run"]
         self.shortcut_path = _startup_folder() / SHORTCUT_NAME
 
     def install(self) -> None:
@@ -39,11 +48,15 @@ class WindowsAutostart(AutostartManager):
         # is the PS-safe escape for embedded apostrophes.
         target = self.target_exe.replace("'", "''")
         sc_path = str(self.shortcut_path).replace("'", "''")
+        # Build "Arguments" string; quote individual args containing spaces.
+        joined = " ".join(
+            f'"{a}"' if " " in a else a for a in self.target_args
+        ).replace("'", "''")
         ps = (
             f"$WshShell = New-Object -ComObject WScript.Shell; "
             f"$Shortcut = $WshShell.CreateShortcut('{sc_path}'); "
             f"$Shortcut.TargetPath = '{target}'; "
-            f"$Shortcut.Arguments = 'run'; "
+            f"$Shortcut.Arguments = '{joined}'; "
             f"$Shortcut.WorkingDirectory = ([System.IO.Path]::GetDirectoryName('{target}')); "
             f"$Shortcut.WindowStyle = 7; "  # 7 = minimized; tray app has no main window
             f"$Shortcut.Save()"

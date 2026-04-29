@@ -29,8 +29,7 @@ PLIST_TEMPLATE = """\
     <string>{bundle_id}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{target_exe}</string>
-        <string>run</string>
+{program_arguments}
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -45,23 +44,44 @@ PLIST_TEMPLATE = """\
 """
 
 
-def _agents_folder() -> Path:
+def _home_dir() -> str:
     home = os.environ.get("HOME")
     if not home:
         raise RuntimeError("HOME env var not set; not a POSIX session?")
-    return Path(home) / "Library" / "LaunchAgents"
+    return home
+
+
+def _agents_folder() -> Path:
+    return Path(_home_dir()) / "Library" / "LaunchAgents"
 
 
 class MacOSAutostart(AutostartManager):
-    def __init__(self, target_exe: str) -> None:
+    def __init__(
+        self,
+        target_exe: str,
+        target_args: list[str] | None = None,
+    ) -> None:
         self.target_exe = target_exe
+        # Default ["run"] preserves the convention that target_exe is the
+        # mnemos-tray binary; for the Python -m fallback the caller passes
+        # ["-m", "claude_mnemos.tray", "run"] with target_exe=sys.executable.
+        self.target_args = target_args if target_args is not None else ["run"]
         self.plist_path = _agents_folder() / PLIST_FILENAME
 
     def _render_plist(self) -> str:
+        # XML-escape angle brackets/ampersands in argv tokens (paths shouldn't
+        # have them but defence in depth).
+        def _escape(s: str) -> str:
+            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        argv = [self.target_exe, *self.target_args]
+        program_arguments = "\n".join(
+            f"        <string>{_escape(a)}</string>" for a in argv
+        )
         return PLIST_TEMPLATE.format(
             bundle_id=BUNDLE_ID,
-            target_exe=self.target_exe,
-            home=os.environ["HOME"],
+            program_arguments=program_arguments,
+            home=_home_dir(),
         )
 
     def install(self) -> None:

@@ -227,17 +227,20 @@ mnemos tray status       # human-readable: autostart enabled? tray PID? daemon P
 
 ```http
 POST /tray/install
-→ 200 {"installed": true, "autostart_path": "C:\\...\\Mnemos.lnk", "tray_pid": 12345}
-→ 500 {"detail": "PowerShell exit 1: ..."}
+→ 200 {"installed": true}
+→ 500 {"detail": "powershell exit 1: ..."}
+→ 501 {"detail": "Autostart not supported on this platform"}
 ```
 
-Под капотом — `subprocess.run(['mnemos', 'tray', 'install'])`.
+Под капотом — `subprocess.run(['mnemos', 'tray', 'install'])` (или `python -m claude_mnemos tray install` если `mnemos` не в PATH). Подробности (autostart_path, tray_pid) клиент получает отдельным `GET /tray/status` запросом.
 
 ### `POST /tray/uninstall`
 
 ```http
 POST /tray/uninstall
 → 200 {"installed": false}
+→ 500 {"detail": "..."}
+→ 501 {"detail": "Autostart not supported on this platform"}
 ```
 
 ### `GET /tray/status`

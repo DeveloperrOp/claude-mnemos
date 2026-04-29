@@ -27,11 +27,13 @@ from claude_mnemos.tray.platform import (
 router = APIRouter(prefix="/tray", tags=["tray"])
 
 
-def _resolve_target_exe() -> str:
+def _resolve_target() -> tuple[str, list[str]]:
+    """Mirror of __main__._resolve_target so /status reports the path the
+    autostart entry would use without importing __main__."""
     found = shutil.which("mnemos-tray")
     if found:
-        return found
-    return f"{sys.executable} -m claude_mnemos.tray"
+        return found, ["run"]
+    return sys.executable, ["-m", "claude_mnemos.tray", "run"]
 
 
 def _exec_tray(action: str) -> None:
@@ -71,7 +73,8 @@ def uninstall() -> dict[str, bool]:
 
 @router.get("/status")
 def status() -> dict[str, object]:
-    mgr = get_autostart_manager(target_exe=_resolve_target_exe())
+    target_exe, target_args = _resolve_target()
+    mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     s = mgr.status()
     tray_pid = None
     if TRAY_PID_FILE.is_file():

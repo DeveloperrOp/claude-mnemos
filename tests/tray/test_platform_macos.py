@@ -95,3 +95,24 @@ def test_uninstall_idempotent_when_plist_absent(fake_home: Path) -> None:
     with patch("claude_mnemos.tray.platform.macos.subprocess.run") as run:
         mgr.uninstall()  # no plist file → must NOT call launchctl, must NOT raise
         assert not run.called
+
+
+def test_install_python_m_fallback_renders_argv_correctly(fake_home: Path) -> None:
+    """Fallback: target_exe=python, args=['-m','claude_mnemos.tray','run'] must
+    each become a separate <string> in ProgramArguments — NOT concatenated.
+    """
+    mgr = MacOSAutostart(
+        target_exe="/usr/local/bin/python3",
+        target_args=["-m", "claude_mnemos.tray", "run"],
+    )
+    with patch("claude_mnemos.tray.platform.macos.subprocess.run") as run:
+        run.return_value = _stub_completed(0)
+        mgr.install()
+
+    plist_path = fake_home / PLIST_FILENAME
+    content = plist_path.read_text(encoding="utf-8")
+    # All four argv elements present as separate <string> tags
+    assert "<string>/usr/local/bin/python3</string>" in content
+    assert "<string>-m</string>" in content
+    assert "<string>claude_mnemos.tray</string>" in content
+    assert "<string>run</string>" in content

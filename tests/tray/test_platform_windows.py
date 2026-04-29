@@ -85,3 +85,27 @@ def test_install_overwrites_existing_shortcut(fake_appdata: Path) -> None:
         run.return_value = _stub_completed(0)
         mgr.install()  # idempotent — no exception
         assert run.called
+
+
+def test_install_python_m_fallback_uses_arguments_field(fake_appdata: Path) -> None:
+    """Fallback path: target_exe=python.exe, args=['-m','claude_mnemos.tray','run'].
+
+    Critical that '-m' / 'claude_mnemos.tray' / 'run' end up in Arguments,
+    NOT concatenated into TargetPath (which would be a broken .lnk).
+    """
+    mgr = WindowsAutostart(
+        target_exe="C:\\Python\\python.exe",
+        target_args=["-m", "claude_mnemos.tray", "run"],
+    )
+    with patch("claude_mnemos.tray.platform.windows.subprocess.run") as run:
+        run.return_value = _stub_completed(0)
+        mgr.install()
+    cmd = run.call_args[0][0]
+    joined = " ".join(cmd)
+    # TargetPath must be ONLY the executable path
+    assert "$Shortcut.TargetPath = 'C:\\Python\\python.exe'" in joined
+    # Args go into Arguments, not TargetPath
+    assert "-m" in joined
+    assert "claude_mnemos.tray" in joined
+    # And TargetPath does NOT contain the args
+    assert "python.exe -m claude_mnemos.tray" not in joined

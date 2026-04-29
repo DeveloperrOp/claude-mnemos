@@ -62,12 +62,18 @@ def _release_tray_lock() -> None:
     TRAY_PID_FILE.unlink(missing_ok=True)
 
 
-def _resolve_target_exe() -> str:
+def _resolve_target() -> tuple[str, list[str]]:
+    """Resolve the (executable, args) pair the OS autostart entry should launch.
+
+    Primary: ``mnemos-tray run`` if ``mnemos-tray`` is on PATH.
+    Fallback: ``<python> -m claude_mnemos.tray run`` — used only when the
+    console-script entry isn't available (e.g. running from a checkout
+    without ``pip install``).
+    """
     found = shutil.which("mnemos-tray")
     if found:
-        return found
-    # Fallback: invoke via python -m
-    return f"{sys.executable} -m claude_mnemos.tray"
+        return found, ["run"]
+    return sys.executable, ["-m", "claude_mnemos.tray", "run"]
 
 
 def _cmd_run() -> int:
@@ -97,13 +103,19 @@ def _cmd_run() -> int:
 
 
 def _cmd_install() -> int:
-    mgr = get_autostart_manager(target_exe=_resolve_target_exe())
+    target_exe, target_args = _resolve_target()
+    mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     mgr.install()
     print(f"Auto-start installed ({platform_label()}).")
     # Detached spawn of `mnemos-tray run` if no tray currently running
-    tray_alive = TRAY_PID_FILE.is_file() and psutil.pid_exists(
-        int(TRAY_PID_FILE.read_text().strip() or 0)
-    )
+    tray_alive = False
+    if TRAY_PID_FILE.is_file():
+        try:
+            tray_pid = int(TRAY_PID_FILE.read_text(encoding="utf-8").strip())
+        except ValueError:
+            tray_pid = 0
+        if tray_pid > 0 and psutil.pid_exists(tray_pid):
+            tray_alive = True
     if not tray_alive:
         creationflags = 0
         if sys.platform == "win32":
@@ -122,14 +134,16 @@ def _cmd_install() -> int:
 
 
 def _cmd_uninstall() -> int:
-    mgr = get_autostart_manager(target_exe=_resolve_target_exe())
+    target_exe, target_args = _resolve_target()
+    mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     mgr.uninstall()
     print(f"Auto-start removed ({platform_label()}).")
     return 0
 
 
 def _cmd_status() -> int:
-    mgr = get_autostart_manager(target_exe=_resolve_target_exe())
+    target_exe, target_args = _resolve_target()
+    mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     s = mgr.status()
     tray_pid = None
     if TRAY_PID_FILE.is_file():
