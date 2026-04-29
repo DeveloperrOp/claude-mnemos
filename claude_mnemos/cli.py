@@ -519,6 +519,12 @@ def build_parser() -> argparse.ArgumentParser:
     sr_target.add_argument("--global", dest="is_global", action="store_true")
     sr.add_argument("key", nargs="?", default=None)
 
+    # ─── tray ─────────────────────────────────────────────────────────────
+    tray_p = sub.add_parser("tray", help="Tray icon + autostart")
+    tray_p.add_argument(
+        "tray_cmd", choices=["run", "install", "uninstall", "status"]
+    )
+
     return parser
 
 
@@ -554,6 +560,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "settings":
         from claude_mnemos.cli_settings import handle as settings_handle
         return settings_handle(args)
+    if args.command == "tray":
+        from claude_mnemos.cli_tray import run as tray_run
+        return tray_run([args.tray_cmd])
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
