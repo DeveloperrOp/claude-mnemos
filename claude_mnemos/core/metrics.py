@@ -77,16 +77,27 @@ class CompressionSummary(BaseModel):
     total_tokens_actual: int
 
 
+def _period_cutoff_dt(today: date_class, period_days: int) -> datetime:
+    """UTC midnight at start of the period window.
+
+    Both :func:`usage_summary` and :func:`compression_summary` use this
+    helper so they count the same boundary-day events.
+    """
+    return datetime.combine(
+        today - timedelta(days=period_days), datetime.min.time(), UTC
+    )
+
+
 def _records_in_window(
     manifest: Manifest,
     *,
-    cutoff: date_class,
+    cutoff_dt: datetime,
 ) -> list[IngestRecord]:
-    """Return manifest records ingested on or after ``cutoff`` (inclusive)."""
+    """Return manifest records ingested on or after ``cutoff_dt`` (inclusive)."""
     return [
         rec
         for rec in manifest.ingested.values()
-        if rec.ingested_at.date() >= cutoff
+        if rec.ingested_at >= cutoff_dt
     ]
 
 
@@ -108,10 +119,10 @@ def usage_summary(
         :class:`UsageSummary` with per-window totals and tokens-per-byte ratio.
     """
     today = today or datetime.now(UTC).date()
-    cutoff = today - timedelta(days=period_days)
+    cutoff_dt = _period_cutoff_dt(today, period_days)
 
     manifest = Manifest.load(vault)
-    records = _records_in_window(manifest, cutoff=cutoff)
+    records = _records_in_window(manifest, cutoff_dt=cutoff_dt)
 
     tokens_input = sum((rec.input_tokens or 0) for rec in records)
     tokens_output = sum((rec.output_tokens or 0) for rec in records)
@@ -225,9 +236,7 @@ def compression_summary(
     saved" framing.
     """
     today = today or datetime.now(UTC).date()
-    cutoff_dt = datetime.combine(
-        today - timedelta(days=period_days), datetime.min.time(), UTC
-    )
+    cutoff_dt = _period_cutoff_dt(today, period_days)
 
     log = InjectMetricsLog.load(vault)
     events = [e for e in log.events if e.timestamp >= cutoff_dt]
