@@ -13,7 +13,7 @@ DEFAULT_TIMEOUT_SEC = 120.0
 
 
 class MissingApiKeyError(RuntimeError):
-    """Raised when ANTHROPIC_API_KEY is not set and LLM extraction is required."""
+    """Raised when ANTHROPIC_API_KEY is not set and ApiLLMClient is selected."""
 
 
 class TranscriptTooLargeError(RuntimeError):
@@ -31,7 +31,7 @@ class ExtractionRaw:
     output_tokens: int
 
 
-class LLMClient:
+class ApiLLMClient:
     """Thin wrapper around anthropic.Anthropic enforcing single-tool-use extraction.
 
     Pass `_client` only in tests (DI for mocking).
