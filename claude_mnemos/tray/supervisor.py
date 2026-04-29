@@ -6,9 +6,19 @@ adopt + main loop are added in subsequent tasks.
 
 from __future__ import annotations
 
+import contextlib
+import logging
+import os
+import subprocess
+import sys
 import time
 from collections import deque
 from enum import Enum
+from pathlib import Path
+
+from claude_mnemos.daemon.lockfile import is_daemon_running
+
+logger = logging.getLogger(__name__)
 
 
 class RestartLimiter:
@@ -89,3 +99,131 @@ def valid_transition(
     from_: SupervisorState | None, to_: SupervisorState
 ) -> bool:
     return to_ in _VALID_TRANSITIONS.get(from_, set())
+
+
+class Supervisor:
+    """Owns daemon subprocess (or adopts an existing one) + state machine.
+
+    Spawned mode: ``self._proc`` is the Popen object we control. ``stop`` and
+    ``restart`` terminate it.
+
+    Adopted mode: external process already running per ``daemon_pid_file``.
+    ``stop`` only deregisters ourselves; we MUST NOT kill it.
+    """
+
+    def __init__(
+        self,
+        *,
+        daemon_pid_file: Path,
+        log_path: Path | None = None,
+    ) -> None:
+        self.daemon_pid_file = daemon_pid_file
+        self.log_path = log_path
+        self.state: SupervisorState | None = None
+        self.daemon_pid: int | None = None
+        self.limiter = RestartLimiter()
+        self._proc: subprocess.Popen | None = None
+        self._spawned: bool = False
+        self._log_fh = None
+
+    # ── liveness helper, mockable ───────────────────────────────
+    def _is_existing_daemon_running(self) -> int | None:
+        return is_daemon_running(self.daemon_pid_file)
+
+    # ── state transitions ───────────────────────────────────────
+    def _transition(self, new: SupervisorState) -> None:
+        if not valid_transition(self.state, new):
+            raise RuntimeError(f"invalid transition {self.state} → {new}")
+        logger.info("[supervisor] state %s → %s", self.state, new)
+        self.state = new
+
+    def mark_running(self) -> None:
+        self._transition(SupervisorState.RUNNING)
+
+    # ── subprocess lifecycle ────────────────────────────────────
+    def _spawn_daemon(self) -> subprocess.Popen:
+        cmd = [sys.executable, "-m", "claude_mnemos.daemon", "foreground", "--all"]
+        creationflags = 0
+        if sys.platform == "win32":
+            # CREATE_NEW_PROCESS_GROUP so we can send CTRL_BREAK_EVENT later;
+            # don't use DETACHED_PROCESS — we want stdout/stderr handles.
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        if self.log_path:
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            self._log_fh = self.log_path.open("a", encoding="utf-8", buffering=1)
+            stdout = self._log_fh
+            stderr = self._log_fh
+        else:
+            stdout = subprocess.DEVNULL
+            stderr = subprocess.DEVNULL
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=stdout,
+            stderr=stderr,
+            stdin=subprocess.DEVNULL,
+            creationflags=creationflags,
+            close_fds=True,
+        )
+        return proc
+
+    def start(self) -> None:
+        existing = self._is_existing_daemon_running()
+        if existing:
+            self._proc = None
+            self._spawned = False
+            self.daemon_pid = existing
+            self._transition(SupervisorState.STARTING)
+            self._transition(SupervisorState.RUNNING)
+            return
+
+        self._proc = self._spawn_daemon()
+        self._spawned = True
+        self.daemon_pid = self._proc.pid
+        self._transition(SupervisorState.STARTING)
+
+    def stop(self, *, grace_seconds: float = 10.0) -> None:
+        self._transition(SupervisorState.STOPPING)
+        if self._spawned and self._proc is not None:
+            try:
+                self._proc.terminate()
+            except (ProcessLookupError, OSError) as exc:
+                logger.warning("[supervisor] terminate() raised %r", exc)
+            try:
+                self._proc.wait(timeout=grace_seconds)
+            except subprocess.TimeoutExpired:
+                logger.warning("[supervisor] grace expired, killing pid=%s", self._proc.pid)
+                with contextlib.suppress(OSError):
+                    self._proc.kill()
+        self._close_log_fh()
+        self._transition(SupervisorState.STOPPED)
+
+    def restart(self, *, grace_seconds: float = 5.0) -> None:
+        if not self._spawned:
+            raise RuntimeError("cannot restart adopted daemon")
+        self._transition(SupervisorState.RESTARTING)
+        if self._proc is not None:
+            try:
+                self._proc.terminate()
+                self._proc.wait(timeout=grace_seconds)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+            except (ProcessLookupError, OSError):
+                pass
+        self._close_log_fh()
+        self._proc = self._spawn_daemon()
+        self.daemon_pid = self._proc.pid
+        self.limiter.reset()
+        # Restarting → Starting needs a separate path; do it directly,
+        # bypassing the normal Restarting → Running edge until /health succeeds.
+        self.state = SupervisorState.STARTING
+        logger.info("[supervisor] restart spawned pid=%s, state=Starting", self._proc.pid)
+
+    def _close_log_fh(self) -> None:
+        if self._log_fh:
+            try:
+                self._log_fh.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._log_fh = None
