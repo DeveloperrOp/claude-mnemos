@@ -236,7 +236,22 @@
     "no_snapshots": "No snapshots yet",
     "showing_n": "{{count}} snapshots",
     "restore_disabled": "Restore (#14c)",
-    "delete_disabled": "Delete (#14c)"
+    "delete_disabled": "Delete (#14c)",
+    "created_toast": "Snapshot created",
+    "deleted_toast": "Snapshot deleted",
+    "restored_toast": "Vault restored",
+    "restore_modal_title": "Restore vault from snapshot?",
+    "restore_modal_desc": "This will revert ALL pages to the state at this snapshot. Operations performed since this snapshot will be lost.",
+    "restore_typed_label": "Type the snapshot name",
+    "restore_button": "Restore",
+    "delete_modal_title": "Delete snapshot?",
+    "delete_modal_desc": "Removes this backup. Cannot be undone.",
+    "delete_button": "Delete",
+    "create_button": "Create snapshot",
+    "create_modal_title": "Create manual snapshot",
+    "create_label_label": "Label (optional)",
+    "create_label_placeholder": "e.g. before-cleanup",
+    "create_submit": "Create"
   },
   "lost_sessions": {
     "title": "Lost sessions",

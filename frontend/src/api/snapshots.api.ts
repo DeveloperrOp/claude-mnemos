@@ -10,3 +10,37 @@ export async function listSnapshots(
   const r = await apiClient.get(`/snapshots/${encodeURIComponent(project)}`);
   return SnapshotListResponseSchema.parse(r.data).snapshots;
 }
+
+export interface RestoreSnapshotResult {
+  success: boolean;
+  snapshot: string;
+  activity_id: string;
+}
+
+export async function createSnapshot(
+  project: string,
+  label?: string,
+): Promise<SnapshotInfo> {
+  const body = label && label.trim() ? { label: label.trim() } : {};
+  const r = await apiClient.post(
+    `/snapshots/${encodeURIComponent(project)}`,
+    body,
+  );
+  return r.data as SnapshotInfo;
+}
+
+export async function deleteSnapshot(project: string, name: string): Promise<void> {
+  await apiClient.delete(
+    `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}`,
+  );
+}
+
+export async function restoreSnapshot(
+  project: string,
+  name: string,
+): Promise<RestoreSnapshotResult> {
+  const r = await apiClient.post(
+    `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}/restore`,
+  );
+  return r.data as RestoreSnapshotResult;
+}

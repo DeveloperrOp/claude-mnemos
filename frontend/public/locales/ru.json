@@ -236,7 +236,22 @@
     "no_snapshots": "Нет снимков",
     "showing_n": "{{count}} снимков",
     "restore_disabled": "Восстановить (#14c)",
-    "delete_disabled": "Удалить (#14c)"
+    "delete_disabled": "Удалить (#14c)",
+    "created_toast": "Снапшот создан",
+    "deleted_toast": "Снапшот удалён",
+    "restored_toast": "Vault восстановлен",
+    "restore_modal_title": "Восстановить vault из снапшота?",
+    "restore_modal_desc": "Это вернёт ВСЕ страницы к состоянию на момент снапшота. Операции после него будут потеряны.",
+    "restore_typed_label": "Введите имя снапшота",
+    "restore_button": "Восстановить",
+    "delete_modal_title": "Удалить снапшот?",
+    "delete_modal_desc": "Удаляет резервную копию. Необратимо.",
+    "delete_button": "Удалить",
+    "create_button": "Создать снапшот",
+    "create_modal_title": "Создать ручной снапшот",
+    "create_label_label": "Метка (опционально)",
+    "create_label_placeholder": "напр., перед-очисткой",
+    "create_submit": "Создать"
   },
   "lost_sessions": {
     "title": "Потерянные сессии",

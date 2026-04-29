@@ -236,7 +236,22 @@
     "no_snapshots": "Немає знімків",
     "showing_n": "{{count}} знімків",
     "restore_disabled": "Відновити (#14c)",
-    "delete_disabled": "Видалити (#14c)"
+    "delete_disabled": "Видалити (#14c)",
+    "created_toast": "Снапшот створено",
+    "deleted_toast": "Снапшот видалено",
+    "restored_toast": "Vault відновлено",
+    "restore_modal_title": "Відновити vault зі снапшоту?",
+    "restore_modal_desc": "Це поверне УСІ сторінки до стану на момент снапшоту. Операції після нього будуть втрачені.",
+    "restore_typed_label": "Введіть назву снапшоту",
+    "restore_button": "Відновити",
+    "delete_modal_title": "Видалити снапшот?",
+    "delete_modal_desc": "Видаляє резервну копію. Незворотно.",
+    "delete_button": "Видалити",
+    "create_button": "Створити снапшот",
+    "create_modal_title": "Створити ручний снапшот",
+    "create_label_label": "Мітка (опціонально)",
+    "create_label_placeholder": "напр., перед-очищенням",
+    "create_submit": "Створити"
   },
   "lost_sessions": {
     "title": "Загублені сесії",
