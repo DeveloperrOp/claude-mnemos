@@ -22,6 +22,11 @@ export function ChartContainer({
   );
 }
 
+// recharts v3 types `TooltipContentProps` as fully required, but recharts
+// injects `active`/`payload`/`label` only at runtime (when used as `content={...}`
+// on a `<Tooltip>` element). We widen the prop type to `Partial<>` so the
+// component can be used as a JSX child without TS complaining about missing
+// required props. Don't remove the `Partial<>` — the JSX usage breaks without it.
 export function ChartTooltipContent({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload || payload.length === 0) return null;
   return (
