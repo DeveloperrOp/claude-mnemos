@@ -54,7 +54,19 @@
   "health": {
     "ok": "Хорошо",
     "degraded": "Деградировано",
-    "down": "Недоступно"
+    "down": "Недоступно",
+    "title": "Здоровье",
+    "watchdog_running": "Watchdog работает",
+    "watchdog_down": "Watchdog остановлен",
+    "jobs_queued": "В очереди",
+    "jobs_running": "Выполняются",
+    "jobs_dead_letter": "Сбойные",
+    "scheduler_jobs": "Запланированные задачи",
+    "no_scheduler_jobs": "Нет запланированных",
+    "alerts_count": "Уведомления",
+    "vault_not_mounted_title": "Vault не смонтирован",
+    "vault_not_mounted_hint": "Запустите через mnemos daemon start",
+    "view_failed_jobs": "Посмотреть сбойные задачи"
   },
   "usage": {
     "title": "Использование",

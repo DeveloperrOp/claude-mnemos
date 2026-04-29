@@ -54,7 +54,19 @@
   "health": {
     "ok": "OK",
     "degraded": "Degraded",
-    "down": "Down"
+    "down": "Down",
+    "title": "Health",
+    "watchdog_running": "Watchdog running",
+    "watchdog_down": "Watchdog down",
+    "jobs_queued": "Queued",
+    "jobs_running": "Running",
+    "jobs_dead_letter": "Failed",
+    "scheduler_jobs": "Scheduler jobs",
+    "no_scheduler_jobs": "No scheduled jobs",
+    "alerts_count": "Alerts",
+    "vault_not_mounted_title": "Vault not mounted",
+    "vault_not_mounted_hint": "Mount via mnemos daemon start",
+    "view_failed_jobs": "View failed jobs"
   },
   "usage": {
     "title": "Usage",

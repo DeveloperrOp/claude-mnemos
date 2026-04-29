@@ -54,7 +54,19 @@
   "health": {
     "ok": "Добре",
     "degraded": "Деградовано",
-    "down": "Недоступний"
+    "down": "Недоступний",
+    "title": "Здоров'я",
+    "watchdog_running": "Watchdog активний",
+    "watchdog_down": "Watchdog не запущено",
+    "jobs_queued": "У черзі",
+    "jobs_running": "Виконуються",
+    "jobs_dead_letter": "Збійні",
+    "scheduler_jobs": "Заплановані задачі",
+    "no_scheduler_jobs": "Немає запланованих",
+    "alerts_count": "Сповіщення",
+    "vault_not_mounted_title": "Vault не змонтовано",
+    "vault_not_mounted_hint": "Запустіть через mnemos daemon start",
+    "view_failed_jobs": "Дивитись збійні задачі"
   },
   "usage": {
     "title": "Використання",
