@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from claude_mnemos import __version__
@@ -177,6 +179,17 @@ def create_app(daemon: Any | None = None) -> FastAPI:
         return JSONResponse(
             status_code=422,
             content={"error": "validation_error", "detail": exc.errors()},
+        )
+
+    # Mount frontend static files (built by `frontend/`).
+    # html=True provides SPA fallback: any path not matching a file → index.html.
+    # Mounted last so REST routers take precedence on overlapping paths.
+    static_dir = Path(__file__).parent / "static"
+    if (static_dir / "index.html").is_file():
+        app.mount(
+            "/",
+            StaticFiles(directory=static_dir, html=True),
+            name="frontend",
         )
 
     return app
