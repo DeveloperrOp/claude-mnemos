@@ -14,8 +14,7 @@ export const UsageSummarySchema = z.object({
 export type UsageSummary = z.infer<typeof UsageSummarySchema>;
 
 // The daemon emits a UsageSummary with the same keys minus `period`, plus
-// the project name (see daemon/routes/metrics.py::by_project_route). Declare
-// the fields explicitly so widgets can consume them with full typing.
+// the project name (see daemon/routes/metrics.py::by_project_route).
 export const UsageByProjectEntrySchema = z.object({
   project: z.string(),
   period_days: z.number().int().nonnegative(),
@@ -25,7 +24,7 @@ export const UsageByProjectEntrySchema = z.object({
   tokens_injected: z.number().int().nonnegative(),
   raw_bytes_total: z.number().int().nonnegative(),
   tokens_per_byte: z.number().nullable(),
-}).passthrough();
+});
 export type UsageByProjectEntry = z.infer<typeof UsageByProjectEntrySchema>;
 
 export const UsageByProjectResponseSchema = z.object({
