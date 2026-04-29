@@ -96,6 +96,31 @@
     "not_found_title": "Сторінку не знайдено",
     "not_found_hint": "Повернутись назад"
   },
+  "sessions": {
+    "title": "Сесії",
+    "open": "Відкрити",
+    "no_sessions": "Сесій не знайдено",
+    "filter_status": "Статус",
+    "limit": "Ліміт",
+    "status": {
+      "succeeded": "Успішно",
+      "queued": "В черзі",
+      "running": "Виконується",
+      "failed": "Помилка",
+      "dead_letter": "Dead-letter"
+    },
+    "tokens_in": "Токенів вхід",
+    "tokens_out": "Токенів вихід",
+    "model": "Модель",
+    "ingested_at": "Завантажено о",
+    "transcript": "Транскрипт",
+    "created_pages": "Створені сторінки",
+    "no_pages_created": "Сторінок не створено",
+    "showing_n_of_m": "{{shown}} з {{total}}",
+    "ingest_disabled": "Повторно завантажити (з'явиться в #14c)",
+    "not_found_title": "Сесію не знайдено",
+    "not_found_hint": "Повернутись назад"
+  },
   "wiki": {
     "status": {
       "draft": "Чернетка",

@@ -96,6 +96,31 @@
     "not_found_title": "Страница не найдена",
     "not_found_hint": "Вернуться назад"
   },
+  "sessions": {
+    "title": "Сессии",
+    "open": "Открыть",
+    "no_sessions": "Сессий не найдено",
+    "filter_status": "Статус",
+    "limit": "Лимит",
+    "status": {
+      "succeeded": "Успешно",
+      "queued": "В очереди",
+      "running": "Выполняется",
+      "failed": "Ошибка",
+      "dead_letter": "Dead-letter"
+    },
+    "tokens_in": "Токенов вход",
+    "tokens_out": "Токенов выход",
+    "model": "Модель",
+    "ingested_at": "Загружено в",
+    "transcript": "Транскрипт",
+    "created_pages": "Созданные страницы",
+    "no_pages_created": "Страниц не создано",
+    "showing_n_of_m": "{{shown}} из {{total}}",
+    "ingest_disabled": "Повторная загрузка (появится в #14c)",
+    "not_found_title": "Сессия не найдена",
+    "not_found_hint": "Вернуться назад"
+  },
   "wiki": {
     "status": {
       "draft": "Черновик",

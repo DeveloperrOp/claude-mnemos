@@ -96,6 +96,31 @@
     "not_found_title": "Page not found",
     "not_found_hint": "Go back"
   },
+  "sessions": {
+    "title": "Sessions",
+    "open": "Open",
+    "no_sessions": "No sessions found",
+    "filter_status": "Status",
+    "limit": "Limit",
+    "status": {
+      "succeeded": "Succeeded",
+      "queued": "Queued",
+      "running": "Running",
+      "failed": "Failed",
+      "dead_letter": "Dead-letter"
+    },
+    "tokens_in": "Tokens in",
+    "tokens_out": "Tokens out",
+    "model": "Model",
+    "ingested_at": "Ingested at",
+    "transcript": "Transcript",
+    "created_pages": "Created pages",
+    "no_pages_created": "No pages created",
+    "showing_n_of_m": "{{shown}} of {{total}}",
+    "ingest_disabled": "Re-ingest (coming in #14c)",
+    "not_found_title": "Session not found",
+    "not_found_hint": "Go back"
+  },
   "wiki": {
     "status": {
       "draft": "Draft",
