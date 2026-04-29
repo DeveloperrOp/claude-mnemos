@@ -206,3 +206,50 @@ def test_parse_period_rejects_garbage():
         with pt.raises(HTTPException) as exc:
             _parse_period(bad)
         assert exc.value.status_code == 400
+
+
+def test_usage_includes_compression_fields(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    """/metrics/usage response includes avg_compression_ratio + inject_events_count."""
+    from claude_mnemos.state.inject_metrics import (
+        InjectMetricEvent,
+        InjectMetricsLog,
+    )
+
+    _daemon, client, vault = daemon_with_one_vault
+
+    log = InjectMetricsLog()
+    log.events.append(
+        InjectMetricEvent(
+            id="e1",
+            timestamp=datetime.now(UTC),
+            session_id="s1",
+            operation="session_start",
+            mode="full",
+            tokens_full=1000,
+            tokens_actual=200,
+            candidates_total=5,
+            candidates_packed=5,
+        )
+    )
+    log.save(vault)
+
+    r = client.get("/metrics/usage", params={"period": "30d"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "avg_compression_ratio" in data
+    assert "inject_events_count" in data
+    assert data["avg_compression_ratio"] == 5.0
+    assert data["inject_events_count"] == 1
+
+
+def test_usage_compression_null_when_no_events(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    _daemon, client, _vault = daemon_with_one_vault
+    r = client.get("/metrics/usage", params={"period": "30d"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["avg_compression_ratio"] is None
+    assert data["inject_events_count"] == 0
