@@ -11,6 +11,7 @@ error instead of a silent default.
 
 from __future__ import annotations
 
+import re
 from datetime import date as date_class
 from datetime import timedelta
 from typing import Any
@@ -23,23 +24,26 @@ from claude_mnemos.daemon.routes._helpers import all_runtimes
 router = APIRouter()
 
 
-def _parse_period(period: str) -> int:
-    """Parse ``"Nd"`` → ``N``. Raises HTTP 400 on anything else.
+_PERIOD_RE = re.compile(r"^(?P<n>\d+)(?P<unit>[dwmy])$")
+_PERIOD_UNIT_DAYS = {"d": 1, "w": 7, "m": 30, "y": 365}
 
-    Only ``d`` (days) is supported in Plan #13a/#13b.  Future scales (``w``,
-    ``m``) can be added without breaking callers because the failure mode is a
-    clean 400 rather than a silent default.
+
+def _parse_period(period: str) -> int:
+    """Parse ``"Nd"`` / ``"Nw"`` / ``"Nm"`` / ``"Ny"`` → number of days.
+
+    Raises HTTP 400 on anything else. Months and years use approximations
+    (30 / 365) — sufficient for dashboard windowing, where exact calendar
+    boundaries are not load-bearing.
     """
-    if period.endswith("d"):
-        try:
-            value = int(period[:-1])
-        except ValueError:
-            value = -1
-        if value > 0:
-            return value
+    m = _PERIOD_RE.match(period)
+    if m:
+        n = int(m.group("n"))
+        unit = m.group("unit")
+        if n > 0:
+            return n * _PERIOD_UNIT_DAYS[unit]
     raise HTTPException(
         status_code=400,
-        detail={"error": "invalid_period_format", "expected": "Nd", "got": period},
+        detail={"error": "invalid_period_format", "expected": "Nd|Nw|Nm|Ny", "got": period},
     )
 
 
