@@ -7,6 +7,7 @@ import { useUsageByProject } from "@/hooks/useUsageByProject";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HealthBadge } from "@/components/widgets/HealthBadge";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
 
@@ -24,12 +25,13 @@ const TILES: Array<{ key: string; emoji: string; path: string; plan: string }> =
 export function ProjectView() {
   const { name } = useParams<{ name: string }>();
   const { t } = useTranslation();
-  const { data: projects, isLoading } = useProjects();
+  const projectsQuery = useProjects();
   const { data: health } = useHealth();
   const { data: usage } = useUsageByProject("30d");
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
-  const project = projects?.find((p) => p.name === name);
+  if (projectsQuery.isLoading) return <Skeleton className="h-64 w-full" />;
+  if (projectsQuery.isError) return <DaemonDownAlert error={projectsQuery.error} />;
+  const project = projectsQuery.data?.find((p) => p.name === name);
   if (!project) return <UnknownProject name={name ?? ""} />;
   const vh = health?.vaults?.[name!];
   const u = usage?.find((x) => (x.project as string) === name);
