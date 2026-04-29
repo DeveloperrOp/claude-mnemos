@@ -394,6 +394,7 @@
     "col_tokens_input": "Вхід",
     "col_tokens_output": "Вихід",
     "col_tokens_per_byte": "ток/Б",
+    "col_compression": "Стиснення",
     "col_session": "Сесія",
     "col_ingested_at": "Інжест",
     "col_tokens_total": "Токени",

@@ -394,6 +394,7 @@
     "col_tokens_input": "Input",
     "col_tokens_output": "Output",
     "col_tokens_per_byte": "tok/B",
+    "col_compression": "Compression",
     "col_session": "Session",
     "col_ingested_at": "Ingested",
     "col_tokens_total": "Tokens",
