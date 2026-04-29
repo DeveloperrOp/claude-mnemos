@@ -21,16 +21,6 @@ from claude_mnemos.core.page_io import PageParseError, ParsedPage, read_page
 from claude_mnemos.state.manifest import Manifest
 
 
-def page_slug_from_path(vault: Path, page_path: Path) -> str:
-    """Slug = relative path under ``vault/wiki/`` without ``.md`` suffix.
-
-    Example: ``vault/wiki/concepts/foo.md`` → ``concepts/foo``.
-    Always uses forward slashes (Windows safe).
-    """
-    rel = page_path.relative_to(vault / "wiki")
-    return str(rel.with_suffix("")).replace("\\", "/")
-
-
 def page_summary(parsed: ParsedPage, *, max_chars: int = 200) -> str:
     """Return the first non-empty ``max_chars`` characters of the page body.
 

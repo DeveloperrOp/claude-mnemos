@@ -5,11 +5,10 @@ from pathlib import Path
 
 from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.core.models import WikiPageFrontmatter
-from claude_mnemos.core.page_io import ParsedPage
+from claude_mnemos.core.page_io import ParsedPage, slug_from_page_path
 from claude_mnemos.core.session_start import (
     FLAVOR_WEIGHTS,
     build_adaptive_context,
-    page_slug_from_path,
     page_summary,
     score_page,
 )
@@ -36,7 +35,7 @@ def test_page_slug_from_path_strips_wiki_prefix_and_md(tmp_path: Path) -> None:
     page = tmp_path / "wiki" / "concepts" / "foo.md"
     page.parent.mkdir(parents=True)
     page.write_text("", encoding="utf-8")
-    assert page_slug_from_path(tmp_path, page) == "concepts/foo"
+    assert slug_from_page_path(tmp_path, page) == "concepts/foo"
 
 
 def test_page_summary_returns_first_n_chars() -> None:

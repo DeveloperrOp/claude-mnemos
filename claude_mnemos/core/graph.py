@@ -19,14 +19,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_mnemos.core.page_io import PageParseError, read_page
+from claude_mnemos.core.page_io import PageParseError, read_page, slug_from_page_path
 from claude_mnemos.core.wikilinks import extract_wikilinks
-
-
-def _slug_for(vault: Path, page_path: Path) -> str:
-    """Return the slug for a vault-relative page (path under ``wiki/`` w/o .md)."""
-    rel = page_path.relative_to(vault / "wiki")
-    return str(rel.with_suffix("")).replace("\\", "/")
 
 
 def build_page_graph(vault: Path) -> dict[str, set[str]]:
@@ -45,7 +39,7 @@ def build_page_graph(vault: Path) -> dict[str, set[str]]:
             parsed = read_page(page_path)
         except PageParseError:
             continue
-        slug = _slug_for(vault, page_path)
+        slug = slug_from_page_path(vault, page_path)
         graph.setdefault(slug, set())
 
         # Body wikilinks
