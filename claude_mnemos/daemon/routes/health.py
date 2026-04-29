@@ -14,6 +14,7 @@ from claude_mnemos.daemon.schemas import (
     VaultHealth,
     VersionResponse,
 )
+from claude_mnemos.ingest.llm.auth import check_claude_cli_auth
 
 router = APIRouter()
 
@@ -74,6 +75,16 @@ async def health(request: Request) -> HealthResponse:
         jobs_alert=jobs_alert,
         queue_paused_until=queue_paused_until,
     )
+
+
+@router.get("/health/claude-cli")
+def health_claude_cli() -> dict[str, object]:
+    s = check_claude_cli_auth()
+    return {
+        "installed": s.installed,
+        "authenticated": s.authenticated,
+        "binary_path": s.binary_path,
+    }
 
 
 @router.get("/version", response_model=VersionResponse)
