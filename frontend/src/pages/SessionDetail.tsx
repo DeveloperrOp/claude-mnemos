@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
+import { pageHref } from "@/lib/pageHref";
 import type { SessionStatus } from "@/types/Session";
 
 const STATUS_COLOR: Record<SessionStatus, string> = {
@@ -100,7 +101,7 @@ export function SessionDetail() {
             {s.created_pages.map((p) => (
               <li key={p}>
                 <Link
-                  to={`/project/${project}/pages/${p}`}
+                  to={pageHref(project!, p)}
                   className="text-[hsl(var(--primary))] hover:underline"
                 >
                   {p}

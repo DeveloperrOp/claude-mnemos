@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityEntry } from "@/hooks/useActivityEntry";
+import { pageHref } from "@/lib/pageHref";
 
 export function ActivityDetail() {
   const { name: project, opId } = useParams<{ name: string; opId: string }>();
@@ -90,7 +91,7 @@ export function ActivityDetail() {
             {e.affected_pages.map((p) => (
               <li key={p}>
                 <Link
-                  to={`/project/${project}/pages/${p}`}
+                  to={pageHref(project!, p)}
                   className="text-[hsl(var(--primary))] hover:underline"
                 >
                   {p}

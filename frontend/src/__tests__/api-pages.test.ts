@@ -2,6 +2,25 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { apiClient } from "../api/client";
 import { listPages, getPage, getPageBacklinks } from "../api/pages.api";
 
+const MOCK_PAGE_DETAIL = {
+  path: "wiki/concepts/a.md",
+  frontmatter: {
+    title: "A",
+    type: "concept",
+    status: "draft",
+    confidence: 0.7,
+    flavor: ["pattern"],
+    sources: [],
+    related: [],
+    created: "2026-04-29",
+    updated: "2026-04-29",
+    provenance: null,
+    agent_written: true,
+    last_human_edit: null,
+  },
+  body: "# A\n\nbody",
+};
+
 vi.mock("../api/client", () => ({
   apiClient: {
     get: vi.fn(),
@@ -86,5 +105,21 @@ describe("pages api", () => {
     });
     const out = await getPageBacklinks("alpha", "wiki/concepts/a.md");
     expect(out).toEqual(["wiki/entities/b.md"]);
+  });
+
+  it("getPage encodes filename special chars", async () => {
+    const spy = vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: MOCK_PAGE_DETAIL,
+    });
+    await getPage("alpha", "wiki/foo bar.md");
+    expect(spy).toHaveBeenCalledWith("/pages/alpha/wiki/foo%20bar.md");
+  });
+
+  it("getPageBacklinks encodes filename special chars", async () => {
+    const spy = vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { backlinks: [] },
+    });
+    await getPageBacklinks("alpha", "wiki/foo bar.md");
+    expect(spy).toHaveBeenCalledWith("/pages/alpha/wiki/foo%20bar.md/backlinks");
   });
 });

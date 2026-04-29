@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfidenceBar } from "./ConfidenceBar";
 import { FlavorTags } from "./FlavorTags";
 import { StatusBadge } from "./StatusBadge";
+import { pageHref } from "@/lib/pageHref";
 import type { WikiPageFrontmatter } from "@/types/WikiPage";
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
 
 export function PageCard({ project, path, frontmatter: fm }: Props) {
   const { t } = useTranslation();
-  const href = `/project/${project}/pages/${path}`;
+  const href = pageHref(project, path);
   return (
     <Card className="transition-colors hover:bg-[hsl(var(--muted))]">
       <CardHeader>

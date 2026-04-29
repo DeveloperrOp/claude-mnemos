@@ -11,6 +11,7 @@ import { FlavorTags } from "@/components/widgets/FlavorTags";
 import { ProvenanceIndicator } from "@/components/widgets/ProvenanceIndicator";
 import { StatusBadge } from "@/components/widgets/StatusBadge";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
+import { pageHref } from "@/lib/pageHref";
 
 export function PageDetail() {
   const { name: project, "*": pageRefRaw } = useParams<{ name: string; "*": string }>();
@@ -107,7 +108,7 @@ export function PageDetail() {
             {backlinksQuery.data!.map((b) => (
               <li key={b}>
                 <Link
-                  to={`/project/${project}/pages/${b}`}
+                  to={pageHref(project!, b)}
                   className="text-[hsl(var(--primary))] hover:underline"
                 >
                   {b}

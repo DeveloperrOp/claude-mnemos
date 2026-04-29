@@ -6,6 +6,12 @@ import {
   type PageDetail,
 } from "@/types/WikiPage";
 
+// Encode each path segment individually to preserve "/" separators while
+// handling filenames that contain spaces, "?", "#", "&", "+" etc.
+function encodePath(p: string): string {
+  return p.split("/").map(encodeURIComponent).join("/");
+}
+
 export async function listPages(project: string): Promise<string[]> {
   const r = await apiClient.get(`/pages/${encodeURIComponent(project)}`);
   return PageListResponseSchema.parse(r.data).pages;
@@ -15,10 +21,8 @@ export async function getPage(
   project: string,
   pageRef: string,
 ): Promise<PageDetail> {
-  // pageRef can contain "/" — must NOT urlencode forward slashes
-  // (FastAPI uses {page_ref:path} which matches multi-segment refs).
   const r = await apiClient.get(
-    `/pages/${encodeURIComponent(project)}/${pageRef}`,
+    `/pages/${encodeURIComponent(project)}/${encodePath(pageRef)}`,
   );
   return PageDetailSchema.parse(r.data);
 }
@@ -28,7 +32,7 @@ export async function getPageBacklinks(
   pageRef: string,
 ): Promise<string[]> {
   const r = await apiClient.get(
-    `/pages/${encodeURIComponent(project)}/${pageRef}/backlinks`,
+    `/pages/${encodeURIComponent(project)}/${encodePath(pageRef)}/backlinks`,
   );
   return PageBacklinksResponseSchema.parse(r.data).backlinks;
 }
