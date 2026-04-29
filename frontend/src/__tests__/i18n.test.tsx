@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 
 // Mock HttpBackend so i18n never makes real HTTP requests.
 vi.mock("i18next-http-backend", () => ({
@@ -14,7 +16,12 @@ vi.mock("i18next-http-backend", () => ({
 
 // Import after mock is registered.
 const { default: i18n } = await import("../i18n");
-const { default: App } = await import("../App");
+
+// Minimal harness isolated from Router: renders t("common.open") in a Button.
+function TranslatedButton() {
+  const { t } = useTranslation();
+  return <Button>{t("common.open")}</Button>;
+}
 
 beforeAll(async () => {
   // Provide inline translations so t() resolves to real strings.
@@ -30,7 +37,7 @@ beforeAll(async () => {
 describe("i18n", () => {
   it("renders Ukrainian by default after detection", async () => {
     await i18n.changeLanguage("uk");
-    render(<App />);
+    render(<TranslatedButton />);
     await waitFor(() =>
       expect(screen.getByRole("button")).toHaveTextContent("Відкрити"),
     );
@@ -38,7 +45,7 @@ describe("i18n", () => {
 
   it("switches language at runtime", async () => {
     await i18n.changeLanguage("en");
-    render(<App />);
+    render(<TranslatedButton />);
     await waitFor(() =>
       expect(screen.getByRole("button")).toHaveTextContent("Open"),
     );

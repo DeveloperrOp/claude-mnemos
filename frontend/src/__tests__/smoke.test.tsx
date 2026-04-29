@@ -23,10 +23,11 @@ beforeAll(async () => {
 });
 
 describe("App smoke", () => {
-  it("renders a button", async () => {
+  it("renders the Layout shell", async () => {
     render(<App />);
     await waitFor(() =>
-      expect(screen.getByRole("button")).toBeInTheDocument(),
+      expect(screen.getByRole("banner")).toBeInTheDocument(),
     );
+    expect(screen.getByText("claude-mnemos")).toBeInTheDocument();
   });
 });
