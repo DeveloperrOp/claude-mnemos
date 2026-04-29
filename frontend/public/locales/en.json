@@ -1,0 +1,71 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "open": "Open",
+    "retry": "Retry"
+  },
+  "navigation": {
+    "overview": "Overview",
+    "pages": "Pages",
+    "sessions": "Sessions",
+    "queue": "Queue",
+    "activity": "Activity",
+    "suggestions": "Suggestions",
+    "lost_sessions": "Lost",
+    "trash": "Trash",
+    "snapshots": "Snapshots",
+    "health": "Health",
+    "settings": "Settings",
+    "metrics": "Metrics",
+    "help": "Help"
+  },
+  "topbar": {
+    "all_projects": "All projects",
+    "alerts": "Alerts",
+    "settings": "Settings",
+    "help": "Help",
+    "locale": "Language"
+  },
+  "overview": {
+    "no_projects_title": "Project brains appear here",
+    "no_projects_hint_cmd": "Register your first project:",
+    "no_projects_hint_command": "mnemos project add NAME --vault PATH",
+    "daemon_down_title": "Daemon unavailable",
+    "daemon_down_hint_cmd": "Start the daemon:",
+    "daemon_down_hint_command": "mnemos daemon start",
+    "daemon_down_reconnect": "The dashboard will reconnect automatically."
+  },
+  "project_view": {
+    "open_in_obsidian": "Open in Obsidian",
+    "watchdog_running": "Watchdog running",
+    "watchdog_down": "Watchdog stopped",
+    "stats": {
+      "sessions_covered": "Sessions covered",
+      "jobs_queued": "Queued",
+      "jobs_running": "Running",
+      "jobs_dead_letter": "Failed"
+    },
+    "unknown_title": "Project not found",
+    "unknown_hint": "This project is not registered. Return to Overview.",
+    "coming_in": "Coming in plan {{plan}}"
+  },
+  "health": {
+    "ok": "OK",
+    "degraded": "Degraded",
+    "down": "Down"
+  },
+  "usage": {
+    "title": "Usage",
+    "tokens_short": "{{count}} tokens",
+    "sessions_short": "{{count}} sessions",
+    "ratio_short": "compression ×{{ratio}}",
+    "no_data": "No data yet"
+  },
+  "placeholder": {
+    "title": "{{section}}",
+    "body": "This section is coming in plan {{plan}}.",
+    "back_link": "Back to Overview"
+  }
+}
