@@ -8,6 +8,12 @@ import { Suggestions } from "../pages/Suggestions";
 
 beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
+    confirm: {
+      cancel: "Cancel",
+      confirm: "Confirm",
+      working: "Working...",
+      typed_confirm_input_placeholder: "Type {{phrase}} to confirm",
+    },
     suggestions: {
       title: "Suggestions",
       filter_status: "Status",
@@ -18,6 +24,17 @@ beforeAll(() => {
       no_suggestions: "No suggestions",
       showing_n: "{{count}} suggestions",
       approve_disabled: "Approve (#14c)", reject_disabled: "Reject (#14c)", defer_disabled: "Defer (#14c)",
+      approved_toast: "Suggestion approved",
+      rejected_toast: "Suggestion rejected",
+      deferred_toast: "Suggestion deferred",
+      approve_button: "Approve",
+      reject_button: "Reject",
+      defer_button: "Defer",
+      approve_modal_title: "Apply suggestion?",
+      approve_modal_desc: "This will execute the {{operation}} operation on {{count}} affected pages.",
+      approve_delete_modal_title: "Apply delete-page suggestion?",
+      approve_delete_modal_desc: "This will permanently delete the page from the vault. Type the page name to confirm.",
+      approve_delete_typed_label: "Type the page name",
     },
   }, true, true);
   void i18n.changeLanguage("en");

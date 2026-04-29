@@ -291,7 +291,18 @@
     "showing_n": "{{count}} пропозицій",
     "approve_disabled": "Затвердити (#14c)",
     "reject_disabled": "Відхилити (#14c)",
-    "defer_disabled": "Відкласти (#14c)"
+    "defer_disabled": "Відкласти (#14c)",
+    "approved_toast": "Пропозицію затверджено",
+    "rejected_toast": "Пропозицію відхилено",
+    "deferred_toast": "Пропозицію відкладено",
+    "approve_button": "Затвердити",
+    "reject_button": "Відхилити",
+    "defer_button": "Відкласти",
+    "approve_modal_title": "Застосувати пропозицію?",
+    "approve_modal_desc": "Виконає операцію {{operation}} над {{count}} сторінками.",
+    "approve_delete_modal_title": "Застосувати видалення сторінки?",
+    "approve_delete_modal_desc": "Сторінка буде видалена з vault. Введіть назву сторінки для підтвердження.",
+    "approve_delete_typed_label": "Введіть назву сторінки"
   },
   "dead_letter": {
     "title": "Збійні задачі",

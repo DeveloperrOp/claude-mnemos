@@ -291,7 +291,18 @@
     "showing_n": "{{count}} предложений",
     "approve_disabled": "Одобрить (#14c)",
     "reject_disabled": "Отклонить (#14c)",
-    "defer_disabled": "Отложить (#14c)"
+    "defer_disabled": "Отложить (#14c)",
+    "approved_toast": "Предложение одобрено",
+    "rejected_toast": "Предложение отклонено",
+    "deferred_toast": "Предложение отложено",
+    "approve_button": "Одобрить",
+    "reject_button": "Отклонить",
+    "defer_button": "Отложить",
+    "approve_modal_title": "Применить предложение?",
+    "approve_modal_desc": "Выполнит операцию {{operation}} над {{count}} страницами.",
+    "approve_delete_modal_title": "Применить удаление страницы?",
+    "approve_delete_modal_desc": "Страница будет удалена из vault. Введите имя страницы для подтверждения.",
+    "approve_delete_typed_label": "Введите имя страницы"
   },
   "dead_letter": {
     "title": "Сбойные задачи",
