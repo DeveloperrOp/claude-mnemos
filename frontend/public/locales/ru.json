@@ -121,6 +121,45 @@
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад"
   },
+  "activity": {
+    "title": "История",
+    "groups": {
+      "needs_attention": "Требует внимания",
+      "today": "Сегодня",
+      "yesterday": "Вчера",
+      "earlier_week": "На этой неделе",
+      "older": "Ранее"
+    },
+    "op": {
+      "ingest": "Импорт",
+      "ingest_extracted": "Импорт (извлечённый)",
+      "ingest_raw_only": "Импорт (только raw)",
+      "lint_autofix": "Автоисправление lint",
+      "lint_fix": "Исправление lint",
+      "ontology_apply": "Применение онтологии",
+      "manual_patch": "Ручное редактирование",
+      "manual_edit": "Ручное редактирование",
+      "manual_soft_delete": "Мягкое удаление",
+      "manual_delete": "Удаление",
+      "manual_restore": "Восстановление",
+      "manual_restore_trash": "Восстановление из корзины",
+      "human_edit_detected": "Обнаружено редактирование пользователем",
+      "manual_undo": "Отмена",
+      "trash_dismissed": "Корзина очищена",
+      "trash_emptied": "Корзина опустошена"
+    },
+    "affected_pages": "{{count}} страниц",
+    "detail": "Детали",
+    "undo_disabled": "Отмена (#14c)",
+    "no_activity": "Активности пока нет",
+    "metadata": "Метаданные",
+    "snapshot": "Снимок",
+    "can_undo": "Можно отменить",
+    "cannot_undo": "Нельзя отменить",
+    "undone": "Отменено",
+    "not_found_title": "Запись активности не найдена",
+    "not_found_hint": "Вернуться назад"
+  },
   "wiki": {
     "status": {
       "draft": "Черновик",

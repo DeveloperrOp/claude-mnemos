@@ -121,6 +121,45 @@
     "not_found_title": "Session not found",
     "not_found_hint": "Go back"
   },
+  "activity": {
+    "title": "Activity",
+    "groups": {
+      "needs_attention": "Needs attention",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "earlier_week": "This week",
+      "older": "Older"
+    },
+    "op": {
+      "ingest": "Ingest",
+      "ingest_extracted": "Ingest (extracted)",
+      "ingest_raw_only": "Ingest (raw only)",
+      "lint_autofix": "Lint auto-fix",
+      "lint_fix": "Lint fix",
+      "ontology_apply": "Ontology apply",
+      "manual_patch": "Manual edit",
+      "manual_edit": "Manual edit",
+      "manual_soft_delete": "Soft delete",
+      "manual_delete": "Delete",
+      "manual_restore": "Restore",
+      "manual_restore_trash": "Restore from trash",
+      "human_edit_detected": "Human edit detected",
+      "manual_undo": "Undo",
+      "trash_dismissed": "Trash dismissed",
+      "trash_emptied": "Trash emptied"
+    },
+    "affected_pages": "{{count}} pages",
+    "detail": "Detail",
+    "undo_disabled": "Undo (#14c)",
+    "no_activity": "No activity yet",
+    "metadata": "Metadata",
+    "snapshot": "Snapshot",
+    "can_undo": "Can undo",
+    "cannot_undo": "Cannot undo",
+    "undone": "Undone",
+    "not_found_title": "Activity entry not found",
+    "not_found_hint": "Go back"
+  },
   "wiki": {
     "status": {
       "draft": "Draft",
