@@ -54,14 +54,17 @@ describe("api", () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({
       data: {
         period: "30d",
-        total_tokens_injected: 1000,
-        tokens_full: 5000,
+        period_days: 30,
         sessions_covered: 10,
-        avg_compression_ratio: 5,
-        events_count: 10,
+        tokens_input: 600,
+        tokens_output: 400,
+        tokens_injected: 1000,
+        raw_bytes_total: 8192,
+        tokens_per_byte: 0.049,
       },
     });
     const u = await getUsage("30d");
     expect(u.sessions_covered).toBe(10);
+    expect(u.tokens_injected).toBe(1000);
   });
 });

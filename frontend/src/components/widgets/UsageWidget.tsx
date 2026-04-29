@@ -8,8 +8,8 @@ function formatTokens(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-function formatRatio(r: number): string {
-  return r.toFixed(1);
+function formatTokensPerByte(r: number): string {
+  return r.toFixed(2);
 }
 
 export function UsageWidget() {
@@ -18,7 +18,7 @@ export function UsageWidget() {
 
   if (isLoading || isError || !data) return null;
 
-  if (data.total_tokens_injected === 0) {
+  if (data.tokens_injected === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
         <Syringe className="h-4 w-4" />
@@ -30,11 +30,15 @@ export function UsageWidget() {
   return (
     <div className="flex items-center gap-2 text-sm" title={t("usage.title")}>
       <Syringe className="h-4 w-4 text-[hsl(var(--primary))]" />
-      <span>{formatTokens(data.total_tokens_injected)}</span>
+      <span>{formatTokens(data.tokens_injected)}</span>
       <span className="text-[hsl(var(--muted-foreground))]">·</span>
       <span>{data.sessions_covered}</span>
-      <span className="text-[hsl(var(--muted-foreground))]">·</span>
-      <span>×{formatRatio(data.avg_compression_ratio)}</span>
+      {data.tokens_per_byte !== null && (
+        <>
+          <span className="text-[hsl(var(--muted-foreground))]">·</span>
+          <span>{formatTokensPerByte(data.tokens_per_byte)} tok/B</span>
+        </>
+      )}
     </div>
   );
 }

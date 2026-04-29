@@ -36,32 +36,56 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("UsageWidget", () => {
-  it("formats tokens injected and ratio", async () => {
+  it("formats tokens injected and sessions covered", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({
       data: {
         period: "1d",
-        total_tokens_injected: 8234,
-        tokens_full: 47356,
+        period_days: 1,
         sessions_covered: 5,
-        avg_compression_ratio: 5.75,
-        events_count: 5,
+        tokens_input: 5000,
+        tokens_output: 3234,
+        tokens_injected: 8234,
+        raw_bytes_total: 65536,
+        tokens_per_byte: 0.0494,
       },
     });
     render(wrap(<UsageWidget />));
     await waitFor(() => expect(screen.getByText(/8\.2K/)).toBeInTheDocument());
-    expect(screen.getByText(/×5\.8/)).toBeInTheDocument();
+    // sessions_covered shown
     expect(screen.getAllByText(/5/).length).toBeGreaterThan(0);
+    // tokens_per_byte shown as "0.05 tok/B"
+    expect(screen.getByText(/tok\/B/)).toBeInTheDocument();
+  });
+
+  it("hides tokens_per_byte when null", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: {
+        period: "1d",
+        period_days: 1,
+        sessions_covered: 3,
+        tokens_input: 400,
+        tokens_output: 200,
+        tokens_injected: 600,
+        raw_bytes_total: 0,
+        tokens_per_byte: null,
+      },
+    });
+    render(wrap(<UsageWidget />));
+    await waitFor(() => expect(screen.getByText(/600/)).toBeInTheDocument());
+    expect(screen.queryByText(/tok\/B/)).not.toBeInTheDocument();
   });
 
   it("shows 'no data' when usage is empty", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({
       data: {
         period: "1d",
-        total_tokens_injected: 0,
-        tokens_full: 0,
+        period_days: 1,
         sessions_covered: 0,
-        avg_compression_ratio: 0,
-        events_count: 0,
+        tokens_input: 0,
+        tokens_output: 0,
+        tokens_injected: 0,
+        raw_bytes_total: 0,
+        tokens_per_byte: null,
       },
     });
     render(wrap(<UsageWidget />));

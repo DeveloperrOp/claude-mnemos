@@ -1,12 +1,15 @@
 import { z } from "zod";
 
+// Shape matches GET /metrics/usage from claude_mnemos/daemon/routes/metrics.py::usage_route
 export const UsageSummarySchema = z.object({
   period: z.string(),
-  total_tokens_injected: z.number().int().nonnegative(),
-  tokens_full: z.number().int().nonnegative(),
+  period_days: z.number().int().nonnegative(),
   sessions_covered: z.number().int().nonnegative(),
-  avg_compression_ratio: z.number().nonnegative(),
-  events_count: z.number().int().nonnegative(),
+  tokens_input: z.number().int().nonnegative(),
+  tokens_output: z.number().int().nonnegative(),
+  tokens_injected: z.number().int().nonnegative(),
+  raw_bytes_total: z.number().int().nonnegative(),
+  tokens_per_byte: z.number().nullable(),
 });
 export type UsageSummary = z.infer<typeof UsageSummarySchema>;
 
