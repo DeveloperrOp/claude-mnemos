@@ -25,6 +25,7 @@ beforeAll(async () => {
       common: { open: "Open" },
       overview: {
         no_projects_title: "Brain of your projects will appear here",
+        no_projects_cta: "Create your first project",
         no_projects_hint_cmd: "Register your first project:",
         no_projects_hint_command: "mnemos project add NAME --vault PATH",
         daemon_down_title: "Daemon unavailable",

@@ -26,7 +26,8 @@
     "settings": "Настройки",
     "failed_jobs": "Ошибки",
     "metrics": "Метрики",
-    "help": "Помощь"
+    "help": "Помощь",
+    "create_project": "+ Новый проект"
   },
   "topbar": {
     "all_projects": "Все проекты",
@@ -37,6 +38,7 @@
   },
   "overview": {
     "no_projects_title": "Мозг проекта появится здесь",
+    "no_projects_cta": "Создать первый проект",
     "no_projects_hint_cmd": "Зарегистрируйте первый проект:",
     "no_projects_hint_command": "mnemos project add NAME --vault PATH",
     "daemon_down_title": "Daemon недоступен",

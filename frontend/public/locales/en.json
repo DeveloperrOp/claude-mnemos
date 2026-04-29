@@ -26,7 +26,8 @@
     "settings": "Settings",
     "failed_jobs": "Failed jobs",
     "metrics": "Metrics",
-    "help": "Help"
+    "help": "Help",
+    "create_project": "+ New project"
   },
   "topbar": {
     "all_projects": "All projects",
@@ -37,6 +38,7 @@
   },
   "overview": {
     "no_projects_title": "Project brains appear here",
+    "no_projects_cta": "Create your first project",
     "no_projects_hint_cmd": "Register your first project:",
     "no_projects_hint_command": "mnemos project add NAME --vault PATH",
     "daemon_down_title": "Daemon unavailable",
