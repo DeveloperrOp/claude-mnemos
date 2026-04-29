@@ -370,7 +370,11 @@
     "mount_failed_title": "Ошибка монтирования",
     "success_toast": "Проект создан",
     "autostart_label": "Запускать mnemos автоматически при логине",
-    "autostart_hint": "Добавит иконку в трей и будет запускать демона при входе в систему."
+    "autostart_hint": "Добавит иконку в трей и будет запускать демона при входе в систему.",
+    "cli_check_label": "Статус Claude CLI",
+    "cli_check_ok": "✓ Claude CLI установлен и залогинен",
+    "cli_check_not_installed": "⚠ Claude CLI не найден — установите Claude Code с https://claude.ai/download",
+    "cli_check_not_authenticated": "⚠ Claude CLI установлен, но не залогинен — запустите `claude login` в терминале"
   },
   "metrics": {
     "title": "Метрики",

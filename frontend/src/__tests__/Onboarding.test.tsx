@@ -31,6 +31,10 @@ beforeAll(() => {
       success_toast: "Project created",
       autostart_label: "Auto-start mnemos on login",
       autostart_hint: "Adds a tray icon and starts the daemon automatically when you sign in.",
+      cli_check_label: "Claude CLI status",
+      cli_check_ok: "✓ Claude CLI installed and authenticated",
+      cli_check_not_installed: "⚠ Claude CLI not found — install Claude Code from https://claude.ai/download",
+      cli_check_not_authenticated: "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal",
     },
   }, true, true);
   void i18n.changeLanguage("en");
@@ -160,5 +164,36 @@ describe("Onboarding", () => {
       const installCalls = trayMock.history.post.filter((c) => c.url === "/tray/install");
       expect(installCalls.length).toBe(1);
     });
+  });
+
+  it("shows green CLI check when authenticated", async () => {
+    trayMock.onGet("/health/claude-cli").reply(200, {
+      installed: true,
+      authenticated: true,
+      binary_path: "/x/claude",
+    });
+    render(wrap(<Onboarding />));
+    expect(await screen.findByText(/Claude CLI installed and authenticated/i))
+      .toBeInTheDocument();
+  });
+
+  it("shows install instruction when CLI missing", async () => {
+    trayMock.onGet("/health/claude-cli").reply(200, {
+      installed: false,
+      authenticated: false,
+    });
+    render(wrap(<Onboarding />));
+    expect(await screen.findByText(/Claude Code from https:/i))
+      .toBeInTheDocument();
+  });
+
+  it("shows login instruction when CLI installed but not authed", async () => {
+    trayMock.onGet("/health/claude-cli").reply(200, {
+      installed: true,
+      authenticated: false,
+    });
+    render(wrap(<Onboarding />));
+    expect(await screen.findByText(/run `claude login`/i))
+      .toBeInTheDocument();
   });
 });
