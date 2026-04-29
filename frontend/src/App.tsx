@@ -1,9 +1,10 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter, RouterProvider, useParams } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "./components/layout/Layout";
 import { Overview } from "./pages/Overview";
 import { ProjectView } from "./pages/ProjectView";
-import { Help } from "./pages/Help";
 import { Placeholder } from "./pages/Placeholder";
 import { PagesBrowser } from "./pages/PagesBrowser";
 import { PageDetail } from "./pages/PageDetail";
@@ -20,7 +21,9 @@ import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { Onboarding } from "./pages/Onboarding";
-import { Metrics } from "./pages/Metrics";
+
+const Help = lazy(() => import("./pages/Help"));
+const Metrics = lazy(() => import("./pages/Metrics"));
 
 // react-router v7 splats must be path-final, so a literal `pages/*/edit` route
 // cannot exist. Both PageDetail and PageEdit share `pages/*`; this switch
@@ -58,8 +61,8 @@ const router = createBrowserRouter([
       { path: "lost-sessions", element: <LostSessions /> },
       { path: "dead-letter", element: <DeadLetter /> },
       { path: "dead-letter/:jobId", element: <DeadLetterDetail /> },
-      { path: "help", element: <Help /> },
-      { path: "metrics", element: <Metrics /> },
+      { path: "help", element: <Suspense fallback={<Skeleton className="h-64" />}><Help /></Suspense> },
+      { path: "metrics", element: <Suspense fallback={<Skeleton className="h-64" />}><Metrics /></Suspense> },
       { path: "settings/global", element: <Placeholder section="Global Settings" plan="#14c" /> },
     ],
   },
