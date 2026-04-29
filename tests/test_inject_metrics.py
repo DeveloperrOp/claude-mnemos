@@ -114,3 +114,45 @@ def test_apply_cap_drops_oldest_by_timestamp_not_insertion_order(tmp_path: Path)
     assert kept_indices[0] == 0  # newest is kept
     assert kept_indices[-1] == MAX_EVENTS - 1  # oldest kept is index MAX-1
     assert all(i < MAX_EVENTS for i in kept_indices)
+
+
+import threading
+
+
+def test_concurrent_append_to_vault_does_not_lose_events(tmp_path: Path) -> None:
+    """Two threads appending in parallel — both events must persist.
+
+    Without a lock, load → modify → save races can drop one event.
+    """
+    n_events = 20
+    barrier = threading.Barrier(2)
+
+    def append_batch(start: int) -> None:
+        barrier.wait()
+        for i in range(start, start + n_events):
+            ts = datetime.now(UTC) + timedelta(microseconds=i)
+            event = InjectMetricEvent(
+                id=f"evt-{i:06d}",
+                timestamp=ts,
+                session_id=f"s-{i}",
+                operation="session_start",
+                mode="full",
+                tokens_full=1000,
+                tokens_actual=200,
+                candidates_total=10,
+                candidates_packed=10,
+            )
+            InjectMetricsLog.append_to_vault(tmp_path, event)
+
+    t1 = threading.Thread(target=append_batch, args=(0,))
+    t2 = threading.Thread(target=append_batch, args=(n_events,))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    log = InjectMetricsLog.load(tmp_path)
+    assert len(log.events) == n_events * 2, (
+        f"expected {n_events * 2} events, got {len(log.events)} — "
+        "concurrent writes lost data"
+    )
