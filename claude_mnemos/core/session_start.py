@@ -205,7 +205,7 @@ def build_adaptive_context(
     cwd_seg = _cwd_segment(cwd)
     now = datetime.now(UTC)
 
-    scored: list[tuple[float, str, "ParsedPage"]] = []
+    scored: list[tuple[float, str, ParsedPage]] = []
     for slug, hop in candidates.items():
         page_path = wiki_root / f"{slug}.md"
         if not page_path.is_file():

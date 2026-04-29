@@ -198,9 +198,10 @@ def test_parse_period_accepts_days_unchanged():
 
 
 def test_parse_period_rejects_garbage():
-    from fastapi import HTTPException
-    from claude_mnemos.daemon.routes.metrics import _parse_period
     import pytest as pt
+    from fastapi import HTTPException
+
+    from claude_mnemos.daemon.routes.metrics import _parse_period
     for bad in ("0d", "-1d", "abc", "30x", "30dd", ""):
         with pt.raises(HTTPException) as exc:
             _parse_period(bad)

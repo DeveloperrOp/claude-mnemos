@@ -5,14 +5,11 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.state.manifest import IngestRecord, Manifest
-from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 
 HOOK_PATH = Path(__file__).resolve().parent.parent / "hooks" / "session_start.py"
 

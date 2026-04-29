@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from pathlib import Path
 
-import pytest
-
+from claude_mnemos.core.atomic import atomic_write
+from claude_mnemos.core.models import WikiPageFrontmatter
+from claude_mnemos.core.page_io import ParsedPage
 from claude_mnemos.core.session_start import (
+    FLAVOR_WEIGHTS,
+    build_adaptive_context,
     page_slug_from_path,
     page_summary,
+    score_page,
 )
-from claude_mnemos.core.page_io import ParsedPage
-from claude_mnemos.core.models import WikiPageFrontmatter
-from datetime import date
+from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 
 def _make_parsed(slug: str, body: str, *, confidence: float = 0.7) -> ParsedPage:
@@ -54,10 +57,6 @@ def test_page_summary_empty_body_returns_empty() -> None:
     assert page_summary(parsed, max_chars=200) == ""
 
 
-from datetime import datetime, UTC
-from claude_mnemos.core.session_start import score_page, FLAVOR_WEIGHTS
-
-
 def _make_parsed_full(
     *, confidence: float = 0.7,
     flavor: list[str] | None = None,
@@ -84,8 +83,9 @@ def _make_parsed_full(
 def test_score_page_higher_confidence_wins() -> None:
     a = _make_parsed_full(confidence=0.9)
     b = _make_parsed_full(confidence=0.3)
-    score_a = score_page(a, hop_distance=2, cwd_segment="zzz", now=datetime(2026, 4, 29, tzinfo=UTC))
-    score_b = score_page(b, hop_distance=2, cwd_segment="zzz", now=datetime(2026, 4, 29, tzinfo=UTC))
+    now = datetime(2026, 4, 29, tzinfo=UTC)
+    score_a = score_page(a, hop_distance=2, cwd_segment="zzz", now=now)
+    score_b = score_page(b, hop_distance=2, cwd_segment="zzz", now=now)
     assert score_a > score_b
 
 
@@ -139,11 +139,6 @@ def test_score_page_recency_decay() -> None:
 def test_flavor_weights_decision_max() -> None:
     assert FLAVOR_WEIGHTS["decision"] >= FLAVOR_WEIGHTS["reference"]
     assert FLAVOR_WEIGHTS["lesson"] >= FLAVOR_WEIGHTS["reference"]
-
-
-from claude_mnemos.core.session_start import build_adaptive_context
-from claude_mnemos.state.manifest import IngestRecord, Manifest
-from claude_mnemos.core.atomic import atomic_write
 
 
 def _seed_manifest(vault: Path, *, sessions: list[tuple[str, list[str]]]) -> None:

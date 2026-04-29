@@ -291,7 +291,8 @@ def test_all_new_op_types_accepted():
 
 
 def test_session_start_inject_accepted_as_op_type():
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
+
     from claude_mnemos.state.activity import ActivityEntry
 
     entry = ActivityEntry(

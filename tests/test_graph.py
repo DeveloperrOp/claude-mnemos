@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from claude_mnemos.core.graph import build_page_graph, pages_within_k_hops
 
 
