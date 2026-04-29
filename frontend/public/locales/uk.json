@@ -6,6 +6,12 @@
     "open": "Відкрити",
     "retry": "Повторити"
   },
+  "confirm": {
+    "cancel": "Скасувати",
+    "confirm": "Підтвердити",
+    "working": "Виконується...",
+    "typed_confirm_input_placeholder": "Введіть {{phrase}} для підтвердження"
+  },
   "navigation": {
     "overview": "Огляд",
     "pages": "Сторінки",

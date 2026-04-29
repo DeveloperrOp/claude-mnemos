@@ -6,6 +6,12 @@
     "open": "Open",
     "retry": "Retry"
   },
+  "confirm": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "working": "Working...",
+    "typed_confirm_input_placeholder": "Type {{phrase}} to confirm"
+  },
   "navigation": {
     "overview": "Overview",
     "pages": "Pages",

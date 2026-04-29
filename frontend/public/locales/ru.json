@@ -6,6 +6,12 @@
     "open": "Открыть",
     "retry": "Повторить"
   },
+  "confirm": {
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "working": "Выполняется...",
+    "typed_confirm_input_placeholder": "Введите {{phrase}} для подтверждения"
+  },
   "navigation": {
     "overview": "Обзор",
     "pages": "Страницы",
