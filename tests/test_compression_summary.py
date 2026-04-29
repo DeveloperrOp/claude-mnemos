@@ -129,13 +129,15 @@ def test_compression_summary_sessions_covered_counts_unique(tmp_path: Path) -> N
 def test_usage_summary_excludes_pre_cutoff_event(tmp_path: Path) -> None:
     """usage_summary excludes events from the day before the cutoff,
     matching compression_summary's UTC-midnight cutoff semantics."""
+    from claude_mnemos.core.atomic import atomic_write
     from claude_mnemos.core.metrics import usage_summary
     from claude_mnemos.state.manifest import IngestRecord, Manifest
-    from claude_mnemos.core.atomic import atomic_write
 
     today = datetime.now(UTC).date()
     pre_boundary = today - timedelta(days=31)  # one day before cutoff
-    pre_ts = datetime.combine(pre_boundary, datetime.min.time(), UTC) + timedelta(hours=23, minutes=59)
+    pre_ts = datetime.combine(
+        pre_boundary, datetime.min.time(), UTC
+    ) + timedelta(hours=23, minutes=59)
 
     rec = IngestRecord(
         session_id="s1",
@@ -159,9 +161,9 @@ def test_usage_summary_excludes_pre_cutoff_event(tmp_path: Path) -> None:
 
 def test_usage_summary_includes_boundary_day_event(tmp_path: Path) -> None:
     """Event at 22:00 UTC on the cutoff day (today - period_days) should be included."""
+    from claude_mnemos.core.atomic import atomic_write
     from claude_mnemos.core.metrics import usage_summary
     from claude_mnemos.state.manifest import IngestRecord, Manifest
-    from claude_mnemos.core.atomic import atomic_write
 
     today = datetime.now(UTC).date()
     boundary_day = today - timedelta(days=30)

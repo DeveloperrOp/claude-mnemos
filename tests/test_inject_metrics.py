@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -114,9 +115,6 @@ def test_apply_cap_drops_oldest_by_timestamp_not_insertion_order(tmp_path: Path)
     assert kept_indices[0] == 0  # newest is kept
     assert kept_indices[-1] == MAX_EVENTS - 1  # oldest kept is index MAX-1
     assert all(i < MAX_EVENTS for i in kept_indices)
-
-
-import threading
 
 
 def test_concurrent_append_to_vault_does_not_lose_events(tmp_path: Path) -> None:

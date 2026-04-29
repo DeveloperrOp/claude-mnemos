@@ -16,6 +16,7 @@ bound disk on extreme usage.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -138,10 +139,8 @@ class InjectMetricsLog(BaseModel):
             log.save(vault_root)
         finally:
             if acquired:
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     lock_path.unlink()
-                except FileNotFoundError:
-                    pass
 
     def _apply_retention(self) -> None:
         cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
