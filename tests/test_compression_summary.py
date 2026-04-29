@@ -98,7 +98,20 @@ def test_compression_summary_all_zero_actual_returns_none(tmp_path: Path) -> Non
     _seed(tmp_path, [_make_event(idx=1, ts=now, tokens_full=500, tokens_actual=0)])
     out = compression_summary(tmp_path, period_days=30)
     assert out.events_count == 1
+    assert out.valid_events_count == 0
     assert out.avg_compression_ratio is None
+
+
+def test_compression_summary_valid_events_count_excludes_zero_actual(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    _seed(tmp_path, [
+        _make_event(idx=1, ts=now, tokens_full=500, tokens_actual=0),
+        _make_event(idx=2, ts=now, tokens_full=1000, tokens_actual=200),
+        _make_event(idx=3, ts=now, tokens_full=600, tokens_actual=300),
+    ])
+    out = compression_summary(tmp_path, period_days=30)
+    assert out.events_count == 3
+    assert out.valid_events_count == 2  # only the two with tokens_actual > 0
 
 
 def test_compression_summary_sessions_covered_counts_unique(tmp_path: Path) -> None:

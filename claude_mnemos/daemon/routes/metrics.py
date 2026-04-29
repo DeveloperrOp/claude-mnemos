@@ -69,21 +69,22 @@ async def usage_route(request: Request, period: str = "30d") -> dict[str, Any]:
         total_output / raw_bytes_total if raw_bytes_total > 0 else None
     )
 
-    # Weighted average across vaults: weight = events_count of vaults that
-    # actually have a ratio (i.e. at least one event with tokens_actual > 0).
-    # Vaults with no qualifying events don't skew the mean.
+    # Weighted average across vaults: weight = valid_events_count (events
+    # with tokens_actual > 0), which is the basis for each vault's local
+    # avg_compression_ratio. Using events_count instead would over-weight
+    # vaults where most events have tokens_actual == 0.
     weighted_sum = sum(
-        (c.avg_compression_ratio or 0.0) * c.events_count
+        (c.avg_compression_ratio or 0.0) * c.valid_events_count
         for c in compression_per_vault
         if c.avg_compression_ratio is not None
     )
-    events_with_ratio = sum(
-        c.events_count
+    valid_events_total = sum(
+        c.valid_events_count
         for c in compression_per_vault
         if c.avg_compression_ratio is not None
     )
     avg_compression_ratio: float | None = (
-        weighted_sum / events_with_ratio if events_with_ratio > 0 else None
+        weighted_sum / valid_events_total if valid_events_total > 0 else None
     )
     inject_events_count = sum(c.events_count for c in compression_per_vault)
 

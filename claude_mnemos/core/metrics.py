@@ -70,6 +70,7 @@ class CompressionSummary(BaseModel):
 
     period_days: int
     events_count: int
+    valid_events_count: int  # events with tokens_actual > 0 — basis for the ratio
     sessions_covered: int
     avg_compression_ratio: float | None
     total_tokens_full: int
@@ -243,6 +244,7 @@ def compression_summary(
     return CompressionSummary(
         period_days=period_days,
         events_count=len(events),
+        valid_events_count=len(valid),
         sessions_covered=sessions_covered,
         avg_compression_ratio=avg,
         total_tokens_full=sum(e.tokens_full for e in events),
