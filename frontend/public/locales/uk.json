@@ -68,6 +68,29 @@
     "body": "Цей розділ з'явиться в плані {{plan}}.",
     "back_link": "Повернутись до Огляду"
   },
+  "pages": {
+    "filters": {
+      "title": "Фільтри",
+      "type": "Тип",
+      "flavor": "Категорія",
+      "status": "Статус",
+      "sort": "Сортування",
+      "sort_updated": "Останнє оновлення",
+      "sort_created": "Дата створення",
+      "sort_title": "Назва",
+      "search_placeholder": "Пошук сторінок…",
+      "all": "Усі",
+      "reset": "Скинути фільтри"
+    },
+    "showing_n_of_m": "{{shown}} з {{total}}",
+    "open": "Відкрити",
+    "open_in_obsidian": "Відкрити в Obsidian",
+    "loading_frontmatter": "Завантаження…",
+    "no_pages": "Сторінок не знайдено",
+    "edit_disabled": "Редагування з'явиться в #14c",
+    "verify_disabled": "Підтвердження з'явиться в #14c",
+    "delete_disabled": "Видалення з'явиться в #14c"
+  },
   "wiki": {
     "status": {
       "draft": "Чернетка",

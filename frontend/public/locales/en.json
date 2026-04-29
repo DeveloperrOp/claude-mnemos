@@ -68,6 +68,29 @@
     "body": "This section is coming in plan {{plan}}.",
     "back_link": "Back to Overview"
   },
+  "pages": {
+    "filters": {
+      "title": "Filters",
+      "type": "Type",
+      "flavor": "Flavor",
+      "status": "Status",
+      "sort": "Sort",
+      "sort_updated": "Last updated",
+      "sort_created": "Created",
+      "sort_title": "Title",
+      "search_placeholder": "Search pages…",
+      "all": "All",
+      "reset": "Reset filters"
+    },
+    "showing_n_of_m": "{{shown}} of {{total}}",
+    "open": "Open",
+    "open_in_obsidian": "Open in Obsidian",
+    "loading_frontmatter": "Loading…",
+    "no_pages": "No pages found",
+    "edit_disabled": "Editing coming in #14c",
+    "verify_disabled": "Verify coming in #14c",
+    "delete_disabled": "Delete coming in #14c"
+  },
   "wiki": {
     "status": {
       "draft": "Draft",

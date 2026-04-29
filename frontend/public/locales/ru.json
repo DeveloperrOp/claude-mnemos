@@ -68,6 +68,29 @@
     "body": "Этот раздел появится в плане {{plan}}.",
     "back_link": "Вернуться в Обзор"
   },
+  "pages": {
+    "filters": {
+      "title": "Фильтры",
+      "type": "Тип",
+      "flavor": "Категория",
+      "status": "Статус",
+      "sort": "Сортировка",
+      "sort_updated": "Последнее обновление",
+      "sort_created": "Дата создания",
+      "sort_title": "Название",
+      "search_placeholder": "Поиск страниц…",
+      "all": "Все",
+      "reset": "Сбросить фильтры"
+    },
+    "showing_n_of_m": "{{shown}} из {{total}}",
+    "open": "Открыть",
+    "open_in_obsidian": "Открыть в Obsidian",
+    "loading_frontmatter": "Загрузка…",
+    "no_pages": "Страниц не найдено",
+    "edit_disabled": "Редактирование появится в #14c",
+    "verify_disabled": "Подтверждение появится в #14c",
+    "delete_disabled": "Удаление появится в #14c"
+  },
   "wiki": {
     "status": {
       "draft": "Черновик",
