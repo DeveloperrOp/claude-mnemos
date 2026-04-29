@@ -405,5 +405,69 @@
     "col_ingested_at": "Інжест",
     "col_tokens_total": "Токени",
     "empty": "Немає даних"
+  },
+  "help": {
+    "title": "Допомога",
+    "nav": {
+      "quickstart": "Швидкий старт",
+      "concepts": "Концепції",
+      "workflows": "Робочі процеси",
+      "troubleshooting": "Усунення несправностей",
+      "about": "Про застосунок"
+    },
+    "quickstart": {
+      "heading": "Швидкий старт",
+      "intro": "Запустіть систему за три кроки.",
+      "step1_title": "1. Створіть проєкт",
+      "step1_body": "Натисніть «+ Новий проєкт» або виконайте mnemos project add <name> <vault-path>.",
+      "step2_title": "2. Запустіть демона",
+      "step2_body": "Виконайте mnemos daemon start. Дашборд слухає порт 5757.",
+      "step3_title": "3. Використовуйте Claude Code",
+      "step3_body": "Сесії у відповідних CWD автоматично інжестяться у vault як markdown wiki-сторінки."
+    },
+    "concepts": {
+      "heading": "Концепції",
+      "intro": "Ключові ідеї claude-mnemos.",
+      "projects_title": "Проєкти",
+      "projects_body": "Проєкт — це іменований vault, директорія markdown-файлів. Кожен проєкт має власні CWD-патерни.",
+      "sessions_title": "Сесії",
+      "sessions_body": "Сесія — це одна розмова в Claude Code. Кожна сесія інжестується у vault як одна чи більше wiki-сторінок.",
+      "pages_title": "Сторінки",
+      "pages_body": "Wiki-сторінка має frontmatter (type, status, flavor, confidence) та тіло. Сторінки пов'язані через [[wikilinks]].",
+      "suggestions_title": "Пропозиції",
+      "suggestions_body": "Онтологічний рушій пропонує об'єднання, перейменування та видалення. Затверджуйте, відхиляйте або відкладайте їх.",
+      "snapshots_title": "Знімки",
+      "snapshots_body": "Pre-op знімки робляться перед ризиковими операціями. Щоденні знімки за розкладом. Ручні — за потреби.",
+      "deadletter_title": "Збійні задачі",
+      "deadletter_body": "Задачі, що впали після повторних спроб, потрапляють у dead-letter чергу. Повторюйте або відхиляйте з /dead-letter."
+    },
+    "workflows": {
+      "heading": "Типові робочі процеси",
+      "intro": "Типові щоденні операції.",
+      "ingest_title": "Щоденний інжест",
+      "ingest_body": "Сесії інжестяться автоматично. Запускайте інжест вручну зі сторінки сесії за потреби.",
+      "snapshot_title": "Знімок перед ризиковою операцією",
+      "snapshot_body": "Натисніть «Створити знімок» на сторінці Знімків перед будь-якою vault-широкою зміною.",
+      "restore_title": "Відновлення з кошика",
+      "restore_body": "Відкрийте /trash для проєкту, натисніть «Відновити». Сторінка повернеться у свій початковий шлях."
+    },
+    "troubleshooting": {
+      "heading": "Усунення несправностей",
+      "intro": "Поширені проблеми та їх вирішення.",
+      "daemon_down_title": "Демон не працює",
+      "daemon_down_body": "Виконайте mnemos daemon status. Перезапустіть командою mnemos daemon start.",
+      "ingest_failing_title": "Інжест падає",
+      "ingest_failing_body": "Перевірте /dead-letter для traceback задачі. Більшість збоїв — rate limits або переповнення диску.",
+      "mount_failed_title": "Помилка монтування проєкту",
+      "mount_failed_body": "Перевірте, що шлях до vault існує і доступний для запису. Виконайте mnemos doctor."
+    },
+    "about": {
+      "heading": "Про застосунок",
+      "version_label": "Версія",
+      "links": "Посилання",
+      "github": "GitHub",
+      "spec": "Специфікація",
+      "issues": "Повідомити про проблему"
+    }
   }
 }

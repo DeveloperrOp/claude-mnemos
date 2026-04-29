@@ -405,5 +405,69 @@
     "col_ingested_at": "Ingested",
     "col_tokens_total": "Tokens",
     "empty": "No data"
+  },
+  "help": {
+    "title": "Help",
+    "nav": {
+      "quickstart": "Quickstart",
+      "concepts": "Concepts",
+      "workflows": "Workflows",
+      "troubleshooting": "Troubleshooting",
+      "about": "About"
+    },
+    "quickstart": {
+      "heading": "Quickstart",
+      "intro": "Get up and running in three steps.",
+      "step1_title": "1. Create a project",
+      "step1_body": "Click \"+ New project\" or run mnemos project add <name> <vault-path>.",
+      "step2_title": "2. Start the daemon",
+      "step2_body": "Run mnemos daemon start. The dashboard listens on port 5757.",
+      "step3_title": "3. Use Claude Code",
+      "step3_body": "Sessions in matched CWDs are auto-ingested into the vault as markdown wiki pages."
+    },
+    "concepts": {
+      "heading": "Concepts",
+      "intro": "Core ideas in claude-mnemos.",
+      "projects_title": "Projects",
+      "projects_body": "A project is a named vault — a directory of markdown files. Each project has its own CWD patterns.",
+      "sessions_title": "Sessions",
+      "sessions_body": "A session is one Claude Code conversation. Each session is ingested into the vault as one or more wiki pages.",
+      "pages_title": "Pages",
+      "pages_body": "A wiki page has frontmatter (type, status, flavor, confidence) and a body. Pages link via [[wikilinks]].",
+      "suggestions_title": "Suggestions",
+      "suggestions_body": "The ontology engine proposes merges, renames, and deletions. Approve, reject, or defer them.",
+      "snapshots_title": "Snapshots",
+      "snapshots_body": "Pre-op snapshots are taken before risky operations. Daily snapshots run on schedule. Manual snapshots on demand.",
+      "deadletter_title": "Failed jobs",
+      "deadletter_body": "Jobs that failed after retries land in the dead-letter queue. Retry or dismiss from /dead-letter."
+    },
+    "workflows": {
+      "heading": "Common workflows",
+      "intro": "Typical day-to-day operations.",
+      "ingest_title": "Daily ingest",
+      "ingest_body": "Sessions auto-ingest. Manually ingest from a session detail page if needed.",
+      "snapshot_title": "Snapshot before risky op",
+      "snapshot_body": "Click Create snapshot on the Snapshots page before any vault-wide change.",
+      "restore_title": "Restore from trash",
+      "restore_body": "Open /trash for the project, click Restore. The page returns to its original path."
+    },
+    "troubleshooting": {
+      "heading": "Troubleshooting",
+      "intro": "Common problems and fixes.",
+      "daemon_down_title": "Daemon down",
+      "daemon_down_body": "Run mnemos daemon status. Restart with mnemos daemon start.",
+      "ingest_failing_title": "Ingest failing",
+      "ingest_failing_body": "Check /dead-letter for the job's traceback. Most failures are rate limits or disk full.",
+      "mount_failed_title": "Project mount failed",
+      "mount_failed_body": "Verify the vault path exists and is writable. Check mnemos doctor."
+    },
+    "about": {
+      "heading": "About",
+      "version_label": "Version",
+      "links": "Links",
+      "github": "GitHub",
+      "spec": "Spec",
+      "issues": "Report an issue"
+    }
   }
 }
