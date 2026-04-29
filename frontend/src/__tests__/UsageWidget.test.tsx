@@ -20,7 +20,13 @@ beforeAll(async () => {
   i18n.addResourceBundle(
     "en",
     "translation",
-    { usage: { title: "Usage", no_data: "No data yet" } },
+    {
+      usage: { title: "Usage", no_data: "No data yet" },
+      metrics: {
+        inject_events: "{{count}} inject events",
+        avg_compression: "{{ratio}}× avg compression",
+      },
+    },
     true,
     true,
   );
@@ -92,5 +98,49 @@ describe("UsageWidget", () => {
     await waitFor(() =>
       expect(screen.getByText(/no_data|no data/i)).toBeInTheDocument(),
     );
+  });
+
+  it("renders inject events + compression ratio when present", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: {
+        period: "30d",
+        period_days: 30,
+        sessions_covered: 12,
+        tokens_input: 100,
+        tokens_output: 200,
+        tokens_injected: 50,
+        raw_bytes_total: 1024,
+        tokens_per_byte: 0.293,
+        avg_compression_ratio: 6.3,
+        inject_events_count: 47,
+      },
+    });
+    render(wrap(<UsageWidget />));
+    await waitFor(() =>
+      expect(screen.getByText(/47 inject events/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/6\.3× avg compression/)).toBeInTheDocument();
+  });
+
+  it("renders zero events without ratio text", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: {
+        period: "30d",
+        period_days: 30,
+        sessions_covered: 4,
+        tokens_input: 100,
+        tokens_output: 200,
+        tokens_injected: 50,
+        raw_bytes_total: 1024,
+        tokens_per_byte: 0.293,
+        avg_compression_ratio: null,
+        inject_events_count: 0,
+      },
+    });
+    render(wrap(<UsageWidget />));
+    await waitFor(() =>
+      expect(screen.getByText(/0 inject events/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/avg compression/)).not.toBeInTheDocument();
   });
 });

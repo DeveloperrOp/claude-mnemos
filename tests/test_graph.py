@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_mnemos.core.graph import build_page_graph, pages_within_k_hops
+from claude_mnemos.core.graph import (
+    build_page_graph,
+    build_page_graph_with_pages,
+    pages_within_k_hops,
+)
 
 
 def _write_page(vault: Path, slug: str, body: str = "", related: list[str] | None = None) -> None:
@@ -110,3 +114,31 @@ def test_pages_within_k_hops_min_distance_wins() -> None:
     graph = {"a": {"b", "c"}, "b": {"a", "d"}, "c": {"a", "d"}, "d": {"b", "c"}}
     out = pages_within_k_hops(graph, {"a"}, k=2)
     assert out["d"] == 2
+
+
+def test_build_page_graph_with_pages_returns_pair(tmp_path: Path) -> None:
+    _write_page(tmp_path, "concepts/a", body="See [[concepts/b]]")
+    _write_page(tmp_path, "concepts/b", body="bravo")
+    graph, pages = build_page_graph_with_pages(tmp_path)
+    assert "concepts/b" in graph["concepts/a"]
+    assert "concepts/a" in pages
+    assert "concepts/b" in pages
+    assert pages["concepts/a"].body == "See [[concepts/b]]"
+
+
+def test_build_page_graph_with_pages_skips_invalid(tmp_path: Path) -> None:
+    bad = tmp_path / "wiki" / "broken.md"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_text("not yaml frontmatter\nbody only\n", encoding="utf-8")
+    _write_page(tmp_path, "concepts/a")
+    graph, pages = build_page_graph_with_pages(tmp_path)
+    assert "concepts/a" in pages
+    assert "broken" not in pages
+    assert "broken" not in graph
+
+
+def test_build_page_graph_with_pages_empty_vault(tmp_path: Path) -> None:
+    (tmp_path / "wiki").mkdir()
+    graph, pages = build_page_graph_with_pages(tmp_path)
+    assert graph == {}
+    assert pages == {}

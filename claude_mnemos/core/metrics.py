@@ -29,6 +29,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from claude_mnemos.state.inject_metrics import InjectMetricsLog
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 
@@ -62,6 +63,18 @@ class TimelinePoint(BaseModel):
     sessions: int
     tokens_input: int
     tokens_output: int
+
+
+class CompressionSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    period_days: int
+    events_count: int
+    valid_events_count: int  # events with tokens_actual > 0 — basis for the ratio
+    sessions_covered: int
+    avg_compression_ratio: float | None
+    total_tokens_full: int
+    total_tokens_actual: int
 
 
 def _records_in_window(
@@ -193,3 +206,47 @@ def timeline(
         bucket.tokens_output += rec.output_tokens or 0
 
     return [buckets[d] for d in sorted(buckets)]
+
+
+def compression_summary(
+    vault: Path,
+    *,
+    period_days: int = 30,
+    today: date_class | None = None,
+) -> CompressionSummary:
+    """Aggregate inject-metric events over the last ``period_days`` days.
+
+    ``avg_compression_ratio`` is the mean of ``tokens_full / tokens_actual``
+    over events with ``tokens_actual > 0``. Returns ``None`` when no such
+    events exist (no division by zero).
+
+    Total token counts include all events in the window — even those with
+    ``tokens_actual == 0`` — so the totals match the dashboard's "tokens
+    saved" framing.
+    """
+    today = today or datetime.now(UTC).date()
+    cutoff_dt = datetime.combine(
+        today - timedelta(days=period_days), datetime.min.time(), UTC
+    )
+
+    log = InjectMetricsLog.load(vault)
+    events = [e for e in log.events if e.timestamp >= cutoff_dt]
+
+    valid = [e for e in events if e.tokens_actual > 0]
+    avg = (
+        sum(e.tokens_full / e.tokens_actual for e in valid) / len(valid)
+        if valid
+        else None
+    )
+
+    sessions_covered = len({e.session_id for e in events if e.session_id})
+
+    return CompressionSummary(
+        period_days=period_days,
+        events_count=len(events),
+        valid_events_count=len(valid),
+        sessions_covered=sessions_covered,
+        avg_compression_ratio=avg,
+        total_tokens_full=sum(e.tokens_full for e in events),
+        total_tokens_actual=sum(e.tokens_actual for e in events),
+    )

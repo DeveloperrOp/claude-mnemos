@@ -33,6 +33,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 RECURSION_ENV = "MNEMOS_INJECT_RUNNING"
+# SessionStart payload `source` field — sources we silently skip:
+#   resume:  Claude is restoring an existing session; it already has prior
+#            context (re-injecting would duplicate).
+#   compact: Claude just ran context compaction; injecting would undo what
+#            the user asked for.
+#   edit:    PostToolUse-triggered partial source — not a fresh session, the
+#            model is mid-flight and any inject would land in an unpredictable
+#            position.
 SKIP_SOURCES = frozenset({"resume", "compact", "edit"})
 DEFAULT_MAX_CHARS = 40_000
 
@@ -40,10 +48,12 @@ DEFAULT_MAX_CHARS = 40_000
 def _log(msg: str) -> None:
     """Append a line to ~/.claude-mnemos/inject.log. Never raise."""
     try:
+        from datetime import UTC, datetime
+        ts = datetime.now(UTC).isoformat()
         log_path = Path.home() / ".claude-mnemos" / "inject.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("a", encoding="utf-8") as f:
-            f.write(f"{msg}\n")
+            f.write(f"{ts} {msg}\n")
     except Exception:  # noqa: BLE001
         pass
 
@@ -71,7 +81,9 @@ def main() -> int:
         return 0
 
     try:
-        from claude_mnemos.core.session_start import build_adaptive_context
+        from claude_mnemos.core.session_start import (
+            build_adaptive_context_with_stats,
+        )
         from claude_mnemos.mapping.resolver import (
             ProjectResolver,
             ResolverAmbiguityError,
@@ -94,7 +106,7 @@ def main() -> int:
         return 0
 
     try:
-        context = build_adaptive_context(
+        context, stats = build_adaptive_context_with_stats(
             Path(project.vault_root),
             cwd=cwd,
             max_chars=DEFAULT_MAX_CHARS,
@@ -105,6 +117,30 @@ def main() -> int:
 
     if not context:
         return 0
+
+    # Best-effort metric write — failure does not block the inject.
+    try:
+        from datetime import UTC, datetime
+        from uuid import uuid4
+
+        from claude_mnemos.state.inject_metrics import (
+            InjectMetricEvent,
+            InjectMetricsLog,
+        )
+        event = InjectMetricEvent(
+            id=uuid4().hex,
+            timestamp=datetime.now(UTC),
+            session_id=payload.get("session_id"),
+            operation="session_start",
+            mode=stats.mode,
+            tokens_full=stats.tokens_full,
+            tokens_actual=stats.tokens_actual,
+            candidates_total=stats.candidates_total,
+            candidates_packed=stats.candidates_packed,
+        )
+        InjectMetricsLog.append_to_vault(Path(project.vault_root), event)
+    except Exception as exc:  # noqa: BLE001
+        _log(f"metric write failed: {exc}")
 
     output = {
         "hookSpecificOutput": {

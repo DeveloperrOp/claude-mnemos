@@ -19,14 +19,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_mnemos.core.page_io import PageParseError, read_page
+from claude_mnemos.core.page_io import PageParseError, ParsedPage, read_page, slug_from_page_path
 from claude_mnemos.core.wikilinks import extract_wikilinks
-
-
-def _slug_for(vault: Path, page_path: Path) -> str:
-    """Return the slug for a vault-relative page (path under ``wiki/`` w/o .md)."""
-    rel = page_path.relative_to(vault / "wiki")
-    return str(rel.with_suffix("")).replace("\\", "/")
 
 
 def build_page_graph(vault: Path) -> dict[str, set[str]]:
@@ -45,7 +39,7 @@ def build_page_graph(vault: Path) -> dict[str, set[str]]:
             parsed = read_page(page_path)
         except PageParseError:
             continue
-        slug = _slug_for(vault, page_path)
+        slug = slug_from_page_path(vault, page_path)
         graph.setdefault(slug, set())
 
         # Body wikilinks
@@ -65,6 +59,48 @@ def build_page_graph(vault: Path) -> dict[str, set[str]]:
             graph.setdefault(r, set()).add(slug)
 
     return graph
+
+
+def build_page_graph_with_pages(
+    vault: Path,
+) -> tuple[dict[str, set[str]], dict[str, ParsedPage]]:
+    """Same undirected adjacency as :func:`build_page_graph`, plus a
+    ``slug → ParsedPage`` map for every page that parsed successfully.
+
+    Use this variant when you also need page bodies (e.g. for scoring) —
+    avoids re-reading every file. Pages with malformed frontmatter are
+    skipped from BOTH the graph and the pages map.
+    """
+    graph: dict[str, set[str]] = {}
+    pages: dict[str, ParsedPage] = {}
+    wiki_root = vault / "wiki"
+    if not wiki_root.is_dir():
+        return graph, pages
+
+    for page_path in wiki_root.rglob("*.md"):
+        try:
+            parsed = read_page(page_path)
+        except PageParseError:
+            continue
+        slug = slug_from_page_path(vault, page_path)
+        graph.setdefault(slug, set())
+        pages[slug] = parsed
+
+        for link in extract_wikilinks(parsed.body):
+            target = link.target.strip()
+            if not target:
+                continue
+            graph[slug].add(target)
+            graph.setdefault(target, set()).add(slug)
+
+        for related in parsed.frontmatter.related:
+            r = related.strip()
+            if not r:
+                continue
+            graph[slug].add(r)
+            graph.setdefault(r, set()).add(slug)
+
+    return graph, pages
 
 
 def pages_within_k_hops(

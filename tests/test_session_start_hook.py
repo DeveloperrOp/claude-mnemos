@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from claude_mnemos.core.atomic import atomic_write
+from claude_mnemos.state.inject_metrics import InjectMetricsLog
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 HOOK_PATH = Path(__file__).resolve().parent.parent / "hooks" / "session_start.py"
@@ -139,3 +140,47 @@ def test_hook_silent_skip_on_invalid_stdin(tmp_path: Path) -> None:
     )
     assert proc.returncode == 0
     assert proc.stdout == ""
+
+
+def test_hook_writes_inject_event(tmp_path: Path, register_project) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    cwd = tmp_path / "code" / "alpha"
+    cwd.mkdir(parents=True)
+    register_project("alpha", vault, cwd_patterns=[str(cwd)])
+
+    _write_full_page(vault, "concepts/a", body="alpha context body")
+    _seed_manifest(vault, pages=["wiki/concepts/a.md"])
+
+    payload = {"cwd": str(cwd), "session_id": "test-sess-1", "source": "startup"}
+    rc, stdout, _ = _run_hook(payload)
+    assert rc == 0
+    assert stdout
+
+    log = InjectMetricsLog.load(vault)
+    assert len(log.events) == 1
+    evt = log.events[0]
+    assert evt.session_id == "test-sess-1"
+    assert evt.operation == "session_start"
+    assert evt.mode in ("full", "trimmed")
+    assert evt.tokens_actual > 0
+    assert evt.tokens_full >= evt.tokens_actual
+
+
+def test_hook_does_not_write_event_on_skip(tmp_path: Path, register_project) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    cwd = tmp_path / "code" / "alpha"
+    cwd.mkdir(parents=True)
+    register_project("alpha", vault, cwd_patterns=[str(cwd)])
+
+    _write_full_page(vault, "concepts/a")
+    _seed_manifest(vault, pages=["wiki/concepts/a.md"])
+
+    payload = {"cwd": str(cwd), "source": "resume"}
+    rc, stdout, _ = _run_hook(payload)
+    assert rc == 0
+    assert stdout == ""
+
+    log = InjectMetricsLog.load(vault)
+    assert log.events == []

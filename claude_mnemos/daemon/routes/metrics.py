@@ -54,16 +54,40 @@ async def usage_route(request: Request, period: str = "30d") -> dict[str, Any]:
     total_output = 0
     sessions_covered = 0
     raw_bytes_total = 0
+    compression_per_vault: list[core_metrics.CompressionSummary] = []
     for runtime in all_runtimes(request):
         s = core_metrics.usage_summary(runtime.vault_root, period_days=days)
         total_input += s.tokens_input
         total_output += s.tokens_output
         sessions_covered += s.sessions_covered
         raw_bytes_total += s.raw_bytes_total
+        compression_per_vault.append(
+            core_metrics.compression_summary(runtime.vault_root, period_days=days)
+        )
     tokens_injected = total_input + total_output
     tokens_per_byte: float | None = (
         total_output / raw_bytes_total if raw_bytes_total > 0 else None
     )
+
+    # Weighted average across vaults: weight = valid_events_count (events
+    # with tokens_actual > 0), which is the basis for each vault's local
+    # avg_compression_ratio. Using events_count instead would over-weight
+    # vaults where most events have tokens_actual == 0.
+    weighted_sum = sum(
+        (c.avg_compression_ratio or 0.0) * c.valid_events_count
+        for c in compression_per_vault
+        if c.avg_compression_ratio is not None
+    )
+    valid_events_total = sum(
+        c.valid_events_count
+        for c in compression_per_vault
+        if c.avg_compression_ratio is not None
+    )
+    avg_compression_ratio: float | None = (
+        weighted_sum / valid_events_total if valid_events_total > 0 else None
+    )
+    inject_events_count = sum(c.events_count for c in compression_per_vault)
+
     return {
         "period": period,
         "period_days": days,
@@ -73,6 +97,8 @@ async def usage_route(request: Request, period: str = "30d") -> dict[str, Any]:
         "tokens_injected": tokens_injected,
         "raw_bytes_total": raw_bytes_total,
         "tokens_per_byte": tokens_per_byte,
+        "avg_compression_ratio": avg_compression_ratio,
+        "inject_events_count": inject_events_count,
     }
 
 

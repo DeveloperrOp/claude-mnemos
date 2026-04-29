@@ -22,6 +22,16 @@ from pydantic import ValidationError
 from claude_mnemos.core.models import WikiPageFrontmatter
 
 
+def slug_from_page_path(vault: Path, page_path: Path) -> str:
+    """Slug = relative path under ``vault/wiki/`` without ``.md`` suffix.
+
+    Example: ``vault/wiki/concepts/foo.md`` → ``concepts/foo``.
+    Always uses forward slashes (Windows-safe).
+    """
+    rel = page_path.relative_to(vault / "wiki")
+    return str(rel.with_suffix("")).replace("\\", "/")
+
+
 class PageParseError(ValueError):
     """Raised when a markdown page cannot be parsed (missing or invalid frontmatter)."""
 

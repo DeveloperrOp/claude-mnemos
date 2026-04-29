@@ -13,22 +13,14 @@ Hook entrypoint lives in ``hooks/session_start.py``.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
-from claude_mnemos.core.graph import build_page_graph, pages_within_k_hops
-from claude_mnemos.core.page_io import PageParseError, ParsedPage, read_page
+from claude_mnemos.core.graph import build_page_graph_with_pages, pages_within_k_hops
+from claude_mnemos.core.page_io import ParsedPage
 from claude_mnemos.state.manifest import Manifest
-
-
-def page_slug_from_path(vault: Path, page_path: Path) -> str:
-    """Slug = relative path under ``vault/wiki/`` without ``.md`` suffix.
-
-    Example: ``vault/wiki/concepts/foo.md`` → ``concepts/foo``.
-    Always uses forward slashes (Windows safe).
-    """
-    rel = page_path.relative_to(vault / "wiki")
-    return str(rel.with_suffix("")).replace("\\", "/")
 
 
 def page_summary(parsed: ParsedPage, *, max_chars: int = 200) -> str:
@@ -138,6 +130,34 @@ DEFAULT_GRAPH_HOPS = 2
 SUMMARY_CHARS = 200
 
 
+InjectMode = Literal["empty", "full", "trimmed"]
+
+
+@dataclass(frozen=True)
+class InjectStats:
+    """Counts emitted alongside the inject context for telemetry (§15)."""
+    tokens_full: int       # ceil(chars_full / 4)
+    tokens_actual: int     # ceil(chars_actual / 4)
+    candidates_total: int
+    candidates_packed: int
+    mode: InjectMode
+
+
+_EMPTY_STATS = InjectStats(
+    tokens_full=0,
+    tokens_actual=0,
+    candidates_total=0,
+    candidates_packed=0,
+    mode="empty",
+)
+
+
+def _ceil_div(n: int, divisor: int) -> int:
+    if n <= 0:
+        return 0
+    return (n + divisor - 1) // divisor
+
+
 def _seeds_from_manifest(vault: Path, *, recent: int) -> set[str]:
     """Collect slugs from the last ``recent`` ingest records' ``created_pages``.
 
@@ -168,51 +188,40 @@ def _cwd_segment(cwd: Path) -> str:
     return name.lower().strip()
 
 
-def build_adaptive_context(
+def build_adaptive_context_with_stats(
     vault: Path,
     *,
     cwd: Path,
     max_chars: int = 40_000,
     recent_sessions: int = DEFAULT_RECENT_SESSIONS,
     graph_hops: int = DEFAULT_GRAPH_HOPS,
-) -> str:
-    """Build the additionalContext markdown block to inject at SessionStart.
-
-    Returns an empty string if vault has no manifest or yields no candidates —
-    callers (i.e. the hook) emit nothing in that case.
-
-    Algorithm:
-    1. Read last N sessions' created_pages → seed slugs.
-    2. Build vault-wide page graph; BFS K hops from seeds → candidate set.
-    3. Score each candidate (confidence + flavor + recency + proximity + cwd match - stale).
-    4. Greedy pack top-K under ``max_chars`` budget. Top 3 get full body if room;
-       others get title + 200-char summary.
-    5. Format as a markdown block.
+) -> tuple[str, InjectStats]:
+    """Same as :func:`build_adaptive_context` but also returns
+    :class:`InjectStats` for telemetry. Uses the parsed-pages map from
+    :func:`build_page_graph_with_pages` to avoid double-reading files.
     """
     wiki_root = vault / "wiki"
     if not wiki_root.is_dir():
-        return ""
+        return "", _EMPTY_STATS
 
     seeds = _seeds_from_manifest(vault, recent=recent_sessions)
     if not seeds:
-        return ""
+        return "", _EMPTY_STATS
 
-    graph = build_page_graph(vault)
+    graph, pages = build_page_graph_with_pages(vault)
     candidates = pages_within_k_hops(graph, seeds, k=graph_hops)
     if not candidates:
-        return ""
+        return "", _EMPTY_STATS
 
     cwd_seg = _cwd_segment(cwd)
     now = datetime.now(UTC)
 
     scored: list[tuple[float, str, ParsedPage]] = []
     for slug, hop in candidates.items():
-        page_path = wiki_root / f"{slug}.md"
-        if not page_path.is_file():
-            continue
-        try:
-            parsed = read_page(page_path)
-        except PageParseError:
+        parsed = pages.get(slug)
+        if parsed is None:
+            # graph contains slugs without their own files (wikilink targets);
+            # only score actual pages we have parsed.
             continue
         score = score_page(
             parsed,
@@ -223,26 +232,70 @@ def build_adaptive_context(
         scored.append((score, slug, parsed))
 
     if not scored:
-        return ""
+        return "", _EMPTY_STATS
 
     scored.sort(key=lambda t: t[0], reverse=True)
 
-    # Greedy pack under char budget.
     header = "# Project context (mnemos)\n\nRecent sessions touched these pages:\n"
     if len(header) >= max_chars:
-        return ""
-    parts: list[str] = [header]
-    used = len(header)
+        return "", _EMPTY_STATS
+
     full_body_quota = 3
+    blocks: list[tuple[str, str]] = []  # (slug, block)
     for i, (_score, slug, parsed) in enumerate(scored):
         if i < full_body_quota:
             block = f"\n## [[{slug}]]\n\n{parsed.body}\n"
         else:
             summary = page_summary(parsed, max_chars=SUMMARY_CHARS)
             block = f"\n- [[{slug}]] — {summary}\n"
+        blocks.append((slug, block))
+
+    chars_full = len(header) + sum(len(b) for _, b in blocks)
+
+    parts: list[str] = [header]
+    used = len(header)
+    packed = 0
+    for _slug, block in blocks:
         if used + len(block) > max_chars:
             break
         parts.append(block)
         used += len(block)
+        packed += 1
 
-    return "".join(parts).strip() + "\n"
+    context = "".join(parts).strip() + "\n"
+    chars_actual = len(context)
+
+    if packed == len(blocks):
+        mode: InjectMode = "full"
+    else:
+        mode = "trimmed"
+
+    stats = InjectStats(
+        tokens_full=_ceil_div(chars_full, 4),
+        tokens_actual=_ceil_div(chars_actual, 4),
+        candidates_total=len(scored),
+        candidates_packed=packed,
+        mode=mode,
+    )
+    return context, stats
+
+
+def build_adaptive_context(
+    vault: Path,
+    *,
+    cwd: Path,
+    max_chars: int = 40_000,
+    recent_sessions: int = DEFAULT_RECENT_SESSIONS,
+    graph_hops: int = DEFAULT_GRAPH_HOPS,
+) -> str:
+    """Backward-compatible wrapper — drops the stats. New code should call
+    :func:`build_adaptive_context_with_stats` directly.
+    """
+    context, _ = build_adaptive_context_with_stats(
+        vault,
+        cwd=cwd,
+        max_chars=max_chars,
+        recent_sessions=recent_sessions,
+        graph_hops=graph_hops,
+    )
+    return context
