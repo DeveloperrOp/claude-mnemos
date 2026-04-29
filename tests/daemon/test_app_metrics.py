@@ -253,3 +253,57 @@ def test_usage_compression_null_when_no_events(
     data = r.json()
     assert data["avg_compression_ratio"] is None
     assert data["inject_events_count"] == 0
+
+
+def test_inject_timeline_returns_daily_points(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    """/metrics/inject/timeline returns per-day events_count + ratio."""
+    from datetime import timedelta
+
+    from claude_mnemos.state.inject_metrics import (
+        InjectMetricEvent,
+        InjectMetricsLog,
+    )
+
+    _daemon, client, vault = daemon_with_one_vault
+
+    today = datetime.now(UTC)
+    yesterday = today - timedelta(days=1)
+    log = InjectMetricsLog()
+    log.events.append(
+        InjectMetricEvent(
+            id="e1",
+            timestamp=yesterday,
+            session_id="s1",
+            operation="session_start",
+            mode="full",
+            tokens_full=1000,
+            tokens_actual=200,
+            candidates_total=5,
+            candidates_packed=5,
+        )
+    )
+    log.save(vault)
+
+    r = client.get("/metrics/inject/timeline", params={"period": "7d"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "points" in data
+    assert len(data["points"]) == 7
+    by_date = {p["date"]: p for p in data["points"]}
+    yesterday_iso = yesterday.date().isoformat()
+    assert by_date[yesterday_iso]["events_count"] == 1
+    assert by_date[yesterday_iso]["avg_compression_ratio"] == 5.0
+
+
+def test_inject_timeline_empty_returns_zero_filled(
+    daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
+) -> None:
+    _daemon, client, _vault = daemon_with_one_vault
+    r = client.get("/metrics/inject/timeline", params={"period": "7d"})
+    assert r.status_code == 200
+    points = r.json()["points"]
+    assert len(points) == 7
+    assert all(p["events_count"] == 0 for p in points)
+    assert all(p["avg_compression_ratio"] is None for p in points)

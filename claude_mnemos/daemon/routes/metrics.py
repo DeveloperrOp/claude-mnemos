@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from datetime import date as date_class
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -163,4 +166,66 @@ async def timeline_route(request: Request, period: str = "30d") -> dict[str, Any
                 "tokens_output": 0,
             }
     points = sorted(by_date.values(), key=lambda p: p["date"])
+    return {"points": points}
+
+
+@router.get("/metrics/inject/timeline")
+async def inject_timeline_route(
+    request: Request,
+    period: str = "30d",
+) -> dict[str, Any]:
+    """Per-day inject event buckets aggregated across all mounted vaults.
+
+    Each bucket carries ``events_count`` (all events that day),
+    ``valid_events_count`` (events with ``tokens_actual > 0``), and
+    ``avg_compression_ratio`` weighted by ``valid_events_count`` across
+    vaults. Days with no valid events return ``avg_compression_ratio = None``.
+    Output is zero-filled for the full window so chart axes line up.
+    """
+    days = _parse_period(period)
+    today = datetime.now(UTC).date()
+
+    aggregated: dict[date_class, dict[str, Any]] = {}
+    for runtime in all_runtimes(request):
+        vault_points = core_metrics.compression_timeline(
+            runtime.vault_root, period_days=days, today=today,
+        )
+        for p in vault_points:
+            agg = aggregated.setdefault(
+                p.date,
+                {"events": 0, "valid": 0, "ratio_weighted_sum": 0.0},
+            )
+            agg["events"] += p.events_count
+            agg["valid"] += p.valid_events_count
+            if p.avg_compression_ratio is not None:
+                agg["ratio_weighted_sum"] += (
+                    p.avg_compression_ratio * p.valid_events_count
+                )
+
+    # When no vaults are mounted, zero-fill the window so callers always
+    # get a usable structure (mirrors /metrics/usage/timeline).
+    if not aggregated:
+        start = today - timedelta(days=days)
+        for i in range(days):
+            aggregated[start + timedelta(days=i)] = {
+                "events": 0,
+                "valid": 0,
+                "ratio_weighted_sum": 0.0,
+            }
+
+    points = []
+    for d in sorted(aggregated):
+        a = aggregated[d]
+        avg = (
+            a["ratio_weighted_sum"] / a["valid"]
+            if a["valid"] > 0
+            else None
+        )
+        points.append({
+            "date": d.isoformat(),
+            "events_count": a["events"],
+            "valid_events_count": a["valid"],
+            "avg_compression_ratio": avg,
+        })
+
     return {"points": points}
