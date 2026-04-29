@@ -362,5 +362,22 @@
     "view_details": "Detail",
     "not_found_title": "Job not found",
     "not_found_hint": "This job ID is unknown or already cleared."
+  },
+  "onboarding": {
+    "title": "Create new project",
+    "subtitle": "Mount a vault directory and start ingesting Claude Code sessions.",
+    "name_label": "Project name",
+    "name_hint": "Lowercase letters, digits, underscores, hyphens. Max 64 chars.",
+    "name_invalid": "Invalid name. Use lowercase a-z, 0-9, underscore, hyphen. Must start with letter or digit.",
+    "name_taken": "A project with this name already exists.",
+    "vault_label": "Vault path",
+    "vault_hint": "Absolute path. The directory will be created if it does not exist.",
+    "advanced_toggle": "Advanced — CWD patterns",
+    "cwd_label": "CWD patterns (one per line)",
+    "cwd_hint": "Glob patterns matching working directories where this project is active.",
+    "submit": "Create project",
+    "cancel": "Cancel",
+    "mount_failed_title": "Mount failed",
+    "success_toast": "Project created"
   }
 }
