@@ -288,3 +288,19 @@ def test_all_new_op_types_accepted():
         log = ActivityLog()
         log.append(e)
         assert log.entries[0].operation_type == op
+
+
+def test_session_start_inject_accepted_as_op_type():
+    from datetime import UTC, datetime
+
+    from claude_mnemos.state.activity import ActivityEntry
+
+    entry = ActivityEntry(
+        id="op-test-1",
+        timestamp=datetime.now(UTC),
+        operation_type="session_start_inject",
+        status="success",
+        snapshot_path=None,
+        can_undo=False,
+    )
+    assert entry.operation_type == "session_start_inject"

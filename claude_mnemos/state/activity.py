@@ -24,6 +24,7 @@ ActivityOperationType = Literal[
     "manual_restore_trash",
     "trash_dismissed",
     "trash_emptied",
+    "session_start_inject",
 ]
 
 

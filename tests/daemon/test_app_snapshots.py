@@ -149,8 +149,9 @@ def test_delete_snapshot_traversal_rejected():
     before the ASGI app sees it, which makes the routing path the actual
     test variable instead of the validator behaviour we care about.
     """
-    from fastapi import HTTPException
     import pytest as pt
+    from fastapi import HTTPException
+
     from claude_mnemos.daemon.routes.snapshots import _validate_snapshot_name
 
     bad_names = ["../etc-passwd", "../../foo", "foo/../bar", "/abs/path"]
