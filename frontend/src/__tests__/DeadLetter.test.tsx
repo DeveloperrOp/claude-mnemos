@@ -15,6 +15,12 @@ beforeAll(() => {
       retry_disabled: "Retry (#14c)", dismiss_disabled: "Dismiss (#14c)",
       view_details: "Detail",
     },
+    overview: {
+      daemon_down_title: "Daemon unavailable",
+      daemon_down_hint_cmd: "Start the daemon:",
+      daemon_down_hint_command: "mnemos daemon start",
+      daemon_down_reconnect: "Dashboard will reconnect automatically.",
+    },
   }, true, true);
   void i18n.changeLanguage("en");
 });
@@ -57,5 +63,13 @@ describe("DeadLetter", () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { jobs: [] } });
     render(wrap(<DeadLetter />));
     await waitFor(() => expect(screen.getByText(/no failed jobs/i)).toBeInTheDocument());
+  });
+
+  it("renders DaemonDownAlert on /jobs failure", async () => {
+    vi.spyOn(apiClient, "get").mockRejectedValue(new Error("ECONNREFUSED"));
+    render(wrap(<DeadLetter />));
+    await waitFor(() =>
+      expect(screen.getByText(/daemon unavailable/i)).toBeInTheDocument(),
+    );
   });
 });

@@ -4,18 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealth } from "@/hooks/useHealth";
 
-type SchedulerJob = {
-  id: string;
-  next_run_time: string | null;
-  trigger: string;
-};
-
-function isSchedulerJob(j: unknown): j is SchedulerJob {
-  if (typeof j !== "object" || j === null) return false;
-  const o = j as Record<string, unknown>;
-  return typeof o.id === "string";
-}
-
 export function Health() {
   const { name: project } = useParams<{ name: string }>();
   const { t } = useTranslation();
@@ -39,9 +27,7 @@ export function Health() {
   }
 
   const projectSchedulerJobs =
-    health?.scheduler_jobs?.filter(isSchedulerJob).filter((j) =>
-      j.id.endsWith(`:${project}`),
-    ) ?? [];
+    health?.scheduler_jobs?.filter((j) => j.id.endsWith(`:${project}`)) ?? [];
 
   return (
     <div className="space-y-6">

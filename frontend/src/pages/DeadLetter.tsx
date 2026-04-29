@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useDeadLetter } from "@/hooks/useDeadLetter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeadLetterRow } from "@/components/widgets/DeadLetterRow";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 
 export function DeadLetter() {
   const { t } = useTranslation();
@@ -13,6 +14,9 @@ export function DeadLetter() {
         {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12" />)}
       </div>
     );
+  }
+  if (dlQuery.isError) {
+    return <DaemonDownAlert error={dlQuery.error} />;
   }
 
   const jobs = dlQuery.data ?? [];
