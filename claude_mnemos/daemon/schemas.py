@@ -46,6 +46,7 @@ class HealthResponse(BaseModel):
     alerts_count: int = Field(default=0, ge=0)
     vaults: dict[str, VaultHealth] = Field(default_factory=dict)
     jobs_alert: bool = False
+    queue_paused_until: datetime | None = None
 
 
 class WatchdogAlertResponse(BaseModel):
