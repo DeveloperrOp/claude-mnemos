@@ -36,3 +36,53 @@ export async function getPageBacklinks(
   );
   return PageBacklinksResponseSchema.parse(r.data).backlinks;
 }
+
+export interface PatchResult {
+  success: boolean;
+  snapshot_path: string | null;
+  activity_id: string;
+}
+
+export interface DeleteResult {
+  success: boolean;
+  snapshot_path: string | null;
+  activity_id: string;
+  trash_id: string;
+}
+
+export interface PagePatchBody {
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+}
+
+export async function verifyPage(
+  project: string,
+  pageRef: string,
+): Promise<PatchResult> {
+  const r = await apiClient.post(
+    `/pages/${encodeURIComponent(project)}/${encodePath(pageRef)}/verify`,
+  );
+  return r.data as PatchResult;
+}
+
+export async function deletePage(
+  project: string,
+  pageRef: string,
+): Promise<DeleteResult> {
+  const r = await apiClient.delete(
+    `/pages/${encodeURIComponent(project)}/${encodePath(pageRef)}`,
+  );
+  return r.data as DeleteResult;
+}
+
+export async function patchPage(
+  project: string,
+  pageRef: string,
+  body: PagePatchBody,
+): Promise<PatchResult> {
+  const r = await apiClient.patch(
+    `/pages/${encodeURIComponent(project)}/${encodePath(pageRef)}`,
+    body,
+  );
+  return r.data as PatchResult;
+}
