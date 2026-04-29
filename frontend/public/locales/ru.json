@@ -209,5 +209,19 @@
     "showing_n": "{{count}} снимков",
     "restore_disabled": "Восстановить (#14c)",
     "delete_disabled": "Удалить (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Потерянные сессии",
+    "scan": "Сканировать",
+    "scanning": "Сканирование...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "размер",
+    "mtime": "изменено",
+    "transcript": "транскрипт",
+    "no_lost": "Все сессии учтены",
+    "showing_n": "{{count}} сессий",
+    "import_disabled": "Импортировать (#14c)",
+    "ignore_disabled": "Игнорировать (#14c)"
   }
 }

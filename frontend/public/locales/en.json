@@ -209,5 +209,19 @@
     "showing_n": "{{count}} snapshots",
     "restore_disabled": "Restore (#14c)",
     "delete_disabled": "Delete (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Lost sessions",
+    "scan": "Scan",
+    "scanning": "Scanning...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "size",
+    "mtime": "mtime",
+    "transcript": "transcript",
+    "no_lost": "All accounted for",
+    "showing_n": "{{count}} sessions",
+    "import_disabled": "Import (#14c)",
+    "ignore_disabled": "Ignore (#14c)"
   }
 }

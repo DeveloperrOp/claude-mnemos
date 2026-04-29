@@ -209,5 +209,19 @@
     "showing_n": "{{count}} знімків",
     "restore_disabled": "Відновити (#14c)",
     "delete_disabled": "Видалити (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Загублені сесії",
+    "scan": "Сканувати",
+    "scanning": "Сканування...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "розмір",
+    "mtime": "змінено",
+    "transcript": "транскрипт",
+    "no_lost": "Усі сесії обліковані",
+    "showing_n": "{{count}} сесій",
+    "import_disabled": "Імпортувати (#14c)",
+    "ignore_disabled": "Ігнорувати (#14c)"
   }
 }
