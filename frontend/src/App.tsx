@@ -24,6 +24,7 @@ const router = createBrowserRouter([
           { path: "trash", element: <Placeholder section="Trash" plan="#14b" /> },
           { path: "snapshots", element: <Placeholder section="Snapshots" plan="#14b" /> },
           { path: "health", element: <Placeholder section="Health" plan="#14b" /> },
+          { path: "queue", element: <Placeholder section="Queue" plan="#14b" /> },
           { path: "settings", element: <Placeholder section="Settings" plan="#14c" /> },
         ],
       },

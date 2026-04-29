@@ -12,7 +12,7 @@ interface NavItem {
 const PROJECT_ITEMS: NavItem[] = [
   { to: (p) => `/project/${p}/pages`, label: "navigation.pages", icon: "📚", requiresProject: true },
   { to: (p) => `/project/${p}/sessions`, label: "navigation.sessions", icon: "💬", requiresProject: true },
-  { to: (p) => `/project/${p}`, label: "navigation.queue", icon: "🌊", requiresProject: true },
+  { to: (p) => `/project/${p}/queue`, label: "navigation.queue", icon: "🌊", requiresProject: true },
   { to: (p) => `/project/${p}/activity`, label: "navigation.activity", icon: "📜", requiresProject: true },
   { to: (p) => `/project/${p}/suggestions`, label: "navigation.suggestions", icon: "💡", requiresProject: true },
   { to: () => "/lost-sessions", label: "navigation.lost_sessions", icon: "🔍", requiresProject: false },
