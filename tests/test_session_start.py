@@ -139,3 +139,98 @@ def test_score_page_recency_decay() -> None:
 def test_flavor_weights_decision_max() -> None:
     assert FLAVOR_WEIGHTS["decision"] >= FLAVOR_WEIGHTS["reference"]
     assert FLAVOR_WEIGHTS["lesson"] >= FLAVOR_WEIGHTS["reference"]
+
+
+from claude_mnemos.core.session_start import build_adaptive_context
+from claude_mnemos.state.manifest import IngestRecord, Manifest
+from claude_mnemos.core.atomic import atomic_write
+
+
+def _seed_manifest(vault: Path, *, sessions: list[tuple[str, list[str]]]) -> None:
+    """Seed vault/.manifest.json with ingest records.
+
+    Each tuple is ``(session_id, created_pages)``.
+    """
+    records: dict[str, IngestRecord] = {}
+    for sid, pages in sessions:
+        records[sid] = IngestRecord(
+            session_id=sid,
+            ingested_at=datetime.now(UTC),
+            raw_path=f"raw/{sid}.md",
+            source_path=None,
+            created_pages=pages,
+            skipped_collisions=[],
+            model=None,
+            input_tokens=None,
+            output_tokens=None,
+        )
+    manifest = Manifest(ingested=records)
+    atomic_write(vault / ".manifest.json", manifest.serialize_to_string())
+
+
+def _write_full_page(
+    vault: Path,
+    slug: str,
+    body: str = "",
+    *,
+    confidence: float = 0.7,
+    flavor: list[str] | None = None,
+    related: list[str] | None = None,
+    status: str = "draft",
+) -> None:
+    page_path = vault / "wiki" / f"{slug}.md"
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    flavor_str = "[]" if not flavor else "[" + ", ".join(flavor) + "]"
+    related_str = "[]" if not related else "[" + ", ".join(related) + "]"
+    fm = (
+        "---\n"
+        f"title: {slug}\n"
+        "type: concept\n"
+        f"status: {status}\n"
+        f"confidence: {confidence}\n"
+        f"flavor: {flavor_str}\n"
+        "sources: []\n"
+        f"related: {related_str}\n"
+        "created: 2026-04-29\n"
+        "updated: 2026-04-29\n"
+        "agent_written: true\n"
+        "---\n"
+    )
+    page_path.write_text(fm + body, encoding="utf-8")
+
+
+def test_build_adaptive_context_empty_vault_returns_empty(tmp_path: Path) -> None:
+    (tmp_path / "wiki").mkdir()
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=1000)
+    assert out == ""
+
+
+def test_build_adaptive_context_no_manifest_returns_empty(tmp_path: Path) -> None:
+    _write_full_page(tmp_path, "concepts/a", body="hello")
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=1000)
+    assert out == ""
+
+
+def test_build_adaptive_context_includes_seeded_pages(tmp_path: Path) -> None:
+    _write_full_page(tmp_path, "concepts/a", body="alpha body")
+    _seed_manifest(tmp_path, sessions=[("s1", ["wiki/concepts/a.md"])])
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=2000)
+    assert "concepts/a" in out
+
+
+def test_build_adaptive_context_respects_char_budget(tmp_path: Path) -> None:
+    for i in range(20):
+        _write_full_page(tmp_path, f"concepts/p{i}", body="x" * 5000)
+    pages_seeded = [f"wiki/concepts/p{i}.md" for i in range(20)]
+    _seed_manifest(tmp_path, sessions=[("s1", pages_seeded)])
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=3000)
+    assert len(out) <= 3500
+
+
+def test_build_adaptive_context_graph_expansion(tmp_path: Path) -> None:
+    _write_full_page(tmp_path, "concepts/a", body="See [[concepts/b]]")
+    _write_full_page(tmp_path, "concepts/b", body="bravo body")
+    _seed_manifest(tmp_path, sessions=[("s1", ["wiki/concepts/a.md"])])
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=3000)
+    assert "concepts/a" in out
+    assert "concepts/b" in out
