@@ -40,7 +40,7 @@ from claude_mnemos.state.projects import ProjectMapCorruptError, ProjectMapError
 from claude_mnemos.state.settings import SettingsCorruptError
 
 
-def create_app(daemon: Any | None = None) -> FastAPI:
+def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> FastAPI:
     app = FastAPI(title="claude-mnemos daemon", version=__version__)
     app.state.daemon = daemon
 
@@ -184,7 +184,8 @@ def create_app(daemon: Any | None = None) -> FastAPI:
     # Mount frontend static files (built by `frontend/`).
     # html=True provides SPA fallback: any path not matching a file → index.html.
     # Mounted last so REST routers take precedence on overlapping paths.
-    static_dir = Path(__file__).parent / "static"
+    if static_dir is None:
+        static_dir = Path(__file__).parent / "static"
     if (static_dir / "index.html").is_file():
         app.mount(
             "/",
