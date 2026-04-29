@@ -43,7 +43,7 @@ export function UsageByProjectTable({ rows }: Props) {
                   </td>
                   <td className="py-1.5 text-right font-mono text-xs">
                     {r.avg_compression_ratio !== null
-                      ? `${r.avg_compression_ratio.toFixed(1)}× (${r.inject_events_count})`
+                      ? `${r.avg_compression_ratio.toFixed(1)}× (${r.valid_events_count})`
                       : "—"}
                   </td>
                 </tr>

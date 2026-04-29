@@ -92,5 +92,5 @@ def test_compression_timeline_sorted_ascending(tmp_path: Path) -> None:
     out = compression_timeline(tmp_path, period_days=5, today=today)
     dates = [p.date for p in out]
     assert dates == sorted(dates)
-    assert dates[0] == date(2026, 4, 24)
-    assert dates[-1] == date(2026, 4, 28)
+    assert dates[0] == date(2026, 4, 25)
+    assert dates[-1] == date(2026, 4, 29)

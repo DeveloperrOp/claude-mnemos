@@ -281,11 +281,10 @@ def compression_timeline(
     Days with no events appear with zero counts and ``avg_compression_ratio
     == None`` so chart axes line up cleanly. Output sorted ascending by
     date. Window matches :func:`timeline` — ``period_days`` days ending at
-    ``today - 1`` (inclusive of ``today - period_days``, exclusive of
-    ``today``).
+    ``today`` (inclusive on both ends).
     """
     today = today or datetime.now(UTC).date()
-    start = today - timedelta(days=period_days)
+    start = today - timedelta(days=period_days - 1)
 
     # Pre-seed every day with empty event-list so missing days are explicit.
     buckets: dict[date_class, list[InjectMetricEvent]] = {
