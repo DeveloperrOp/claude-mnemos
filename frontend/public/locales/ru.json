@@ -249,5 +249,22 @@
     "approve_disabled": "Одобрить (#14c)",
     "reject_disabled": "Отклонить (#14c)",
     "defer_disabled": "Отложить (#14c)"
+  },
+  "dead_letter": {
+    "title": "Сбойные задачи",
+    "no_failed": "Нет сбоев",
+    "showing_n": "{{count}} задач",
+    "kind": "тип",
+    "attempt": "попытка",
+    "attempt_n_of_m": "Попытка {{n}}/{{max}}",
+    "finished_at": "завершено",
+    "error": "ошибка",
+    "traceback": "трассировка",
+    "payload": "payload",
+    "retry_disabled": "Повторить (#14c)",
+    "dismiss_disabled": "Отменить (#14c)",
+    "view_details": "Детально",
+    "not_found_title": "Задача не найдена",
+    "not_found_hint": "Этот ID неизвестен или уже очищен."
   }
 }

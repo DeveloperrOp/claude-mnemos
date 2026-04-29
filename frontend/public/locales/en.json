@@ -249,5 +249,22 @@
     "approve_disabled": "Approve (#14c)",
     "reject_disabled": "Reject (#14c)",
     "defer_disabled": "Defer (#14c)"
+  },
+  "dead_letter": {
+    "title": "Failed jobs",
+    "no_failed": "No failed jobs",
+    "showing_n": "{{count}} jobs",
+    "kind": "kind",
+    "attempt": "attempt",
+    "attempt_n_of_m": "Attempt {{n}}/{{max}}",
+    "finished_at": "finished",
+    "error": "error",
+    "traceback": "traceback",
+    "payload": "payload",
+    "retry_disabled": "Retry (#14c)",
+    "dismiss_disabled": "Dismiss (#14c)",
+    "view_details": "Detail",
+    "not_found_title": "Job not found",
+    "not_found_hint": "This job ID is unknown or already cleared."
   }
 }

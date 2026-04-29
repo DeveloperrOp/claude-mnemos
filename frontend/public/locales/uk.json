@@ -249,5 +249,22 @@
     "approve_disabled": "Затвердити (#14c)",
     "reject_disabled": "Відхилити (#14c)",
     "defer_disabled": "Відкласти (#14c)"
+  },
+  "dead_letter": {
+    "title": "Збійні задачі",
+    "no_failed": "Немає збоїв",
+    "showing_n": "{{count}} задач",
+    "kind": "тип",
+    "attempt": "спроба",
+    "attempt_n_of_m": "Спроба {{n}}/{{max}}",
+    "finished_at": "завершено",
+    "error": "помилка",
+    "traceback": "трасування",
+    "payload": "payload",
+    "retry_disabled": "Повторити (#14c)",
+    "dismiss_disabled": "Відхилити (#14c)",
+    "view_details": "Детально",
+    "not_found_title": "Задачу не знайдено",
+    "not_found_hint": "Цей ID невідомий або вже очищений."
   }
 }
