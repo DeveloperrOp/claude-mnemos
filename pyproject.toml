@@ -59,6 +59,7 @@ addopts = "-ra -q --strict-markers"
 asyncio_mode = "auto"
 markers = [
     "slow: tests that hit external services or take >1s",
+    "manual: tests requiring display/network/external setup; skipped in CI",
 ]
 
 [tool.ruff]
