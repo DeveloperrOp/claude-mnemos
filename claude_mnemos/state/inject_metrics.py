@@ -114,7 +114,8 @@ class InjectMetricsLog(BaseModel):
 
     def _apply_cap(self) -> None:
         if len(self.events) > MAX_EVENTS:
-            # Keep the most-recent MAX_EVENTS by drop-from-head (events list
-            # is ingest-order, not necessarily timestamp-sorted, but for our
-            # use case the difference is negligible).
+            # Sort by timestamp ascending and keep the most-recent MAX_EVENTS.
+            # Defensive: hooks normally append in chronological order, but a
+            # backfill / manual edit / future feature could violate that.
+            self.events.sort(key=lambda e: e.timestamp)
             self.events = self.events[-MAX_EVENTS:]

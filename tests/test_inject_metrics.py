@@ -94,3 +94,23 @@ def test_load_invalid_schema_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(InjectMetricsCorruptError):
         InjectMetricsLog.load(tmp_path)
+
+
+def test_apply_cap_drops_oldest_by_timestamp_not_insertion_order(tmp_path: Path) -> None:
+    """Defensive: even if events are appended out of order, cap drops by timestamp."""
+    log = InjectMetricsLog()
+    base = datetime.now(UTC)
+    # Insert in reverse-chronological order
+    for i in range(MAX_EVENTS + 5):
+        ts = base - timedelta(seconds=i)  # newer-to-older
+        log.events.append(_make_event(idx=i, ts=ts))
+    log.save(tmp_path)
+
+    fresh = InjectMetricsLog.load(tmp_path)
+    assert len(fresh.events) == MAX_EVENTS
+    kept_indices = sorted(int(e.id.split("-")[1]) for e in fresh.events)
+    # The newest events have the lowest indices (because reverse insert).
+    # The 5 oldest by timestamp (highest indices) must be dropped.
+    assert kept_indices[0] == 0  # newest is kept
+    assert kept_indices[-1] == MAX_EVENTS - 1  # oldest kept is index MAX-1
+    assert all(i < MAX_EVENTS for i in kept_indices)
