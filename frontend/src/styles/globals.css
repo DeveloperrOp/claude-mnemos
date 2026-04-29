@@ -34,4 +34,19 @@
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
+
+  .prose h1 { @apply mt-6 mb-3 text-2xl font-bold; }
+  .prose h2 { @apply mt-5 mb-2 text-xl font-semibold; }
+  .prose h3 { @apply mt-4 mb-2 text-lg font-semibold; }
+  .prose p { @apply my-2 leading-relaxed; }
+  .prose code { @apply rounded bg-[hsl(var(--muted))] px-1 py-0.5 text-sm; }
+  .prose pre { @apply my-3 overflow-x-auto rounded-md bg-[hsl(var(--muted))] p-3 text-sm; }
+  .prose pre code { @apply bg-transparent p-0; }
+  .prose ul { @apply my-2 ml-5 list-disc space-y-1; }
+  .prose ol { @apply my-2 ml-5 list-decimal space-y-1; }
+  .prose blockquote { @apply my-3 border-l-4 border-[hsl(var(--border))] pl-3 italic; }
+  .prose a { @apply text-[hsl(var(--primary))] underline; }
+  .prose table { @apply my-3 w-full border-collapse text-sm; }
+  .prose th, .prose td { @apply border border-[hsl(var(--border))] px-2 py-1; }
+  .prose th { @apply bg-[hsl(var(--muted))] font-semibold; }
 }
