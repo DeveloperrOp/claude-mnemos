@@ -337,6 +337,8 @@
     "kind": "kind",
     "attempt": "attempt",
     "attempt_n_of_m": "Attempt {{n}}/{{max}}",
+    "created_at": "Created at",
+    "started_at": "Started at",
     "finished_at": "finished",
     "error": "error",
     "traceback": "traceback",

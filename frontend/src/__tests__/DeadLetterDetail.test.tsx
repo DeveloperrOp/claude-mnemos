@@ -14,6 +14,7 @@ beforeAll(() => {
       dismiss_modal_title: "Dismiss failed job?",
       dismiss_modal_desc: "This permanently removes the job from the dead-letter queue.",
       kind: "kind", attempt_n_of_m: "Attempt {{n}}/{{max}}",
+      created_at: "Created at", started_at: "Started at",
       finished_at: "finished", error: "error", traceback: "Traceback",
       payload: "Payload",
       not_found_title: "Job not found", not_found_hint: "Back",

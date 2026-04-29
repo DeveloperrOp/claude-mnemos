@@ -80,17 +80,17 @@ export function DeadLetterDetail() {
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.kind")}</dt>
         <dd><code>{j.kind}</code></dd>
-        <dt className="text-[hsl(var(--muted-foreground))]">created_at</dt>
+        <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.created_at")}</dt>
         <dd>{formatDateTime(j.created_at, i18n.language)}</dd>
         {j.started_at && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">started_at</dt>
+            <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.started_at")}</dt>
             <dd>{formatDateTime(j.started_at, i18n.language)}</dd>
           </>
         )}
         {j.finished_at && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">finished_at</dt>
+            <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.finished_at")}</dt>
             <dd>{formatDateTime(j.finished_at, i18n.language)}</dd>
           </>
         )}

@@ -337,6 +337,8 @@
     "kind": "тип",
     "attempt": "спроба",
     "attempt_n_of_m": "Спроба {{n}}/{{max}}",
+    "created_at": "Створено",
+    "started_at": "Розпочато",
     "finished_at": "завершено",
     "error": "помилка",
     "traceback": "трасування",
