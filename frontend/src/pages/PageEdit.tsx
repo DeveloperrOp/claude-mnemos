@@ -13,6 +13,16 @@ const PAGE_TYPES = ["entity", "concept", "source"] as const;
 const PAGE_STATUSES = ["draft", "reviewed", "verified", "stale", "archived"] as const;
 const PAGE_FLAVORS = ["pattern", "mistake", "decision", "lesson", "reference"] as const;
 
+interface FormState {
+  title: string;
+  type: string;
+  status: string;
+  flavor: string[];
+  confidence: number;
+  aliases: string;
+  body: string;
+}
+
 export function PageEdit() {
   const { name: project, "*": pagePath } = useParams<{ name: string; "*": string }>();
   const cleanPath = (pagePath ?? "").replace(/\/edit$/, "");
@@ -22,32 +32,36 @@ export function PageEdit() {
   const pageQuery = usePage(project, cleanPath);
   const patchMut = usePagePatch();
 
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<string>("concept");
-  const [status, setStatus] = useState<string>("draft");
-  const [flavor, setFlavor] = useState<string[]>([]);
-  const [confidence, setConfidence] = useState<number>(0);
-  const [aliases, setAliases] = useState<string>("");
-  const [body, setBody] = useState<string>("");
+  const [form, setForm] = useState<FormState | null>(null);
   const [dirty, setDirty] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
 
   useEffect(() => {
     if (pageQuery.data) {
       const fm = pageQuery.data.frontmatter;
-      setTitle(fm.title ?? "");
-      setType(fm.type);
-      setStatus(fm.status);
-      setFlavor(Array.isArray(fm.flavor) ? fm.flavor : []);
-      setConfidence(fm.confidence ?? 0);
-      setAliases("");
-      setBody(pageQuery.data.body ?? "");
+      // Server-data sync into local form state — intentional initialization pattern.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm({
+        title: fm.title ?? "",
+        type: fm.type,
+        status: fm.status,
+        flavor: Array.isArray(fm.flavor) ? fm.flavor : [],
+        confidence: fm.confidence ?? 0,
+        aliases: "",
+        body: pageQuery.data.body ?? "",
+      });
       setDirty(false);
     }
   }, [pageQuery.data]);
 
   if (pageQuery.isLoading) return <Skeleton className="h-64" />;
   if (!project || !pagePath) return null;
+  if (!form) return <Skeleton className="h-64" />;
+
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setDirty(true);
+  };
 
   const cancel = () => {
     if (dirty) setDiscardOpen(true);
@@ -61,17 +75,17 @@ export function PageEdit() {
         page_ref: cleanPath,
         body: {
           frontmatter: {
-            title,
-            type,
-            status,
-            flavor: flavor.length > 0 ? flavor : undefined,
-            confidence,
-            aliases: aliases
+            title: form.title,
+            type: form.type,
+            status: form.status,
+            flavor: form.flavor.length > 0 ? form.flavor : undefined,
+            confidence: form.confidence,
+            aliases: form.aliases
               .split(",")
               .map((a) => a.trim())
               .filter(Boolean),
           },
-          body,
+          body: form.body,
         },
       },
       {
@@ -104,11 +118,8 @@ export function PageEdit() {
             <label className="text-xs font-medium">{t("pages.editor.title_field")}</label>
             <input
               type="text"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setDirty(true);
-              }}
+              value={form.title}
+              onChange={(e) => update("title", e.target.value)}
               className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
             />
           </div>
@@ -116,11 +127,8 @@ export function PageEdit() {
             <div>
               <label className="text-xs font-medium">{t("pages.editor.type")}</label>
               <select
-                value={type}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  setDirty(true);
-                }}
+                value={form.type}
+                onChange={(e) => update("type", e.target.value)}
                 className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
               >
                 {PAGE_TYPES.map((v) => (
@@ -133,11 +141,8 @@ export function PageEdit() {
             <div>
               <label className="text-xs font-medium">{t("pages.editor.status")}</label>
               <select
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value);
-                  setDirty(true);
-                }}
+                value={form.status}
+                onChange={(e) => update("status", e.target.value)}
                 className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
               >
                 {PAGE_STATUSES.map((v) => (
@@ -154,12 +159,11 @@ export function PageEdit() {
                 step="0.05"
                 min="0"
                 max="1"
-                value={confidence}
+                value={form.confidence}
                 onChange={(e) => {
                   const n = Number(e.target.value);
                   if (!Number.isNaN(n) && n >= 0 && n <= 1) {
-                    setConfidence(n);
-                    setDirty(true);
+                    update("confidence", n);
                   }
                 }}
                 className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
@@ -170,11 +174,10 @@ export function PageEdit() {
             <label className="text-xs font-medium">{t("pages.editor.flavor")}</label>
             <select
               multiple
-              value={flavor}
+              value={form.flavor}
               onChange={(e) => {
                 const next = Array.from(e.target.selectedOptions).map((o) => o.value);
-                setFlavor(next);
-                setDirty(true);
+                update("flavor", next);
               }}
               className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
             >
@@ -194,11 +197,8 @@ export function PageEdit() {
             </label>
             <input
               type="text"
-              value={aliases}
-              onChange={(e) => {
-                setAliases(e.target.value);
-                setDirty(true);
-              }}
+              value={form.aliases}
+              onChange={(e) => update("aliases", e.target.value)}
               className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
             />
           </div>
@@ -208,11 +208,8 @@ export function PageEdit() {
             </label>
             <textarea
               id="page-body"
-              value={body}
-              onChange={(e) => {
-                setBody(e.target.value);
-                setDirty(true);
-              }}
+              value={form.body}
+              onChange={(e) => update("body", e.target.value)}
               className="mt-1 h-96 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 font-mono text-sm"
             />
           </div>
@@ -223,7 +220,7 @@ export function PageEdit() {
             {t("pages.editor.preview")}
           </div>
           <div className="rounded-md border bg-[hsl(var(--background))] p-4">
-            <MarkdownView body={body} />
+            <MarkdownView body={form.body} />
           </div>
         </div>
       </div>
