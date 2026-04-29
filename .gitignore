@@ -29,3 +29,12 @@ tmp/
 
 # uv (not used by this project — pip + venv are canonical)
 uv.lock
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Built frontend artefacts (only .gitkeep is tracked)
+claude_mnemos/daemon/static/*
+!claude_mnemos/daemon/static/.gitkeep
