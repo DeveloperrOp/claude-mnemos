@@ -63,7 +63,7 @@ export function ActivityRow({ project, entry: e }: Props) {
       <Button
         size="sm"
         variant="outline"
-        disabled={!e.can_undo || e.undone}
+        disabled
         title={t("activity.undo_disabled")}
       >
         {t("activity.undo_disabled")}
