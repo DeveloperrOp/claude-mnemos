@@ -23,7 +23,7 @@ will land in Plan #13c).
 
 from __future__ import annotations
 
-from datetime import date as date_class
+from datetime import UTC, date as date_class
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -164,7 +164,7 @@ def timeline(
     Days with no ingests appear with zero counts so chart axes line up cleanly.
     Output is sorted ascending by date.
     """
-    today = today or date_class.today()
+    today = today or datetime.now(UTC).date()
     start = today - timedelta(days=period_days - 1)
 
     # Pre-seed every day in the window with zeros so missing days are explicit.
