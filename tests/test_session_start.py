@@ -8,7 +8,9 @@ from claude_mnemos.core.models import WikiPageFrontmatter
 from claude_mnemos.core.page_io import ParsedPage, slug_from_page_path
 from claude_mnemos.core.session_start import (
     FLAVOR_WEIGHTS,
+    InjectStats,
     build_adaptive_context,
+    build_adaptive_context_with_stats,
     page_summary,
     score_page,
 )
@@ -228,3 +230,64 @@ def test_build_adaptive_context_graph_expansion(tmp_path: Path) -> None:
     out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=3000)
     assert "concepts/a" in out
     assert "concepts/b" in out
+
+
+def test_build_adaptive_context_with_stats_returns_pair(tmp_path: Path) -> None:
+    _write_full_page(tmp_path, "concepts/a", body="alpha body")
+    _seed_manifest(tmp_path, sessions=[("s1", ["wiki/concepts/a.md"])])
+    context, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=2000,
+    )
+    assert "concepts/a" in context
+    assert isinstance(stats, InjectStats)
+    assert stats.tokens_actual > 0
+    assert stats.tokens_full >= stats.tokens_actual
+    assert stats.candidates_total >= 1
+    assert stats.candidates_packed >= 1
+
+
+def test_build_adaptive_context_with_stats_empty_vault(tmp_path: Path) -> None:
+    (tmp_path / "wiki").mkdir()
+    context, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=1000,
+    )
+    assert context == ""
+    assert stats.mode == "empty"
+    assert stats.tokens_full == 0
+    assert stats.tokens_actual == 0
+    assert stats.candidates_total == 0
+    assert stats.candidates_packed == 0
+
+
+def test_build_adaptive_context_with_stats_full_mode(tmp_path: Path) -> None:
+    """When all candidates fit under budget, mode == 'full'."""
+    _write_full_page(tmp_path, "concepts/a", body="short body")
+    _seed_manifest(tmp_path, sessions=[("s1", ["wiki/concepts/a.md"])])
+    _, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=10_000,
+    )
+    assert stats.mode == "full"
+    assert stats.tokens_full == stats.tokens_actual
+
+
+def test_build_adaptive_context_with_stats_trimmed_mode(tmp_path: Path) -> None:
+    """When budget is too small for all candidates, mode == 'trimmed'."""
+    for i in range(20):
+        _write_full_page(tmp_path, f"concepts/p{i}", body="x" * 5000)
+    pages_seeded = [f"wiki/concepts/p{i}.md" for i in range(20)]
+    _seed_manifest(tmp_path, sessions=[("s1", pages_seeded)])
+    _, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=3000,
+    )
+    assert stats.mode == "trimmed"
+    assert stats.tokens_full > stats.tokens_actual
+    assert stats.candidates_packed < stats.candidates_total
+
+
+def test_build_adaptive_context_wrapper_drops_stats(tmp_path: Path) -> None:
+    """Backward-compat wrapper still returns plain string."""
+    _write_full_page(tmp_path, "concepts/a", body="alpha")
+    _seed_manifest(tmp_path, sessions=[("s1", ["wiki/concepts/a.md"])])
+    out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=2000)
+    assert isinstance(out, str)
+    assert "concepts/a" in out
