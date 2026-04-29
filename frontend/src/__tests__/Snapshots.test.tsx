@@ -14,7 +14,6 @@ beforeAll(() => {
       filter_kind: "Kind",
       label: "label", op_id: "op", op_type: "type", size: "size",
       no_snapshots: "No snapshots", showing_n: "{{count}} snapshots",
-      restore_disabled: "Restore (#14c)", delete_disabled: "Delete (#14c)",
       created_toast: "Snapshot created",
       deleted_toast: "Snapshot deleted",
       restored_toast: "Vault restored",

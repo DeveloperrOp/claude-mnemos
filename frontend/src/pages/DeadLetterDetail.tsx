@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,12 +9,13 @@ import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { useDeadLetterEntry } from "@/hooks/useDeadLetterEntry";
 import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
 import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
-
-const MAX_ATTEMPTS = 4;
+import { formatDateTime } from "@/lib/datetime";
+import { JOB_MAX_ATTEMPTS } from "@/types/Job";
 
 export function DeadLetterDetail() {
   const { jobId } = useParams<{ jobId: string }>();
-  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const jobQuery = useDeadLetterEntry(jobId);
   const [dismissOpen, setDismissOpen] = useState(false);
   const retry = useDeadLetterRetry();
@@ -71,8 +72,8 @@ export function DeadLetterDetail() {
           <span className="font-mono text-xl">{j.id}</span>
         </div>
         <p className="text-xs text-[hsl(var(--muted-foreground))]">
-          {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: MAX_ATTEMPTS })}
-          {j.finished_at && <> · {t("dead_letter.finished_at")}: {j.finished_at}</>}
+          {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: JOB_MAX_ATTEMPTS })}
+          {j.finished_at && <> · {t("dead_letter.finished_at")}: {formatDateTime(j.finished_at, i18n.language)}</>}
         </p>
       </header>
 
@@ -80,17 +81,17 @@ export function DeadLetterDetail() {
         <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.kind")}</dt>
         <dd><code>{j.kind}</code></dd>
         <dt className="text-[hsl(var(--muted-foreground))]">created_at</dt>
-        <dd>{j.created_at}</dd>
+        <dd>{formatDateTime(j.created_at, i18n.language)}</dd>
         {j.started_at && (
           <>
             <dt className="text-[hsl(var(--muted-foreground))]">started_at</dt>
-            <dd>{j.started_at}</dd>
+            <dd>{formatDateTime(j.started_at, i18n.language)}</dd>
           </>
         )}
         {j.finished_at && (
           <>
             <dt className="text-[hsl(var(--muted-foreground))]">finished_at</dt>
-            <dd>{j.finished_at}</dd>
+            <dd>{formatDateTime(j.finished_at, i18n.language)}</dd>
           </>
         )}
       </dl>
@@ -125,7 +126,10 @@ export function DeadLetterDetail() {
         description={t("dead_letter.dismiss_modal_desc")}
         confirmLabel={t("dead_letter.dismiss_button")}
         destructive
-        onConfirm={() => j && dismiss.mutate(j.id, { onSettled: () => setDismissOpen(false) })}
+        onConfirm={() => j && dismiss.mutate(j.id, {
+          onSuccess: () => navigate("/dead-letter"),
+          onSettled: () => setDismissOpen(false),
+        })}
         isPending={dismiss.isPending}
       />
     </article>

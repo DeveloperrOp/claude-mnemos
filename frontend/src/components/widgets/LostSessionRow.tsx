@@ -6,6 +6,7 @@ import { ProjectBadge } from "./ProjectBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useLostSessionImport } from "@/hooks/useLostSessionImport";
 import { useLostSessionIgnore } from "@/hooks/useLostSessionIgnore";
+import { formatDateTime } from "@/lib/datetime";
 import type { LostSession } from "@/types/LostSession";
 
 function formatBytes(n: number): string {
@@ -16,7 +17,7 @@ function formatBytes(n: number): string {
 }
 
 export function LostSessionRow({ session: s }: { session: LostSession }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const importMut = useLostSessionImport();
   const ignoreMut = useLostSessionIgnore();
@@ -35,7 +36,7 @@ export function LostSessionRow({ session: s }: { session: LostSession }) {
             </span>
           </div>
           <div className="text-xs text-[hsl(var(--muted-foreground))]" title={s.transcript_path}>
-            {formatBytes(s.size_bytes)} · {s.mtime}
+            {formatBytes(s.size_bytes)} · {formatDateTime(s.mtime, i18n.language)}
           </div>
         </div>
         <Button

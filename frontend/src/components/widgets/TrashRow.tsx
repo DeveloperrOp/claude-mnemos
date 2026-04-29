@@ -8,11 +8,12 @@ import { TypedConfirmDialog } from "./TypedConfirmDialog";
 import { useTrashRestore } from "@/hooks/useTrashRestore";
 import { useTrashDelete } from "@/hooks/useTrashDelete";
 import { pageBasename } from "@/lib/pageBasename";
+import { formatDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type { TrashEntry } from "@/types/Trash";
 
 export function TrashRow({ entry: e }: { entry: TrashEntry }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { name: project } = useParams<{ name: string }>();
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -36,7 +37,7 @@ export function TrashRow({ entry: e }: { entry: TrashEntry }) {
             )}
           </div>
           <div className="text-xs text-[hsl(var(--muted-foreground))]">
-            {t("trash.deleted_at")}: {e.deleted_at}
+            {t("trash.deleted_at")}: {formatDateTime(e.deleted_at, i18n.language)}
           </div>
           {!e.restorable && e.restore_blocked_reason && (
             <div className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const JOB_MAX_ATTEMPTS = 4;
+
 export const JobKindSchema = z.string();
 export type JobKind = z.infer<typeof JobKindSchema>;
 

@@ -23,7 +23,6 @@ beforeAll(() => {
         op: { ingest: "Ingest", manual_patch: "Manual edit" },
         affected_pages: "{{count}} pages",
         detail: "Detail",
-        undo_disabled: "Undo (#14c)",
         undo_button: "Undo",
         undone_toast: "Operation undone",
         undo_modal_title: "Undo this operation?",

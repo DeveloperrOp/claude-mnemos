@@ -7,12 +7,11 @@ import { ProjectBadge } from "./ProjectBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
 import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
-import type { Job } from "@/types/Job";
-
-const MAX_ATTEMPTS = 4;
+import { formatDateTime } from "@/lib/datetime";
+import { JOB_MAX_ATTEMPTS, type Job } from "@/types/Job";
 
 export function DeadLetterRow({ job: j }: { job: Job }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [dismissOpen, setDismissOpen] = useState(false);
   const retry = useDeadLetterRetry();
   const dismiss = useDeadLetterDismiss();
@@ -30,11 +29,11 @@ export function DeadLetterRow({ job: j }: { job: Job }) {
               {j.id.slice(0, 8)}…
             </span>
             <span className="text-xs text-[hsl(var(--muted-foreground))]">
-              {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: MAX_ATTEMPTS })}
+              {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: JOB_MAX_ATTEMPTS })}
             </span>
             {j.finished_at && (
               <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                · {j.finished_at}
+                · {formatDateTime(j.finished_at, i18n.language)}
               </span>
             )}
           </div>
