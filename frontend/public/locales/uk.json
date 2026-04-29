@@ -1,0 +1,71 @@
+{
+  "common": {
+    "loading": "Завантаження...",
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "open": "Відкрити",
+    "retry": "Повторити"
+  },
+  "navigation": {
+    "overview": "Огляд",
+    "pages": "Сторінки",
+    "sessions": "Чати",
+    "queue": "Черга",
+    "activity": "Історія",
+    "suggestions": "Пропозиції",
+    "lost_sessions": "Втрачені",
+    "trash": "Кошик",
+    "snapshots": "Знімки",
+    "health": "Здоров'я",
+    "settings": "Налаштування",
+    "metrics": "Метрики",
+    "help": "Допомога"
+  },
+  "topbar": {
+    "all_projects": "Всі проєкти",
+    "alerts": "Сповіщення",
+    "settings": "Налаштування",
+    "help": "Допомога",
+    "locale": "Мова"
+  },
+  "overview": {
+    "no_projects_title": "Мозок проєкту з'явиться тут",
+    "no_projects_hint_cmd": "Зареєструйте перший проєкт:",
+    "no_projects_hint_command": "mnemos project add NAME --vault PATH",
+    "daemon_down_title": "Демон недоступний",
+    "daemon_down_hint_cmd": "Запустіть демон:",
+    "daemon_down_hint_command": "mnemos daemon start",
+    "daemon_down_reconnect": "Дашборд автоматично перепідключиться."
+  },
+  "project_view": {
+    "open_in_obsidian": "Відкрити в Obsidian",
+    "watchdog_running": "Watchdog працює",
+    "watchdog_down": "Watchdog зупинено",
+    "stats": {
+      "sessions_covered": "Сесії з контекстом",
+      "jobs_queued": "В черзі",
+      "jobs_running": "Виконуються",
+      "jobs_dead_letter": "Помилки"
+    },
+    "unknown_title": "Проєкт не знайдено",
+    "unknown_hint": "Цей проєкт не зареєстровано. Поверніться до Огляду.",
+    "coming_in": "З'явиться в плані {{plan}}"
+  },
+  "health": {
+    "ok": "Добре",
+    "degraded": "Деградовано",
+    "down": "Недоступний"
+  },
+  "usage": {
+    "title": "Використання",
+    "tokens_short": "{{count}} токенів",
+    "sessions_short": "{{count}} сесій",
+    "ratio_short": "стиснення ×{{ratio}}",
+    "no_data": "Поки без даних"
+  },
+  "placeholder": {
+    "title": "{{section}}",
+    "body": "Цей розділ з'явиться в плані {{plan}}.",
+    "back_link": "Повернутись до Огляду"
+  }
+}

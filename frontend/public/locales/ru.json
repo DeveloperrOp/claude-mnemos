@@ -1,0 +1,71 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "save": "Сохранить",
+    "cancel": "Отменить",
+    "open": "Открыть",
+    "retry": "Повторить"
+  },
+  "navigation": {
+    "overview": "Обзор",
+    "pages": "Страницы",
+    "sessions": "Чаты",
+    "queue": "Очередь",
+    "activity": "История",
+    "suggestions": "Предложения",
+    "lost_sessions": "Потерянные",
+    "trash": "Корзина",
+    "snapshots": "Снимки",
+    "health": "Здоровье",
+    "settings": "Настройки",
+    "metrics": "Метрики",
+    "help": "Помощь"
+  },
+  "topbar": {
+    "all_projects": "Все проекты",
+    "alerts": "Уведомления",
+    "settings": "Настройки",
+    "help": "Помощь",
+    "locale": "Язык"
+  },
+  "overview": {
+    "no_projects_title": "Мозг проекта появится здесь",
+    "no_projects_hint_cmd": "Зарегистрируйте первый проект:",
+    "no_projects_hint_command": "mnemos project add NAME --vault PATH",
+    "daemon_down_title": "Daemon недоступен",
+    "daemon_down_hint_cmd": "Запустите daemon:",
+    "daemon_down_hint_command": "mnemos daemon start",
+    "daemon_down_reconnect": "Дашборд переподключится автоматически."
+  },
+  "project_view": {
+    "open_in_obsidian": "Открыть в Obsidian",
+    "watchdog_running": "Watchdog работает",
+    "watchdog_down": "Watchdog остановлен",
+    "stats": {
+      "sessions_covered": "Сессий с контекстом",
+      "jobs_queued": "В очереди",
+      "jobs_running": "Выполняются",
+      "jobs_dead_letter": "Ошибки"
+    },
+    "unknown_title": "Проект не найден",
+    "unknown_hint": "Этот проект не зарегистрирован. Вернитесь в Обзор.",
+    "coming_in": "Появится в плане {{plan}}"
+  },
+  "health": {
+    "ok": "Хорошо",
+    "degraded": "Деградировано",
+    "down": "Недоступно"
+  },
+  "usage": {
+    "title": "Использование",
+    "tokens_short": "{{count}} токенов",
+    "sessions_short": "{{count}} сессий",
+    "ratio_short": "сжатие ×{{ratio}}",
+    "no_data": "Пока без данных"
+  },
+  "placeholder": {
+    "title": "{{section}}",
+    "body": "Этот раздел появится в плане {{plan}}.",
+    "back_link": "Вернуться в Обзор"
+  }
+}
