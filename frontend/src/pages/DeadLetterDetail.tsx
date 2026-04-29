@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +14,7 @@ import { JOB_MAX_ATTEMPTS } from "@/types/Job";
 
 export function DeadLetterDetail() {
   const { jobId } = useParams<{ jobId: string }>();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const jobQuery = useDeadLetterEntry(jobId);
   const [dismissOpen, setDismissOpen] = useState(false);
@@ -125,7 +126,10 @@ export function DeadLetterDetail() {
         description={t("dead_letter.dismiss_modal_desc")}
         confirmLabel={t("dead_letter.dismiss_button")}
         destructive
-        onConfirm={() => j && dismiss.mutate(j.id, { onSettled: () => setDismissOpen(false) })}
+        onConfirm={() => j && dismiss.mutate(j.id, {
+          onSuccess: () => navigate("/dead-letter"),
+          onSettled: () => setDismissOpen(false),
+        })}
         isPending={dismiss.isPending}
       />
     </article>
