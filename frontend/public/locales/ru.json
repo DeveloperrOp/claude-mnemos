@@ -223,5 +223,31 @@
     "showing_n": "{{count}} сессий",
     "import_disabled": "Импортировать (#14c)",
     "ignore_disabled": "Игнорировать (#14c)"
+  },
+  "suggestions": {
+    "title": "Предложения",
+    "filter_status": "Статус",
+    "status": {
+      "pending": "Ожидают",
+      "approved": "Одобрены",
+      "rejected": "Отклонены",
+      "deferred": "Отложены",
+      "all": "Все"
+    },
+    "operation": {
+      "merge_entities": "Объединить сущности",
+      "rename_entity": "Переименовать сущность",
+      "delete_page": "Удалить страницу"
+    },
+    "confidence": "Уверенность",
+    "affected_pages": "Затронутые страницы",
+    "proposed_target": "Целевая страница",
+    "reason": "Причина",
+    "body_header": "Обоснование",
+    "no_suggestions": "Нет предложений",
+    "showing_n": "{{count}} предложений",
+    "approve_disabled": "Одобрить (#14c)",
+    "reject_disabled": "Отклонить (#14c)",
+    "defer_disabled": "Отложить (#14c)"
   }
 }

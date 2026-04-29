@@ -223,5 +223,31 @@
     "showing_n": "{{count}} сесій",
     "import_disabled": "Імпортувати (#14c)",
     "ignore_disabled": "Ігнорувати (#14c)"
+  },
+  "suggestions": {
+    "title": "Пропозиції",
+    "filter_status": "Статус",
+    "status": {
+      "pending": "Очікують",
+      "approved": "Затверджені",
+      "rejected": "Відхилені",
+      "deferred": "Відкладені",
+      "all": "Усі"
+    },
+    "operation": {
+      "merge_entities": "Об'єднати сутності",
+      "rename_entity": "Перейменувати сутність",
+      "delete_page": "Видалити сторінку"
+    },
+    "confidence": "Впевненість",
+    "affected_pages": "Залучені сторінки",
+    "proposed_target": "Цільова сторінка",
+    "reason": "Причина",
+    "body_header": "Обґрунтування",
+    "no_suggestions": "Немає пропозицій",
+    "showing_n": "{{count}} пропозицій",
+    "approve_disabled": "Затвердити (#14c)",
+    "reject_disabled": "Відхилити (#14c)",
+    "defer_disabled": "Відкласти (#14c)"
   }
 }

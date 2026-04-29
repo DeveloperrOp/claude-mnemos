@@ -223,5 +223,31 @@
     "showing_n": "{{count}} sessions",
     "import_disabled": "Import (#14c)",
     "ignore_disabled": "Ignore (#14c)"
+  },
+  "suggestions": {
+    "title": "Suggestions",
+    "filter_status": "Status",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "deferred": "Deferred",
+      "all": "All"
+    },
+    "operation": {
+      "merge_entities": "Merge entities",
+      "rename_entity": "Rename entity",
+      "delete_page": "Delete page"
+    },
+    "confidence": "Confidence",
+    "affected_pages": "Affected pages",
+    "proposed_target": "Proposed target",
+    "reason": "Reason",
+    "body_header": "Reasoning",
+    "no_suggestions": "No suggestions",
+    "showing_n": "{{count}} suggestions",
+    "approve_disabled": "Approve (#14c)",
+    "reject_disabled": "Reject (#14c)",
+    "defer_disabled": "Defer (#14c)"
   }
 }
