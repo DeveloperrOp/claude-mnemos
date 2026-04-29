@@ -122,6 +122,7 @@ def main() -> int:
     try:
         from datetime import UTC, datetime
         from uuid import uuid4
+
         from claude_mnemos.state.inject_metrics import (
             InjectMetricEvent,
             InjectMetricsLog,

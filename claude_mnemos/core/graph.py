@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_mnemos.core.page_io import ParsedPage, PageParseError, read_page, slug_from_page_path
+from claude_mnemos.core.page_io import PageParseError, ParsedPage, read_page, slug_from_page_path
 from claude_mnemos.core.wikilinks import extract_wikilinks
 
 

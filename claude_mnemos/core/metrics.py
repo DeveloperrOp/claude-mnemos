@@ -232,10 +232,11 @@ def compression_summary(
     events = [e for e in log.events if e.timestamp >= cutoff_dt]
 
     valid = [e for e in events if e.tokens_actual > 0]
-    if valid:
-        avg = sum(e.tokens_full / e.tokens_actual for e in valid) / len(valid)
-    else:
-        avg = None
+    avg = (
+        sum(e.tokens_full / e.tokens_actual for e in valid) / len(valid)
+        if valid
+        else None
+    )
 
     sessions_covered = len({e.session_id for e in events if e.session_id})
 

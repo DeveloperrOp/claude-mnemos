@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_mnemos.core.graph import build_page_graph, pages_within_k_hops
-from claude_mnemos.core.graph import build_page_graph_with_pages
+from claude_mnemos.core.graph import (
+    build_page_graph,
+    build_page_graph_with_pages,
+    pages_within_k_hops,
+)
 
 
 def _write_page(vault: Path, slug: str, body: str = "", related: list[str] | None = None) -> None:
