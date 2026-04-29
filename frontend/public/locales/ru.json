@@ -180,5 +180,16 @@
       "concept": "Концепт",
       "source": "Источник"
     }
+  },
+  "trash": {
+    "title": "Корзина",
+    "deleted_at": "удалено",
+    "operation_type": "операция",
+    "restorable": "Можно восстановить",
+    "blocked": "Заблокировано",
+    "restore_disabled": "Восстановить (#14c)",
+    "delete_permanently_disabled": "Удалить навсегда (#14c)",
+    "no_entries": "Корзина пуста",
+    "showing_n": "{{count}} записей"
   }
 }

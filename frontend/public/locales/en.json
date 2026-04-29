@@ -180,5 +180,16 @@
       "concept": "Concept",
       "source": "Source"
     }
+  },
+  "trash": {
+    "title": "Trash",
+    "deleted_at": "deleted at",
+    "operation_type": "operation",
+    "restorable": "Restorable",
+    "blocked": "Blocked",
+    "restore_disabled": "Restore (#14c)",
+    "delete_permanently_disabled": "Delete permanently (#14c)",
+    "no_entries": "Trash is empty",
+    "showing_n": "{{count}} entries"
   }
 }

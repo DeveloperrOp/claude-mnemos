@@ -180,5 +180,16 @@
       "concept": "Концепт",
       "source": "Джерело"
     }
+  },
+  "trash": {
+    "title": "Кошик",
+    "deleted_at": "видалено",
+    "operation_type": "операція",
+    "restorable": "Можна відновити",
+    "blocked": "Заблоковано",
+    "restore_disabled": "Відновити (#14c)",
+    "delete_permanently_disabled": "Видалити назавжди (#14c)",
+    "no_entries": "Кошик порожній",
+    "showing_n": "{{count}} записів"
   }
 }
