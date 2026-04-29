@@ -20,6 +20,7 @@ import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { Onboarding } from "./pages/Onboarding";
+import { Metrics } from "./pages/Metrics";
 
 // react-router v7 splats must be path-final, so a literal `pages/*/edit` route
 // cannot exist. Both PageDetail and PageEdit share `pages/*`; this switch
@@ -58,7 +59,7 @@ const router = createBrowserRouter([
       { path: "dead-letter", element: <DeadLetter /> },
       { path: "dead-letter/:jobId", element: <DeadLetterDetail /> },
       { path: "help", element: <Help /> },
-      { path: "metrics", element: <Placeholder section="Metrics" plan="#14d" /> },
+      { path: "metrics", element: <Metrics /> },
       { path: "settings/global", element: <Placeholder section="Global Settings" plan="#14c" /> },
     ],
   },
