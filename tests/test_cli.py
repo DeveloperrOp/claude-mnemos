@@ -11,19 +11,16 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample_session.jsonl"
 
 @pytest.fixture
 def project_env(tmp_path: Path) -> tuple[Path, dict]:
-    """Set up an isolated ~/.claude-mnemos/ via HOME/USERPROFILE override and
-    pre-register a project named "p" pointing at ``tmp_path / "vault"``.
+    """Pre-register a project named "p" pointing at ``tmp_path / "vault"``.
 
-    Returns (vault_path, env_dict) where env_dict is suitable for passing as
-    the ``env=`` kwarg to subprocess.run().
+    Relies on the autouse ``isolate_cli_state`` fixture for HOME/USERPROFILE
+    isolation and offline daemon URL. Returns (vault_path, env_dict) where
+    env_dict is the (already-isolated) os.environ snapshot, suitable for
+    passing as the ``env=`` kwarg to subprocess.run().
     """
     vault = tmp_path / "vault"
     vault.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
-    env.pop("ANTHROPIC_API_KEY", None)
-    env.pop("MNEMOS_VAULT_ROOT", None)
-    env["HOME"] = str(tmp_path)
-    env["USERPROFILE"] = str(tmp_path)
 
     # Register the project via the CLI itself so the subprocess and the test
     # share the same on-disk project-map.
