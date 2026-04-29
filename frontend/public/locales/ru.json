@@ -67,5 +67,26 @@
     "title": "{{section}}",
     "body": "Этот раздел появится в плане {{plan}}.",
     "back_link": "Вернуться в Обзор"
+  },
+  "wiki": {
+    "status": {
+      "draft": "Черновик",
+      "reviewed": "Просмотрено",
+      "verified": "Подтверждено",
+      "stale": "Устарело",
+      "archived": "В архиве"
+    },
+    "flavor": {
+      "pattern": "Паттерн",
+      "mistake": "Ошибка",
+      "decision": "Решение",
+      "lesson": "Урок",
+      "reference": "Ссылка"
+    },
+    "type": {
+      "entity": "Сущность",
+      "concept": "Концепт",
+      "source": "Источник"
+    }
   }
 }

@@ -67,5 +67,26 @@
     "title": "{{section}}",
     "body": "Цей розділ з'явиться в плані {{plan}}.",
     "back_link": "Повернутись до Огляду"
+  },
+  "wiki": {
+    "status": {
+      "draft": "Чернетка",
+      "reviewed": "Переглянуто",
+      "verified": "Підтверджено",
+      "stale": "Застаріло",
+      "archived": "В архіві"
+    },
+    "flavor": {
+      "pattern": "Шаблон",
+      "mistake": "Помилка",
+      "decision": "Рішення",
+      "lesson": "Урок",
+      "reference": "Посилання"
+    },
+    "type": {
+      "entity": "Сутність",
+      "concept": "Концепт",
+      "source": "Джерело"
+    }
   }
 }

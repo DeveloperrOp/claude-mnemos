@@ -67,5 +67,26 @@
     "title": "{{section}}",
     "body": "This section is coming in plan {{plan}}.",
     "back_link": "Back to Overview"
+  },
+  "wiki": {
+    "status": {
+      "draft": "Draft",
+      "reviewed": "Reviewed",
+      "verified": "Verified",
+      "stale": "Stale",
+      "archived": "Archived"
+    },
+    "flavor": {
+      "pattern": "Pattern",
+      "mistake": "Mistake",
+      "decision": "Decision",
+      "lesson": "Lesson",
+      "reference": "Reference"
+    },
+    "type": {
+      "entity": "Entity",
+      "concept": "Concept",
+      "source": "Source"
+    }
   }
 }
