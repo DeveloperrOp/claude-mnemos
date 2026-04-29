@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import MockAdapter from "axios-mock-adapter";
+import axios from "axios";
 import { Toaster } from "../components/ui/sonner";
 import i18n from "../i18n";
 import { apiClient } from "../api/client";
@@ -27,9 +29,21 @@ beforeAll(() => {
       cancel: "Cancel",
       mount_failed_title: "Mount failed",
       success_toast: "Project created",
+      autostart_label: "Auto-start mnemos on login",
+      autostart_hint: "Adds a tray icon and starts the daemon automatically when you sign in.",
     },
   }, true, true);
   void i18n.changeLanguage("en");
+});
+
+let trayMock: MockAdapter;
+
+beforeEach(() => {
+  trayMock = new MockAdapter(axios);
+});
+
+afterEach(() => {
+  trayMock.restore();
 });
 
 function wrap(ui: React.ReactNode) {
@@ -100,5 +114,51 @@ describe("Onboarding", () => {
     await user.type(screen.getByLabelText(/vault path/i), "/tmp/alpha");
     await user.click(screen.getByRole("button", { name: /create project/i }));
     await waitFor(() => expect(screen.getByText(/already exists/i)).toBeInTheDocument());
+  });
+
+  it("renders auto-start checkbox when platform supported", async () => {
+    trayMock.onGet("/tray/status").reply(200, {
+      platform: "windows",
+      autostart_enabled: false,
+    });
+    render(wrap(<Onboarding />));
+
+    expect(await screen.findByLabelText(/auto.?start/i)).toBeInTheDocument();
+  });
+
+  it("hides auto-start checkbox on unsupported platform", async () => {
+    trayMock.onGet("/tray/status").reply(200, {
+      platform: "unsupported",
+      autostart_enabled: false,
+    });
+    render(wrap(<Onboarding />));
+    // Wait a tick so the fetch resolves and any conditional render settles.
+    await waitFor(() => expect(trayMock.history.get.length).toBeGreaterThan(0));
+    expect(screen.queryByLabelText(/auto.?start/i)).not.toBeInTheDocument();
+  });
+
+  it("calls /tray/install when checkbox checked and form submitted", async () => {
+    trayMock.onGet("/tray/status").reply(200, {
+      platform: "windows",
+      autostart_enabled: false,
+    });
+    trayMock.onPost("/tray/install").reply(200, { installed: true });
+    vi.spyOn(apiClient, "post").mockResolvedValueOnce({
+      data: { name: "p1", vault_root: "/x", cwd_patterns: [] },
+    });
+
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+    await user.type(screen.getByLabelText(/project name/i), "p1");
+    await user.type(screen.getByLabelText(/vault path/i), "/x");
+    // Checkbox is checked by default; the explicit click would toggle off.
+    // The plan's intent is "checkbox checked" so we just submit.
+    expect(await screen.findByLabelText(/auto.?start/i)).toBeChecked();
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => {
+      const installCalls = trayMock.history.post.filter((c) => c.url === "/tray/install");
+      expect(installCalls.length).toBe(1);
+    });
   });
 });

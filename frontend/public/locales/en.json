@@ -368,7 +368,9 @@
     "submit": "Create project",
     "cancel": "Cancel",
     "mount_failed_title": "Mount failed",
-    "success_toast": "Project created"
+    "success_toast": "Project created",
+    "autostart_label": "Auto-start mnemos on login",
+    "autostart_hint": "Adds a tray icon and starts the daemon automatically when you sign in."
   },
   "metrics": {
     "title": "Metrics",
