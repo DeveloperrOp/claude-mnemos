@@ -126,7 +126,7 @@ def score_page(
     score += W_FLAVOR * _flavor_weight(list(fm.flavor))
     score += W_RECENCY * _recency_decay(fm.last_human_edit, now)
     score += W_PROXIMITY * _proximity(hop_distance)
-    if cwd_segment and cwd_segment in parsed.body:
+    if cwd_segment and cwd_segment in parsed.body.lower():
         score += W_CWD_MATCH
     score -= W_STALE_PENALTY * _stale_penalty(fm.status)
     return score
@@ -229,6 +229,8 @@ def build_adaptive_context(
 
     # Greedy pack under char budget.
     header = "# Project context (mnemos)\n\nRecent sessions touched these pages:\n"
+    if len(header) >= max_chars:
+        return ""
     parts: list[str] = [header]
     used = len(header)
     full_body_quota = 3

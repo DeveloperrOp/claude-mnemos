@@ -11,7 +11,7 @@
       {
         "command": "python ${CLAUDE_PLUGIN_ROOT}/hooks/session_start.py",
         "timeout_seconds": 15,
-        "blocking": false
+        "blocking": true
       }
     ]
   }
