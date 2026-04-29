@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from enum import Enum
 
 
 class RestartLimiter:
@@ -58,3 +59,33 @@ class RestartLimiter:
 
     def reset(self) -> None:
         self._crashes.clear()
+
+
+class SupervisorState(Enum):
+    STARTING = "starting"
+    RUNNING = "running"
+    RESTARTING = "restarting"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    CRASHED = "crashed"
+
+
+_VALID_TRANSITIONS: dict[SupervisorState | None, set[SupervisorState]] = {
+    None: {SupervisorState.STARTING},
+    SupervisorState.STARTING: {SupervisorState.RUNNING, SupervisorState.CRASHED},
+    SupervisorState.RUNNING: {
+        SupervisorState.RESTARTING,
+        SupervisorState.STOPPING,
+        SupervisorState.CRASHED,
+    },
+    SupervisorState.RESTARTING: {SupervisorState.RUNNING, SupervisorState.CRASHED},
+    SupervisorState.STOPPING: {SupervisorState.STOPPED},
+    SupervisorState.STOPPED: {SupervisorState.STARTING},
+    SupervisorState.CRASHED: {SupervisorState.STARTING},
+}
+
+
+def valid_transition(
+    from_: SupervisorState | None, to_: SupervisorState
+) -> bool:
+    return to_ in _VALID_TRANSITIONS.get(from_, set())
