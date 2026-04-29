@@ -116,9 +116,27 @@ body
             encoding="utf-8",
         )
 
-        # Wait for the daemon to potentially detect the seed write — give it a
-        # full second to settle, then we'll do a deliberate external modify.
-        time.sleep(1.0)
+        # Wait for the daemon to fully process the seed write before doing the
+        # external modify. The seed (a fresh file under wiki/) shows up as an
+        # `external_create` alert from the watchdog's perspective; once that
+        # alert is visible, the watchdog has drained the seed event and the
+        # follow-up modify is unambiguous.
+        def seed_was_observed() -> bool:
+            try:
+                r = httpx.get(f"http://127.0.0.1:{port}/alerts", timeout=2.0)
+                if r.status_code != 200:
+                    return False
+                return any(
+                    a.get("kind") == "external_create"
+                    and a.get("path", "").endswith("foo.md")
+                    for a in r.json()
+                )
+            except httpx.HTTPError:
+                return False
+
+        assert _wait_for(seed_was_observed, timeout=5.0), (
+            "daemon never observed seed write (no external_create alert)"
+        )
 
         # External modify simulating an editor save.
         existing = page.read_text(encoding="utf-8")
@@ -127,7 +145,8 @@ body
         def has_human_edit() -> bool:
             try:
                 r = httpx.get(
-                    f"http://127.0.0.1:{port}/activity?limit=20", timeout=2.0
+                    f"http://127.0.0.1:{port}/activity/main?limit=200",
+                    timeout=2.0,
                 )
                 if r.status_code != 200:
                     return False

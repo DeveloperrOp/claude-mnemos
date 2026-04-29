@@ -15,6 +15,7 @@ beforeAll(() => {
       period_7d: "7 days",
       period_30d: "30 days",
       period_90d: "90 days",
+      period_1y: "1 year",
       timeline_title: "Token usage timeline",
       timeline_legend_input: "Input tokens",
       timeline_legend_output: "Output tokens",

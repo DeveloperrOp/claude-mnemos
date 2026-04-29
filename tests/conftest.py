@@ -7,6 +7,24 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def isolate_cli_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate every test from real user state.
+
+    - HOME/USERPROFILE → tmp_path so Path.home() doesn't read ~/.claude-mnemos.
+    - MNEMOS_DAEMON_URL → dead URL so CLI write commands skip the daemon-first
+      branch (which on dev machines hits the running daemon and pollutes the
+      real project map). Tests that need a real-daemon transport use ASGI
+      directly and ignore this env var.
+    - Drop env vars that vary per developer.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("MNEMOS_DAEMON_URL", "http://127.0.0.1:1")
+    monkeypatch.delenv("MNEMOS_VAULT_ROOT", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+
 @pytest.fixture
 def register_project(tmp_path, monkeypatch):
     """Register a project pointing at a tmp vault, isolating ~/.claude-mnemos/.

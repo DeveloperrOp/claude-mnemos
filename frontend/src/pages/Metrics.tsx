@@ -11,7 +11,7 @@ import { UsageByProjectTable } from "@/components/widgets/UsageByProjectTable";
 import { TopSessionsTable } from "@/components/widgets/TopSessionsTable";
 import { cn } from "@/lib/utils";
 
-const PERIODS = ["7d", "30d", "90d"] as const;
+const PERIODS = ["7d", "30d", "90d", "1y"] as const;
 type Period = (typeof PERIODS)[number];
 
 function Metrics() {

@@ -143,9 +143,21 @@ async def test_delete_snapshot_missing_returns_404(client: Any) -> None:
     assert r.status_code == 404
 
 
-async def test_delete_snapshot_traversal_rejected(client: Any) -> None:
-    r = await client.request("DELETE", "/snapshots/alpha/..%2Fetc-passwd")
-    assert r.status_code in (400, 404)
+def test_delete_snapshot_traversal_rejected():
+    """Validator rejects path-traversal segments. Tested at the validator
+    level rather than over HTTP because httpx percent-decodes the URL
+    before the ASGI app sees it, which makes the routing path the actual
+    test variable instead of the validator behaviour we care about.
+    """
+    from fastapi import HTTPException
+    import pytest as pt
+    from claude_mnemos.daemon.routes.snapshots import _validate_snapshot_name
+
+    bad_names = ["../etc-passwd", "../../foo", "foo/../bar", "/abs/path"]
+    for name in bad_names:
+        with pt.raises(HTTPException) as exc:
+            _validate_snapshot_name(name)
+        assert exc.value.status_code == 400, f"expected 400 for {name!r}"
 
 
 async def test_delete_snapshot_unknown_prefix(client: Any, alpha_vault: Path) -> None:

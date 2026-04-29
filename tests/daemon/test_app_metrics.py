@@ -172,3 +172,36 @@ async def test_usage_bad_period_400(no_vault_client) -> None:
     r = await no_vault_client.get("/metrics/usage?period=oops")
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "invalid_period_format"
+
+
+def test_parse_period_accepts_weeks():
+    from claude_mnemos.daemon.routes.metrics import _parse_period
+    assert _parse_period("1w") == 7
+    assert _parse_period("4w") == 28
+
+
+def test_parse_period_accepts_months():
+    from claude_mnemos.daemon.routes.metrics import _parse_period
+    assert _parse_period("1m") == 30
+    assert _parse_period("3m") == 90
+
+
+def test_parse_period_accepts_years():
+    from claude_mnemos.daemon.routes.metrics import _parse_period
+    assert _parse_period("1y") == 365
+
+
+def test_parse_period_accepts_days_unchanged():
+    from claude_mnemos.daemon.routes.metrics import _parse_period
+    assert _parse_period("30d") == 30
+    assert _parse_period("1d") == 1
+
+
+def test_parse_period_rejects_garbage():
+    from fastapi import HTTPException
+    from claude_mnemos.daemon.routes.metrics import _parse_period
+    import pytest as pt
+    for bad in ("0d", "-1d", "abc", "30x", "30dd", ""):
+        with pt.raises(HTTPException) as exc:
+            _parse_period(bad)
+        assert exc.value.status_code == 400

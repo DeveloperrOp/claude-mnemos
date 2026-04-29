@@ -2,20 +2,11 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from claude_mnemos.cli import main as cli_main
 from claude_mnemos.state.projects import (
     HOME_CONFIG_DIRNAME,
     PROJECT_MAP_FILENAME,
 )
-
-
-@pytest.fixture(autouse=True)
-def _isolate_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.delenv("MNEMOS_VAULT_ROOT", raising=False)
 
 
 def test_project_add_writes_map(tmp_path):

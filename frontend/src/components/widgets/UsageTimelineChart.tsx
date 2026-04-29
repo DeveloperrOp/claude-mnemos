@@ -41,9 +41,9 @@ export function UsageTimelineChart({ points }: Props) {
           <YAxis yAxisId="sessions" orientation="right" fontSize={11} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar yAxisId="tokens" dataKey="tokens_input" stackId="t" name={t("metrics.timeline_legend_input")} fill="#3b82f6" />
-          <Bar yAxisId="tokens" dataKey="tokens_output" stackId="t" name={t("metrics.timeline_legend_output")} fill="#10b981" />
-          <Line yAxisId="sessions" type="monotone" dataKey="sessions" name={t("metrics.timeline_legend_sessions")} stroke="#f59e0b" strokeWidth={2} />
+          <Bar yAxisId="tokens" dataKey="tokens_input" stackId="t" name={t("metrics.timeline_legend_input")} fill="var(--chart-input)" />
+          <Bar yAxisId="tokens" dataKey="tokens_output" stackId="t" name={t("metrics.timeline_legend_output")} fill="var(--chart-output)" />
+          <Line yAxisId="sessions" type="monotone" dataKey="sessions" name={t("metrics.timeline_legend_sessions")} stroke="var(--chart-sessions)" strokeWidth={2} />
         </ComposedChart>
       </ChartContainer>
     </>
