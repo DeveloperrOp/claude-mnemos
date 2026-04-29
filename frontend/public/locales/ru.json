@@ -120,7 +120,26 @@
     "no_backlinks": "Обратных ссылок нет",
     "copy_wikilink": "Скопировать wikilink",
     "not_found_title": "Страница не найдена",
-    "not_found_hint": "Вернуться назад"
+    "not_found_hint": "Вернуться назад",
+    "editor": {
+      "title": "Редактировать страницу",
+      "title_field": "Заголовок",
+      "type": "Тип",
+      "status": "Статус",
+      "flavor": "Стиль",
+      "confidence": "Уверенность",
+      "aliases": "Псевдонимы",
+      "aliases_hint": "Через запятую",
+      "body_label": "Текст (markdown)",
+      "preview": "Превью",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "saved_toast": "Страница сохранена",
+      "discard_modal_title": "Отбросить несохранённые изменения?",
+      "discard_modal_desc": "Ваши изменения будут потеряны.",
+      "discard_button": "Отбросить",
+      "loading": "Загрузка…"
+    }
   },
   "sessions": {
     "title": "Сессии",

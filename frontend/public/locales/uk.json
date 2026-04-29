@@ -120,7 +120,26 @@
     "no_backlinks": "Зворотних посилань немає",
     "copy_wikilink": "Скопіювати wikilink",
     "not_found_title": "Сторінку не знайдено",
-    "not_found_hint": "Повернутись назад"
+    "not_found_hint": "Повернутись назад",
+    "editor": {
+      "title": "Редагувати сторінку",
+      "title_field": "Заголовок",
+      "type": "Тип",
+      "status": "Статус",
+      "flavor": "Стиль",
+      "confidence": "Впевненість",
+      "aliases": "Псевдоніми",
+      "aliases_hint": "Через кому",
+      "body_label": "Текст (markdown)",
+      "preview": "Перегляд",
+      "save": "Зберегти",
+      "cancel": "Скасувати",
+      "saved_toast": "Сторінку збережено",
+      "discard_modal_title": "Відкинути незбережені зміни?",
+      "discard_modal_desc": "Ваші зміни будуть втрачені.",
+      "discard_button": "Відкинути",
+      "loading": "Завантаження…"
+    }
   },
   "sessions": {
     "title": "Сесії",

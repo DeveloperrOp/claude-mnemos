@@ -120,7 +120,26 @@
     "no_backlinks": "No backlinks",
     "copy_wikilink": "Copy wikilink",
     "not_found_title": "Page not found",
-    "not_found_hint": "Go back"
+    "not_found_hint": "Go back",
+    "editor": {
+      "title": "Edit page",
+      "title_field": "Title",
+      "type": "Type",
+      "status": "Status",
+      "flavor": "Flavor",
+      "confidence": "Confidence",
+      "aliases": "Aliases",
+      "aliases_hint": "Comma-separated",
+      "body_label": "Body (markdown)",
+      "preview": "Preview",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved_toast": "Page saved",
+      "discard_modal_title": "Discard unsaved changes?",
+      "discard_modal_desc": "Your edits will be lost.",
+      "discard_button": "Discard",
+      "loading": "Loading…"
+    }
   },
   "sessions": {
     "title": "Sessions",
