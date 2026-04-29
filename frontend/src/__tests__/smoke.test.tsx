@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("i18next-http-backend", () => ({
   default: {
@@ -24,7 +25,12 @@ beforeAll(async () => {
 
 describe("App smoke", () => {
   it("renders the Layout shell", async () => {
-    render(<App />);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <App />
+      </QueryClientProvider>,
+    );
     await waitFor(() =>
       expect(screen.getByRole("banner")).toBeInTheDocument(),
     );

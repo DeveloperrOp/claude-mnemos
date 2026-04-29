@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("i18next-http-backend", () => ({
   default: {
@@ -23,14 +24,17 @@ beforeAll(async () => {
 
 describe("Layout", () => {
   it("renders TopBar slot, Sidebar slot, and Outlet content", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<div>page-body</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<div>page-body</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     expect(screen.getByRole("banner")).toBeInTheDocument(); // TopBar = <header>
     expect(screen.getByRole("navigation")).toBeInTheDocument(); // Sidebar = <nav>

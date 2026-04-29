@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/ui.store";
+import { ProjectSwitcher } from "./ProjectSwitcher";
 
 const LOCALE_CYCLE = ["uk", "ru", "en"] as const;
 type Locale = (typeof LOCALE_CYCLE)[number];
@@ -27,6 +28,7 @@ export function TopBar() {
         <Link to="/" className="font-semibold">
           claude-mnemos
         </Link>
+        <ProjectSwitcher />
       </div>
       <div className="flex items-center gap-2">
         <Button
