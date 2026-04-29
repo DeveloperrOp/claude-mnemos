@@ -89,7 +89,12 @@
     "no_pages": "Сторінок не знайдено",
     "edit_disabled": "Редагування з'явиться в #14c",
     "verify_disabled": "Підтвердження з'явиться в #14c",
-    "delete_disabled": "Видалення з'явиться в #14c"
+    "delete_disabled": "Видалення з'явиться в #14c",
+    "backlinks": "Зворотні посилання",
+    "no_backlinks": "Зворотних посилань немає",
+    "copy_wikilink": "Скопіювати wikilink",
+    "not_found_title": "Сторінку не знайдено",
+    "not_found_hint": "Повернутись назад"
   },
   "wiki": {
     "status": {

@@ -89,7 +89,12 @@
     "no_pages": "Страниц не найдено",
     "edit_disabled": "Редактирование появится в #14c",
     "verify_disabled": "Подтверждение появится в #14c",
-    "delete_disabled": "Удаление появится в #14c"
+    "delete_disabled": "Удаление появится в #14c",
+    "backlinks": "Обратные ссылки",
+    "no_backlinks": "Обратных ссылок нет",
+    "copy_wikilink": "Скопировать wikilink",
+    "not_found_title": "Страница не найдена",
+    "not_found_hint": "Вернуться назад"
   },
   "wiki": {
     "status": {
