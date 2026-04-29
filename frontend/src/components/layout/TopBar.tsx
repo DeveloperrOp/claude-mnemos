@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/ui.store";
 import { ProjectSwitcher } from "./ProjectSwitcher";
+import { UsageWidget } from "@/components/widgets/UsageWidget";
 
 const LOCALE_CYCLE = ["uk", "ru", "en"] as const;
 type Locale = (typeof LOCALE_CYCLE)[number];
@@ -30,7 +31,8 @@ export function TopBar() {
         </Link>
         <ProjectSwitcher />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        <UsageWidget />
         <Button
           variant="ghost"
           size="sm"
