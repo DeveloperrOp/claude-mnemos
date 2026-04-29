@@ -18,6 +18,7 @@
     "snapshots": "Snapshots",
     "health": "Health",
     "settings": "Settings",
+    "failed_jobs": "Failed jobs",
     "metrics": "Metrics",
     "help": "Help"
   },
@@ -54,7 +55,19 @@
   "health": {
     "ok": "OK",
     "degraded": "Degraded",
-    "down": "Down"
+    "down": "Down",
+    "title": "Health",
+    "watchdog_running": "Watchdog running",
+    "watchdog_down": "Watchdog down",
+    "jobs_queued": "Queued",
+    "jobs_running": "Running",
+    "jobs_dead_letter": "Failed",
+    "scheduler_jobs": "Scheduler jobs",
+    "no_scheduler_jobs": "No scheduled jobs",
+    "alerts_count": "Alerts",
+    "vault_not_mounted_title": "Vault not mounted",
+    "vault_not_mounted_hint": "Mount via mnemos daemon start",
+    "view_failed_jobs": "View failed jobs"
   },
   "usage": {
     "title": "Usage",
@@ -180,5 +193,91 @@
       "concept": "Concept",
       "source": "Source"
     }
+  },
+  "trash": {
+    "title": "Trash",
+    "deleted_at": "deleted at",
+    "operation_type": "operation",
+    "restorable": "Restorable",
+    "blocked": "Blocked",
+    "restore_disabled": "Restore (#14c)",
+    "delete_permanently_disabled": "Delete permanently (#14c)",
+    "no_entries": "Trash is empty",
+    "showing_n": "{{count}} entries"
+  },
+  "snapshots": {
+    "title": "Snapshots",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Daily",
+      "manual": "Manual",
+      "all": "All"
+    },
+    "filter_kind": "Kind",
+    "label": "label",
+    "op_id": "operation",
+    "op_type": "type",
+    "size": "size",
+    "no_snapshots": "No snapshots yet",
+    "showing_n": "{{count}} snapshots",
+    "restore_disabled": "Restore (#14c)",
+    "delete_disabled": "Delete (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Lost sessions",
+    "scan": "Scan",
+    "scanning": "Scanning...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "size",
+    "mtime": "mtime",
+    "transcript": "transcript",
+    "no_lost": "All accounted for",
+    "showing_n": "{{count}} sessions",
+    "import_disabled": "Import (#14c)",
+    "ignore_disabled": "Ignore (#14c)"
+  },
+  "suggestions": {
+    "title": "Suggestions",
+    "filter_status": "Status",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "deferred": "Deferred",
+      "all": "All"
+    },
+    "operation": {
+      "merge_entities": "Merge entities",
+      "rename_entity": "Rename entity",
+      "delete_page": "Delete page"
+    },
+    "confidence": "Confidence",
+    "affected_pages": "Affected pages",
+    "proposed_target": "Proposed target",
+    "reason": "Reason",
+    "body_header": "Reasoning",
+    "no_suggestions": "No suggestions",
+    "showing_n": "{{count}} suggestions",
+    "approve_disabled": "Approve (#14c)",
+    "reject_disabled": "Reject (#14c)",
+    "defer_disabled": "Defer (#14c)"
+  },
+  "dead_letter": {
+    "title": "Failed jobs",
+    "no_failed": "No failed jobs",
+    "showing_n": "{{count}} jobs",
+    "kind": "kind",
+    "attempt": "attempt",
+    "attempt_n_of_m": "Attempt {{n}}/{{max}}",
+    "finished_at": "finished",
+    "error": "error",
+    "traceback": "traceback",
+    "payload": "payload",
+    "retry_disabled": "Retry (#14c)",
+    "dismiss_disabled": "Dismiss (#14c)",
+    "view_details": "Detail",
+    "not_found_title": "Job not found",
+    "not_found_hint": "This job ID is unknown or already cleared."
   }
 }

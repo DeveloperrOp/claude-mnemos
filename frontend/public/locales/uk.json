@@ -18,6 +18,7 @@
     "snapshots": "Знімки",
     "health": "Здоров'я",
     "settings": "Налаштування",
+    "failed_jobs": "Помилки",
     "metrics": "Метрики",
     "help": "Допомога"
   },
@@ -54,7 +55,19 @@
   "health": {
     "ok": "Добре",
     "degraded": "Деградовано",
-    "down": "Недоступний"
+    "down": "Недоступний",
+    "title": "Здоров'я",
+    "watchdog_running": "Watchdog активний",
+    "watchdog_down": "Watchdog не запущено",
+    "jobs_queued": "У черзі",
+    "jobs_running": "Виконуються",
+    "jobs_dead_letter": "Збійні",
+    "scheduler_jobs": "Заплановані задачі",
+    "no_scheduler_jobs": "Немає запланованих",
+    "alerts_count": "Сповіщення",
+    "vault_not_mounted_title": "Vault не змонтовано",
+    "vault_not_mounted_hint": "Запустіть через mnemos daemon start",
+    "view_failed_jobs": "Дивитись збійні задачі"
   },
   "usage": {
     "title": "Використання",
@@ -180,5 +193,91 @@
       "concept": "Концепт",
       "source": "Джерело"
     }
+  },
+  "trash": {
+    "title": "Кошик",
+    "deleted_at": "видалено",
+    "operation_type": "операція",
+    "restorable": "Можна відновити",
+    "blocked": "Заблоковано",
+    "restore_disabled": "Відновити (#14c)",
+    "delete_permanently_disabled": "Видалити назавжди (#14c)",
+    "no_entries": "Кошик порожній",
+    "showing_n": "{{count}} записів"
+  },
+  "snapshots": {
+    "title": "Знімки",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Щоденний",
+      "manual": "Ручний",
+      "all": "Усі"
+    },
+    "filter_kind": "Тип",
+    "label": "мітка",
+    "op_id": "операція",
+    "op_type": "тип",
+    "size": "розмір",
+    "no_snapshots": "Немає знімків",
+    "showing_n": "{{count}} знімків",
+    "restore_disabled": "Відновити (#14c)",
+    "delete_disabled": "Видалити (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Загублені сесії",
+    "scan": "Сканувати",
+    "scanning": "Сканування...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "розмір",
+    "mtime": "змінено",
+    "transcript": "транскрипт",
+    "no_lost": "Усі сесії обліковані",
+    "showing_n": "{{count}} сесій",
+    "import_disabled": "Імпортувати (#14c)",
+    "ignore_disabled": "Ігнорувати (#14c)"
+  },
+  "suggestions": {
+    "title": "Пропозиції",
+    "filter_status": "Статус",
+    "status": {
+      "pending": "Очікують",
+      "approved": "Затверджені",
+      "rejected": "Відхилені",
+      "deferred": "Відкладені",
+      "all": "Усі"
+    },
+    "operation": {
+      "merge_entities": "Об'єднати сутності",
+      "rename_entity": "Перейменувати сутність",
+      "delete_page": "Видалити сторінку"
+    },
+    "confidence": "Впевненість",
+    "affected_pages": "Залучені сторінки",
+    "proposed_target": "Цільова сторінка",
+    "reason": "Причина",
+    "body_header": "Обґрунтування",
+    "no_suggestions": "Немає пропозицій",
+    "showing_n": "{{count}} пропозицій",
+    "approve_disabled": "Затвердити (#14c)",
+    "reject_disabled": "Відхилити (#14c)",
+    "defer_disabled": "Відкласти (#14c)"
+  },
+  "dead_letter": {
+    "title": "Збійні задачі",
+    "no_failed": "Немає збоїв",
+    "showing_n": "{{count}} задач",
+    "kind": "тип",
+    "attempt": "спроба",
+    "attempt_n_of_m": "Спроба {{n}}/{{max}}",
+    "finished_at": "завершено",
+    "error": "помилка",
+    "traceback": "трасування",
+    "payload": "payload",
+    "retry_disabled": "Повторити (#14c)",
+    "dismiss_disabled": "Відхилити (#14c)",
+    "view_details": "Детально",
+    "not_found_title": "Задачу не знайдено",
+    "not_found_hint": "Цей ID невідомий або вже очищений."
   }
 }

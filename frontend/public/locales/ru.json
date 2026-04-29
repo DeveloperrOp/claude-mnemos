@@ -18,6 +18,7 @@
     "snapshots": "Снимки",
     "health": "Здоровье",
     "settings": "Настройки",
+    "failed_jobs": "Ошибки",
     "metrics": "Метрики",
     "help": "Помощь"
   },
@@ -54,7 +55,19 @@
   "health": {
     "ok": "Хорошо",
     "degraded": "Деградировано",
-    "down": "Недоступно"
+    "down": "Недоступно",
+    "title": "Здоровье",
+    "watchdog_running": "Watchdog работает",
+    "watchdog_down": "Watchdog остановлен",
+    "jobs_queued": "В очереди",
+    "jobs_running": "Выполняются",
+    "jobs_dead_letter": "Сбойные",
+    "scheduler_jobs": "Запланированные задачи",
+    "no_scheduler_jobs": "Нет запланированных",
+    "alerts_count": "Уведомления",
+    "vault_not_mounted_title": "Vault не смонтирован",
+    "vault_not_mounted_hint": "Запустите через mnemos daemon start",
+    "view_failed_jobs": "Посмотреть сбойные задачи"
   },
   "usage": {
     "title": "Использование",
@@ -180,5 +193,91 @@
       "concept": "Концепт",
       "source": "Источник"
     }
+  },
+  "trash": {
+    "title": "Корзина",
+    "deleted_at": "удалено",
+    "operation_type": "операция",
+    "restorable": "Можно восстановить",
+    "blocked": "Заблокировано",
+    "restore_disabled": "Восстановить (#14c)",
+    "delete_permanently_disabled": "Удалить навсегда (#14c)",
+    "no_entries": "Корзина пуста",
+    "showing_n": "{{count}} записей"
+  },
+  "snapshots": {
+    "title": "Снимки",
+    "kind": {
+      "pre-op": "Pre-op",
+      "daily": "Ежедневный",
+      "manual": "Ручной",
+      "all": "Все"
+    },
+    "filter_kind": "Тип",
+    "label": "метка",
+    "op_id": "операция",
+    "op_type": "тип",
+    "size": "размер",
+    "no_snapshots": "Нет снимков",
+    "showing_n": "{{count}} снимков",
+    "restore_disabled": "Восстановить (#14c)",
+    "delete_disabled": "Удалить (#14c)"
+  },
+  "lost_sessions": {
+    "title": "Потерянные сессии",
+    "scan": "Сканировать",
+    "scanning": "Сканирование...",
+    "session_id": "session_id",
+    "sha": "sha",
+    "size": "размер",
+    "mtime": "изменено",
+    "transcript": "транскрипт",
+    "no_lost": "Все сессии учтены",
+    "showing_n": "{{count}} сессий",
+    "import_disabled": "Импортировать (#14c)",
+    "ignore_disabled": "Игнорировать (#14c)"
+  },
+  "suggestions": {
+    "title": "Предложения",
+    "filter_status": "Статус",
+    "status": {
+      "pending": "Ожидают",
+      "approved": "Одобрены",
+      "rejected": "Отклонены",
+      "deferred": "Отложены",
+      "all": "Все"
+    },
+    "operation": {
+      "merge_entities": "Объединить сущности",
+      "rename_entity": "Переименовать сущность",
+      "delete_page": "Удалить страницу"
+    },
+    "confidence": "Уверенность",
+    "affected_pages": "Затронутые страницы",
+    "proposed_target": "Целевая страница",
+    "reason": "Причина",
+    "body_header": "Обоснование",
+    "no_suggestions": "Нет предложений",
+    "showing_n": "{{count}} предложений",
+    "approve_disabled": "Одобрить (#14c)",
+    "reject_disabled": "Отклонить (#14c)",
+    "defer_disabled": "Отложить (#14c)"
+  },
+  "dead_letter": {
+    "title": "Сбойные задачи",
+    "no_failed": "Нет сбоев",
+    "showing_n": "{{count}} задач",
+    "kind": "тип",
+    "attempt": "попытка",
+    "attempt_n_of_m": "Попытка {{n}}/{{max}}",
+    "finished_at": "завершено",
+    "error": "ошибка",
+    "traceback": "трассировка",
+    "payload": "payload",
+    "retry_disabled": "Повторить (#14c)",
+    "dismiss_disabled": "Отменить (#14c)",
+    "view_details": "Детально",
+    "not_found_title": "Задача не найдена",
+    "not_found_hint": "Этот ID неизвестен или уже очищен."
   }
 }
