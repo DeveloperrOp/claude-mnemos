@@ -36,7 +36,7 @@ export function TypedConfirmDialog({
   const { t } = useTranslation();
   const [typed, setTyped] = useState("");
 
-  const matches = typed === expectedPhrase;
+  const matches = expectedPhrase.length > 0 && typed === expectedPhrase;
 
   return (
     <AlertDialog

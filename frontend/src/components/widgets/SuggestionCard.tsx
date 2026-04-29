@@ -149,7 +149,7 @@ export function SuggestionCard({ project, suggestion: s }: Props) {
         </CardContent>
       </Card>
 
-      {isDelete ? (
+      {isDelete && targetBasename ? (
         <TypedConfirmDialog
           open={approveOpen}
           onOpenChange={setApproveOpen}
