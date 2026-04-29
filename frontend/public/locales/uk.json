@@ -44,7 +44,8 @@
     "daemon_down_title": "Демон недоступний",
     "daemon_down_hint_cmd": "Запустіть демон:",
     "daemon_down_hint_command": "mnemos daemon start",
-    "daemon_down_reconnect": "Дашборд автоматично перепідключиться."
+    "daemon_down_reconnect": "Дашборд автоматично перепідключиться.",
+    "rate_limited_until": "Rate limit — відновиться о {{time}}"
   },
   "project_view": {
     "open_in_obsidian": "Відкрити в Obsidian",

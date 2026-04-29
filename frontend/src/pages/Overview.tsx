@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useProjects } from "@/hooks/useProjects";
 import { useHealth } from "@/hooks/useHealth";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
@@ -7,6 +8,7 @@ import { NoProjectsCallout } from "@/components/widgets/NoProjectsCallout";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function Overview() {
+  const { t } = useTranslation();
   const projectsQuery = useProjects();
   const healthQuery = useHealth();
   const usageQuery = useUsageByProject("30d");
@@ -34,18 +36,34 @@ export function Overview() {
     (usageQuery.data ?? []).map((u) => [u.project as string, u]),
   );
 
+  const pausedUntil = healthQuery.data?.queue_paused_until ?? null;
+  const showRateLimitBanner =
+    pausedUntil !== null && new Date(pausedUntil) > new Date();
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-      {projects.map((p) => (
-        <ProjectCard
-          key={p.name}
-          project={p}
-          vault_health={healthQuery.data?.vaults?.[p.name]}
-          usage={usageByName.get(p.name) as
-            | { sessions_covered?: number; avg_compression_ratio?: number }
-            | undefined}
-        />
-      ))}
+    <div className="space-y-4">
+      {showRateLimitBanner && (
+        <div
+          role="status"
+          className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm dark:border-amber-700 dark:bg-amber-950"
+        >
+          {t("overview.rate_limited_until", {
+            time: new Date(pausedUntil!).toLocaleTimeString(),
+          })}
+        </div>
+      )}
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {projects.map((p) => (
+          <ProjectCard
+            key={p.name}
+            project={p}
+            vault_health={healthQuery.data?.vaults?.[p.name]}
+            usage={usageByName.get(p.name) as
+              | { sessions_covered?: number; avg_compression_ratio?: number }
+              | undefined}
+          />
+        ))}
+      </div>
     </div>
   );
 }

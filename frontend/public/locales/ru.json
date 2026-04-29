@@ -44,7 +44,8 @@
     "daemon_down_title": "Daemon недоступен",
     "daemon_down_hint_cmd": "Запустите daemon:",
     "daemon_down_hint_command": "mnemos daemon start",
-    "daemon_down_reconnect": "Дашборд переподключится автоматически."
+    "daemon_down_reconnect": "Дашборд переподключится автоматически.",
+    "rate_limited_until": "Rate limit — возобновится в {{time}}"
   },
   "project_view": {
     "open_in_obsidian": "Открыть в Obsidian",

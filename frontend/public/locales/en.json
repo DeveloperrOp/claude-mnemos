@@ -44,7 +44,8 @@
     "daemon_down_title": "Daemon unavailable",
     "daemon_down_hint_cmd": "Start the daemon:",
     "daemon_down_hint_command": "mnemos daemon start",
-    "daemon_down_reconnect": "The dashboard will reconnect automatically."
+    "daemon_down_reconnect": "The dashboard will reconnect automatically.",
+    "rate_limited_until": "Rate limited — resumes at {{time}}"
   },
   "project_view": {
     "open_in_obsidian": "Open in Obsidian",

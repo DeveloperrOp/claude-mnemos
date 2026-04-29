@@ -23,5 +23,6 @@ export const HealthSchema = z.object({
   vaults: z.record(z.string(), VaultHealthSchema),
   jobs_alert: z.boolean(),
   scheduler_jobs: z.array(SchedulerJobInfoSchema).default([]),
+  queue_paused_until: z.string().datetime().nullable().default(null),
 });
 export type Health = z.infer<typeof HealthSchema>;
