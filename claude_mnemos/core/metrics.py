@@ -88,13 +88,13 @@ def usage_summary(
     Args:
         vault: Vault root containing ``.manifest.json``.
         period_days: Window length in days, ending on ``today`` (inclusive).
-        today: Reference date; defaults to ``date.today()``. Tests inject this
+        today: Reference date; defaults to today (UTC). Tests inject this
             to keep results deterministic.
 
     Returns:
         :class:`UsageSummary` with per-window totals and tokens-per-byte ratio.
     """
-    today = today or date_class.today()
+    today = today or datetime.now(UTC).date()
     cutoff = today - timedelta(days=period_days)
 
     manifest = Manifest.load(vault)
