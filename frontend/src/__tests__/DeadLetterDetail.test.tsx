@@ -9,7 +9,6 @@ import { DeadLetterDetail } from "../pages/DeadLetterDetail";
 beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
     dead_letter: {
-      retry_disabled: "Retry (#14c)", dismiss_disabled: "Dismiss (#14c)",
       retry_button: "Retry", dismiss_button: "Dismiss",
       retried_toast: "Job re-queued", dismissed_toast: "Job dismissed",
       dismiss_modal_title: "Dismiss failed job?",

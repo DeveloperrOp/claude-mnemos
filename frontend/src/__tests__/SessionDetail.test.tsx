@@ -13,7 +13,6 @@ beforeAll(() => {
       tokens_in: "in", tokens_out: "out", model: "model", ingested_at: "at",
       created_pages: "pages", no_pages_created: "no pages",
       transcript: "transcript",
-      ingest_disabled: "Ingest (#14c)",
       ingest_button: "Ingest",
       ingested_toast: "Ingest queued",
       not_found_title: "Session not found",

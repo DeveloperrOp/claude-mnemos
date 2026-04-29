@@ -18,7 +18,6 @@ beforeAll(() => {
         can_undo: "Can undo",
         cannot_undo: "Cannot undo",
         undone: "Undone",
-        undo_disabled: "Undo (#14c)",
         undo_button: "Undo",
         undone_toast: "Operation undone",
         undo_modal_title: "Undo this operation?",

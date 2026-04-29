@@ -12,7 +12,6 @@ beforeAll(() => {
       title: "Failed jobs", no_failed: "No failed jobs",
       showing_n: "{{count}} jobs", attempt_n_of_m: "Attempt {{n}}/{{max}}",
       finished_at: "finished",
-      retry_disabled: "Retry (#14c)", dismiss_disabled: "Dismiss (#14c)",
       retry_button: "Retry", dismiss_button: "Dismiss",
       retried_toast: "Job re-queued", dismissed_toast: "Job dismissed",
       dismiss_modal_title: "Dismiss failed job?",

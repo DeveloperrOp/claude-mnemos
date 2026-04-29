@@ -23,7 +23,6 @@ beforeAll(() => {
       reason: "Reason", body_header: "Reasoning",
       no_suggestions: "No suggestions",
       showing_n: "{{count}} suggestions",
-      approve_disabled: "Approve (#14c)", reject_disabled: "Reject (#14c)", defer_disabled: "Defer (#14c)",
       approved_toast: "Suggestion approved",
       rejected_toast: "Suggestion rejected",
       deferred_toast: "Suggestion deferred",

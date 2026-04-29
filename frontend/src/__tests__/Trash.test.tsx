@@ -14,8 +14,6 @@ beforeAll(() => {
       operation_type: "op",
       restorable: "Restorable",
       blocked: "Blocked",
-      restore_disabled: "Restore (#14c)",
-      delete_permanently_disabled: "Delete (#14c)",
       no_entries: "No trash",
       showing_n: "{{count}} entries",
       restored_toast: "Restored",
