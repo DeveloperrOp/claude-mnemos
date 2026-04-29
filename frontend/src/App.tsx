@@ -1,4 +1,5 @@
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, RouterProvider, useParams } from "react-router";
+import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout/Layout";
 import { Overview } from "./pages/Overview";
 import { ProjectView } from "./pages/ProjectView";
@@ -6,6 +7,7 @@ import { Help } from "./pages/Help";
 import { Placeholder } from "./pages/Placeholder";
 import { PagesBrowser } from "./pages/PagesBrowser";
 import { PageDetail } from "./pages/PageDetail";
+import { PageEdit } from "./pages/PageEdit";
 import { Sessions } from "./pages/Sessions";
 import { SessionDetail } from "./pages/SessionDetail";
 import { ActivityCenter } from "./pages/ActivityCenter";
@@ -17,6 +19,14 @@ import { Health } from "./pages/Health";
 import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
+
+// react-router v7 splats must be path-final, so a literal `pages/*/edit` route
+// cannot exist. Both PageDetail and PageEdit share `pages/*`; this switch
+// dispatches based on whether the splat ends in `/edit`.
+function PagesRouteSwitch() {
+  const { "*": rest } = useParams<{ "*": string }>();
+  return rest?.endsWith("/edit") ? <PageEdit /> : <PageDetail />;
+}
 
 const router = createBrowserRouter([
   {
@@ -30,7 +40,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <ProjectView /> },
           { path: "pages", element: <PagesBrowser /> },
-          { path: "pages/*", element: <PageDetail /> },
+          { path: "pages/*", element: <PagesRouteSwitch /> },
           { path: "sessions", element: <Sessions /> },
           { path: "sessions/:sid", element: <SessionDetail /> },
           { path: "activity", element: <ActivityCenter /> },
@@ -54,5 +64,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster richColors position="bottom-right" />
+    </>
+  );
 }

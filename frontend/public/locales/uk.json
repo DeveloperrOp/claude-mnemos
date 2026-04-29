@@ -6,6 +6,12 @@
     "open": "Відкрити",
     "retry": "Повторити"
   },
+  "confirm": {
+    "cancel": "Скасувати",
+    "confirm": "Підтвердити",
+    "working": "Виконується...",
+    "typed_confirm_input_placeholder": "Введіть {{phrase}} для підтвердження"
+  },
   "navigation": {
     "overview": "Огляд",
     "pages": "Сторінки",
@@ -103,11 +109,37 @@
     "edit_disabled": "Редагування з'явиться в #14c",
     "verify_disabled": "Підтвердження з'явиться в #14c",
     "delete_disabled": "Видалення з'явиться в #14c",
+    "edit_button": "Редагувати",
+    "verify_button": "Перевірити",
+    "delete_button": "Видалити",
+    "verified_toast": "Сторінку перевірено",
+    "deleted_toast": "Переміщено до кошика",
+    "delete_modal_title": "Перемістити до кошика?",
+    "delete_modal_desc": "Сторінка переміщується до /trash і її можна відновити звідти.",
     "backlinks": "Зворотні посилання",
     "no_backlinks": "Зворотних посилань немає",
     "copy_wikilink": "Скопіювати wikilink",
     "not_found_title": "Сторінку не знайдено",
-    "not_found_hint": "Повернутись назад"
+    "not_found_hint": "Повернутись назад",
+    "editor": {
+      "title": "Редагувати сторінку",
+      "title_field": "Заголовок",
+      "type": "Тип",
+      "status": "Статус",
+      "flavor": "Стиль",
+      "confidence": "Впевненість",
+      "aliases": "Псевдоніми",
+      "aliases_hint": "Через кому",
+      "body_label": "Текст (markdown)",
+      "preview": "Перегляд",
+      "save": "Зберегти",
+      "cancel": "Скасувати",
+      "saved_toast": "Сторінку збережено",
+      "discard_modal_title": "Відкинути незбережені зміни?",
+      "discard_modal_desc": "Ваші зміни будуть втрачені.",
+      "discard_button": "Відкинути",
+      "loading": "Завантаження…"
+    }
   },
   "sessions": {
     "title": "Сесії",
@@ -131,6 +163,8 @@
     "no_pages_created": "Сторінок не створено",
     "showing_n_of_m": "{{shown}} з {{total}}",
     "ingest_disabled": "Повторно завантажити (з'явиться в #14c)",
+    "ingest_button": "Інжест",
+    "ingested_toast": "Інжест у черзі",
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад"
   },
@@ -164,6 +198,10 @@
     "affected_pages": "{{count}} сторінок",
     "detail": "Деталі",
     "undo_disabled": "Скасування (#14c)",
+    "undo_button": "Скасувати",
+    "undone_toast": "Операцію скасовано",
+    "undo_modal_title": "Скасувати цю операцію?",
+    "undo_modal_desc": "Це поверне усі сторінки, торкнуті цією операцією, до стану до її виконання.",
     "no_activity": "Активності поки немає",
     "metadata": "Метадані",
     "snapshot": "Знімок",
@@ -203,7 +241,16 @@
     "restore_disabled": "Відновити (#14c)",
     "delete_permanently_disabled": "Видалити назавжди (#14c)",
     "no_entries": "Кошик порожній",
-    "showing_n": "{{count}} записів"
+    "showing_n": "{{count}} записів",
+    "restored_toast": "Відновлено",
+    "permanently_deleted_toast": "Видалено назавжди",
+    "restore_modal_title": "Відновити сторінку?",
+    "restore_modal_desc": "Перемістити {{name}} назад.",
+    "restore_button": "Відновити",
+    "delete_permanent_modal_title": "Видалити назавжди?",
+    "delete_permanent_modal_desc": "Це незворотно. Введіть назву сторінки для підтвердження.",
+    "delete_permanent_typed_label": "Введіть назву сторінки",
+    "delete_permanent_button": "Видалити назавжди"
   },
   "snapshots": {
     "title": "Знімки",
@@ -221,7 +268,22 @@
     "no_snapshots": "Немає знімків",
     "showing_n": "{{count}} знімків",
     "restore_disabled": "Відновити (#14c)",
-    "delete_disabled": "Видалити (#14c)"
+    "delete_disabled": "Видалити (#14c)",
+    "created_toast": "Снапшот створено",
+    "deleted_toast": "Снапшот видалено",
+    "restored_toast": "Vault відновлено",
+    "restore_modal_title": "Відновити vault зі снапшоту?",
+    "restore_modal_desc": "Це поверне УСІ сторінки до стану на момент снапшоту. Операції після нього будуть втрачені.",
+    "restore_typed_label": "Введіть назву снапшоту",
+    "restore_button": "Відновити",
+    "delete_modal_title": "Видалити снапшот?",
+    "delete_modal_desc": "Видаляє резервну копію. Незворотно.",
+    "delete_button": "Видалити",
+    "create_button": "Створити снапшот",
+    "create_modal_title": "Створити ручний снапшот",
+    "create_label_label": "Мітка (опціонально)",
+    "create_label_placeholder": "напр., перед-очищенням",
+    "create_submit": "Створити"
   },
   "lost_sessions": {
     "title": "Загублені сесії",
@@ -234,8 +296,12 @@
     "transcript": "транскрипт",
     "no_lost": "Усі сесії обліковані",
     "showing_n": "{{count}} сесій",
-    "import_disabled": "Імпортувати (#14c)",
-    "ignore_disabled": "Ігнорувати (#14c)"
+    "import_button": "Імпортувати",
+    "ignore_button": "Ігнорувати",
+    "imported_toast": "Імпорт у черзі",
+    "ignored_toast": "Позначено як ігнорувати",
+    "ignore_modal_title": "Позначити сесію як ігнорувати?",
+    "ignore_modal_desc": "Це сховає сесію зі списку загублених. Файл транскрипту не видаляється."
   },
   "suggestions": {
     "title": "Пропозиції",
@@ -261,7 +327,18 @@
     "showing_n": "{{count}} пропозицій",
     "approve_disabled": "Затвердити (#14c)",
     "reject_disabled": "Відхилити (#14c)",
-    "defer_disabled": "Відкласти (#14c)"
+    "defer_disabled": "Відкласти (#14c)",
+    "approved_toast": "Пропозицію затверджено",
+    "rejected_toast": "Пропозицію відхилено",
+    "deferred_toast": "Пропозицію відкладено",
+    "approve_button": "Затвердити",
+    "reject_button": "Відхилити",
+    "defer_button": "Відкласти",
+    "approve_modal_title": "Застосувати пропозицію?",
+    "approve_modal_desc": "Виконає операцію {{operation}} над {{count}} сторінками.",
+    "approve_delete_modal_title": "Застосувати видалення сторінки?",
+    "approve_delete_modal_desc": "Сторінка буде видалена з vault. Введіть назву сторінки для підтвердження.",
+    "approve_delete_typed_label": "Введіть назву сторінки"
   },
   "dead_letter": {
     "title": "Збійні задачі",
@@ -276,6 +353,12 @@
     "payload": "payload",
     "retry_disabled": "Повторити (#14c)",
     "dismiss_disabled": "Відхилити (#14c)",
+    "retry_button": "Повторити",
+    "dismiss_button": "Відхилити",
+    "retried_toast": "Задачу повторно поставлено в чергу",
+    "dismissed_toast": "Задачу відхилено",
+    "dismiss_modal_title": "Відхилити збійну задачу?",
+    "dismiss_modal_desc": "Це назавжди видаляє задачу з черги збоїв.",
     "view_details": "Детально",
     "not_found_title": "Задачу не знайдено",
     "not_found_hint": "Цей ID невідомий або вже очищений."

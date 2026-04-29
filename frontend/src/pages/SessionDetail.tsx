@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/useSession";
+import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
 import { pageHref } from "@/lib/pageHref";
 import type { SessionStatus } from "@/types/Session";
@@ -19,6 +20,7 @@ export function SessionDetail() {
   const { name: project, sid } = useParams<{ name: string; sid: string }>();
   const { t } = useTranslation();
   const sessionQuery = useSession(project, sid);
+  const ingest = useSessionIngest();
 
   if (sessionQuery.isLoading) return <Skeleton className="h-64 w-full" />;
   if (sessionQuery.isError) {
@@ -40,8 +42,22 @@ export function SessionDetail() {
         <Link to={`/project/${project}/sessions`} className="text-sm text-[hsl(var(--primary))] underline">
           ← {t("navigation.sessions")}
         </Link>
-        <Button size="sm" variant="outline" disabled title={t("sessions.ingest_disabled")}>
-          {t("sessions.ingest_disabled")}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={ingest.isPending || !s.transcript_path}
+          onClick={() => {
+            if (project && sid && s.transcript_path) {
+              ingest.mutate({
+                project,
+                session_id: sid,
+                transcript_path: s.transcript_path,
+              });
+            }
+          }}
+          title={t("sessions.ingest_button")}
+        >
+          {t("sessions.ingest_button")}
         </Button>
       </div>
 

@@ -1,27 +1,36 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { ExternalLink, Copy, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjects } from "@/hooks/useProjects";
 import { usePage } from "@/hooks/usePage";
 import { usePageBacklinks } from "@/hooks/usePageBacklinks";
+import { usePageVerify } from "@/hooks/usePageVerify";
+import { usePageDelete } from "@/hooks/usePageDelete";
 import { ConfidenceBar } from "@/components/widgets/ConfidenceBar";
+import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { FlavorTags } from "@/components/widgets/FlavorTags";
 import { ProvenanceIndicator } from "@/components/widgets/ProvenanceIndicator";
 import { StatusBadge } from "@/components/widgets/StatusBadge";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
-import { pageHref } from "@/lib/pageHref";
+import { pageHref, pagePathSegments } from "@/lib/pageHref";
 
 export function PageDetail() {
   const { name: project, "*": pageRefRaw } = useParams<{ name: string; "*": string }>();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const pageRef = pageRefRaw ?? "";
   const projects = useProjects();
   const project_entry = projects.data?.find((p) => p.name === project);
 
   const pageQuery = usePage(project, pageRef);
   const backlinksQuery = usePageBacklinks(project, pageRef);
+
+  const verify = usePageVerify();
+  const remove = usePageDelete();
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (pageQuery.isLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -56,14 +65,35 @@ export function PageDetail() {
           ← {t("navigation.pages")}
         </Link>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" disabled title={t("pages.edit_disabled")}>
-            <Pencil className="mr-1 h-3 w-3" /> {t("pages.edit_disabled")}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              navigate(
+                `/project/${encodeURIComponent(project!)}/pages/${pagePathSegments(pageRef)}/edit`,
+              )
+            }
+            title={t("pages.edit_button")}
+          >
+            <Pencil className="mr-1 h-3 w-3" /> {t("pages.edit_button")}
           </Button>
-          <Button size="sm" variant="outline" disabled title={t("pages.verify_disabled")}>
-            <ShieldCheck className="mr-1 h-3 w-3" /> {t("pages.verify_disabled")}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={verify.isPending}
+            onClick={() => verify.mutate({ project: project!, page_ref: pageRef })}
+            title={t("pages.verify_button")}
+          >
+            <ShieldCheck className="mr-1 h-3 w-3" /> {t("pages.verify_button")}
           </Button>
-          <Button size="sm" variant="outline" disabled title={t("pages.delete_disabled")}>
-            <Trash2 className="mr-1 h-3 w-3" /> {t("pages.delete_disabled")}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={remove.isPending}
+            onClick={() => setDeleteOpen(true)}
+            title={t("pages.delete_button")}
+          >
+            <Trash2 className="mr-1 h-3 w-3" /> {t("pages.delete_button")}
           </Button>
         </div>
       </div>
@@ -118,6 +148,26 @@ export function PageDetail() {
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t("pages.delete_modal_title")}
+        description={t("pages.delete_modal_desc")}
+        confirmLabel={t("pages.delete_button")}
+        destructive
+        onConfirm={() =>
+          remove.mutate(
+            { project: project!, page_ref: pageRef },
+            {
+              onSuccess: () =>
+                navigate(`/project/${encodeURIComponent(project!)}/pages`),
+              onSettled: () => setDeleteOpen(false),
+            },
+          )
+        }
+        isPending={remove.isPending}
+      />
     </article>
   );
 }

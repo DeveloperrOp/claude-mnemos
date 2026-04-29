@@ -24,3 +24,12 @@ export async function getDeadLetter(jobId: string): Promise<Job> {
   const r = await apiClient.get(`/dead-letter/${encodeURIComponent(jobId)}`);
   return JobSchema.parse(r.data);
 }
+
+export async function retryDeadLetter(jobId: string): Promise<Job> {
+  const r = await apiClient.post(`/dead-letter/${encodeURIComponent(jobId)}/retry`);
+  return r.data as Job;
+}
+
+export async function dismissDeadLetter(jobId: string): Promise<void> {
+  await apiClient.delete(`/dead-letter/${encodeURIComponent(jobId)}`);
+}

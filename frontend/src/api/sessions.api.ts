@@ -4,6 +4,7 @@ import {
   SessionViewSchema,
   type SessionView,
 } from "@/types/Session";
+import type { Job } from "@/types/Job";
 
 export interface ListSessionsOptions {
   status?: string;
@@ -32,4 +33,16 @@ export async function getSession(
     `/sessions/${encodeURIComponent(project)}/${encodeURIComponent(sessionId)}`,
   );
   return SessionViewSchema.parse(r.data);
+}
+
+export async function ingestSession(
+  project: string,
+  session_id: string,
+  transcript_path: string,
+): Promise<Job> {
+  const r = await apiClient.post(
+    `/sessions/${encodeURIComponent(project)}/${encodeURIComponent(session_id)}/ingest`,
+    { transcript_path },
+  );
+  return r.data as Job;
 }

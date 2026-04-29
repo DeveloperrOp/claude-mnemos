@@ -6,6 +6,12 @@
     "open": "Открыть",
     "retry": "Повторить"
   },
+  "confirm": {
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "working": "Выполняется...",
+    "typed_confirm_input_placeholder": "Введите {{phrase}} для подтверждения"
+  },
   "navigation": {
     "overview": "Обзор",
     "pages": "Страницы",
@@ -103,11 +109,37 @@
     "edit_disabled": "Редактирование появится в #14c",
     "verify_disabled": "Подтверждение появится в #14c",
     "delete_disabled": "Удаление появится в #14c",
+    "edit_button": "Редактировать",
+    "verify_button": "Подтвердить",
+    "delete_button": "Удалить",
+    "verified_toast": "Страница подтверждена",
+    "deleted_toast": "Перемещено в корзину",
+    "delete_modal_title": "Переместить в корзину?",
+    "delete_modal_desc": "Страница перемещается в /trash и может быть восстановлена оттуда.",
     "backlinks": "Обратные ссылки",
     "no_backlinks": "Обратных ссылок нет",
     "copy_wikilink": "Скопировать wikilink",
     "not_found_title": "Страница не найдена",
-    "not_found_hint": "Вернуться назад"
+    "not_found_hint": "Вернуться назад",
+    "editor": {
+      "title": "Редактировать страницу",
+      "title_field": "Заголовок",
+      "type": "Тип",
+      "status": "Статус",
+      "flavor": "Стиль",
+      "confidence": "Уверенность",
+      "aliases": "Псевдонимы",
+      "aliases_hint": "Через запятую",
+      "body_label": "Текст (markdown)",
+      "preview": "Превью",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "saved_toast": "Страница сохранена",
+      "discard_modal_title": "Отбросить несохранённые изменения?",
+      "discard_modal_desc": "Ваши изменения будут потеряны.",
+      "discard_button": "Отбросить",
+      "loading": "Загрузка…"
+    }
   },
   "sessions": {
     "title": "Сессии",
@@ -131,6 +163,8 @@
     "no_pages_created": "Страниц не создано",
     "showing_n_of_m": "{{shown}} из {{total}}",
     "ingest_disabled": "Повторная загрузка (появится в #14c)",
+    "ingest_button": "Ингест",
+    "ingested_toast": "Ингест в очереди",
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад"
   },
@@ -164,6 +198,10 @@
     "affected_pages": "{{count}} страниц",
     "detail": "Детали",
     "undo_disabled": "Отмена (#14c)",
+    "undo_button": "Отменить",
+    "undone_toast": "Операция отменена",
+    "undo_modal_title": "Отменить эту операцию?",
+    "undo_modal_desc": "Это вернёт все страницы, затронутые операцией, к состоянию до её выполнения.",
     "no_activity": "Активности пока нет",
     "metadata": "Метаданные",
     "snapshot": "Снимок",
@@ -203,7 +241,16 @@
     "restore_disabled": "Восстановить (#14c)",
     "delete_permanently_disabled": "Удалить навсегда (#14c)",
     "no_entries": "Корзина пуста",
-    "showing_n": "{{count}} записей"
+    "showing_n": "{{count}} записей",
+    "restored_toast": "Восстановлено",
+    "permanently_deleted_toast": "Удалено навсегда",
+    "restore_modal_title": "Восстановить страницу?",
+    "restore_modal_desc": "Переместить {{name}} обратно.",
+    "restore_button": "Восстановить",
+    "delete_permanent_modal_title": "Удалить навсегда?",
+    "delete_permanent_modal_desc": "Это необратимо. Введите имя страницы для подтверждения.",
+    "delete_permanent_typed_label": "Введите имя страницы",
+    "delete_permanent_button": "Удалить навсегда"
   },
   "snapshots": {
     "title": "Снимки",
@@ -221,7 +268,22 @@
     "no_snapshots": "Нет снимков",
     "showing_n": "{{count}} снимков",
     "restore_disabled": "Восстановить (#14c)",
-    "delete_disabled": "Удалить (#14c)"
+    "delete_disabled": "Удалить (#14c)",
+    "created_toast": "Снапшот создан",
+    "deleted_toast": "Снапшот удалён",
+    "restored_toast": "Vault восстановлен",
+    "restore_modal_title": "Восстановить vault из снапшота?",
+    "restore_modal_desc": "Это вернёт ВСЕ страницы к состоянию на момент снапшота. Операции после него будут потеряны.",
+    "restore_typed_label": "Введите имя снапшота",
+    "restore_button": "Восстановить",
+    "delete_modal_title": "Удалить снапшот?",
+    "delete_modal_desc": "Удаляет резервную копию. Необратимо.",
+    "delete_button": "Удалить",
+    "create_button": "Создать снапшот",
+    "create_modal_title": "Создать ручной снапшот",
+    "create_label_label": "Метка (опционально)",
+    "create_label_placeholder": "напр., перед-очисткой",
+    "create_submit": "Создать"
   },
   "lost_sessions": {
     "title": "Потерянные сессии",
@@ -234,8 +296,12 @@
     "transcript": "транскрипт",
     "no_lost": "Все сессии учтены",
     "showing_n": "{{count}} сессий",
-    "import_disabled": "Импортировать (#14c)",
-    "ignore_disabled": "Игнорировать (#14c)"
+    "import_button": "Импортировать",
+    "ignore_button": "Игнорировать",
+    "imported_toast": "Импорт в очереди",
+    "ignored_toast": "Помечено как игнорировать",
+    "ignore_modal_title": "Пометить сессию как игнорировать?",
+    "ignore_modal_desc": "Это скроет сессию из списка потерянных. Файл транскрипта не удаляется."
   },
   "suggestions": {
     "title": "Предложения",
@@ -261,7 +327,18 @@
     "showing_n": "{{count}} предложений",
     "approve_disabled": "Одобрить (#14c)",
     "reject_disabled": "Отклонить (#14c)",
-    "defer_disabled": "Отложить (#14c)"
+    "defer_disabled": "Отложить (#14c)",
+    "approved_toast": "Предложение одобрено",
+    "rejected_toast": "Предложение отклонено",
+    "deferred_toast": "Предложение отложено",
+    "approve_button": "Одобрить",
+    "reject_button": "Отклонить",
+    "defer_button": "Отложить",
+    "approve_modal_title": "Применить предложение?",
+    "approve_modal_desc": "Выполнит операцию {{operation}} над {{count}} страницами.",
+    "approve_delete_modal_title": "Применить удаление страницы?",
+    "approve_delete_modal_desc": "Страница будет удалена из vault. Введите имя страницы для подтверждения.",
+    "approve_delete_typed_label": "Введите имя страницы"
   },
   "dead_letter": {
     "title": "Сбойные задачи",
@@ -276,6 +353,12 @@
     "payload": "payload",
     "retry_disabled": "Повторить (#14c)",
     "dismiss_disabled": "Отменить (#14c)",
+    "retry_button": "Повторить",
+    "dismiss_button": "Отклонить",
+    "retried_toast": "Задача переставлена в очередь",
+    "dismissed_toast": "Задача отклонена",
+    "dismiss_modal_title": "Отклонить сбойную задачу?",
+    "dismiss_modal_desc": "Это навсегда удаляет задачу из очереди сбоев.",
     "view_details": "Детально",
     "not_found_title": "Задача не найдена",
     "not_found_hint": "Этот ID неизвестен или уже очищен."

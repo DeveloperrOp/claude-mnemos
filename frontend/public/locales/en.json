@@ -6,6 +6,12 @@
     "open": "Open",
     "retry": "Retry"
   },
+  "confirm": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "working": "Working...",
+    "typed_confirm_input_placeholder": "Type {{phrase}} to confirm"
+  },
   "navigation": {
     "overview": "Overview",
     "pages": "Pages",
@@ -103,11 +109,37 @@
     "edit_disabled": "Editing coming in #14c",
     "verify_disabled": "Verify coming in #14c",
     "delete_disabled": "Delete coming in #14c",
+    "edit_button": "Edit",
+    "verify_button": "Verify",
+    "delete_button": "Delete",
+    "verified_toast": "Page verified",
+    "deleted_toast": "Moved to trash",
+    "delete_modal_title": "Move to trash?",
+    "delete_modal_desc": "The page is moved to /trash and can be restored from there.",
     "backlinks": "Backlinks",
     "no_backlinks": "No backlinks",
     "copy_wikilink": "Copy wikilink",
     "not_found_title": "Page not found",
-    "not_found_hint": "Go back"
+    "not_found_hint": "Go back",
+    "editor": {
+      "title": "Edit page",
+      "title_field": "Title",
+      "type": "Type",
+      "status": "Status",
+      "flavor": "Flavor",
+      "confidence": "Confidence",
+      "aliases": "Aliases",
+      "aliases_hint": "Comma-separated",
+      "body_label": "Body (markdown)",
+      "preview": "Preview",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved_toast": "Page saved",
+      "discard_modal_title": "Discard unsaved changes?",
+      "discard_modal_desc": "Your edits will be lost.",
+      "discard_button": "Discard",
+      "loading": "Loading…"
+    }
   },
   "sessions": {
     "title": "Sessions",
@@ -131,6 +163,8 @@
     "no_pages_created": "No pages created",
     "showing_n_of_m": "{{shown}} of {{total}}",
     "ingest_disabled": "Re-ingest (coming in #14c)",
+    "ingest_button": "Ingest",
+    "ingested_toast": "Ingest queued",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back"
   },
@@ -164,6 +198,10 @@
     "affected_pages": "{{count}} pages",
     "detail": "Detail",
     "undo_disabled": "Undo (#14c)",
+    "undo_button": "Undo",
+    "undone_toast": "Operation undone",
+    "undo_modal_title": "Undo this operation?",
+    "undo_modal_desc": "This will revert all pages affected by this operation to their state before it ran.",
     "no_activity": "No activity yet",
     "metadata": "Metadata",
     "snapshot": "Snapshot",
@@ -203,7 +241,16 @@
     "restore_disabled": "Restore (#14c)",
     "delete_permanently_disabled": "Delete permanently (#14c)",
     "no_entries": "Trash is empty",
-    "showing_n": "{{count}} entries"
+    "showing_n": "{{count}} entries",
+    "restored_toast": "Restored",
+    "permanently_deleted_toast": "Permanently deleted",
+    "restore_modal_title": "Restore page?",
+    "restore_modal_desc": "Move {{name}} back to its original location.",
+    "restore_button": "Restore",
+    "delete_permanent_modal_title": "Permanently delete?",
+    "delete_permanent_modal_desc": "This cannot be undone. Type the page name to confirm.",
+    "delete_permanent_typed_label": "Type the page name",
+    "delete_permanent_button": "Delete forever"
   },
   "snapshots": {
     "title": "Snapshots",
@@ -221,7 +268,22 @@
     "no_snapshots": "No snapshots yet",
     "showing_n": "{{count}} snapshots",
     "restore_disabled": "Restore (#14c)",
-    "delete_disabled": "Delete (#14c)"
+    "delete_disabled": "Delete (#14c)",
+    "created_toast": "Snapshot created",
+    "deleted_toast": "Snapshot deleted",
+    "restored_toast": "Vault restored",
+    "restore_modal_title": "Restore vault from snapshot?",
+    "restore_modal_desc": "This will revert ALL pages to the state at this snapshot. Operations performed since this snapshot will be lost.",
+    "restore_typed_label": "Type the snapshot name",
+    "restore_button": "Restore",
+    "delete_modal_title": "Delete snapshot?",
+    "delete_modal_desc": "Removes this backup. Cannot be undone.",
+    "delete_button": "Delete",
+    "create_button": "Create snapshot",
+    "create_modal_title": "Create manual snapshot",
+    "create_label_label": "Label (optional)",
+    "create_label_placeholder": "e.g. before-cleanup",
+    "create_submit": "Create"
   },
   "lost_sessions": {
     "title": "Lost sessions",
@@ -234,8 +296,12 @@
     "transcript": "transcript",
     "no_lost": "All accounted for",
     "showing_n": "{{count}} sessions",
-    "import_disabled": "Import (#14c)",
-    "ignore_disabled": "Ignore (#14c)"
+    "import_button": "Import",
+    "ignore_button": "Ignore",
+    "imported_toast": "Import queued",
+    "ignored_toast": "Marked ignored",
+    "ignore_modal_title": "Mark session as ignored?",
+    "ignore_modal_desc": "This will hide the session from the lost-sessions list. The transcript file is not deleted."
   },
   "suggestions": {
     "title": "Suggestions",
@@ -261,7 +327,18 @@
     "showing_n": "{{count}} suggestions",
     "approve_disabled": "Approve (#14c)",
     "reject_disabled": "Reject (#14c)",
-    "defer_disabled": "Defer (#14c)"
+    "defer_disabled": "Defer (#14c)",
+    "approved_toast": "Suggestion approved",
+    "rejected_toast": "Suggestion rejected",
+    "deferred_toast": "Suggestion deferred",
+    "approve_button": "Approve",
+    "reject_button": "Reject",
+    "defer_button": "Defer",
+    "approve_modal_title": "Apply suggestion?",
+    "approve_modal_desc": "This will execute the {{operation}} operation on {{count}} affected pages.",
+    "approve_delete_modal_title": "Apply delete-page suggestion?",
+    "approve_delete_modal_desc": "This will permanently delete the page from the vault. Type the page name to confirm.",
+    "approve_delete_typed_label": "Type the page name"
   },
   "dead_letter": {
     "title": "Failed jobs",
@@ -276,6 +353,12 @@
     "payload": "payload",
     "retry_disabled": "Retry (#14c)",
     "dismiss_disabled": "Dismiss (#14c)",
+    "retry_button": "Retry",
+    "dismiss_button": "Dismiss",
+    "retried_toast": "Job re-queued",
+    "dismissed_toast": "Job dismissed",
+    "dismiss_modal_title": "Dismiss failed job?",
+    "dismiss_modal_desc": "This permanently removes the job from the dead-letter queue.",
     "view_details": "Detail",
     "not_found_title": "Job not found",
     "not_found_hint": "This job ID is unknown or already cleared."

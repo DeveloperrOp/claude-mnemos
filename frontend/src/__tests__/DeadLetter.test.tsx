@@ -13,7 +13,14 @@ beforeAll(() => {
       showing_n: "{{count}} jobs", attempt_n_of_m: "Attempt {{n}}/{{max}}",
       finished_at: "finished",
       retry_disabled: "Retry (#14c)", dismiss_disabled: "Dismiss (#14c)",
+      retry_button: "Retry", dismiss_button: "Dismiss",
+      retried_toast: "Job re-queued", dismissed_toast: "Job dismissed",
+      dismiss_modal_title: "Dismiss failed job?",
+      dismiss_modal_desc: "This permanently removes the job from the dead-letter queue.",
       view_details: "Detail",
+    },
+    confirm: {
+      cancel: "Cancel", working: "Working…",
     },
     overview: {
       daemon_down_title: "Daemon unavailable",

@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectBadge } from "@/components/widgets/ProjectBadge";
+import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { useDeadLetterEntry } from "@/hooks/useDeadLetterEntry";
+import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
+import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
 
 const MAX_ATTEMPTS = 4;
 
@@ -12,6 +16,9 @@ export function DeadLetterDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const { t } = useTranslation();
   const jobQuery = useDeadLetterEntry(jobId);
+  const [dismissOpen, setDismissOpen] = useState(false);
+  const retry = useDeadLetterRetry();
+  const dismiss = useDeadLetterDismiss();
 
   if (jobQuery.isLoading) return <Skeleton className="h-64" />;
   if (jobQuery.isError) {
@@ -35,13 +42,25 @@ export function DeadLetterDetail() {
           ←
         </Link>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" disabled title={t("dead_letter.retry_disabled")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={retry.isPending}
+            onClick={() => j && retry.mutate(j.id)}
+            title={t("dead_letter.retry_button")}
+          >
             <RotateCcw className="mr-1 h-3 w-3" />
-            {t("dead_letter.retry_disabled")}
+            {t("dead_letter.retry_button")}
           </Button>
-          <Button size="sm" variant="outline" disabled title={t("dead_letter.dismiss_disabled")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={dismiss.isPending}
+            onClick={() => setDismissOpen(true)}
+            title={t("dead_letter.dismiss_button")}
+          >
             <X className="mr-1 h-3 w-3" />
-            {t("dead_letter.dismiss_disabled")}
+            {t("dead_letter.dismiss_button")}
           </Button>
         </div>
       </div>
@@ -98,6 +117,17 @@ export function DeadLetterDetail() {
           {JSON.stringify(j.payload, null, 2)}
         </pre>
       </section>
+
+      <ConfirmDialog
+        open={dismissOpen}
+        onOpenChange={setDismissOpen}
+        title={t("dead_letter.dismiss_modal_title")}
+        description={t("dead_letter.dismiss_modal_desc")}
+        confirmLabel={t("dead_letter.dismiss_button")}
+        destructive
+        onConfirm={() => j && dismiss.mutate(j.id, { onSettled: () => setDismissOpen(false) })}
+        isPending={dismiss.isPending}
+      />
     </article>
   );
 }

@@ -3,6 +3,7 @@ import {
   LostSessionListResponseSchema,
   type LostSession,
 } from "@/types/LostSession";
+import type { Job } from "@/types/Job";
 
 export async function listLostSessions(): Promise<{
   sessions: LostSession[];
@@ -18,4 +19,36 @@ export async function scanLostSessions(): Promise<{
 }> {
   const r = await apiClient.post("/lost-sessions/scan");
   return LostSessionListResponseSchema.parse(r.data);
+}
+
+export interface ImportLostSessionBody {
+  project_name: string;
+  transcript_path?: string;
+}
+
+export interface IgnoreLostSessionBody {
+  project_name: string;
+  sha?: string;
+}
+
+export async function importLostSession(
+  session_id: string,
+  body: ImportLostSessionBody,
+): Promise<Job> {
+  const r = await apiClient.post(
+    `/lost-sessions/${encodeURIComponent(session_id)}/import`,
+    body,
+  );
+  return r.data as Job;
+}
+
+export async function ignoreLostSession(
+  session_id: string,
+  body: IgnoreLostSessionBody,
+): Promise<{ ignored_count: number }> {
+  const r = await apiClient.post(
+    `/lost-sessions/${encodeURIComponent(session_id)}/ignore`,
+    body,
+  );
+  return r.data as { ignored_count: number };
 }
