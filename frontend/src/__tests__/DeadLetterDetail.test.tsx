@@ -10,10 +10,17 @@ beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
     dead_letter: {
       retry_disabled: "Retry (#14c)", dismiss_disabled: "Dismiss (#14c)",
+      retry_button: "Retry", dismiss_button: "Dismiss",
+      retried_toast: "Job re-queued", dismissed_toast: "Job dismissed",
+      dismiss_modal_title: "Dismiss failed job?",
+      dismiss_modal_desc: "This permanently removes the job from the dead-letter queue.",
       kind: "kind", attempt_n_of_m: "Attempt {{n}}/{{max}}",
       finished_at: "finished", error: "error", traceback: "Traceback",
       payload: "Payload",
       not_found_title: "Job not found", not_found_hint: "Back",
+    },
+    confirm: {
+      cancel: "Cancel", working: "Working…",
     },
   }, true, true);
   void i18n.changeLanguage("en");

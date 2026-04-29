@@ -317,6 +317,12 @@
     "payload": "payload",
     "retry_disabled": "Повторити (#14c)",
     "dismiss_disabled": "Відхилити (#14c)",
+    "retry_button": "Повторити",
+    "dismiss_button": "Відхилити",
+    "retried_toast": "Задачу повторно поставлено в чергу",
+    "dismissed_toast": "Задачу відхилено",
+    "dismiss_modal_title": "Відхилити збійну задачу?",
+    "dismiss_modal_desc": "Це назавжди видаляє задачу з черги збоїв.",
     "view_details": "Детально",
     "not_found_title": "Задачу не знайдено",
     "not_found_hint": "Цей ID невідомий або вже очищений."
