@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { useProjectCreate } from "@/hooks/useProjectCreate";
+import { getTrayStatus, installTray } from "@/api/tray.api";
+import type { TrayStatus } from "@/types/Tray";
 
 const NAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -18,6 +20,15 @@ export function Onboarding() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [nameTakenError, setNameTakenError] = useState(false);
   const [mountFailedDetail, setMountFailedDetail] = useState<string | null>(null);
+  const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
+  const [autostartChecked, setAutostartChecked] = useState<boolean>(true);
+
+  // Fetch platform info on mount to decide whether to show the autostart
+  // checkbox (hidden on Linux / unsupported per design §8). Errors are
+  // ignored — checkbox stays hidden.
+  useEffect(() => {
+    getTrayStatus().then(setTrayStatus).catch(() => setTrayStatus(null));
+  }, []);
 
   const nameValid = NAME_REGEX.test(name);
   const vaultValid = vault.trim().length > 0;
@@ -35,7 +46,18 @@ export function Onboarding() {
     create.mutate(
       { name, vault_root: vault.trim(), cwd_patterns },
       {
-        onSuccess: (entry) => navigate(`/project/${encodeURIComponent(entry.name)}`),
+        onSuccess: (entry) => {
+          if (
+            autostartChecked &&
+            trayStatus &&
+            (trayStatus.platform === "windows" || trayStatus.platform === "macos")
+          ) {
+            installTray().catch(() => {
+              // Surface as toast in a future polish; for now silent — checkbox optional
+            });
+          }
+          navigate(`/project/${encodeURIComponent(entry.name)}`);
+        },
         onError: (err) => {
           if (axios.isAxiosError(err)) {
             const status = err.response?.status;
@@ -118,6 +140,22 @@ export function Onboarding() {
         <div className="rounded-md border-2 border-red-600 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
           <div className="font-semibold">{t("onboarding.mount_failed_title")}</div>
           <div className="mt-1 break-all font-mono text-xs">{mountFailedDetail}</div>
+        </div>
+      )}
+
+      {trayStatus && (trayStatus.platform === "windows" || trayStatus.platform === "macos") && (
+        <div className="mt-4">
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={autostartChecked}
+              onChange={(e) => setAutostartChecked(e.target.checked)}
+            />
+            {t("onboarding.autostart_label")}
+          </label>
+          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            {t("onboarding.autostart_hint")}
+          </p>
         </div>
       )}
 
