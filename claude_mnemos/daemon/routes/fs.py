@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/fs", tags=["fs"])
 
@@ -54,3 +55,27 @@ def browse(path: str) -> dict[str, object]:
         "entries": [{"name": c.name, "path": str(c)} for c in children],
         "truncated": truncated,
     }
+
+
+class MkdirRequest(BaseModel):
+    path: str
+
+
+@router.post("/mkdir")
+def mkdir(req: MkdirRequest) -> dict[str, str]:
+    p = Path(req.path)
+    if not p.is_absolute():
+        raise HTTPException(status_code=400, detail="path must be absolute")
+    if p.exists():
+        raise HTTPException(status_code=400, detail=f"path already exists: {p}")
+    if not p.parent.exists():
+        raise HTTPException(
+            status_code=400, detail=f"parent directory does not exist: {p.parent}"
+        )
+    try:
+        p.mkdir(parents=False, exist_ok=False)
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403, detail=f"permission denied: {exc}"
+        ) from exc
+    return {"path": str(p.resolve())}

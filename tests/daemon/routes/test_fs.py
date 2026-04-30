@@ -86,3 +86,31 @@ def test_get_fs_browse_sorts_case_insensitive(tmp_path: Path) -> None:
     resp = _client().get(f"/fs/browse?path={tmp_path}")
     names = [e["name"] for e in resp.json()["entries"]]
     assert names == ["alpha", "Beta"]
+
+
+def test_post_fs_mkdir_creates_directory(tmp_path: Path) -> None:
+    target = tmp_path / "new_folder"
+    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    assert resp.status_code == 200
+    assert Path(resp.json()["path"]) == target.resolve()
+    assert target.is_dir()
+
+
+def test_post_fs_mkdir_returns_400_when_target_exists(tmp_path: Path) -> None:
+    target = tmp_path / "exists"
+    target.mkdir()
+    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    assert resp.status_code == 400
+    assert "exists" in resp.json()["detail"].lower()
+
+
+def test_post_fs_mkdir_returns_400_when_parent_missing(tmp_path: Path) -> None:
+    target = tmp_path / "parent" / "child"  # parent doesn't exist
+    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    assert resp.status_code == 400
+    assert "parent" in resp.json()["detail"].lower()
+
+
+def test_post_fs_mkdir_returns_400_for_relative_path() -> None:
+    resp = _client().post("/fs/mkdir", json={"path": "relative/here"})
+    assert resp.status_code == 400
