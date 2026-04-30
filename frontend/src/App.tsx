@@ -21,6 +21,7 @@ import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { Onboarding } from "./pages/Onboarding";
+import { ProjectSettings } from "./pages/ProjectSettings";
 
 const Help = lazy(() => import("./pages/Help"));
 const Metrics = lazy(() => import("./pages/Metrics"));
@@ -55,7 +56,7 @@ const router = createBrowserRouter([
           { path: "snapshots", element: <Snapshots /> },
           { path: "health", element: <Health /> },
           { path: "queue", element: <Placeholder section="Queue" plan="#14b" /> },
-          { path: "settings", element: <Placeholder section="Settings" plan="#14c" /> },
+          { path: "settings", element: <ProjectSettings /> },
         ],
       },
       { path: "lost-sessions", element: <LostSessions /> },

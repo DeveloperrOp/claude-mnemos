@@ -503,6 +503,7 @@
   },
   "settings": {
     "title": "Settings",
+    "loading": "Loading settings...",
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
