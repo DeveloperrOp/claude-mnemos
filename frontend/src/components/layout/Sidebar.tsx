@@ -26,6 +26,7 @@ const GLOBAL_ITEMS: NavItem[] = [
   { to: () => "/dead-letter", label: "navigation.failed_jobs", icon: "⚠", requiresProject: false },
   { to: () => "/metrics", label: "navigation.metrics", icon: "📈", requiresProject: false },
   { to: () => "/help", label: "navigation.help", icon: "📖", requiresProject: false },
+  { to: () => "/settings/global", label: "navigation.global_settings", icon: "⚙", requiresProject: false },
 ];
 
 interface SidebarLinkProps {

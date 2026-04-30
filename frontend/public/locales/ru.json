@@ -27,6 +27,7 @@
     "failed_jobs": "Ошибки",
     "metrics": "Метрики",
     "help": "Помощь",
+    "global_settings": "Глобальные настройки",
     "create_project": "+ Новый проект"
   },
   "topbar": {
@@ -585,6 +586,21 @@
         "max_input_tokens": "Переопределить max input tokens",
         "context_limit": "Переопределить лимит контекста",
         "using_default": "Используется по умолчанию ({{value}})"
+      }
+    },
+    "global": {
+      "title": "Глобальные настройки",
+      "general": {
+        "title": "Общее",
+        "locale": "Язык интерфейса",
+        "daemon_port": "Порт демона"
+      },
+      "defaults": {
+        "title": "По умолчанию",
+        "default_model": "Модель по умолчанию",
+        "default_language_hint": "Подсказка языка по умолчанию",
+        "default_max_input_tokens": "Max input tokens по умолчанию",
+        "default_retention_days": "Срок хранения (дни) по умолчанию"
       }
     }
   }

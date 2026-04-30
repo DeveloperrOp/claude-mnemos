@@ -27,6 +27,7 @@
     "failed_jobs": "Помилки",
     "metrics": "Метрики",
     "help": "Допомога",
+    "global_settings": "Глобальні налаштування",
     "create_project": "+ Новий проєкт"
   },
   "topbar": {
@@ -585,6 +586,21 @@
         "max_input_tokens": "Переозначити max input tokens",
         "context_limit": "Переозначити ліміт контексту",
         "using_default": "Використовується за замовчуванням ({{value}})"
+      }
+    },
+    "global": {
+      "title": "Глобальні налаштування",
+      "general": {
+        "title": "Загальне",
+        "locale": "Мова інтерфейсу",
+        "daemon_port": "Порт демона"
+      },
+      "defaults": {
+        "title": "За замовчуванням",
+        "default_model": "Модель за замовчуванням",
+        "default_language_hint": "Підказка мови за замовчуванням",
+        "default_max_input_tokens": "Max input tokens за замовчуванням",
+        "default_retention_days": "Термін зберігання (дні) за замовчуванням"
       }
     }
   }
