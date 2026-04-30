@@ -3,6 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import MockAdapter from "axios-mock-adapter";
+import axios from "axios";
 import i18n from "../i18n";
 import { apiClient } from "../api/client";
 import { PromptsSection } from "../components/settings/sections/PromptsSection";
@@ -21,11 +23,29 @@ const FULL = {
   ingest: { model: null, language_hint: null, max_input_tokens: null, context_limit: null },
 };
 
+let axiosMock: MockAdapter;
+
 beforeEach(() => {
   i18n.addResourceBundle(
     "en",
     "translation",
     {
+      picker: {
+        title: "Choose folder",
+        path_placeholder: "Type or paste path",
+        filter_placeholder: "Filter folders…",
+        recent: "Recent",
+        loading: "Loading…",
+        empty: "No subfolders",
+        truncated: "Showing first 100 — refine filter to narrow",
+        new_folder: "New folder",
+        folder_name: "Folder name",
+        create: "Create",
+        cancel: "Cancel",
+        select: "Select this folder",
+        computer: "Computer",
+        select_file: "Click a file to select",
+      },
       settings: {
         save: "Save",
         saving: "Saving...",
@@ -34,6 +54,7 @@ beforeEach(() => {
             title: "Prompts",
             custom_system_path: "Custom system prompt path",
             custom_extract_user_path: "Custom extract-user prompt path",
+            browse: "Browse...",
           },
         },
       },
@@ -44,9 +65,11 @@ beforeEach(() => {
   void i18n.changeLanguage("en");
   vi.spyOn(apiClient, "get");
   vi.spyOn(apiClient, "patch");
+  axiosMock = new MockAdapter(axios);
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  axiosMock.restore();
 });
 
 function wrap(ui: ReactNode) {
@@ -97,5 +120,30 @@ describe("PromptsSection", () => {
         },
       }),
     );
+  });
+
+  it("Browse button opens file picker; selecting a file fills input", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
+    axiosMock.onGet("/fs/home").reply(200, { home: "/x" });
+    axiosMock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/x",
+      parent: null,
+      entries: [
+        { name: "prompt.md", path: "/x/prompt.md", type: "file" },
+      ],
+      truncated: false,
+    });
+    wrap(<PromptsSection slug="p1" />);
+    await waitFor(() =>
+      expect(screen.getByText("Prompts")).toBeInTheDocument(),
+    );
+    const browseButtons = screen.getAllByRole("button", { name: /Browse/i });
+    await userEvent.click(browseButtons[0]);
+    const fileButton = await screen.findByText(/📄\s*prompt\.md/);
+    await userEvent.click(fileButton);
+    await waitFor(() => {
+      const inputs = screen.getAllByRole("textbox");
+      expect((inputs[0] as HTMLInputElement).value).toBe("/x/prompt.md");
+    });
   });
 });

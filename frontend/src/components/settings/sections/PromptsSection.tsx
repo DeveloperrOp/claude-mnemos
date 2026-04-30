@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsAccordion } from "../SettingsAccordion";
+import { Button } from "@/components/ui/button";
+import { DirectoryPicker } from "@/components/picker/DirectoryPicker";
 import {
   useProjectSettings,
   useProjectSettingsMutation,
@@ -27,6 +29,8 @@ export function PromptsSection({ slug }: Props) {
   const server = data?.prompts;
   const [systemPath, setSystemPath] = useState("");
   const [extractUserPath, setExtractUserPath] = useState("");
+  const [pickingSystem, setPickingSystem] = useState(false);
+  const [pickingExtract, setPickingExtract] = useState(false);
 
   useEffect(() => {
     if (server) {
@@ -68,24 +72,65 @@ export function PromptsSection({ slug }: Props) {
         <label className="text-xs text-[hsl(var(--muted-foreground))]">
           {t("settings.section.prompts.custom_system_path")}
         </label>
-        <input
-          type="text"
-          value={systemPath}
-          onChange={(e) => setSystemPath(e.target.value)}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={systemPath}
+            onChange={(e) => setSystemPath(e.target.value)}
+            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickingSystem(true)}
+          >
+            {t("settings.section.prompts.browse")}
+          </Button>
+        </div>
       </div>
       <div className="space-y-1">
         <label className="text-xs text-[hsl(var(--muted-foreground))]">
           {t("settings.section.prompts.custom_extract_user_path")}
         </label>
-        <input
-          type="text"
-          value={extractUserPath}
-          onChange={(e) => setExtractUserPath(e.target.value)}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={extractUserPath}
+            onChange={(e) => setExtractUserPath(e.target.value)}
+            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickingExtract(true)}
+          >
+            {t("settings.section.prompts.browse")}
+          </Button>
+        </div>
       </div>
+
+      <DirectoryPicker
+        open={pickingSystem}
+        mode="file"
+        fileExtensions={[".md", ".txt"]}
+        onSelect={(path) => {
+          setSystemPath(path);
+          setPickingSystem(false);
+        }}
+        onClose={() => setPickingSystem(false)}
+      />
+      <DirectoryPicker
+        open={pickingExtract}
+        mode="file"
+        fileExtensions={[".md", ".txt"]}
+        onSelect={(path) => {
+          setExtractUserPath(path);
+          setPickingExtract(false);
+        }}
+        onClose={() => setPickingExtract(false)}
+      />
     </SettingsAccordion>
   );
 }

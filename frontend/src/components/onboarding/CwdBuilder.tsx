@@ -93,6 +93,7 @@ export function CwdBuilder({ patterns, onChange, disabled }: Props) {
 
       <DirectoryPicker
         open={pickerOpen}
+        allowCreate
         onSelect={handleSelect}
         onClose={() => setPickerOpen(false)}
       />

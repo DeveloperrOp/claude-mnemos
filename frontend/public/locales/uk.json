@@ -573,7 +573,8 @@
       "prompts": {
         "title": "Промпти",
         "custom_system_path": "Шлях до власного system-промпту",
-        "custom_extract_user_path": "Шлях до власного extract-user промпту"
+        "custom_extract_user_path": "Шлях до власного extract-user промпту",
+        "browse": "Огляд..."
       },
       "telemetry": {
         "title": "Телеметрія",

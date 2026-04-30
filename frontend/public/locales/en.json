@@ -573,7 +573,8 @@
       "prompts": {
         "title": "Prompts",
         "custom_system_path": "Custom system prompt path",
-        "custom_extract_user_path": "Custom extract-user prompt path"
+        "custom_extract_user_path": "Custom extract-user prompt path",
+        "browse": "Browse..."
       },
       "telemetry": {
         "title": "Telemetry",
