@@ -493,5 +493,11 @@
     "create": "Create",
     "cancel": "Cancel",
     "select": "Select this folder"
+  },
+  "cwd_builder": {
+    "add": "Add folder",
+    "remove": "Remove",
+    "recursive": "Include subfolders",
+    "empty": "No folders added — sessions must be ingested manually"
   }
 }
