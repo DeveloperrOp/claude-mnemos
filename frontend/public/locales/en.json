@@ -544,6 +544,10 @@
         "title": "Snapshots",
         "daily_enabled": "Daily snapshots enabled",
         "retention_days": "Retention (days)"
+      },
+      "locale": {
+        "title": "Locale",
+        "inherit": "Inherit from global"
       }
     }
   }
