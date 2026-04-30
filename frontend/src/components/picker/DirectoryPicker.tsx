@@ -2,19 +2,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { browseDirectory, getHome, mkdir } from "@/api/fs.api";
-import type { FsBrowse } from "@/types/Fs";
+import { browseDirectory, getHome, listDrives, mkdir } from "@/api/fs.api";
+import type { FsBrowse, FsDrive } from "@/types/Fs";
 import { useRecentPaths } from "@/hooks/useRecentPaths";
 
 interface Props {
   open: boolean;
   initialPath?: string;
   allowCreate?: boolean;
+  mode?: "directory" | "file";
+  fileExtensions?: string[];
   onSelect: (path: string) => void;
   onClose: () => void;
 }
 
-export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onClose }: Props) {
+export function DirectoryPicker({
+  open,
+  initialPath,
+  allowCreate,
+  mode = "directory",
+  fileExtensions,
+  onSelect,
+  onClose,
+}: Props) {
   const { t } = useTranslation();
   const { recent, addRecent } = useRecentPaths();
   const [cwd, setCwd] = useState<string>(initialPath ?? "");
@@ -25,6 +35,8 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
   const [filter, setFilter] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [drivesView, setDrivesView] = useState(false);
+  const [drives, setDrives] = useState<FsDrive[]>([]);
 
   // Monotonic counter to discard stale async results when the user navigates
   // again before the previous request completes (or closes/reopens picker).
@@ -34,13 +46,35 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
     const version = ++navigationVersion.current;
     setLoading(true);
     setError(null);
+    setDrivesView(false);
     try {
-      const result = await browseDirectory(path);
+      const result = await browseDirectory(path, {
+        includeFiles: mode === "file",
+      });
       if (version !== navigationVersion.current) return;
       setCwd(result.cwd);
       setData(result);
       setPathInputValue(result.cwd);
       setFilter("");
+    } catch (e) {
+      if (version !== navigationVersion.current) return;
+      if (axios.isAxiosError(e)) {
+        setError(e.response?.data?.detail ?? e.message);
+      }
+    } finally {
+      if (version === navigationVersion.current) setLoading(false);
+    }
+  }
+
+  async function goToDrives() {
+    const version = ++navigationVersion.current;
+    setDrivesView(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await listDrives();
+      if (version !== navigationVersion.current) return;
+      setDrives(result.drives);
     } catch (e) {
       if (version !== navigationVersion.current) return;
       if (axios.isAxiosError(e)) {
@@ -128,10 +162,19 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
 
   const visibleEntries = useMemo(() => {
     if (!data) return [];
-    if (!filter) return data.entries;
+    let entries = data.entries;
+    if (mode === "file" && fileExtensions && fileExtensions.length > 0) {
+      const exts = fileExtensions.map((x) => x.toLowerCase());
+      entries = entries.filter(
+        (e) =>
+          e.type === "directory" ||
+          exts.some((ext) => e.name.toLowerCase().endsWith(ext)),
+      );
+    }
+    if (!filter) return entries;
     const f = filter.toLowerCase();
-    return data.entries.filter((e) => e.name.toLowerCase().includes(f));
-  }, [data, filter]);
+    return entries.filter((e) => e.name.toLowerCase().includes(f));
+  }, [data, filter, mode, fileExtensions]);
 
   if (!open) return null;
 
@@ -152,18 +195,27 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
             className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
           />
 
-          <div className="flex flex-wrap gap-1 text-xs text-[hsl(var(--muted-foreground))]">
-            {breadcrumbs.map((b, i) => (
-              <span key={b.path}>
-                {i > 0 && " > "}
-                <button
-                  onClick={() => navigateTo(b.path)}
-                  className="hover:underline"
-                >
-                  {b.label}
-                </button>
-              </span>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={goToDrives}
+              className="text-xs text-[hsl(var(--primary))] underline"
+            >
+              🖥 {t("picker.computer")}
+            </button>
+            <div className="flex flex-wrap gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+              {breadcrumbs.map((b, i) => (
+                <span key={b.path}>
+                  {i > 0 && " > "}
+                  <button
+                    onClick={() => navigateTo(b.path)}
+                    className="hover:underline"
+                  >
+                    {b.label}
+                  </button>
+                </span>
+              ))}
+            </div>
           </div>
 
           <input
@@ -174,7 +226,7 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
           />
         </div>
 
-        {recent.length > 0 && (
+        {recent.length > 0 && !drivesView && (
           <div className="mt-3 border-t pt-2">
             <div className="text-xs font-medium text-[hsl(var(--muted-foreground))]">{t("picker.recent")}</div>
             <ul className="mt-1 space-y-0.5 text-xs">
@@ -195,26 +247,45 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
         <div className="mt-3 max-h-64 overflow-y-auto rounded-md border">
           {loading && <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">{t("picker.loading")}</div>}
           {error && <div className="p-3 text-sm text-red-700">{error}</div>}
-          {!loading && !error && visibleEntries.length === 0 && (
-            <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">{t("picker.empty")}</div>
-          )}
-          {!loading && !error && visibleEntries.map((e) => (
+          {!loading && !error && drivesView && drives.map((d) => (
             <button
-              key={e.path}
-              onClick={() => navigateTo(e.path)}
+              key={d.path}
+              onClick={() => navigateTo(d.path)}
               className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
             >
-              📁 {e.name}
+              💿 {d.name}
             </button>
           ))}
-          {data?.truncated && (
+          {!loading && !error && !drivesView && visibleEntries.length === 0 && (
+            <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">{t("picker.empty")}</div>
+          )}
+          {!loading && !error && !drivesView && visibleEntries.map((e) => {
+            const isDir = e.type === "directory";
+            return (
+              <button
+                key={e.path}
+                onClick={() => {
+                  if (isDir) {
+                    navigateTo(e.path);
+                  } else if (mode === "file") {
+                    addRecent(e.path);
+                    onSelect(e.path);
+                  }
+                }}
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
+              >
+                {isDir ? "📁" : "📄"} {e.name}
+              </button>
+            );
+          })}
+          {!drivesView && data?.truncated && (
             <div className="p-2 text-xs text-[hsl(var(--muted-foreground))]">
               {t("picker.truncated")}
             </div>
           )}
         </div>
 
-        {allowCreate && (
+        {allowCreate && !drivesView && (
           <div className="mt-2">
             {!showNewFolder ? (
               <button
@@ -242,7 +313,12 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
 
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>{t("picker.cancel")}</Button>
-          <Button onClick={selectCurrent}>{t("picker.select")}</Button>
+          {!drivesView && mode === "directory" && (
+            <Button onClick={selectCurrent}>{t("picker.select")}</Button>
+          )}
+          {!drivesView && mode === "file" && (
+            <Button disabled variant="outline">{t("picker.select_file")}</Button>
+          )}
         </div>
       </div>
     </div>

@@ -114,3 +114,60 @@ def test_post_fs_mkdir_returns_400_when_parent_missing(tmp_path: Path) -> None:
 def test_post_fs_mkdir_returns_400_for_relative_path() -> None:
     resp = _client().post("/fs/mkdir", json={"path": "relative/here"})
     assert resp.status_code == 400
+
+
+def test_get_fs_drives_unix_returns_root(monkeypatch) -> None:
+    """On Unix, /fs/drives returns single root entry."""
+    monkeypatch.setattr("claude_mnemos.daemon.routes.fs.sys.platform", "linux")
+    resp = _client().get("/fs/drives")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["drives"] == [{"name": "/", "path": "/"}]
+
+
+def test_get_fs_drives_windows_returns_drive_letters(monkeypatch) -> None:
+    """On Windows, /fs/drives returns letter-drive list filtered by exists()."""
+    monkeypatch.setattr("claude_mnemos.daemon.routes.fs.sys.platform", "win32")
+    real_exists = Path.exists
+
+    def fake_exists(self: Path) -> bool:
+        s = str(self)
+        if s in ("C:\\", "D:\\"):
+            return True
+        if len(s) == 3 and s[1:] == ":\\":
+            return False
+        return real_exists(self)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+    resp = _client().get("/fs/drives")
+    assert resp.status_code == 200
+    drives = [d["path"] for d in resp.json()["drives"]]
+    assert "C:\\" in drives
+    assert "D:\\" in drives
+
+
+def test_get_fs_browse_with_include_files_returns_files_too(tmp_path: Path) -> None:
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "file.md").write_text("hello")
+    (tmp_path / "image.png").write_bytes(b"\x00")
+
+    resp = _client().get(f"/fs/browse?path={tmp_path}&include_files=true")
+    assert resp.status_code == 200
+    entries = resp.json()["entries"]
+    types = {e["name"]: e["type"] for e in entries}
+    assert types == {"subdir": "directory", "file.md": "file", "image.png": "file"}
+
+
+def test_get_fs_browse_without_include_files_returns_only_directories(
+    tmp_path: Path,
+) -> None:
+    """Default behaviour unchanged — only directories."""
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "file.md").write_text("hi")
+    resp = _client().get(f"/fs/browse?path={tmp_path}")
+    body = resp.json()
+    names = [e["name"] for e in body["entries"]]
+    assert names == ["subdir"]
+    # type field present (default "directory") for backward-compat
+    types = {e["type"] for e in body["entries"]}
+    assert types == {"directory"}

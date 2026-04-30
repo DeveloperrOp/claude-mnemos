@@ -494,7 +494,9 @@
     "folder_name": "Folder name",
     "create": "Create",
     "cancel": "Cancel",
-    "select": "Select this folder"
+    "select": "Select this folder",
+    "computer": "Computer",
+    "select_file": "Click a file to select"
   },
   "cwd_builder": {
     "add": "Add folder",
@@ -571,7 +573,8 @@
       "prompts": {
         "title": "Prompts",
         "custom_system_path": "Custom system prompt path",
-        "custom_extract_user_path": "Custom extract-user prompt path"
+        "custom_extract_user_path": "Custom extract-user prompt path",
+        "browse": "Browse..."
       },
       "telemetry": {
         "title": "Telemetry",

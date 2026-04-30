@@ -494,7 +494,9 @@
     "folder_name": "Имя папки",
     "create": "Создать",
     "cancel": "Отмена",
-    "select": "Выбрать эту папку"
+    "select": "Выбрать эту папку",
+    "computer": "Мой компьютер",
+    "select_file": "Кликните по файлу для выбора"
   },
   "cwd_builder": {
     "add": "Добавить папку",
@@ -571,7 +573,8 @@
       "prompts": {
         "title": "Промпты",
         "custom_system_path": "Путь к своему system-промпту",
-        "custom_extract_user_path": "Путь к своему extract-user промпту"
+        "custom_extract_user_path": "Путь к своему extract-user промпту",
+        "browse": "Обзор..."
       },
       "telemetry": {
         "title": "Телеметрия",
