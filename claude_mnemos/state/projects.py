@@ -147,6 +147,7 @@ class ProjectStore:
         cwd_patterns: list[str] | None = None,
         add_cwd_patterns: list[str] | None = None,
         remove_cwd_patterns: list[str] | None = None,
+        display_name: str | None = None,
     ) -> ProjectMapEntry:
         """Update fields of an existing entry.
 
@@ -157,6 +158,7 @@ class ProjectStore:
         ``add_cwd_patterns`` appends entries (preserving order, deduplicating).
         ``remove_cwd_patterns`` removes specific entries.
         Caller should pass either ``cwd_patterns`` OR ``add``/``remove``, not both.
+        ``display_name`` is set when not None; leave None to keep current value.
         """
         with self._lock:
             pm = self._load()
@@ -179,6 +181,7 @@ class ProjectStore:
                         update={
                             "vault_root": vault_root if vault_root is not None else e.vault_root,
                             "cwd_patterns": new_patterns,
+                            "display_name": display_name if display_name is not None else e.display_name,
                         }
                     )
                     pm.projects[i] = new_e

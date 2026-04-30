@@ -24,6 +24,7 @@ router = APIRouter()
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(pattern=PROJECT_NAME_PATTERN)
+    display_name: str | None = None
     vault_root: Path
     cwd_patterns: list[str] = Field(default_factory=list)
 
@@ -34,11 +35,13 @@ class ProjectPatch(BaseModel):
     cwd_patterns: list[str] | None = None  # full replace
     add_cwd_patterns: list[str] | None = None
     remove_cwd_patterns: list[str] | None = None
+    display_name: str | None = None
 
 
 class ProjectView(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
+    display_name: str | None = None
     vault_root: Path
     cwd_patterns: list[str]
     settings: ProjectSettings
@@ -68,6 +71,7 @@ def get_project(name: str) -> ProjectView:
     settings = _settings_store().get_project(name)
     return ProjectView(
         name=entry.name,
+        display_name=entry.display_name,
         vault_root=entry.vault_root,
         cwd_patterns=entry.cwd_patterns,
         settings=settings,
@@ -79,6 +83,7 @@ async def create_project(request: Request, body: ProjectCreate) -> dict[str, Any
     store = ProjectStore()
     entry = ProjectMapEntry(
         name=body.name,
+        display_name=body.display_name,
         vault_root=body.vault_root,
         cwd_patterns=body.cwd_patterns or [],
     )
@@ -170,6 +175,7 @@ async def patch_project(
             cwd_patterns=new_patterns,
             add_cwd_patterns=add_patterns,
             remove_cwd_patterns=remove_patterns,
+            display_name=body.display_name,
         )
     except ProjectNotFoundError as exc:
         raise HTTPException(

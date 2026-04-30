@@ -107,3 +107,36 @@ def test_corrupt_map_returns_503(client):
     f.write_text("{not json")
     r = c.get("/projects")
     assert r.status_code == 503
+
+
+def test_post_projects_accepts_display_name(client):
+    """POST /projects with display_name persists; GET returns it."""
+    c, home = client
+    body = {
+        "name": "foo",
+        "display_name": "Foo Project",
+        "vault_root": str(home / "v"),
+        "cwd_patterns": [],
+    }
+    r = c.post("/projects", json=body)
+    assert r.status_code == 201, r.text
+    assert r.json()["display_name"] == "Foo Project"
+    r2 = c.get("/projects/foo")
+    assert r2.status_code == 200
+    assert r2.json()["display_name"] == "Foo Project"
+
+
+def test_post_projects_without_display_name_returns_null(client):
+    """POST /projects without display_name → response/GET both null."""
+    c, home = client
+    body = {
+        "name": "foo",
+        "vault_root": str(home / "v"),
+        "cwd_patterns": [],
+    }
+    r = c.post("/projects", json=body)
+    assert r.status_code == 201, r.text
+    assert r.json()["display_name"] is None
+    r2 = c.get("/projects/foo")
+    assert r2.status_code == 200
+    assert r2.json()["display_name"] is None

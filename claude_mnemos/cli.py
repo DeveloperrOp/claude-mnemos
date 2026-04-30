@@ -473,6 +473,8 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("--vault", required=True, type=Path)
     pa.add_argument("--cwd-pattern", action="append", default=[],
                     help="May be repeated; glob pattern matched against cwd")
+    pa.add_argument("--display-name", default=None,
+                    help="Optional UTF-8 display name shown in dashboard")
 
     pl = project_sub.add_parser("list", help="List all projects")
     pl.add_argument("--json", action="store_true")
@@ -486,6 +488,8 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--vault", type=Path, default=None)
     pu.add_argument("--add-cwd-pattern", action="append", default=[])
     pu.add_argument("--remove-cwd-pattern", action="append", default=[])
+    pu.add_argument("--display-name", default=None,
+                    help="Set/replace UTF-8 display name (omit to leave unchanged)")
 
     pr = project_sub.add_parser("remove", help="Remove a project entry")
     pr.add_argument("name")

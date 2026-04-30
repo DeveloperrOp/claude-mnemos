@@ -57,8 +57,10 @@ def handle(args: argparse.Namespace) -> int:
 
 
 def _handle_add(args: argparse.Namespace) -> int:
+    display_name = getattr(args, "display_name", None)
     body = {
         "name": args.name,
+        "display_name": display_name,
         "vault_root": str(args.vault),
         "cwd_patterns": args.cwd_pattern,
     }
@@ -79,6 +81,7 @@ def _handle_add(args: argparse.Namespace) -> int:
         try:
             ProjectStore().add(ProjectMapEntry(
                 name=args.name,
+                display_name=display_name,
                 vault_root=args.vault,
                 cwd_patterns=args.cwd_pattern,
             ))
@@ -114,6 +117,7 @@ def _handle_show(args: argparse.Namespace) -> int:
     settings = SettingsStore().get_project(args.name)
     view = {
         "name": entry.name,
+        "display_name": entry.display_name,
         "vault_root": str(entry.vault_root),
         "cwd_patterns": entry.cwd_patterns,
         "settings": settings.model_dump(mode="json"),
@@ -128,9 +132,11 @@ def _handle_show(args: argparse.Namespace) -> int:
 def _pretty(view: Mapping[str, object]) -> str:
     cwd_patterns = view["cwd_patterns"]
     assert isinstance(cwd_patterns, list)
+    display_name = view.get("display_name")
     out = [
-        f"name:        {view['name']}",
-        f"vault_root:  {view['vault_root']}",
+        f"name:         {view['name']}",
+        f"display_name: {display_name if display_name is not None else '-'}",
+        f"vault_root:   {view['vault_root']}",
         f"cwd_patterns: {', '.join(cwd_patterns) or '-'}",
         "settings:",
         json.dumps(view["settings"], indent=2),
@@ -139,6 +145,7 @@ def _pretty(view: Mapping[str, object]) -> str:
 
 
 def _handle_update(args: argparse.Namespace) -> int:
+    display_name = getattr(args, "display_name", None)
     body: dict[str, object] = {}
     if args.add_cwd_pattern:
         body["add_cwd_patterns"] = list(args.add_cwd_pattern)
@@ -146,6 +153,8 @@ def _handle_update(args: argparse.Namespace) -> int:
         body["remove_cwd_patterns"] = list(args.remove_cwd_pattern)
     if args.vault is not None:
         body["vault_root"] = str(args.vault)
+    if display_name is not None:
+        body["display_name"] = display_name
     try:
         r = httpx.patch(f"{_daemon_url()}/projects/{args.name}", json=body, timeout=2.0)
         if r.status_code == 200:
@@ -163,8 +172,10 @@ def _handle_update(args: argparse.Namespace) -> int:
             ProjectStore().update(
                 args.name,
                 vault_root=args.vault,
+                cwd_patterns=None,
                 add_cwd_patterns=add,
                 remove_cwd_patterns=remove,
+                display_name=display_name,
             )
             print(f"updated project {args.name!r} (offline)")
             return 0
