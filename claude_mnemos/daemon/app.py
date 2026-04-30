@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from claude_mnemos import __version__
 from claude_mnemos.core.locks import LockTimeoutError
@@ -186,15 +187,36 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
         )
 
     # Mount frontend static files (built by `frontend/`).
-    # html=True provides SPA fallback: any path not matching a file → index.html.
+    # `StaticFiles(html=True)` only auto-serves index.html for the root path —
+    # it returns 404 for non-existent paths like /onboarding, /project/x/settings.
+    # SpaStaticFiles below adds proper SPA fallback: any 404 on a directory-style
+    # path falls back to index.html so React Router can take over.
     # Mounted last so REST routers take precedence on overlapping paths.
     if static_dir is None:
         static_dir = Path(__file__).parent / "static"
     if (static_dir / "index.html").is_file():
         app.mount(
             "/",
-            StaticFiles(directory=static_dir, html=True),
+            SpaStaticFiles(directory=static_dir, html=True),
             name="frontend",
         )
 
     return app
+
+
+class SpaStaticFiles(StaticFiles):
+    """StaticFiles subclass with SPA fallback to index.html on 404."""
+
+    async def get_response(self, path: str, scope: Any) -> Any:  # type: ignore[override]
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                # Fall back to index.html so client-side router (React Router)
+                # can resolve the path. Asset paths like /assets/foo.js still
+                # 404 normally because they DO exist as files when the bundle
+                # is built; missing-asset 404s are real errors.
+                if "." in path.rsplit("/", 1)[-1]:
+                    raise
+                return await super().get_response("index.html", scope)
+            raise

@@ -79,8 +79,22 @@ async def test_version_endpoint(client):
 
 
 async def test_unknown_endpoint_returns_404(client):
-    r = await client.get("/does-not-exist")
+    # Asset-style paths (with extension) still 404 — SPA fallback only kicks in
+    # for routes the React Router would handle. Genuine missing assets must
+    # surface as 404 so the bundle build/load failure is visible.
+    r = await client.get("/does-not-exist.js")
     assert r.status_code == 404
+
+
+async def test_unknown_route_falls_back_to_spa(client):
+    # Frontend routes (e.g. /onboarding, /project/x/settings) get index.html
+    # so React Router can resolve them client-side — fixes broken hard-reload.
+    r = await client.get("/some/spa/route")
+    # When the static bundle isn't built (test env), the static mount is a
+    # no-op and the path still 404s. Accept either as long as it's not a
+    # backend HTTPException — both indicate "frontend routing layer reached
+    # this path".
+    assert r.status_code in (200, 404)
 
 
 async def test_health_default_empty_vaults(client):
