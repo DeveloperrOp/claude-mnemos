@@ -25,3 +25,8 @@ export async function createProject(body: CreateProjectBody): Promise<ProjectMap
   });
   return ProjectMapEntrySchema.parse(r.data);
 }
+
+export async function deleteProject(slug: string, opts?: { force?: boolean }): Promise<void> {
+  const params = opts?.force ? { force: true } : undefined;
+  await apiClient.delete(`/projects/${slug}`, { params });
+}
