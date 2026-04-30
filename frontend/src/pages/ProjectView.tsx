@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HealthBadge } from "@/components/widgets/HealthBadge";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
+import { getProjectDisplayName } from "@/lib/projectDisplayName";
 
 const TILES: Array<{ key: string; emoji: string; path: string; plan: string }> = [
   { key: "navigation.pages",        emoji: "📚", path: "pages",        plan: "#14b" },
@@ -42,7 +43,7 @@ export function ProjectView() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">{project.name}</h1>
+          <h1 className="text-2xl font-semibold">{getProjectDisplayName(project)}</h1>
           <p className="text-sm text-[hsl(var(--muted-foreground))]">
             {project.vault_root}
           </p>

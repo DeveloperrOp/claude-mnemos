@@ -361,8 +361,16 @@
     "name_hint": "Lowercase letters, digits, underscores, hyphens. Max 64 chars.",
     "name_invalid": "Invalid name. Use lowercase a-z, 0-9, underscore, hyphen. Must start with letter or digit.",
     "name_taken": "A project with this name already exists.",
+    "display_name_label": "Display name",
+    "display_name_hint": "Name shown in the dashboard. Any characters allowed.",
+    "slug_label": "Slug (technical)",
+    "slug_hint": "Used in URLs and folder names. Auto-derived from display name.",
+    "slug_edit": "Edit slug",
+    "slug_lock": "Auto",
+    "slug_invalid": "Invalid slug. Use a-z, 0-9, _, - only; must start with a letter or digit.",
     "vault_label": "Vault path",
     "vault_hint": "Absolute path. The directory will be created if it does not exist.",
+    "vault_browse": "Browse",
     "advanced_toggle": "Advanced — CWD patterns",
     "cwd_label": "CWD patterns (one per line)",
     "cwd_hint": "Glob patterns matching working directories where this project is active.",
@@ -472,5 +480,25 @@
       "spec": "Spec",
       "issues": "Report an issue"
     }
+  },
+  "picker": {
+    "title": "Choose folder",
+    "path_placeholder": "Type or paste path",
+    "filter_placeholder": "Filter folders…",
+    "recent": "Recent",
+    "loading": "Loading…",
+    "empty": "No subfolders",
+    "truncated": "Showing first 100 — refine filter to narrow",
+    "new_folder": "New folder",
+    "folder_name": "Folder name",
+    "create": "Create",
+    "cancel": "Cancel",
+    "select": "Select this folder"
+  },
+  "cwd_builder": {
+    "add": "Add folder",
+    "remove": "Remove",
+    "recursive": "Include subfolders",
+    "empty": "No folders added — sessions must be ingested manually"
   }
 }

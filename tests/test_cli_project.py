@@ -170,3 +170,32 @@ def test_project_resolve_with_explicit_cwd(tmp_path, capsys):
 def test_project_resolve_no_match_nonzero(tmp_path):
     rc = cli_main(["project", "resolve", "--cwd", str(tmp_path / "elsewhere"), "--json"])
     assert rc != 0
+
+
+def test_project_add_with_display_name(tmp_path):
+    """`mnemos project add ... --display-name ...` stores display_name."""
+    rc = cli_main([
+        "project", "add",
+        "--name", "foo",
+        "--vault", str(tmp_path / "v"),
+        "--display-name", "Foo Project",
+    ])
+    assert rc == 0
+    f = tmp_path / HOME_CONFIG_DIRNAME / PROJECT_MAP_FILENAME
+    data = json.loads(f.read_text())
+    entries = {p["name"]: p for p in data["projects"]}
+    assert entries["foo"]["display_name"] == "Foo Project"
+
+
+def test_project_add_without_display_name_stores_none(tmp_path):
+    """add without --display-name → display_name=None in stored entry."""
+    rc = cli_main([
+        "project", "add",
+        "--name", "foo",
+        "--vault", str(tmp_path / "v"),
+    ])
+    assert rc == 0
+    f = tmp_path / HOME_CONFIG_DIRNAME / PROJECT_MAP_FILENAME
+    data = json.loads(f.read_text())
+    entries = {p["name"]: p for p in data["projects"]}
+    assert entries["foo"]["display_name"] is None

@@ -70,6 +70,7 @@ class ProjectMapEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=PROJECT_NAME_PATTERN)
+    display_name: str | None = None
     vault_root: Path
     cwd_patterns: list[str] = Field(default_factory=list)
 
@@ -146,6 +147,7 @@ class ProjectStore:
         cwd_patterns: list[str] | None = None,
         add_cwd_patterns: list[str] | None = None,
         remove_cwd_patterns: list[str] | None = None,
+        display_name: str | None = None,
     ) -> ProjectMapEntry:
         """Update fields of an existing entry.
 
@@ -156,6 +158,11 @@ class ProjectStore:
         ``add_cwd_patterns`` appends entries (preserving order, deduplicating).
         ``remove_cwd_patterns`` removes specific entries.
         Caller should pass either ``cwd_patterns`` OR ``add``/``remove``, not both.
+        ``display_name`` semantics: leave ``None`` to keep current value;
+        pass an empty string ``""`` to clear it back to ``None``; any other
+        non-empty string sets the new value. (Empty string as "clear" is a
+        pragmatic API convention since JSON has no Optional[Optional[T]] —
+        callers wanting to clear it just send an empty string.)
         """
         with self._lock:
             pm = self._load()
@@ -174,10 +181,17 @@ class ProjectStore:
                         if remove_cwd_patterns:
                             remove_set = set(remove_cwd_patterns)
                             new_patterns = [p for p in new_patterns if p not in remove_set]
+                    if display_name is None:
+                        new_display = e.display_name
+                    elif display_name == "":
+                        new_display = None
+                    else:
+                        new_display = display_name
                     new_e = e.model_copy(
                         update={
                             "vault_root": vault_root if vault_root is not None else e.vault_root,
                             "cwd_patterns": new_patterns,
+                            "display_name": new_display,
                         }
                     )
                     pm.projects[i] = new_e
