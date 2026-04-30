@@ -500,5 +500,12 @@
     "remove": "Remove",
     "recursive": "Include subfolders",
     "empty": "No folders added — sessions must be ingested manually"
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "error": "Error: {{msg}}"
   }
 }
