@@ -177,11 +177,14 @@ class ProjectStore:
                         if remove_cwd_patterns:
                             remove_set = set(remove_cwd_patterns)
                             new_patterns = [p for p in new_patterns if p not in remove_set]
+                    new_display = (
+                        display_name if display_name is not None else e.display_name
+                    )
                     new_e = e.model_copy(
                         update={
                             "vault_root": vault_root if vault_root is not None else e.vault_root,
                             "cwd_patterns": new_patterns,
-                            "display_name": display_name if display_name is not None else e.display_name,
+                            "display_name": new_display,
                         }
                     )
                     pm.projects[i] = new_e
