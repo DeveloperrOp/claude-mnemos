@@ -70,6 +70,7 @@ class ProjectMapEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=PROJECT_NAME_PATTERN)
+    display_name: str | None = None
     vault_root: Path
     cwd_patterns: list[str] = Field(default_factory=list)
 
