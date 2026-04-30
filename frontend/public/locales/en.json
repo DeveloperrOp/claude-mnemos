@@ -479,5 +479,19 @@
       "spec": "Spec",
       "issues": "Report an issue"
     }
+  },
+  "picker": {
+    "title": "Choose folder",
+    "path_placeholder": "Type or paste path",
+    "filter_placeholder": "Filter folders…",
+    "recent": "Recent",
+    "loading": "Loading…",
+    "empty": "No subfolders",
+    "truncated": "Showing first 100 — refine filter to narrow",
+    "new_folder": "New folder",
+    "folder_name": "Folder name",
+    "create": "Create",
+    "cancel": "Cancel",
+    "select": "Select this folder"
   }
 }
