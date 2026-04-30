@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -26,10 +26,35 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
+  // Monotonic counter to discard stale async results when the user navigates
+  // again before the previous request completes (or closes/reopens picker).
+  const navigationVersion = useRef(0);
+
+  async function navigateTo(path: string) {
+    const version = ++navigationVersion.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await browseDirectory(path);
+      if (version !== navigationVersion.current) return;
+      setCwd(result.cwd);
+      setData(result);
+      setPathInputValue(result.cwd);
+      setFilter("");
+    } catch (e) {
+      if (version !== navigationVersion.current) return;
+      if (axios.isAxiosError(e)) {
+        setError(e.response?.data?.detail ?? e.message);
+      }
+    } finally {
+      if (version === navigationVersion.current) setLoading(false);
+    }
+  }
+
   // Initial load: navigate to initialPath or to home.
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    const version = ++navigationVersion.current;
     (async () => {
       setLoading(true);
       setError(null);
@@ -38,37 +63,24 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
           await navigateTo(initialPath);
         } else {
           const home = await getHome();
+          if (version !== navigationVersion.current) return;
           await navigateTo(home.home);
         }
       } catch (e) {
-        if (!cancelled && axios.isAxiosError(e)) {
+        if (version !== navigationVersion.current) return;
+        if (axios.isAxiosError(e)) {
           setError(e.response?.data?.detail ?? e.message);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      // Bumping the version invalidates the in-flight request's late state
+      // updates; it doesn't actually cancel the network call (that needs
+      // AbortController), but it stops state-write races.
+      navigationVersion.current++;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  async function navigateTo(path: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await browseDirectory(path);
-      setCwd(result.cwd);
-      setData(result);
-      setPathInputValue(result.cwd);
-      setFilter("");
-    } catch (e) {
-      if (axios.isAxiosError(e)) {
-        setError(e.response?.data?.detail ?? e.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function selectCurrent() {
     if (cwd) {
@@ -102,7 +114,8 @@ export function DirectoryPicker({ open, initialPath, allowCreate, onSelect, onCl
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       if (i === 0 && cwd.includes("\\")) {
-        running = part;
+        // Windows drive root: "C:" alone is not absolute; backend expects "C:\\".
+        running = `${part}\\`;
       } else if (i === 0 && !cwd.includes("\\")) {
         running = `/${part}`;
       } else {

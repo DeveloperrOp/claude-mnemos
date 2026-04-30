@@ -158,7 +158,11 @@ class ProjectStore:
         ``add_cwd_patterns`` appends entries (preserving order, deduplicating).
         ``remove_cwd_patterns`` removes specific entries.
         Caller should pass either ``cwd_patterns`` OR ``add``/``remove``, not both.
-        ``display_name`` is set when not None; leave None to keep current value.
+        ``display_name`` semantics: leave ``None`` to keep current value;
+        pass an empty string ``""`` to clear it back to ``None``; any other
+        non-empty string sets the new value. (Empty string as "clear" is a
+        pragmatic API convention since JSON has no Optional[Optional[T]] —
+        callers wanting to clear it just send an empty string.)
         """
         with self._lock:
             pm = self._load()
@@ -177,9 +181,12 @@ class ProjectStore:
                         if remove_cwd_patterns:
                             remove_set = set(remove_cwd_patterns)
                             new_patterns = [p for p in new_patterns if p not in remove_set]
-                    new_display = (
-                        display_name if display_name is not None else e.display_name
-                    )
+                    if display_name is None:
+                        new_display = e.display_name
+                    elif display_name == "":
+                        new_display = None
+                    else:
+                        new_display = display_name
                     new_e = e.model_copy(
                         update={
                             "vault_root": vault_root if vault_root is not None else e.vault_root,
