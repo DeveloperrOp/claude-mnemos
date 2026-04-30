@@ -27,6 +27,7 @@
     "failed_jobs": "Failed jobs",
     "metrics": "Metrics",
     "help": "Help",
+    "global_settings": "Global settings",
     "create_project": "+ New project"
   },
   "topbar": {
@@ -500,5 +501,107 @@
     "remove": "Remove",
     "recursive": "Include subfolders",
     "empty": "No folders added — sessions must be ingested manually"
+  },
+  "settings": {
+    "title": "Settings",
+    "loading": "Loading settings...",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "error": "Error: {{msg}}",
+    "danger": {
+      "title": "Danger zone",
+      "body": "Permanent actions. The vault folder is not deleted; you can re-add the project to restore.",
+      "delete_button": "Delete project",
+      "modal_title": "Delete project «{{name}}»?",
+      "modal_body": "Removes the project from the registry. Vault folder at {{vault}} will NOT be deleted.",
+      "confirm_label": "Type «{{slug}}» to confirm:",
+      "cancel": "Cancel",
+      "confirm": "Delete project",
+      "deleting": "Deleting...",
+      "force_delete": "Force delete (cancel jobs)"
+    },
+    "section": {
+      "general": {
+        "title": "General",
+        "display_name": "Display name",
+        "display_name_hint": "Shown in dashboard. Leave empty to clear.",
+        "slug": "Slug (read-only)",
+        "slug_hint": "Used in URLs and file paths. Fixed at creation.",
+        "vault": "Vault path (read-only)",
+        "vault_hint": "To move vault, create new project and migrate data.",
+        "cwd": "Project folders (auto-routing)",
+        "copy": "Copy"
+      },
+      "auto_ingest": {
+        "title": "Auto-ingest",
+        "enabled": "Enabled",
+        "mode": "Mode"
+      },
+      "lint": {
+        "title": "Lint",
+        "schedule": "Cron schedule",
+        "enabled_rules": "Enabled rules (comma-separated)",
+        "autofix_on_save": "Autofix on save"
+      },
+      "ontology": {
+        "title": "Ontology",
+        "auto_mode": "Auto mode",
+        "confidence_min": "Minimum confidence (0..1)",
+        "confidence_auto_apply": "Auto-apply confidence (0..1)"
+      },
+      "watchdog": {
+        "title": "Watchdog",
+        "mode": "Mode"
+      },
+      "snapshots": {
+        "title": "Snapshots",
+        "daily_enabled": "Daily snapshots enabled",
+        "retention_days": "Retention (days)"
+      },
+      "locale": {
+        "title": "Locale",
+        "inherit": "Inherit from global"
+      },
+      "lifecycle": {
+        "title": "Lifecycle",
+        "auto_stale_days": "Auto-stale (days)",
+        "auto_archive": "Auto-archive stale pages"
+      },
+      "prompts": {
+        "title": "Prompts",
+        "custom_system_path": "Custom system prompt path",
+        "custom_extract_user_path": "Custom extract-user prompt path"
+      },
+      "telemetry": {
+        "title": "Telemetry",
+        "opt_in": "Send anonymous usage stats",
+        "hint": "No prompts, transcripts, or vault content is ever sent."
+      },
+      "ingest": {
+        "title": "Ingest overrides",
+        "hint": "Override global defaults per project. Unchecked = inherit from global settings.",
+        "model": "Override model",
+        "language_hint": "Override language hint",
+        "max_input_tokens": "Override max input tokens",
+        "context_limit": "Override context limit",
+        "using_default": "Using default ({{value}})"
+      }
+    },
+    "global": {
+      "title": "Global settings",
+      "general": {
+        "title": "General",
+        "locale": "Dashboard language",
+        "daemon_port": "Daemon port"
+      },
+      "defaults": {
+        "title": "Defaults",
+        "default_model": "Default model",
+        "default_language_hint": "Default language hint",
+        "default_max_input_tokens": "Default max input tokens",
+        "default_retention_days": "Default retention (days)"
+      }
+    }
   }
 }

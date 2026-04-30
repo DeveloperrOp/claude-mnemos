@@ -25,3 +25,21 @@ export async function createProject(body: CreateProjectBody): Promise<ProjectMap
   });
   return ProjectMapEntrySchema.parse(r.data);
 }
+
+export async function deleteProject(slug: string, opts?: { force?: boolean }): Promise<void> {
+  const params = opts?.force ? { force: true } : undefined;
+  await apiClient.delete(`/projects/${slug}`, { params });
+}
+
+export interface UpdateProjectBody {
+  display_name?: string | null;
+  cwd_patterns?: string[];
+}
+
+export async function updateProject(
+  slug: string,
+  body: UpdateProjectBody,
+): Promise<ProjectMapEntry> {
+  const r = await apiClient.patch(`/projects/${slug}`, body);
+  return ProjectMapEntrySchema.parse(r.data);
+}

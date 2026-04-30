@@ -21,6 +21,8 @@ import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { Onboarding } from "./pages/Onboarding";
+import { ProjectSettings } from "./pages/ProjectSettings";
+import { GlobalSettings } from "./pages/GlobalSettings";
 
 const Help = lazy(() => import("./pages/Help"));
 const Metrics = lazy(() => import("./pages/Metrics"));
@@ -55,7 +57,7 @@ const router = createBrowserRouter([
           { path: "snapshots", element: <Snapshots /> },
           { path: "health", element: <Health /> },
           { path: "queue", element: <Placeholder section="Queue" plan="#14b" /> },
-          { path: "settings", element: <Placeholder section="Settings" plan="#14c" /> },
+          { path: "settings", element: <ProjectSettings /> },
         ],
       },
       { path: "lost-sessions", element: <LostSessions /> },
@@ -63,7 +65,7 @@ const router = createBrowserRouter([
       { path: "dead-letter/:jobId", element: <DeadLetterDetail /> },
       { path: "help", element: <Suspense fallback={<Skeleton className="h-64" />}><Help /></Suspense> },
       { path: "metrics", element: <Suspense fallback={<Skeleton className="h-64" />}><Metrics /></Suspense> },
-      { path: "settings/global", element: <Placeholder section="Global Settings" plan="#14c" /> },
+      { path: "settings/global", element: <GlobalSettings /> },
     ],
   },
 ]);
