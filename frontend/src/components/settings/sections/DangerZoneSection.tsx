@@ -1,0 +1,134 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { deleteProject } from "@/api/projects.api";
+import type { ProjectMapEntry } from "@/types/Project";
+
+interface Props {
+  project: ProjectMapEntry;
+}
+
+export function DangerZoneSection({ project }: Props) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const mut = useMutation({
+    mutationFn: (force: boolean) =>
+      deleteProject(project.name, force ? { force: true } : undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      navigate("/");
+    },
+    onError: (err: unknown) => {
+      // Backend 409 returns detail as dict {error, queued, running, hint}.
+      // Other errors may have detail as string.
+      const e = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const detail = e?.response?.data?.detail;
+      let msg: string;
+      if (typeof detail === "string") {
+        msg = detail;
+      } else if (detail && typeof detail === "object") {
+        const d = detail as { hint?: string; error?: string };
+        msg = d.hint || d.error || (e.message ?? "Error");
+      } else {
+        msg = e.message ?? "Error";
+      }
+      setError(msg);
+    },
+  });
+
+  const slugMatches = confirmInput === project.name;
+  const displayName = project.display_name || project.name;
+
+  const handleDelete = (force = false) => {
+    setError(null);
+    mut.mutate(force);
+  };
+
+  const errorMentionsJobs = (error ?? "").toLowerCase().match(/jobs|queued|running/);
+
+  return (
+    <section className="rounded-md border-2 border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+      <h3 className="text-sm font-semibold text-red-900 dark:text-red-300">
+        {t("settings.danger.title")}
+      </h3>
+      <p className="mt-1 text-xs text-red-800 dark:text-red-400">
+        {t("settings.danger.body")}
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-3 border-red-600 text-red-700 hover:bg-red-100 dark:hover:bg-red-900"
+        onClick={() => {
+          setOpen(true);
+          setConfirmInput("");
+          setError(null);
+        }}
+      >
+        {t("settings.danger.delete_button")}
+      </Button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-md border bg-[hsl(var(--background))] p-4 shadow-lg">
+            <h4 className="text-base font-semibold">
+              {t("settings.danger.modal_title", { name: displayName })}
+            </h4>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              {t("settings.danger.modal_body", {
+                vault: String(project.vault_root),
+              })}
+            </p>
+            <div className="mt-3 space-y-1">
+              <label className="text-xs font-medium">
+                {t("settings.danger.confirm_label", { slug: project.name })}
+              </label>
+              <input
+                type="text"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+                autoFocus
+              />
+            </div>
+            {error && (
+              <div className="mt-2 rounded-md border border-amber-500 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                {error}
+                {errorMentionsJobs && (
+                  <button
+                    type="button"
+                    className="ml-2 underline"
+                    onClick={() => handleDelete(true)}
+                  >
+                    {t("settings.danger.force_delete")}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+                {t("settings.danger.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleDelete(false)}
+                disabled={!slugMatches || mut.isPending}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {mut.isPending
+                  ? t("settings.danger.deleting")
+                  : t("settings.danger.confirm")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

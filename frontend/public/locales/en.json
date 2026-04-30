@@ -507,6 +507,18 @@
     "saving": "Saving...",
     "saved": "Saved",
     "error": "Error: {{msg}}",
+    "danger": {
+      "title": "Danger zone",
+      "body": "Permanent actions. The vault folder is not deleted; you can re-add the project to restore.",
+      "delete_button": "Delete project",
+      "modal_title": "Delete project «{{name}}»?",
+      "modal_body": "Removes the project from the registry. Vault folder at {{vault}} will NOT be deleted.",
+      "confirm_label": "Type «{{slug}}» to confirm:",
+      "cancel": "Cancel",
+      "confirm": "Delete project",
+      "deleting": "Deleting...",
+      "force_delete": "Force delete (cancel jobs)"
+    },
     "section": {
       "general": {
         "title": "General",
