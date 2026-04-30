@@ -8,15 +8,18 @@ import { getTrayStatus, installTray } from "@/api/tray.api";
 import type { TrayStatus } from "@/types/Tray";
 import { getClaudeCliAuth } from "@/api/claudeCli.api";
 import type { ClaudeCliAuth } from "@/types/ClaudeCliAuth";
+import { deriveSlug } from "@/lib/slugify";
 
-const NAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const SLUG_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 export function Onboarding() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const create = useProjectCreate();
 
-  const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugLocked, setSlugLocked] = useState(false);
   const [vault, setVault] = useState("");
   const [cwd, setCwd] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -38,11 +41,11 @@ export function Onboarding() {
     getClaudeCliAuth().then(setCliAuth).catch(() => setCliAuth(null));
   }, []);
 
-  const nameValid = NAME_REGEX.test(name);
+  const slugValid = SLUG_REGEX.test(slug);
   const vaultValid = vault.trim().length > 0;
-  const canSubmit = nameValid && vaultValid && !create.isPending;
-
-  const showNameInvalid = name.length > 0 && !nameValid;
+  const canSubmit =
+    slugValid && vaultValid && displayName.trim().length > 0 && !create.isPending;
+  const showSlugInvalid = slug.length > 0 && !slugValid;
 
   const submit = () => {
     setNameTakenError(false);
@@ -52,7 +55,12 @@ export function Onboarding() {
       .map((s) => s.trim())
       .filter(Boolean);
     create.mutate(
-      { name, vault_root: vault.trim(), cwd_patterns },
+      {
+        name: slug,
+        display_name: displayName.trim() || null,
+        vault_root: vault.trim(),
+        cwd_patterns,
+      },
       {
         onSuccess: (entry) => {
           if (
@@ -89,18 +97,57 @@ export function Onboarding() {
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="onb-name" className="text-sm font-medium">{t("onboarding.name_label")}</label>
+        <label htmlFor="onb-display" className="text-sm font-medium">{t("onboarding.display_name_label")}</label>
         <input
-          id="onb-name"
+          id="onb-display"
           type="text"
-          value={name}
-          onChange={(e) => { setName(e.target.value); setNameTakenError(false); }}
+          value={displayName}
+          onChange={(e) => {
+            const next = e.target.value;
+            setDisplayName(next);
+            setNameTakenError(false);
+            if (!slugLocked) setSlug(deriveSlug(next));
+          }}
           disabled={create.isPending}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
         />
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.name_hint")}</p>
-        {showNameInvalid && (
-          <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.name_invalid")}</p>
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.display_name_hint")}</p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label htmlFor="onb-slug" className="text-sm font-medium">{t("onboarding.slug_label")}</label>
+          {!slugLocked ? (
+            <button
+              type="button"
+              className="text-xs text-[hsl(var(--primary))] underline"
+              onClick={() => setSlugLocked(true)}
+            >
+              {t("onboarding.slug_edit")}
+            </button>
+          ) : (
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              <button
+                type="button"
+                className="underline"
+                onClick={() => { setSlugLocked(false); setSlug(deriveSlug(displayName)); }}
+              >
+                {t("onboarding.slug_lock")}
+              </button>
+            </span>
+          )}
+        </div>
+        <input
+          id="onb-slug"
+          type="text"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          disabled={!slugLocked || create.isPending}
+          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono disabled:opacity-60"
+        />
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.slug_hint")}</p>
+        {showSlugInvalid && (
+          <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.slug_invalid")}</p>
         )}
         {nameTakenError && (
           <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.name_taken")}</p>

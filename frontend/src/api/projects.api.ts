@@ -11,6 +11,7 @@ export async function listProjects(): Promise<ProjectMapEntry[]> {
 
 export interface CreateProjectBody {
   name: string;
+  display_name: string | null;
   vault_root: string;
   cwd_patterns?: string[];
 }
@@ -18,6 +19,7 @@ export interface CreateProjectBody {
 export async function createProject(body: CreateProjectBody): Promise<ProjectMapEntry> {
   const r = await apiClient.post("/projects", {
     name: body.name,
+    display_name: body.display_name,
     vault_root: body.vault_root,
     cwd_patterns: body.cwd_patterns ?? [],
   });

@@ -10,21 +10,24 @@ describe("projects mutations", () => {
   beforeEach(() => vi.mocked(apiClient.post).mockReset());
   afterEach(() => vi.resetAllMocks());
 
-  it("createProject POSTs body with name + vault_root + cwd_patterns", async () => {
+  it("createProject POSTs body with name + display_name + vault_root + cwd_patterns", async () => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({
       data: {
         name: "alpha",
+        display_name: "Alpha",
         vault_root: "/tmp/alpha",
         cwd_patterns: ["~/code/alpha"],
       },
     });
     const out = await createProject({
       name: "alpha",
+      display_name: "Alpha",
       vault_root: "/tmp/alpha",
       cwd_patterns: ["~/code/alpha"],
     });
     expect(apiClient.post).toHaveBeenCalledWith("/projects", {
       name: "alpha",
+      display_name: "Alpha",
       vault_root: "/tmp/alpha",
       cwd_patterns: ["~/code/alpha"],
     });
@@ -33,11 +36,12 @@ describe("projects mutations", () => {
 
   it("createProject defaults cwd_patterns to empty array", async () => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({
-      data: { name: "beta", vault_root: "/tmp/beta", cwd_patterns: [] },
+      data: { name: "beta", display_name: null, vault_root: "/tmp/beta", cwd_patterns: [] },
     });
-    await createProject({ name: "beta", vault_root: "/tmp/beta" });
+    await createProject({ name: "beta", display_name: null, vault_root: "/tmp/beta" });
     expect(apiClient.post).toHaveBeenCalledWith("/projects", {
       name: "beta",
+      display_name: null,
       vault_root: "/tmp/beta",
       cwd_patterns: [],
     });
