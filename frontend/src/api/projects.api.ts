@@ -33,6 +33,7 @@ export async function deleteProject(slug: string, opts?: { force?: boolean }): P
 
 export interface UpdateProjectBody {
   display_name?: string | null;
+  vault_root?: string;
   cwd_patterns?: string[];
 }
 

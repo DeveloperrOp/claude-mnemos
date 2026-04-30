@@ -62,14 +62,16 @@ function wrap(ui: ReactNode) {
 }
 
 describe("GeneralSection", () => {
-  it("renders display_name, slug RO, vault RO, CWD list", () => {
+  it("renders display_name, slug RO, vault editable + Browse, CWD list", () => {
     wrap(<GeneralSection project={PROJECT} />);
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Project One")).toBeInTheDocument();
     const slugInput = screen.getByDisplayValue("p1");
     expect(slugInput).toHaveAttribute("readonly");
+    // Vault is now editable (no readonly attribute) and has a Browse button.
     const vaultInput = screen.getByDisplayValue("/tmp/p1");
-    expect(vaultInput).toHaveAttribute("readonly");
+    expect(vaultInput).not.toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i })).toBeInTheDocument();
     expect(screen.getByText(/~\/code\/p1$/)).toBeInTheDocument();
   });
 

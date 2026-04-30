@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsAccordion } from "../SettingsAccordion";
 import { CwdBuilder } from "@/components/onboarding/CwdBuilder";
+import { DirectoryPicker } from "@/components/picker/DirectoryPicker";
+import { Button } from "@/components/ui/button";
 import { useProjectUpdate } from "@/hooks/useProjectUpdate";
 import type { ProjectMapEntry } from "@/types/Project";
 
@@ -14,25 +16,35 @@ export function GeneralSection({ project }: Props) {
   const mut = useProjectUpdate(project.name);
 
   const [displayName, setDisplayName] = useState(project.display_name ?? "");
+  const [vaultRoot, setVaultRoot] = useState<string>(String(project.vault_root));
   const [cwdPatterns, setCwdPatterns] = useState<string[]>(project.cwd_patterns);
+  const [vaultPickerOpen, setVaultPickerOpen] = useState(false);
 
   useEffect(() => {
     // Server-data sync into local form state — intentional initialization pattern.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDisplayName(project.display_name ?? "");
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVaultRoot(String(project.vault_root));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCwdPatterns(project.cwd_patterns);
   }, [project]);
 
-  const trimmed = displayName.trim();
+  const trimmedName = displayName.trim();
+  const trimmedVault = vaultRoot.trim();
+  const vaultChanged = trimmedVault !== String(project.vault_root);
   const dirty =
-    trimmed !== (project.display_name ?? "") ||
+    trimmedName !== (project.display_name ?? "") ||
+    vaultChanged ||
     JSON.stringify(cwdPatterns) !== JSON.stringify(project.cwd_patterns);
 
   const onSave = () => {
-    // Empty string → backend clears display_name to null.
     mut.mutate({
-      display_name: trimmed,
+      display_name: trimmedName,
+      // Only send vault_root in body if it actually changed — backend treats
+      // null as "leave unchanged"; sending the same value would still pass but
+      // keeps the diff minimal.
+      ...(vaultChanged ? { vault_root: trimmedVault } : {}),
       cwd_patterns: cwdPatterns,
     });
   };
@@ -99,13 +111,21 @@ export function GeneralSection({ project }: Props) {
         <div className="flex gap-2">
           <input
             type="text"
-            value={String(project.vault_root)}
-            readOnly
-            className="flex-1 rounded-md border bg-[hsl(var(--muted))] px-3 py-2 text-sm font-mono"
+            value={vaultRoot}
+            onChange={(e) => setVaultRoot(e.target.value)}
+            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setVaultPickerOpen(true)}
+          >
+            📁 {t("settings.section.general.browse")}
+          </Button>
           <button
             type="button"
-            onClick={() => copy(String(project.vault_root))}
+            onClick={() => copy(vaultRoot)}
             className="text-xs text-[hsl(var(--primary))] underline"
           >
             {t("settings.section.general.copy")}
@@ -114,6 +134,11 @@ export function GeneralSection({ project }: Props) {
         <p className="text-xs text-[hsl(var(--muted-foreground))]">
           {t("settings.section.general.vault_hint")}
         </p>
+        {vaultChanged && (
+          <p className="rounded-md border-2 border-amber-500 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            ⚠ {t("settings.section.general.vault_warn")}
+          </p>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -126,6 +151,17 @@ export function GeneralSection({ project }: Props) {
           disabled={mut.isPending}
         />
       </div>
+
+      <DirectoryPicker
+        open={vaultPickerOpen}
+        initialPath={vaultRoot.trim() || undefined}
+        allowCreate
+        onSelect={(p) => {
+          setVaultRoot(p);
+          setVaultPickerOpen(false);
+        }}
+        onClose={() => setVaultPickerOpen(false)}
+      />
     </SettingsAccordion>
   );
 }

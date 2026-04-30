@@ -530,8 +530,10 @@
         "display_name_hint": "Shown in dashboard. Leave empty to clear.",
         "slug": "Slug (read-only)",
         "slug_hint": "Used in URLs and file paths. Fixed at creation.",
-        "vault": "Vault path (read-only)",
-        "vault_hint": "To move vault, create new project and migrate data.",
+        "vault": "Vault path",
+        "vault_hint": "Absolute path to vault. Changing it only updates the registry — move existing data files manually before saving.",
+        "vault_warn": "Path changed. The daemon does NOT move data files automatically — make sure the new directory contains your vault content (or is empty for a fresh start) before saving.",
+        "browse": "Browse",
         "cwd": "Project folders (auto-routing)",
         "copy": "Copy"
       },
