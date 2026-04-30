@@ -17,6 +17,9 @@ export function DangerZoneSection({ project }: Props) {
   const [open, setOpen] = useState(false);
   const [confirmInput, setConfirmInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Track HTTP status separately from text — force-delete should ONLY be offered
+  // when backend returned 409 (vault busy), not on any error containing "jobs".
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
 
   const mut = useMutation({
     mutationFn: (force: boolean) =>
@@ -28,7 +31,11 @@ export function DangerZoneSection({ project }: Props) {
     onError: (err: unknown) => {
       // Backend 409 returns detail as dict {error, queued, running, hint}.
       // Other errors may have detail as string.
-      const e = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const e = err as {
+        response?: { status?: number; data?: { detail?: unknown } };
+        message?: string;
+      };
+      const status = e?.response?.status ?? null;
       const detail = e?.response?.data?.detail;
       let msg: string;
       if (typeof detail === "string") {
@@ -39,6 +46,7 @@ export function DangerZoneSection({ project }: Props) {
       } else {
         msg = e.message ?? "Error";
       }
+      setErrorStatus(status);
       setError(msg);
     },
   });
@@ -48,10 +56,12 @@ export function DangerZoneSection({ project }: Props) {
 
   const handleDelete = (force = false) => {
     setError(null);
+    setErrorStatus(null);
     mut.mutate(force);
   };
 
-  const errorMentionsJobs = (error ?? "").toLowerCase().match(/jobs|queued|running/);
+  // Force-delete link: only on real 409 (vault busy), not arbitrary errors with "jobs" in text.
+  const showForceLink = errorStatus === 409;
 
   return (
     <section className="rounded-md border-2 border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
@@ -100,7 +110,7 @@ export function DangerZoneSection({ project }: Props) {
             {error && (
               <div className="mt-2 rounded-md border border-amber-500 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 {error}
-                {errorMentionsJobs && (
+                {showForceLink && (
                   <button
                     type="button"
                     className="ml-2 underline"

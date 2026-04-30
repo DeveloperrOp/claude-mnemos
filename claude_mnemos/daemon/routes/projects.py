@@ -134,9 +134,7 @@ async def delete_project(
     try:
         ProjectStore().remove(name)
     except ProjectNotFoundError as exc:
-        # If not in map and not in runtimes either, it never existed.
-        if daemon is None or name not in (e.name for e in ProjectStore().list_all()):
-            raise HTTPException(404, detail={"error": "not_found", "name": name}) from exc
+        raise HTTPException(404, detail={"error": "not_found", "name": name}) from exc
 
     # Physically delete per-project settings file (if any). Vault folder NOT
     # touched — re-add with same slug + vault to restore.

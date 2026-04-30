@@ -149,9 +149,10 @@ export function IngestOverridesSection({ slug }: Props) {
             type="number"
             value={maxInputTokens}
             min={1024}
-            onChange={(e) =>
-              setMaxInputTokens(parseInt(e.target.value || "0", 10))
-            }
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (!Number.isNaN(v)) setMaxInputTokens(v);
+            }}
             className="ml-6 w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm"
           />
         ) : (
@@ -177,9 +178,10 @@ export function IngestOverridesSection({ slug }: Props) {
             type="number"
             value={contextLimit}
             min={1}
-            onChange={(e) =>
-              setContextLimit(parseInt(e.target.value || "0", 10))
-            }
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (!Number.isNaN(v)) setContextLimit(v);
+            }}
             className="ml-6 w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm"
           />
         ) : (

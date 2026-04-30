@@ -6,7 +6,10 @@ export function useProjectUpdate(slug: string) {
   return useMutation({
     mutationFn: (patch: UpdateProjectBody) => updateProject(slug, patch),
     onSuccess: () => {
+      // Invalidate both the list (sidebar/switcher) and the per-project query
+      // (settings page, project detail header).
       void qc.invalidateQueries({ queryKey: ["projects"] });
+      void qc.invalidateQueries({ queryKey: ["project", slug] });
     },
   });
 }

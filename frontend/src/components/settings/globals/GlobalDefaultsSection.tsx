@@ -92,7 +92,10 @@ export function GlobalDefaultsSection() {
           min={1024}
           step={1}
           value={maxInputTokens}
-          onChange={(e) => setMaxInputTokens(Number(e.target.value))}
+          onChange={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (!Number.isNaN(v)) setMaxInputTokens(v);
+          }}
           className="w-40 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
         />
       </div>
@@ -105,7 +108,10 @@ export function GlobalDefaultsSection() {
           min={1}
           step={1}
           value={retentionDays}
-          onChange={(e) => setRetentionDays(Number(e.target.value))}
+          onChange={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (!Number.isNaN(v)) setRetentionDays(v);
+          }}
           className="w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
         />
       </div>
