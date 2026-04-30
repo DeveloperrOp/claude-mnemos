@@ -29,6 +29,7 @@ beforeAll(() => {
       slug_invalid: "Invalid slug",
       vault_label: "Vault path",
       vault_hint: "Absolute",
+      vault_browse: "Browse",
       advanced_toggle: "Advanced",
       cwd_label: "CWD patterns",
       cwd_hint: "globs",
@@ -42,6 +43,26 @@ beforeAll(() => {
       cli_check_ok: "✓ Claude CLI installed and authenticated",
       cli_check_not_installed: "⚠ Claude CLI not found — install Claude Code from https://claude.ai/download",
       cli_check_not_authenticated: "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal",
+    },
+    cwd_builder: {
+      add: "Add folder",
+      remove: "Remove",
+      recursive: "Include subfolders",
+      empty: "No folders added — sessions must be ingested manually",
+    },
+    picker: {
+      title: "Choose folder",
+      path_placeholder: "Type or paste path",
+      filter_placeholder: "Filter folders…",
+      recent: "Recent",
+      loading: "Loading…",
+      empty: "No subfolders",
+      truncated: "Showing first 100 — refine filter to narrow",
+      new_folder: "New folder",
+      folder_name: "Folder name",
+      create: "Create",
+      cancel: "Cancel",
+      select: "Select this folder",
     },
   }, true, true);
   void i18n.changeLanguage("en");
@@ -253,5 +274,67 @@ describe("Onboarding", () => {
     expect(body.display_name).toBe("My Project");
     expect(body.name).toBe("my-project");
     expect(body.vault_root).toBe("/tmp/x");
+  });
+
+  it("opens DirectoryPicker on Browse button click", async () => {
+    trayMock.onGet("/fs/home").reply(200, { home: "/home" });
+    trayMock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/home",
+      parent: null,
+      entries: [{ name: "code", path: "/home/code" }],
+      truncated: false,
+    });
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+    await user.click(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i }));
+    expect(await screen.findByText(/📁\s*code$/)).toBeInTheDocument();  // picker open
+  });
+
+  it("Browse → Select sets vault input", async () => {
+    trayMock.onGet("/fs/home").reply(200, { home: "/home" });
+    trayMock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/home",
+      parent: null,
+      entries: [{ name: "code", path: "/home/code" }],
+      truncated: false,
+    });
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+    await user.click(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i }));
+    await screen.findByText(/📁\s*code$/);
+    await user.click(screen.getByRole("button", { name: /Select|Выбрать|Вибрати/i }));
+
+    const vaultInput = screen.getByLabelText(/vault|Path to vault/i) as HTMLInputElement;
+    expect(vaultInput.value).toBe("/home");
+  });
+
+  it("CwdBuilder add folder appends to cwd_patterns on submit", async () => {
+    trayMock.onGet("/fs/home").reply(200, { home: "/home" });
+    trayMock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/home",
+      parent: null,
+      entries: [{ name: "code", path: "/home/code" }],
+      truncated: false,
+    });
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValueOnce({
+      data: { name: "x", display_name: null, vault_root: "/home", cwd_patterns: ["/home/*"] },
+    });
+
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+    await user.type(screen.getByLabelText(/display name/i), "Test");
+    await user.type(screen.getByLabelText(/vault path/i), "/home");
+
+    // Open advanced section + Add folder via builder
+    await user.click(screen.getByRole("button", { name: /Advanced|Расширенные|Розширені/i }));
+    await user.click(screen.getByRole("button", { name: /Add folder|Добавить|Додати/i }));
+    await screen.findByText(/📁\s*code$/);
+    await user.click(screen.getByRole("button", { name: /Select|Выбрать|Вибрати/i }));
+
+    await user.click(screen.getByRole("button", { name: /Create project/i }));
+
+    await waitFor(() => expect(postSpy).toHaveBeenCalled());
+    const [, body] = postSpy.mock.calls[0] as [string, Record<string, unknown>];
+    expect(body.cwd_patterns).toContain("/home/*");
   });
 });

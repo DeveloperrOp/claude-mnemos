@@ -9,6 +9,8 @@ import type { TrayStatus } from "@/types/Tray";
 import { getClaudeCliAuth } from "@/api/claudeCli.api";
 import type { ClaudeCliAuth } from "@/types/ClaudeCliAuth";
 import { deriveSlug } from "@/lib/slugify";
+import { DirectoryPicker } from "@/components/picker/DirectoryPicker";
+import { CwdBuilder } from "@/components/onboarding/CwdBuilder";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
@@ -21,7 +23,8 @@ export function Onboarding() {
   const [slug, setSlug] = useState("");
   const [slugLocked, setSlugLocked] = useState(false);
   const [vault, setVault] = useState("");
-  const [cwd, setCwd] = useState("");
+  const [cwdPatterns, setCwdPatterns] = useState<string[]>([]);
+  const [vaultPickerOpen, setVaultPickerOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [nameTakenError, setNameTakenError] = useState(false);
   const [mountFailedDetail, setMountFailedDetail] = useState<string | null>(null);
@@ -50,16 +53,12 @@ export function Onboarding() {
   const submit = () => {
     setNameTakenError(false);
     setMountFailedDetail(null);
-    const cwd_patterns = cwd
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
     create.mutate(
       {
         name: slug,
         display_name: displayName.trim() || null,
         vault_root: vault.trim(),
-        cwd_patterns,
+        cwd_patterns: cwdPatterns,
       },
       {
         onSuccess: (entry) => {
@@ -156,14 +155,25 @@ export function Onboarding() {
 
       <div className="space-y-2">
         <label htmlFor="onb-vault" className="text-sm font-medium">{t("onboarding.vault_label")}</label>
-        <input
-          id="onb-vault"
-          type="text"
-          value={vault}
-          onChange={(e) => setVault(e.target.value)}
-          disabled={create.isPending}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
-        />
+        <div className="flex gap-2">
+          <input
+            id="onb-vault"
+            type="text"
+            value={vault}
+            onChange={(e) => setVault(e.target.value)}
+            disabled={create.isPending}
+            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={create.isPending}
+            onClick={() => setVaultPickerOpen(true)}
+          >
+            📁 {t("onboarding.vault_browse")}
+          </Button>
+        </div>
         <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.vault_hint")}</p>
       </div>
 
@@ -176,15 +186,12 @@ export function Onboarding() {
           {t("onboarding.advanced_toggle")}
         </button>
         {advancedOpen && (
-          <div className="space-y-1 rounded-md border bg-[hsl(var(--muted))] p-3">
-            <label htmlFor="onb-cwd" className="text-sm font-medium">{t("onboarding.cwd_label")}</label>
-            <textarea
-              id="onb-cwd"
-              value={cwd}
-              onChange={(e) => setCwd(e.target.value)}
+          <div className="space-y-2 rounded-md border bg-[hsl(var(--muted))] p-3">
+            <label className="text-sm font-medium">{t("onboarding.cwd_label")}</label>
+            <CwdBuilder
+              patterns={cwdPatterns}
+              onChange={setCwdPatterns}
               disabled={create.isPending}
-              rows={3}
-              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
             />
             <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.cwd_hint")}</p>
           </div>
@@ -235,6 +242,14 @@ export function Onboarding() {
           <Link to="/">{t("onboarding.cancel")}</Link>
         </Button>
       </div>
+
+      <DirectoryPicker
+        open={vaultPickerOpen}
+        initialPath={vault.trim() || undefined}
+        allowCreate
+        onSelect={(path) => { setVault(path); setVaultPickerOpen(false); }}
+        onClose={() => setVaultPickerOpen(false)}
+      />
     </div>
   );
 }

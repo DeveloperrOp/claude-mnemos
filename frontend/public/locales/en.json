@@ -370,6 +370,7 @@
     "slug_invalid": "Invalid slug. Use a-z, 0-9, _, - only; must start with a letter or digit.",
     "vault_label": "Vault path",
     "vault_hint": "Absolute path. The directory will be created if it does not exist.",
+    "vault_browse": "Browse",
     "advanced_toggle": "Advanced — CWD patterns",
     "cwd_label": "CWD patterns (one per line)",
     "cwd_hint": "Glob patterns matching working directories where this project is active.",
