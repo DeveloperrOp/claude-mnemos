@@ -548,6 +548,21 @@
       "locale": {
         "title": "Locale",
         "inherit": "Inherit from global"
+      },
+      "lifecycle": {
+        "title": "Lifecycle",
+        "auto_stale_days": "Auto-stale (days)",
+        "auto_archive": "Auto-archive stale pages"
+      },
+      "prompts": {
+        "title": "Prompts",
+        "custom_system_path": "Custom system prompt path",
+        "custom_extract_user_path": "Custom extract-user prompt path"
+      },
+      "telemetry": {
+        "title": "Telemetry",
+        "opt_in": "Send anonymous usage stats",
+        "hint": "No prompts, transcripts, or vault content is ever sent."
       }
     }
   }
