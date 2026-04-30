@@ -8,6 +8,7 @@ on behalf of the user — they already control the machine.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -24,7 +25,7 @@ def get_home() -> dict[str, str]:
 
 
 @router.get("/browse")
-def browse(path: str) -> dict[str, object]:
+def browse(path: str, include_files: bool = False) -> dict[str, object]:
     p = Path(path)
     if not p.is_absolute():
         raise HTTPException(status_code=400, detail="path must be absolute")
@@ -36,13 +37,18 @@ def browse(path: str) -> dict[str, object]:
         raise HTTPException(status_code=400, detail="path is not a directory")
 
     try:
-        children = [c for c in resolved.iterdir() if c.is_dir()]
+        all_children = list(resolved.iterdir())
     except PermissionError as exc:
         raise HTTPException(
             status_code=403, detail=f"permission denied: {exc}"
         ) from exc
 
-    children.sort(key=lambda c: c.name.casefold())
+    if include_files:
+        children = [c for c in all_children if c.is_dir() or c.is_file()]
+    else:
+        children = [c for c in all_children if c.is_dir()]
+
+    children.sort(key=lambda c: (not c.is_dir(), c.name.casefold()))
     truncated = len(children) > LIST_LIMIT
     children = children[:LIST_LIMIT]
 
@@ -52,9 +58,33 @@ def browse(path: str) -> dict[str, object]:
     return {
         "cwd": str(resolved),
         "parent": parent_str,
-        "entries": [{"name": c.name, "path": str(c)} for c in children],
+        "entries": [
+            {
+                "name": c.name,
+                "path": str(c),
+                "type": "directory" if c.is_dir() else "file",
+            }
+            for c in children
+        ],
         "truncated": truncated,
     }
+
+
+@router.get("/drives")
+def drives() -> dict[str, list[dict[str, str]]]:
+    """List top-level filesystem roots.
+
+    On Windows, returns each existing drive letter (C:\\, D:\\, ...).
+    On POSIX, returns a single root entry.
+    """
+    if sys.platform == "win32":
+        result: list[dict[str, str]] = []
+        for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            drive_path = Path(f"{letter}:\\")
+            if drive_path.exists():
+                result.append({"name": f"{letter}:", "path": str(drive_path)})
+        return {"drives": result}
+    return {"drives": [{"name": "/", "path": "/"}]}
 
 
 class MkdirRequest(BaseModel):
