@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useProjects } from "@/hooks/useProjects";
+import { getProjectDisplayName } from "@/lib/projectDisplayName";
 
 export function ProjectSwitcher() {
   const { t } = useTranslation();
@@ -17,8 +18,12 @@ export function ProjectSwitcher() {
   const navigate = useNavigate();
   const { data: projects, isLoading } = useProjects();
 
+  const currentProject = currentName
+    ? projects?.find((p) => p.name === currentName)
+    : undefined;
   const label =
-    currentName ?? (isLoading ? t("common.loading") : t("topbar.all_projects"));
+    (currentProject ? getProjectDisplayName(currentProject) : currentName) ??
+    (isLoading ? t("common.loading") : t("topbar.all_projects"));
 
   return (
     <DropdownMenu>
@@ -37,7 +42,7 @@ export function ProjectSwitcher() {
             key={p.name}
             onClick={() => navigate(`/project/${p.name}`)}
           >
-            {p.name}
+            {getProjectDisplayName(p)}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />

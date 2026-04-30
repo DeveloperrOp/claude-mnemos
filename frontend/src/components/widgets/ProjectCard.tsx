@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { type ProjectMapEntry } from "@/types/Project";
 import { type VaultHealth } from "@/types/Health";
+import { getProjectDisplayName } from "@/lib/projectDisplayName";
 import { HealthBadge } from "./HealthBadge";
 
 interface Props {
@@ -27,7 +28,7 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2">
         <CardTitle className="truncate text-base font-semibold">
-          {project.name}
+          {getProjectDisplayName(project)}
         </CardTitle>
         <HealthBadge vault_health={vault_health} />
       </CardHeader>
