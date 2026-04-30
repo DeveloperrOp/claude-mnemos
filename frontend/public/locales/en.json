@@ -494,7 +494,9 @@
     "folder_name": "Folder name",
     "create": "Create",
     "cancel": "Cancel",
-    "select": "Select this folder"
+    "select": "Select this folder",
+    "computer": "Computer",
+    "select_file": "Click a file to select"
   },
   "cwd_builder": {
     "add": "Add folder",

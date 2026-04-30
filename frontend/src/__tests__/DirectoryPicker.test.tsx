@@ -21,6 +21,8 @@ beforeAll(() => {
       create: "Create",
       cancel: "Cancel",
       select: "Select this folder",
+      computer: "Computer",
+      select_file: "Click a file to select",
     },
   }, true, true);
   void i18n.changeLanguage("en");
@@ -144,5 +146,85 @@ describe("DirectoryPicker", () => {
     await screen.findByText(folderEntry("code"));
     await userEvent.click(screen.getByRole("button", { name: /Cancel|Отмена|Скасувати/i }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("Computer button opens drives view", async () => {
+    setupMock();
+    mock.onGet("/fs/drives").reply(200, {
+      drives: [
+        { name: "C:", path: "C:\\" },
+        { name: "D:", path: "D:\\" },
+      ],
+    });
+    render(<DirectoryPicker open onSelect={() => {}} onClose={() => {}} />);
+    await screen.findByText(folderEntry("code"));
+    await userEvent.click(screen.getByRole("button", { name: /Computer/i }));
+    expect(await screen.findByText(/💿\s*C:/)).toBeInTheDocument();
+    expect(screen.getByText(/💿\s*D:/)).toBeInTheDocument();
+  });
+
+  it("file mode lists files alongside folders", async () => {
+    mock.onGet("/fs/home").reply(200, { home: "/x" });
+    mock.onGet(/\/fs\/browse/).reply((config) => {
+      // verify include_files=true was passed
+      expect((config.params as { include_files?: boolean }).include_files).toBe(true);
+      return [
+        200,
+        {
+          cwd: "/x",
+          parent: null,
+          entries: [
+            { name: "subdir", path: "/x/subdir", type: "directory" },
+            { name: "prompt.md", path: "/x/prompt.md", type: "file" },
+          ],
+          truncated: false,
+        },
+      ];
+    });
+    render(
+      <DirectoryPicker open mode="file" onSelect={() => {}} onClose={() => {}} />,
+    );
+    expect(await screen.findByText(/📁\s*subdir/)).toBeInTheDocument();
+    expect(screen.getByText(/📄\s*prompt\.md/)).toBeInTheDocument();
+  });
+
+  it("file mode click on file calls onSelect immediately", async () => {
+    const onSelect = vi.fn();
+    mock.onGet("/fs/home").reply(200, { home: "/x" });
+    mock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/x",
+      parent: null,
+      entries: [{ name: "prompt.md", path: "/x/prompt.md", type: "file" }],
+      truncated: false,
+    });
+    render(
+      <DirectoryPicker open mode="file" onSelect={onSelect} onClose={() => {}} />,
+    );
+    await userEvent.click(await screen.findByText(/📄\s*prompt\.md/));
+    expect(onSelect).toHaveBeenCalledWith("/x/prompt.md");
+  });
+
+  it("file mode filters by fileExtensions prop", async () => {
+    mock.onGet("/fs/home").reply(200, { home: "/x" });
+    mock.onGet(/\/fs\/browse/).reply(200, {
+      cwd: "/x",
+      parent: null,
+      entries: [
+        { name: "prompt.md", path: "/x/prompt.md", type: "file" },
+        { name: "image.png", path: "/x/image.png", type: "file" },
+      ],
+      truncated: false,
+    });
+    render(
+      <DirectoryPicker
+        open
+        mode="file"
+        fileExtensions={[".md"]}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(await screen.findByText(/📄\s*prompt\.md/)).toBeInTheDocument();
+    expect(screen.queryByText(/image\.png/)).not.toBeInTheDocument();
   });
 });
