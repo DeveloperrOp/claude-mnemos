@@ -506,6 +506,34 @@
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
-    "error": "Error: {{msg}}"
+    "error": "Error: {{msg}}",
+    "section": {
+      "auto_ingest": {
+        "title": "Auto-ingest",
+        "enabled": "Enabled",
+        "mode": "Mode"
+      },
+      "lint": {
+        "title": "Lint",
+        "schedule": "Cron schedule",
+        "enabled_rules": "Enabled rules (comma-separated)",
+        "autofix_on_save": "Autofix on save"
+      },
+      "ontology": {
+        "title": "Ontology",
+        "auto_mode": "Auto mode",
+        "confidence_min": "Minimum confidence (0..1)",
+        "confidence_auto_apply": "Auto-apply confidence (0..1)"
+      },
+      "watchdog": {
+        "title": "Watchdog",
+        "mode": "Mode"
+      },
+      "snapshots": {
+        "title": "Snapshots",
+        "daily_enabled": "Daily snapshots enabled",
+        "retention_days": "Retention (days)"
+      }
+    }
   }
 }

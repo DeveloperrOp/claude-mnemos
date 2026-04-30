@@ -506,6 +506,34 @@
     "save": "Зберегти",
     "saving": "Збереження...",
     "saved": "Збережено",
-    "error": "Помилка: {{msg}}"
+    "error": "Помилка: {{msg}}",
+    "section": {
+      "auto_ingest": {
+        "title": "Автоінжест",
+        "enabled": "Увімкнено",
+        "mode": "Режим"
+      },
+      "lint": {
+        "title": "Лінт",
+        "schedule": "Cron-розклад",
+        "enabled_rules": "Увімкнені правила (через кому)",
+        "autofix_on_save": "Автовиправлення при збереженні"
+      },
+      "ontology": {
+        "title": "Онтологія",
+        "auto_mode": "Авто-режим",
+        "confidence_min": "Мінімальна впевненість (0..1)",
+        "confidence_auto_apply": "Впевненість для авто-застосування (0..1)"
+      },
+      "watchdog": {
+        "title": "Watchdog",
+        "mode": "Режим"
+      },
+      "snapshots": {
+        "title": "Знімки",
+        "daily_enabled": "Щоденні знімки",
+        "retention_days": "Зберігати (днів)"
+      }
+    }
   }
 }
