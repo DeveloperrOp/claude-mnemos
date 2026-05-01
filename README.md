@@ -1,343 +1,274 @@
 # claude-mnemos
 
-Long-term structured per-project knowledge base for Claude Code sessions.
+> Long-term memory for Claude Code. Sessions become structured per-project knowledge bases in Obsidian-compatible vaults.
 
-Преемник [LLM Wiki Control Panel](../OBSIDIAN/.shared/). Самостоятельный проект, не Obsidian-companion.
+Claude Code holds context only within one session. **claude-mnemos** stores every conversation as atomic markdown wiki pages in your vault, then injects the most relevant ones into the next session's system prompt — so Claude effectively remembers what you did before.
 
-## Статус
+## Status
 
-`0.0.1` — Plans #1-#13a в `main`. Готовы:
+`0.0.1` — early development. Single-user, runs locally, no server-side anything. Not on PyPI yet — install from source.
 
-- **Ingest pipeline** (Plans #1-#2): JSONL чат → markdown vault (raw/chats + extracted wiki/entities/concepts/sources) через Claude API.
-- **Транзакционный vault** (Plan #3): staging-first writes + atomic promote + pre-op snapshots + rollback.
-- **Activity log + undo** (Plan #4): `.activity.json` + `mnemos undo <op_id>` / `mnemos undo --last`.
-- **Daemon foundation** (Plan #5): FastAPI на `127.0.0.1:5757` + APScheduler (daily snapshot 04:00 UTC, backups cleanup 05:00 UTC, 180-day retention) + REST endpoints.
-- **MCP server** (Plan #6): stdio MCP с 5 read tools (прямой доступ к vault) + 4 write tools (через REST к daemon).
-- **Claude Code plugin** (Plan #7): SessionEnd auto-ingest hook + 5 skills + plugin manifest. После установки каждая сессия автоматически попадает в vault.
-- **Ontology HITL** (Plan #8): `.ontology-suggestions/` Pydantic-валидируемые suggestion файлы + 3 операции (`merge_entities`, `rename_entity`, `delete_page`) + REST endpoints + 3 MCP tools + CLI subgroup. Применение через `StagingTransaction` с pre-op snapshot — undo через `mnemos undo` восстанавливает всё (sources возвращаются из trash, wikilinks переписываются обратно).
-- **Watchdog real-time** (Plan #9): daemon наблюдает `wiki/*.md` через Python `watchdog`, отличает self-writes от human edits через in-memory `OurWritesTracker` (TTL set + paused() context). При external modify помечает страницу `agent_written: false` + `last_human_edit: <ts>` + пишет activity entry `human_edit_detected`. Alerts buffer (in-memory, cap 200) + endpoints `GET /alerts` / `DELETE /alerts/{id}`. `HealthResponse` расширен `watchdog_running` + `alerts_count`.
-- **Lint** (Plan #10): 8 structural rules + 1 synthetic (`page_parse_failed`) — `wikilinks_broken` (with Levenshtein-typo autofix), `orphan_pages`, `stale_pages`, `duplicate_titles`, `provenance_inferred_high`, `provenance_ambiguous_high`, `trailing_whitespace`, `missing_required_frontmatter`. Cached report in `<vault>/.lint-results.json`. Safe autofix whitelist runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. CLI `mnemos lint {run, results, autofix}`, REST `POST /lint/run|autofix` + `GET /lint/results`, MCP `run_lint` + `get_lint_results` (12→14 tools).
-- **Jobs queue + Dead-letter** (Plan #11): persistent SQLite-backed queue at `<vault>/.jobs.db` (excluded from snapshots). `IngestHandler` runs the existing sync ingest in `asyncio.to_thread`, with retry policy 4 attempts × backoff 30s/2min/20min. SessionEnd hook now prefers `POST /jobs` over the detached subprocess (closes Plan #9 watchdog false-positive). REST `POST/GET/DELETE /jobs`, `GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`. CLI `mnemos jobs {list, show, cancel, retry-dead, dismiss}`. Health response gains `jobs_queued/running/dead_letter/jobs_alert` (alert at >10 dead-letter).
-- **Page edit + Trash** (Plan #12): direct page mutations (edit/verify/archive/delete) and trash management (list/restore/dismiss/empty). All mutations route through `StagingTransaction` with pre-op snapshot — undo via `mnemos undo` reverts everything. `.trash/<id>/.metadata.json` carries `original_path` so restore puts content back to its original location. REST `PATCH/POST/DELETE /pages/{ref:path}` + `GET/POST/DELETE /trash`. CLI `mnemos page {edit, verify, archive, delete}` and `mnemos trash {list, restore, dismiss, empty}`. New activity types: `manual_edit`, `manual_delete` (undoable), `manual_restore_trash` (undoable), `trash_dismissed`, `trash_emptied` (audit-only).
-- **Sessions + Lost-sessions + Token metrics** (Plan #13a): backend views of session lifecycle (merged manifest IngestRecord + jobs queue), lost-session scanner over `~/.claude/projects/` with cache + ignore-list, token usage aggregations (per-period summary, per-project, top-sessions, daily timeline). Manifest extended with `transcript_path` + `raw_transcript_bytes` (cross-ref + compression metric). New state file `<vault>/.lost-sessions-ignore.json`. REST `/sessions/*` + `/lost-sessions/*` + `/metrics/usage*`. CLI `mnemos {sessions, lost-sessions, metrics} ...`. Multi-vault `by-project` returns single entry — multi-vault routing → Plan #13b.
+## Install
 
-### Plan #13b-α — Settings + project-map foundation (2026-04-27)
+Recommended path uses **pipx** (industry-standard isolated installer for Python CLI tools). System-Python `pip install -e .` is documented as a fallback but **not recommended** — it produces dependency conflicts and orphan files over time.
 
-- `~/.claude-mnemos/project-map.json` now routes cwd → vault.
-- Per-project settings: `~/.claude-mnemos/settings/<project>.json` (9 spec §12.8 groups).
-- Global settings: `~/.claude-mnemos/global-settings.json`.
-- New CLI: `mnemos project {add,list,show,update,remove,resolve}`,
-  `mnemos settings {get,set,reset} --project NAME | --global`.
-- All other CLI commands now take `--project NAME` (auto-resolves via cwd if omitted).
-- Daemon at startup applies `snapshots.retention_days` + `snapshots.daily_enabled`
-  for its registered vault; `PATCH /settings/{project}` reloads live (rescheduling
-  daily snapshot job + backups cleanup).
-- MCP server defaults to `--auto-resolve` (cwd → project-map). Falls back to
-  degraded mode if no match (server stays alive, every tool returns a fix-hint
-  TextContent — avoids Claude Code spawn-loop on crash).
-- SessionEnd hook resolves cwd → project; unmatched cwd → silent skip
-  (transcript stays in lost-sessions, picked up by `mnemos lost-sessions scan`).
-- One-shot migration: PID file moved from `~/.mnemos/` to `~/.claude-mnemos/`
-  (legacy files relocated automatically on daemon start, never overwritten).
-
-#### Migration from previous versions
-
-If you previously set `MNEMOS_VAULT_ROOT`, register your vault explicitly:
+### Get the source
 
 ```bash
-mnemos project add \
-  --name claude-mnemos \
-  --vault $MNEMOS_VAULT_ROOT \
-  --cwd-pattern "$(dirname $MNEMOS_VAULT_ROOT)/*"
-unset MNEMOS_VAULT_ROOT
+git clone https://github.com/<your-fork>/claude-mnemos.git
+cd claude-mnemos
 ```
 
-Then restart any running daemon so it can read your project's settings.
+### Install via pipx (recommended)
 
-The `MNEMOS_VAULT_ROOT` env var is no longer read by anything (CLI, hook,
-MCP server, daemon).
-
-## Установка
+If you don't have pipx yet:
 
 ```bash
-pip install -e ".[dev]"
-pytest -q
+# Windows
+py -3.12 -m pip install --user pipx
+py -3.12 -m pipx ensurepath
+
+# macOS / Linux
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
 ```
+
+Open a new terminal so pipx is on `PATH`, then install mnemos editable:
+
+```bash
+pipx install --editable . --python 3.12
+```
+
+This puts mnemos in an isolated venv (`~/pipx/venvs/claude-mnemos/` on Windows, `~/.local/share/pipx/venvs/claude-mnemos/` on Unix) and publishes three commands on your `PATH`: `mnemos`, `mnemos-mcp`, `mnemos-tray`.
+
+To upgrade later: `cd <path> && git pull && pipx reinstall claude-mnemos`. To uninstall cleanly: `pipx uninstall claude-mnemos`.
+
+### Fallback: pip in your own venv
+
+If you prefer manual venv management:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate          # macOS / Linux
+.venv\Scripts\Activate.ps1         # Windows PowerShell
+pip install -e .
+```
+
+You'll need to activate that venv every time before running mnemos commands. pipx avoids that step.
+
+**Avoid:** `pip install -e .` directly into system Python. It works at first, but every future `pip install <other-package>` may conflict with mnemos's pinned deps; partial uninstalls leave orphan files behind.
+
+### Verify
+
+```bash
+mnemos --version
+mnemos --help
+```
+
+You should see subcommands (`project`, `daemon`, `tray`, `settings`, `ingest`, `lint`, `ontology`, …).
+
+Python requirement: 3.12+.
+
+## Quickstart
+
+```bash
+# 1. Authenticate Claude Code (uses your Pro/Max subscription — no separate API key needed)
+claude login
+claude -p "hi"            # smoke test
+
+# 2. Create a project (registers a vault and CWD patterns)
+mnemos project add my-project \
+  --vault ~/code/my-project/.mnemos \
+  --cwd-pattern "~/code/my-project/**"
+
+# 3. Start the daemon (FastAPI on 127.0.0.1:5757)
+mnemos daemon start
+
+# 4. (Optional) Tray icon + autostart on every login
+mnemos tray install
+```
+
+Then open `http://localhost:5757/` — the dashboard is live.
+
+Now run Claude Code in a folder covered by your CWD patterns. After you exit, the session JSONL gets ingested automatically into the vault. Re-launch Claude in the same folder, and the SessionStart hook injects the most relevant pages into the system prompt.
+
+## How it works
+
+```
+┌──────────────────┐                      ┌─────────────────────────┐
+│  Claude Code     │  finishes session    │  ~/.claude/projects/    │
+│  session         ├────────────────────►│  <hash>/<uuid>.jsonl     │
+└──────────────────┘                      └────────────┬────────────┘
+                                                       │ watchdog detects new file
+                                                       ▼
+                                          ┌─────────────────────────┐
+                                          │  daemon (5757)          │
+                                          │  ingest job → LLM       │
+                                          │  extracts atomic facts  │
+                                          └────────────┬────────────┘
+                                                       │ writes via StagingTransaction
+                                                       ▼
+                                          ┌─────────────────────────┐
+                                          │  vault/                 │
+                                          │   wiki/                 │
+                                          │     entities/*.md       │
+                                          │     concepts/*.md       │
+                                          │     sources/*.md        │
+                                          │   .activity.json        │
+                                          │   snapshots/            │
+                                          └────────────┬────────────┘
+                                                       │
+┌──────────────────┐  start session       ┌────────────▼────────────┐
+│  Claude Code     │◄─────────────────────┤  SessionStart hook      │
+│  (next time,     │  inject top-N pages  │  scores pages by graph  │
+│  same folder)    │   into system prompt │  proximity + freshness  │
+└──────────────────┘                      └─────────────────────────┘
+```
+
+Two operations, both transparent to the user:
+
+- **Ingest** — closed Claude session → LLM extracts atomic facts → markdown pages.
+- **Inject** — new Claude session in the same folder → relevant pages auto-loaded into the system prompt.
+
+## Dashboard
+
+`http://localhost:5757/` (served by the daemon). React 19 + Tailwind v4 + shadcn/ui SPA, three locales (uk/ru/en), light/dark/system theme toggle.
+
+Pages:
+
+| Page | What |
+|---|---|
+| Overview | Project list with health, session counts, queue stats |
+| Pages | Browse vault wiki pages by type (entity/concept/source) with frontmatter view + edit |
+| Sessions | Ingested-session list per project (status, tokens, errors) |
+| Lost | JSONL transcripts whose CWD didn't match any project — import or ignore |
+| Queue | Live job queue with retry/cancel controls |
+| Activity | Operation log (ingests, edits, merges, deletes) with one-click undo |
+| Suggestions | HITL ontology proposals (merge / rename / delete) — approve, reject, defer |
+| Trash | Soft-deleted pages (30-day retention by default) — restore or hard-delete |
+| Snapshots | Daily and pre-op vault snapshots — create / restore / delete |
+| Health | Watchdog + scheduler status, alerts, daemon uptime |
+| Dead-letter | Failed jobs with traceback, retry / dismiss |
+| Metrics | Token usage charts (input/output/compression) per period |
+| Settings | Per-project + global settings (12-section accordion), CWD builder, vault path |
+| Help | Concepts, workflows, troubleshooting, glossary — multi-language |
+
+Theme toggle (`Sun`/`Moon`/`Monitor` icon) cycles `system → light → dark`, persists to `localStorage`. The visual language is IDE/terminal-inspired: Geist Sans / Mono fonts, lime acid accent (`oklch(70% 0.22 130)` light, `oklch(85% 0.27 130)` dark), monospace section labels in `SECTION ▸ VALUE` pattern.
 
 ## CLI
 
 ```bash
-# Ingest сессии в vault
-mnemos ingest <session.jsonl> <vault-path>
-
-# Activity / undo
-mnemos activity --vault <path> [--limit N]
-mnemos undo <op_id> --vault <path>
-mnemos undo --last --vault <path>
+# Project management
+mnemos project {add,list,show,update,remove,resolve}
+mnemos settings {get,set,reset} [--project NAME | --global]
 
 # Daemon
-mnemos daemon start --vault <path> [--port N] [--host H]
-mnemos daemon status
-mnemos daemon stop
-mnemos daemon foreground --vault <path>   # для отладки
+mnemos daemon {start,stop,status,foreground}
 
-# Ontology (HITL suggestions)
-mnemos ontology propose merge \
-  --source wiki/entities/foo.md --source wiki/entities/bar.md \
-  --target wiki/entities/foobar.md --reason "..." --vault <path>
-mnemos ontology propose rename --source old.md --target new.md --vault <path>
-mnemos ontology propose delete --source orphan.md --vault <path>
-mnemos ontology list --vault <path> [--all]
-mnemos ontology approve <id> --vault <path>
-mnemos ontology reject <id> --vault <path>
-mnemos ontology defer <id> --vault <path>
+# Tray (Win/Mac autostart)
+mnemos tray {install,uninstall,start,run,status}
+
+# Ingest pipeline
+mnemos ingest <jsonl> [--project NAME | --vault PATH]
+mnemos sessions {list,show,ingest}
+mnemos lost-sessions {list,scan,import,ignore}
+
+# Vault operations
+mnemos page {edit,verify,archive,delete}
+mnemos trash {list,restore,dismiss,empty}
+mnemos activity [--limit N]
+mnemos undo <op_id> | --last
+
+# Queue + retry
+mnemos jobs {list,show,cancel,retry-dead,dismiss}
+
+# Quality
+mnemos lint {run,results,autofix}
+mnemos ontology {propose,list,approve,reject,defer}
+
+# Metrics
+mnemos metrics {usage,top-sessions,timeline}
 ```
 
-## MCP server
+All vault-touching commands take `--project NAME` (auto-resolved from CWD if omitted) or `--vault PATH` (direct).
 
-MCP server запускается Claude Code'ом автоматически — никакой отдельный сервис поднимать не надо. Регистрация:
+## Plugin install (Claude Code)
+
+The plugin bundles the CLI/daemon/MCP server with a SessionEnd hook and 5 skills. After install, every Claude Code session auto-ingests into the vault, and the LLM in chat sees mnemos tools without manual MCP registration.
 
 ```bash
-claude mcp add --transport stdio mnemos -- \
-  python -m claude_mnemos.mcp --vault /absolute/path/to/your/vault
+mnemos daemon start                     # write tools and snapshots need this
+claude --plugin-dir $(pwd)              # from the cloned repo root
 ```
 
-Опционально через env:
+Skills exposed: `mnemos` (main behavioral prompt), `/mnemos-status`, `/mnemos-search`, `/mnemos-undo`, `/mnemos-activity`.
+
+## MCP server (manual, alternative to plugin)
 
 ```bash
-MNEMOS_DAEMON_URL=http://127.0.0.1:5757 \
-MNEMOS_MCP_LOG=info \
-claude mcp add --transport stdio mnemos -- \
-  python -m claude_mnemos.mcp --vault /path/to/vault
+claude mcp add --transport stdio mnemos -- mnemos-mcp --auto-resolve
 ```
 
-После регистрации в любой Claude Code сессии будут доступны 9 tools:
+12 tools exposed (5 read direct + 7 write through daemon REST). See `claude_mnemos/mcp/__main__.py` for the full list.
 
-| Tool | Kind | Что делает |
-|---|---|---|
-| `list_pages(type?, flavor?, limit)` | read | Список wiki страниц с фильтрами |
-| `read_page(page_ref)` | read | Прочитать конкретную страницу |
-| `search_pages(query, limit)` | read | Substring grep по filename + body |
-| `get_status` | read | Vault summary (counts, snapshots, size) |
-| `get_recent_activity(limit)` | read | Последние activity entries |
-| `undo_operation(op_id)` | write | Откатить операцию через daemon |
-| `create_snapshot(label?)` | write | Создать manual snapshot |
-| `restore_snapshot(name)` | write | Восстановить vault из snapshot'а |
-| `delete_snapshot(name)` | write | Удалить snapshot |
-| `list_suggestions(status?)` | read | Список ontology suggestions |
-| `apply_ontology_suggestion(id)` | write | Применить suggestion (merge/rename/delete) |
-| `propose_ontology_change(...)` | write | Создать новый suggestion |
-
-**Read tools** работают без daemon'а — читают файлы напрямую. **Write tools** требуют запущенный daemon (`mnemos daemon start`); если daemon offline — возвращают понятное сообщение со ссылкой на нужную команду.
-
-## Install as Claude Code plugin
-
-Plugin упаковывает CLI/daemon/MCP вместе с SessionEnd hook'ом и 5 skills. После установки каждая Claude Code сессия автоматически уходит в vault через hook, и LLM в чате видит мнемос-tools без необходимости вручную регистрировать MCP.
-
-**Установка (dev mode):**
-
-```bash
-git clone <repo-url>
-cd claude-mnemos
-pip install -e .
-
-# Настроить vault path как env var (single source of truth)
-export MNEMOS_VAULT_ROOT=/absolute/path/to/your/vault     # bash/zsh
-# либо:
-[Environment]::SetEnvironmentVariable('MNEMOS_VAULT_ROOT', 'C:\path\to\vault', 'User')   # PowerShell
-
-# Запустить daemon (нужен для write tools и snapshots)
-mnemos daemon start
-
-# Подключить плагин в Claude Code
-claude --plugin-dir $(pwd)
-```
-
-После этого каждая сессия после закрытия → auto-ingest в vault через `hooks/session_end.py`.
-
-**5 skills:**
-
-| Skill | Что делает |
-|---|---|
-| `mnemos` | Главный behavioral prompt — даёт LLM понимание что есть mnemos и когда его дёргать |
-| `/mnemos-status` | Показать summary vault'а |
-| `/mnemos-search <query>` | Substring search по vault'у |
-| `/mnemos-undo [op_id\|--last]` | Откатить операцию |
-| `/mnemos-activity [limit]` | Последние записи activity log |
-
-**Структура плагина:**
-
-```
-.claude-plugin/plugin.json     # манифест плагина
-.mcp.json                       # регистрация MCP server'а
-hooks/
-  hooks.json                    # SessionEnd registration
-  session_end.py                # spawn detached `mnemos ingest`
-skills/
-  mnemos/SKILL.md               # главный behavioral
-  mnemos-{status,search,undo,activity}/SKILL.md
-```
-
-## Структура
+## Architecture
 
 ```
 claude_mnemos/
-  core/      # примитивы: locks, atomic_write, snapshots, undo, wikilinks, ontology_apply
-  state/     # state-файлы (manifest, activity, ontology suggestions)
-  ingest/    # pipeline ингеста чатов в vault через Claude API
-  daemon/    # FastAPI + APScheduler + REST endpoints
-  mcp/       # MCP server (stdio) с read+write tools
-  cli.py     # `mnemos` entrypoint
-tests/
-docs/plans/  # design + impl plans для каждого Plan #N
+  core/         # primitives: locks, atomic write, snapshots, undo, wikilinks, ontology apply
+  state/        # state files: manifest, activity, ontology suggestions, jobs (SQLite)
+  ingest/       # JSONL → markdown pipeline through Claude API or CLI subscription
+  daemon/       # FastAPI + APScheduler + REST endpoints + watchdog + jobs worker
+  mcp/          # stdio MCP server with read/write tools
+  tray/         # Pystray icon + supervisor (auto-restart daemon, autostart on login)
+  hooks/        # SessionEnd / SessionStart hooks
+  cli.py        # `mnemos` entrypoint
+frontend/
+  src/          # React 19 + Tailwind v4 + shadcn/ui dashboard
+  public/       # static assets, locales (uk/ru/en), Geist Sans + Mono fonts
+tests/          # 1488 fast pytest + 11 slow E2E (subprocess daemon, watchdog, jobs, pages)
+docs/plans/     # design + implementation plans for each Plan #N (the project's history)
 ```
 
-## Watchdog real-time
+The daemon serves the built React SPA from `claude_mnemos/daemon/static/` (output of `pnpm build`), so a single `mnemos daemon start` gives both the API and the dashboard.
 
-После `mnemos daemon start` daemon наблюдает за `wiki/*.md` через Python `watchdog`. Любое внешнее изменение (через Obsidian, IDE, любой текстовый редактор) детектируется в течение ~1 секунды:
+## Development
 
-- **External modify** → page marked `agent_written: false` + `last_human_edit: <ts>` (Obsidian-extras в frontmatter сохраняются при round-trip), активность пишется в `.activity.json` как `human_edit_detected` (non-undoable).
-- **External create/rename** → alert (mutation не делается; user сам решает).
-- **Frontmatter parsing failed** → alert; файл не трогается.
-- **Pipeline lock timeout** → alert (на ваш ingest pipeline нет race).
-
-Что наблюдается / нет:
-
-| Path | Поведение |
-|---|---|
-| `wiki/**/*.md` | Watched |
-| `raw/**`, `.staging/`, `.backups/`, `.trash/`, `.ontology-suggestions/`, `.obsidian/`, `.git/` | Skipped |
-| Non-`.md` файлы под `wiki/` | Skipped |
-
-Inspecting alerts:
+### Run backend tests
 
 ```bash
-curl http://127.0.0.1:5757/alerts
-curl -X DELETE http://127.0.0.1:5757/alerts/<id>
-curl http://127.0.0.1:5757/health  # содержит watchdog_running + alerts_count
+# pipx-installed mnemos has the test deps via pipx inject:
+pipx inject claude-mnemos pytest pytest-cov pytest-asyncio
+
+# Then run:
+"$(pipx environment --value PIPX_HOME)/venvs/claude-mnemos/Scripts/python.exe" -m pytest tests/ -m "not slow"
+# or under the venv directly: ~/pipx/venvs/claude-mnemos/bin/pytest tests/ -m "not slow"
+
+# Or with a manual venv:
+pip install -e ".[dev]"
+pytest tests/ -m "not slow"        # 1488 fast tests
+pytest tests/ -m slow              # 11 slow E2E tests
 ```
 
-**Известные ограничения:**
-
-- Если CLI `mnemos ingest` запускается параллельно с daemon'ом, их writes могут пометиться daemon'ом как `human_edit_detected` (false positive). В стандартном flow (auto-ingest через SessionEnd hook → не concurrent с user editing) это не возникает. Закроется в Plan #11+, когда daemon станет orchestrator'ом ingest'а.
-- Alerts хранятся только в памяти (cap 200) — теряются при restart daemon'а. Persistence — Plan #11+.
-- Один daemon наблюдает один vault. Multi-vault — Plan #13.
-- Debouncing batch external changes (replace-all из IDE) не реализован — handler обрабатывает каждый event отдельно.
-
-## Lint
-
-Health-check the wiki: 8 structural rules + 1 synthetic for parse failures.
+### Frontend
 
 ```bash
-mnemos lint run --vault <path>
-mnemos lint results --vault <path> [--severity error|warning|info]
-mnemos lint autofix --vault <path> [--dry-run]
+cd frontend
+pnpm install
+pnpm vitest run        # 307 tests
+pnpm lint              # 0 errors expected
+pnpm build             # writes to ../claude_mnemos/daemon/static/
+pnpm dev               # vite dev server (separate from daemon — unusual; daemon serves the built dist)
 ```
 
-### Rules
+### Project history
 
-| ID | Severity | Autofix |
-|---|---|---|
-| `wikilinks_broken` | warning | typo fix (Levenshtein ≤ 2 unique) |
-| `orphan_pages` | warning | — |
-| `stale_pages` | info | — |
-| `duplicate_titles` | warning | — |
-| `provenance_inferred_high` (>=50%) | info | — |
-| `provenance_ambiguous_high` (>30%) | info | — |
-| `trailing_whitespace` | info | strip |
-| `missing_required_frontmatter` | warning | (placeholder, no-op) |
-| `page_parse_failed` (synthetic) | error | — |
+`docs/plans/` contains design + implementation specs for every major change (Plan #1 through Plan #14 series, Plan A/B settings UI, dashboard redesign, etc.). Each major feature lives as `YYYY-MM-DD-<name>-design.md` + `YYYY-MM-DD-<name>-plan.md`.
 
-REST: `POST /lint/run`, `GET /lint/results`, `POST /lint/autofix`. MCP: `run_lint` (write, daemon required), `get_lint_results` (read, direct file). Autofix runs through `StagingTransaction` with snapshot — undo via `mnemos undo <activity_id>`. Concurrent ingest is serialized by `pipeline_lock`.
+## License
 
-### Known limitations
+MIT. See `pyproject.toml`.
 
-- LLM-powered rules (`contradictions_between_pages`) — Plan #11+.
-- Auto-stale state transition (`draft → stale` after 90 days) — Plan #11+ via `core/lifecycle.py`.
-- Scheduled weekly lint via APScheduler — Plan #11+.
-- Lint-driven ontology suggestions for low-confidence wikilinks fixes — Plan #11+.
+## Contributing
 
-## Jobs queue
-
-Persistent job queue inside the daemon (SQLite at `<vault>/.jobs.db`). Single
-asyncio worker pulls ready jobs and dispatches to `IngestHandler` (only
-`kind="ingest"` in Plan #11 — Plans #12+ add lint, ontology, etc.).
-
-```bash
-mnemos jobs list --vault <path> [--status STATUS] [--limit N]
-mnemos jobs show <job_id> --vault <path>
-mnemos jobs cancel <job_id> --vault <path>          # queued only
-mnemos jobs retry-dead <job_id> --vault <path>      # restore from dead-letter
-mnemos jobs dismiss <job_id> --vault <path>         # permanent delete from dead-letter
-```
-
-REST: `POST /jobs`, `GET /jobs?status=...`, `GET /jobs/{id}`, `DELETE /jobs/{id}`,
-`GET /dead-letter`, `POST /dead-letter/{id}/retry`, `DELETE /dead-letter/{id}`.
-
-### Retry policy
-
-- 4 attempts total: initial + 3 retries.
-- Backoff between attempts: 30s, 2min, 20min.
-- After the 4th failure → `dead_letter`. Auto-cleanup never (per spec §8.9).
-- Health alert flips on when dead-letter > 10.
-
-### Crash recovery
-
-On daemon startup, every `running` job is requeued (`attempt += 1`) or moved to
-`dead_letter` if that would exceed `MAX_ATTEMPTS`. ingest pipeline is idempotent
-via SHA-dedup manifest, so re-running a partially-applied ingest is safe.
-
-### SessionEnd hook integration
-
-The hook now POSTs to `/jobs` first; if the daemon is offline it falls back to
-the existing detached `mnemos ingest` subprocess. Concurrent CLI ingest with the
-daemon running no longer triggers the watchdog false-positive
-`human_edit_detected` (Plan #9 known limitation closed).
-
-## Pages + Trash
-
-Direct page edit/verify/archive/delete + trash management with snapshot+undo.
-
-```bash
-mnemos page edit wiki/entities/foo --vault <path> --frontmatter '{"status":"verified","tags":["important"]}'
-mnemos page verify wiki/entities/foo --vault <path>
-mnemos page archive wiki/entities/foo --vault <path>
-mnemos page delete wiki/entities/foo --vault <path>      # → trash, undoable
-
-mnemos trash list --vault <path>
-mnemos trash restore <trash-id> --vault <path>           # back to original location
-mnemos trash dismiss <trash-id> --vault <path>           # hard delete (no undo)
-mnemos trash empty --vault <path> [--yes]                # empty all trash entries
-```
-
-REST: PATCH/POST/DELETE on `/pages/{page_ref:path}{,/verify,/archive}` + GET/POST/DELETE on `/trash`. Activity entries: `manual_edit`, `manual_delete` (undoable via `mnemos undo`), `manual_restore_trash`, `trash_dismissed`, `trash_emptied` (audit-only).
-
-Trash entries with `.metadata.json` (`original_path`, `operation_id`, etc.) are restorable. Old trash dirs from before Plan #12 (no metadata) are listed but not restorable.
-
-## Sessions + Metrics
-
-Backend views on session lifecycle, lost transcripts, and token usage.
-
-```bash
-mnemos sessions list --vault <path> [--status STATUS] [--limit N]
-mnemos sessions show <session_id> --vault <path>
-mnemos sessions ingest <transcript_path> --vault <path>      # → POST /jobs queue
-
-mnemos lost-sessions list --vault <path>
-mnemos lost-sessions scan --vault <path>                      # rescan ~/.claude/projects/
-mnemos lost-sessions import <session_id> --vault <path>       # enqueue ingest
-mnemos lost-sessions ignore <session_id> --vault <path>
-
-mnemos metrics usage --vault <path> [--period 30d]
-mnemos metrics top-sessions --vault <path> [--limit 10]
-mnemos metrics timeline --vault <path> [--period 30d]
-```
-
-REST: `/sessions/*` (merged manifest + jobs view), `/lost-sessions/*` (scanner with cache + ignore list), `/metrics/usage*` (summary, by-project, top-sessions, timeline). Manifest extended with `transcript_path` + `raw_transcript_bytes` for cross-ref + compression metric. New state file: `<vault>/.lost-sessions-ignore.json`.
-
-## Запуск всех тестов
-
-```bash
-pytest -q              # быстрые (924 теста + 2 skipped)
-pytest -q -m slow      # медленные E2E (11 тестов + 2 skipped: subprocess daemon + watchdog + jobs + pages E2E)
-```
+The repo is currently private and single-author. PRs welcome once it's open-sourced — for now, the design specs in `docs/plans/` are the entry point for understanding any subsystem.
