@@ -51,7 +51,12 @@
     "hook_banner": {
       "title": "Mnemos hooks not installed",
       "body": "Without these, sessions won't auto-ingest and Claude won't get project context on next launch. Install them with one command:",
-      "no_settings": "(No ~/.claude/settings.json found yet — running install will create one.)"
+      "no_settings": "(No ~/.claude/settings.json found yet — running install will create one.)",
+      "install_button": "Install hooks now",
+      "installing": "Installing…",
+      "or_cli": "or via CLI:",
+      "install_success": "Mnemos hooks installed. Restart Claude Code sessions to take effect.",
+      "install_error": "Install failed: {{error}}"
     }
   },
   "project_view": {

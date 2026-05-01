@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from claude_mnemos import cli_hooks
 
@@ -57,4 +57,35 @@ async def hooks_status() -> dict[str, Any]:
         "session_start": ss,
         "session_end": se,
         "all_installed": ss["installed"] and se["installed"],
+    }
+
+
+@router.post("/hooks/install")
+async def hooks_install() -> dict[str, Any]:
+    """Install (or refresh) mnemos hooks in ~/.claude/settings.json.
+
+    Idempotent — replaces any existing mnemos-tagged blocks; preserves foreign
+    hooks. Returns the full install result plus the post-install /hooks/status
+    payload so the dashboard can update without a second roundtrip.
+    """
+    try:
+        result = cli_hooks.install()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"settings.json unwritable: {e}")
+
+    settings = cli_hooks._load_settings()
+    hooks_section = settings.get("hooks", {})
+    ss = _summarize_event("SessionStart", hooks_section)
+    se = _summarize_event("SessionEnd", hooks_section)
+    return {
+        "install_result": result,
+        "status": {
+            "settings_path": str(cli_hooks.CLAUDE_SETTINGS),
+            "settings_exists": cli_hooks.CLAUDE_SETTINGS.exists(),
+            "session_start": ss,
+            "session_end": se,
+            "all_installed": ss["installed"] and se["installed"],
+        },
     }

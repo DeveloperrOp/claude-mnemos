@@ -95,18 +95,36 @@ def _backup_settings() -> Path | None:
     return backup
 
 
-def _cmd_install(_args: argparse.Namespace) -> int:
+def install(*, dry_run: bool = False) -> dict:
+    """Install (or refresh) mnemos hooks in ~/.claude/settings.json.
+
+    Returns a result dict::
+
+        {
+          "ok": True,
+          "python": "<exec>",
+          "session_start_script": "<path>",
+          "session_end_script": "<path>",
+          "backup_path": "<path or None>",
+        }
+
+    On error raises FileNotFoundError (hook scripts missing) or OSError
+    (settings file unwritable). Caller catches.
+    """
     py = _detect_python()
-    try:
-        ss_script, se_script = _detect_hook_scripts()
-    except FileNotFoundError as e:
-        print(str(e), file=sys.stderr)
-        return 2
+    ss_script, se_script = _detect_hook_scripts()  # may raise FileNotFoundError
+
+    if dry_run:
+        return {
+            "ok": True,
+            "python": py,
+            "session_start_script": ss_script,
+            "session_end_script": se_script,
+            "backup_path": None,
+            "dry_run": True,
+        }
 
     backup = _backup_settings()
-    if backup:
-        print(f"backup → {backup}")
-
     settings = _load_settings()
     settings.setdefault("hooks", {})
     hooks = settings["hooks"]
@@ -117,7 +135,6 @@ def _cmd_install(_args: argparse.Namespace) -> int:
     # Strategy: replace any existing mnemos-flagged blocks; preserve foreign blocks.
     for event, new_block in (("SessionStart", ss_block), ("SessionEnd", se_block)):
         existing = hooks.get(event, [])
-        # Drop any blocks whose any hook command contains mnemos-token.
         filtered = [
             block for block in existing
             if not any(_is_mnemos_command(h.get("command", "")) for h in block.get("hooks", []))
@@ -126,9 +143,28 @@ def _cmd_install(_args: argparse.Namespace) -> int:
         hooks[event] = filtered
 
     _save_settings(settings)
+    return {
+        "ok": True,
+        "python": py,
+        "session_start_script": ss_script,
+        "session_end_script": se_script,
+        "backup_path": str(backup) if backup else None,
+    }
+
+
+def _cmd_install(_args: argparse.Namespace) -> int:
+    """CLI wrapper — calls install() and prints user-facing summary."""
+    try:
+        result = install()
+    except FileNotFoundError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+    if result.get("backup_path"):
+        print(f"backup → {result['backup_path']}")
     print("[OK] mnemos hooks installed")
-    print(f"  SessionStart: {py} {ss_script}")
-    print(f"  SessionEnd:   {py} {se_script}")
+    print(f"  SessionStart: {result['python']} {result['session_start_script']}")
+    print(f"  SessionEnd:   {result['python']} {result['session_end_script']}")
     print()
     print("Existing non-mnemos hooks for these events were preserved.")
     return 0

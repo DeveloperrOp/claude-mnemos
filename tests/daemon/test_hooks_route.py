@@ -73,3 +73,52 @@ def test_status_with_foreign_only(client_with_fake_home):
     assert data["all_installed"] is False
     assert data["session_start"]["installed"] is False
     assert data["session_start"]["other_commands"] == ["python /other/start.py"]
+
+
+def test_install_creates_settings_file_when_absent(client_with_fake_home):
+    client, settings_path = client_with_fake_home
+    assert not settings_path.exists()
+    r = client.post("/hooks/install")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["install_result"]["ok"] is True
+    assert data["status"]["all_installed"] is True
+    assert settings_path.exists()
+
+
+def test_install_idempotent(client_with_fake_home):
+    client, settings_path = client_with_fake_home
+    r1 = client.post("/hooks/install")
+    r2 = client.post("/hooks/install")
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    # Both events still have exactly one mnemos block after second install.
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    for event in ("SessionStart", "SessionEnd"):
+        blocks = settings["hooks"][event]
+        mnemos_blocks = [
+            b for b in blocks
+            if any("claude_mnemos" in h.get("command", "") or "claude-mnemos" in h.get("command", "")
+                   for h in b.get("hooks", []))
+        ]
+        assert len(mnemos_blocks) == 1
+
+
+def test_install_preserves_foreign_hooks(client_with_fake_home):
+    client, settings_path = client_with_fake_home
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps({
+        "hooks": {
+            "Stop": [{"hooks": [{"type": "command", "command": "echo bye"}]}],
+            "SessionStart": [{"hooks": [{"type": "command", "command": "python /other/start.py"}]}],
+        }
+    }), encoding="utf-8")
+    r = client.post("/hooks/install")
+    assert r.status_code == 200
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    # Stop block preserved unchanged.
+    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == "echo bye"
+    # SessionStart has BOTH the foreign block AND the new mnemos block.
+    ss_cmds = [h["command"] for b in settings["hooks"]["SessionStart"] for h in b["hooks"]]
+    assert any("/other/start.py" in c for c in ss_cmds)
+    assert any("session_start.py" in c and ("claude_mnemos" in c or "claude-mnemos" in c) for c in ss_cmds)

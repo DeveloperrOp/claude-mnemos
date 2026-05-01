@@ -51,7 +51,12 @@
     "hook_banner": {
       "title": "Хуки mnemos не установлены",
       "body": "Без них сессии не будут автоматически ingest'иться и Claude не получит контекст проекта при следующем запуске. Установи одной командой:",
-      "no_settings": "(Файл ~/.claude/settings.json пока отсутствует — install создаст его.)"
+      "no_settings": "(Файл ~/.claude/settings.json пока отсутствует — install создаст его.)",
+      "install_button": "Установить хуки сейчас",
+      "installing": "Установка…",
+      "or_cli": "или через CLI:",
+      "install_success": "Хуки mnemos установлены. Перезапусти открытые Claude Code сессии.",
+      "install_error": "Не удалось установить: {{error}}"
     }
   },
   "project_view": {
