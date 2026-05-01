@@ -15,6 +15,7 @@ beforeAll(() => {
       restorable: "Restorable",
       blocked: "Blocked",
       no_entries: "No trash",
+      empty: { title: "Nothing deleted", body: "body" },
       showing_n: "{{count}} entries",
       restored_toast: "Restored",
       permanently_deleted_toast: "Permanently deleted",
@@ -73,6 +74,6 @@ describe("Trash", () => {
   it("shows empty state", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { entries: [], total: 0 } });
     render(wrap(<Trash />));
-    await waitFor(() => expect(screen.getByText(/no trash/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/nothing deleted/i)).toBeInTheDocument());
   });
 });

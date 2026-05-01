@@ -28,6 +28,7 @@ beforeAll(() => {
         undo_modal_title: "Undo this operation?",
         undo_modal_desc: "This will revert all pages affected by this operation to their state before it ran.",
         no_activity: "No activity",
+        empty: { title: "No operations yet", body: "body" },
       },
       confirm: {
         cancel: "Cancel", working: "Working…",
@@ -86,7 +87,7 @@ describe("ActivityCenter", () => {
     });
     render(wrap(<ActivityCenter />));
     await waitFor(() =>
-      expect(screen.getByText(/no activity/i)).toBeInTheDocument(),
+      expect(screen.getByText(/no operations yet/i)).toBeInTheDocument(),
     );
   });
 });

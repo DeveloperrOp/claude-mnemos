@@ -11,7 +11,9 @@ beforeAll(() => {
     sessions: {
       title: "Sessions", filter_status: "Status", limit: "Limit",
       status: { succeeded: "Succeeded", queued: "Queued", running: "Running", failed: "Failed", dead_letter: "Dead-letter" },
-      no_sessions: "No sessions", showing_n_of_m: "{{shown}} of {{total}}",
+      no_sessions: "No sessions",
+      empty: { title: "No sessions ingested yet", body: "body", cta_settings: "Check CWD", cta_lost: "Import lost" },
+      showing_n_of_m: "{{shown}} of {{total}}",
       tokens_in: "in", tokens_out: "out", model: "model", ingested_at: "at",
       created_pages: "pages",
     },
@@ -63,6 +65,6 @@ describe("Sessions", () => {
   it("shows empty state", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { sessions: [], total: 0 } });
     render(wrap(<Sessions />));
-    await waitFor(() => expect(screen.getByText(/no sessions/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/no sessions ingested yet/i)).toBeInTheDocument());
   });
 });

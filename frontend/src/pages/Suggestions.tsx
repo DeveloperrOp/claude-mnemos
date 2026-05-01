@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useSuggestions } from "@/hooks/useSuggestions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SuggestionCard } from "@/components/widgets/SuggestionCard";
+import { EmptyState } from "@/components/widgets/EmptyState";
 import { SuggestionFilters, type StatusFilter } from "@/components/filters/SuggestionFilters";
 
 export function Suggestions() {
@@ -29,9 +30,16 @@ export function Suggestions() {
     <div className="space-y-3">
       <SuggestionFilters value={status} onChange={setStatus} />
       {items.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          {t("suggestions.no_suggestions")}
-        </div>
+        <EmptyState
+          icon="🧭"
+          title={t("suggestions.empty.title")}
+          body={t("suggestions.empty.body")}
+          actions={
+            <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
+              {t("suggestions.empty.cta")}
+            </code>
+          }
+        />
       ) : (
         <>
           <div className="text-xs text-muted-foreground">

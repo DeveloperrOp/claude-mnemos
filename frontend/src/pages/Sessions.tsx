@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useSessions } from "@/hooks/useSessions";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionCard } from "@/components/widgets/SessionCard";
+import { EmptyState } from "@/components/widgets/EmptyState";
 import {
   SessionFilters,
   defaultSessionFilterState,
@@ -36,9 +38,23 @@ export function Sessions() {
     return (
       <div className="space-y-3">
         <SessionFilters state={filters} onChange={setFilters} />
-        <div className="py-12 text-center text-muted-foreground">
-          {t("sessions.no_sessions")}
-        </div>
+        <EmptyState
+          icon="💬"
+          title={t("sessions.empty.title")}
+          body={t("sessions.empty.body")}
+          actions={
+            <>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/project/${project}/settings`}>
+                  {t("sessions.empty.cta_settings")}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/lost-sessions">{t("sessions.empty.cta_lost")}</Link>
+              </Button>
+            </>
+          }
+        />
       </div>
     );
   }

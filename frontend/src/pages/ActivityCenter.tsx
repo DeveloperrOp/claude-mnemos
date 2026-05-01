@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivity } from "@/hooks/useActivity";
 import { ActivityRow } from "@/components/widgets/ActivityRow";
+import { EmptyState } from "@/components/widgets/EmptyState";
 import { groupByDay, type DayGroupKey } from "@/lib/groupByDay";
 
 const VISIBLE_GROUPS: DayGroupKey[] = [
@@ -39,9 +40,11 @@ export function ActivityCenter() {
   const total = activityQuery.data?.total ?? 0;
   if (total === 0) {
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        {t("activity.no_activity")}
-      </div>
+      <EmptyState
+        icon="📜"
+        title={t("activity.empty.title")}
+        body={t("activity.empty.body")}
+      />
     );
   }
 

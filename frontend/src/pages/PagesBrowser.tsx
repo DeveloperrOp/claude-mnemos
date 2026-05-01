@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueries } from "@tanstack/react-query";
 import { usePages } from "@/hooks/usePages";
 import { getPage } from "@/api/pages.api";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   PageFilters,
@@ -12,6 +13,7 @@ import {
   type SortMode,
 } from "@/components/filters/PageFilters";
 import { PageCard } from "@/components/widgets/PageCard";
+import { EmptyState } from "@/components/widgets/EmptyState";
 import type { PageDetail, WikiPageFrontmatter } from "@/types/WikiPage";
 
 const MAX_PAGES = 200;
@@ -87,9 +89,23 @@ export function PagesBrowser() {
   const totalPaths = pagesQuery.data?.length ?? 0;
   if (totalPaths === 0) {
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        {t("pages.no_pages")}
-      </div>
+      <EmptyState
+        icon="📄"
+        title={t("pages_browser.empty.title")}
+        body={t("pages_browser.empty.body")}
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/lost-sessions">{t("pages_browser.empty.cta_lost")}</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link to={`/project/${project}/settings`}>
+                {t("pages_browser.empty.cta_settings")}
+              </Link>
+            </Button>
+          </>
+        }
+      />
     );
   }
 

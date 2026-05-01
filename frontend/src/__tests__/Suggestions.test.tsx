@@ -22,6 +22,7 @@ beforeAll(() => {
       confidence: "Confidence", affected_pages: "Affected", proposed_target: "Target",
       reason: "Reason", body_header: "Reasoning",
       no_suggestions: "No suggestions",
+      empty: { title: "No proposals pending", body: "body", cta: "mnemos ontology scan" },
       showing_n: "{{count}} suggestions",
       approved_toast: "Suggestion approved",
       rejected_toast: "Suggestion rejected",
@@ -84,6 +85,6 @@ describe("Suggestions", () => {
   it("shows empty state", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { suggestions: [], total: 0 } });
     render(wrap(<Suggestions />));
-    await waitFor(() => expect(screen.getByText(/no suggestions/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/no proposals pending/i)).toBeInTheDocument());
   });
 });

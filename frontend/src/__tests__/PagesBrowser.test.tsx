@@ -19,6 +19,9 @@ beforeAll(() => {
       no_pages: "No pages",
       loading_frontmatter: "Loading...",
     },
+    pages_browser: {
+      empty: { title: "Vault is empty", body: "body", cta_lost: "Lost", cta_settings: "Settings" },
+    },
     wiki: {
       type: { entity: "Entity", concept: "Concept", source: "Source" },
       status: { draft: "Draft", reviewed: "Reviewed", verified: "Verified", stale: "Stale", archived: "Archived" },
@@ -68,7 +71,7 @@ describe("PagesBrowser", () => {
   it("shows empty state when no pages", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { pages: [] } });
     render(wrap(<PagesBrowser />));
-    await waitFor(() => expect(screen.getByText(/no pages/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/vault is empty/i)).toBeInTheDocument());
   });
 
   it("filters by type when type is unchecked", async () => {

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useTrash } from "@/hooks/useTrash";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrashRow } from "@/components/widgets/TrashRow";
+import { EmptyState } from "@/components/widgets/EmptyState";
 
 export function Trash() {
   const { name: project } = useParams<{ name: string }>();
@@ -21,9 +22,11 @@ export function Trash() {
   const entries = trashQuery.data?.entries ?? [];
   if (entries.length === 0) {
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        {t("trash.no_entries")}
-      </div>
+      <EmptyState
+        icon="🗑️"
+        title={t("trash.empty.title")}
+        body={t("trash.empty.body")}
+      />
     );
   }
 

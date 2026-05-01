@@ -171,10 +171,24 @@
       "loading": "Loading…"
     }
   },
+  "pages_browser": {
+    "empty": {
+      "title": "Vault is empty",
+      "body": "Wiki pages appear here as sessions get ingested. Each session produces 1+ atomic pages (entities, concepts, sources).",
+      "cta_lost": "Bring up Lost sessions",
+      "cta_settings": "Verify ingest is wired"
+    }
+  },
   "sessions": {
     "title": "Sessions",
     "open": "Open",
     "no_sessions": "No sessions found",
+    "empty": {
+      "title": "No sessions ingested yet",
+      "body": "Open `claude` in any folder covered by this project's CWD patterns. After you exit the session, it ingests automatically and shows up here within ~30 seconds.",
+      "cta_settings": "Check CWD patterns",
+      "cta_lost": "Or import a lost session"
+    },
     "filter_status": "Status",
     "limit": "Limit",
     "status": {
@@ -231,6 +245,10 @@
     "undo_modal_title": "Undo this operation?",
     "undo_modal_desc": "This will revert all pages affected by this operation to their state before it ran.",
     "no_activity": "No activity yet",
+    "empty": {
+      "title": "No operations yet",
+      "body": "Every change to the vault — ingest, page edit, merge, delete, lint autofix — gets logged here with one-click undo. Empty means the vault hasn't been touched yet."
+    },
     "metadata": "Metadata",
     "snapshot": "Snapshot",
     "can_undo": "Can undo",
@@ -267,6 +285,10 @@
     "restorable": "Restorable",
     "blocked": "Blocked",
     "no_entries": "Trash is empty",
+    "empty": {
+      "title": "Nothing deleted",
+      "body": "Pages you remove (manually or via ontology / lint autofix) land here for 30 days before permanent cleanup. You can restore from here at any time within that window."
+    },
     "showing_n": "{{count}} entries",
     "restored_toast": "Restored",
     "permanently_deleted_toast": "Permanently deleted",
@@ -348,6 +370,11 @@
     "reason": "Reason",
     "body_header": "Reasoning",
     "no_suggestions": "No suggestions",
+    "empty": {
+      "title": "No proposals pending",
+      "body": "The ontology engine periodically scans the vault and proposes merge / rename / delete operations for HITL approval. Empty means nothing's pending — either the engine hasn't scanned yet, or it found nothing to flag.",
+      "cta": "mnemos ontology scan --project NAME"
+    },
     "showing_n": "{{count}} suggestions",
     "approved_toast": "Suggestion approved",
     "rejected_toast": "Suggestion rejected",
