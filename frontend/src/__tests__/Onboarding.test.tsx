@@ -43,6 +43,10 @@ beforeAll(() => {
       cli_check_ok: "✓ Claude CLI installed and authenticated",
       cli_check_not_installed: "⚠ Claude CLI not found — install Claude Code from https://claude.ai/download",
       cli_check_not_authenticated: "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal",
+      hook_install: {
+        auto_success: "Mnemos hooks installed automatically. Restart any open Claude Code sessions to take effect.",
+        auto_failed: "Couldn't auto-install hooks ({{error}}). The Overview banner has a manual install button.",
+      },
     },
     cwd_builder: {
       add: "Add folder",
@@ -336,5 +340,79 @@ describe("Onboarding", () => {
     await waitFor(() => expect(postSpy).toHaveBeenCalled());
     const [, body] = postSpy.mock.calls[0] as [string, Record<string, unknown>];
     expect(body.cwd_patterns).toContain("/home/*");
+  });
+
+  it("auto-installs hooks after project creation when not yet installed", async () => {
+    const hookStatusNotInstalled = {
+      settings_path: "/x/settings.json",
+      settings_exists: true,
+      session_start: { installed: false, mnemos_commands: [], other_commands: [] },
+      session_end: { installed: false, mnemos_commands: [], other_commands: [] },
+      all_installed: false,
+    };
+    vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/hooks/status") return Promise.resolve({ data: hookStatusNotInstalled });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    const installResponse = {
+      install_result: { ok: true, python: "python3", session_start_script: "x", session_end_script: "x", backup_path: null },
+      status: { ...hookStatusNotInstalled, all_installed: true },
+    };
+    const postSpy = vi.spyOn(apiClient, "post").mockImplementation((url: string) => {
+      if (url === "/projects") {
+        return Promise.resolve({
+          data: { name: "p1", display_name: "p1", vault_root: "/x", cwd_patterns: [] },
+        });
+      }
+      if (url === "/hooks/install") return Promise.resolve({ data: installResponse });
+      return Promise.reject(new Error(`unexpected POST ${url}`));
+    });
+
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+
+    await user.type(screen.getByLabelText(/display name/i), "p1");
+    await user.type(screen.getByLabelText(/vault path/i), "/x");
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    // /hooks/install should be called once and navigation should proceed.
+    await waitFor(() => {
+      const installCalls = postSpy.mock.calls.filter(([url]) => url === "/hooks/install");
+      expect(installCalls.length).toBe(1);
+    });
+    await waitFor(() => expect(screen.getByTestId("project-view-stub")).toBeInTheDocument());
+  });
+
+  it("skips hook auto-install when hooks are already installed", async () => {
+    const hookStatusInstalled = {
+      settings_path: "/x/settings.json",
+      settings_exists: true,
+      session_start: { installed: true, mnemos_commands: ["a"], other_commands: [] },
+      session_end: { installed: true, mnemos_commands: ["b"], other_commands: [] },
+      all_installed: true,
+    };
+    vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/hooks/status") return Promise.resolve({ data: hookStatusInstalled });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    const postSpy = vi.spyOn(apiClient, "post").mockImplementation((url: string) => {
+      if (url === "/projects") {
+        return Promise.resolve({
+          data: { name: "p2", display_name: "p2", vault_root: "/x", cwd_patterns: [] },
+        });
+      }
+      return Promise.reject(new Error(`unexpected POST ${url}`));
+    });
+
+    const user = userEvent.setup();
+    render(wrap(<Onboarding />));
+
+    await user.type(screen.getByLabelText(/display name/i), "p2");
+    await user.type(screen.getByLabelText(/vault path/i), "/x");
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(screen.getByTestId("project-view-stub")).toBeInTheDocument());
+    const installCalls = postSpy.mock.calls.filter(([url]) => url === "/hooks/install");
+    expect(installCalls.length).toBe(0);
   });
 });

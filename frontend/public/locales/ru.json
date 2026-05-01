@@ -404,7 +404,11 @@
     "cli_check_label": "Статус Claude CLI",
     "cli_check_ok": "✓ Claude CLI установлен и залогинен",
     "cli_check_not_installed": "⚠ Claude CLI не найден — установите Claude Code с https://claude.ai/download",
-    "cli_check_not_authenticated": "⚠ Claude CLI установлен, но не залогинен — запустите `claude login` в терминале"
+    "cli_check_not_authenticated": "⚠ Claude CLI установлен, но не залогинен — запустите `claude login` в терминале",
+    "hook_install": {
+      "auto_success": "Хуки mnemos установлены автоматически. Перезапусти открытые Claude Code сессии.",
+      "auto_failed": "Не удалось установить хуки автоматически ({{error}}). Баннер на главной странице предлагает установить вручную."
+    }
   },
   "metrics": {
     "title": "Метрики",

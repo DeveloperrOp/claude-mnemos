@@ -404,7 +404,11 @@
     "cli_check_label": "Claude CLI status",
     "cli_check_ok": "✓ Claude CLI installed and authenticated",
     "cli_check_not_installed": "⚠ Claude CLI not found — install Claude Code from https://claude.ai/download",
-    "cli_check_not_authenticated": "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal"
+    "cli_check_not_authenticated": "⚠ Claude CLI installed but not logged in — run `claude login` in your terminal",
+    "hook_install": {
+      "auto_success": "Mnemos hooks installed automatically. Restart any open Claude Code sessions to take effect.",
+      "auto_failed": "Couldn't auto-install hooks ({{error}}). The Overview banner has a manual install button."
+    }
   },
   "metrics": {
     "title": "Metrics",

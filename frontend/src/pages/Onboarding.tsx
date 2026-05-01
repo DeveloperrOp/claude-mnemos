@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useProjectCreate } from "@/hooks/useProjectCreate";
+import { useHookStatus } from "@/hooks/useHookStatus";
+import { useInstallHooks } from "@/hooks/useInstallHooks";
 import { getTrayStatus, installTray } from "@/api/tray.api";
 import type { TrayStatus } from "@/types/Tray";
 import { getClaudeCliAuth } from "@/api/claudeCli.api";
@@ -18,6 +21,8 @@ export function Onboarding() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const create = useProjectCreate();
+  const hookStatus = useHookStatus();
+  const installHooks = useInstallHooks();
 
   const [displayName, setDisplayName] = useState("");
   const [slug, setSlug] = useState("");
@@ -61,7 +66,7 @@ export function Onboarding() {
         cwd_patterns: cwdPatterns,
       },
       {
-        onSuccess: (entry) => {
+        onSuccess: async (entry) => {
           if (
             autostartChecked &&
             trayStatus &&
@@ -70,6 +75,18 @@ export function Onboarding() {
             installTray().catch(() => {
               // Surface as toast in a future polish; for now silent — checkbox optional
             });
+          }
+          // Auto-install Claude Code hooks if not yet installed. Failure does
+          // NOT block navigation — the Overview HookStatusBanner offers a
+          // manual retry path.
+          if (hookStatus.data && !hookStatus.data.all_installed) {
+            try {
+              await installHooks.mutateAsync();
+              toast.success(t("onboarding.hook_install.auto_success"));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "unknown";
+              toast.error(t("onboarding.hook_install.auto_failed", { error: msg }));
+            }
           }
           navigate(`/project/${encodeURIComponent(entry.name)}`);
         },

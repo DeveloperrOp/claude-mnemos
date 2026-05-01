@@ -404,7 +404,11 @@
     "cli_check_label": "Статус Claude CLI",
     "cli_check_ok": "✓ Claude CLI встановлено й автентифіковано",
     "cli_check_not_installed": "⚠ Claude CLI не знайдено — встановіть Claude Code з https://claude.ai/download",
-    "cli_check_not_authenticated": "⚠ Claude CLI встановлено, але не автентифіковано — виконайте `claude login` в терміналі"
+    "cli_check_not_authenticated": "⚠ Claude CLI встановлено, але не автентифіковано — виконайте `claude login` в терміналі",
+    "hook_install": {
+      "auto_success": "Хуки mnemos встановлено автоматично. Перезапусти відкриті Claude Code сесії.",
+      "auto_failed": "Не вдалося встановити хуки автоматично ({{error}}). Банер на головній сторінці пропонує встановити вручну."
+    }
   },
   "metrics": {
     "title": "Метрики",
