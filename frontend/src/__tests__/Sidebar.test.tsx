@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
+import { TooltipProvider } from "../components/ui/tooltip";
 
 vi.mock("i18next-http-backend", () => ({
   default: {
@@ -48,11 +49,13 @@ beforeAll(async () => {
 describe("Sidebar", () => {
   it("highlights Overview on /", () => {
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<Sidebar />} />
-        </Routes>
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/" element={<Sidebar />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     const overview = screen.getByRole("link", { name: /overview|огляд|обзор/i });
     expect(overview).toHaveAttribute("aria-current", "page");
@@ -60,11 +63,13 @@ describe("Sidebar", () => {
 
   it("shows project section disabled when no project active", () => {
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<Sidebar />} />
-        </Routes>
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/" element={<Sidebar />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     // Per-project nav links are present but render as disabled (data-disabled).
     const pages = screen.queryByText(/pages|сторінки|страницы/i);
@@ -74,11 +79,13 @@ describe("Sidebar", () => {
 
   it("activates project links when on /project/:name", () => {
     render(
-      <MemoryRouter initialEntries={["/project/alpha/pages"]}>
-        <Routes>
-          <Route path="/project/:name/*" element={<Sidebar />} />
-        </Routes>
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/project/alpha/pages"]}>
+          <Routes>
+            <Route path="/project/:name/*" element={<Sidebar />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     const pages = screen.getByRole("link", { name: /pages|сторінки|страницы/i });
     expect(pages).toHaveAttribute("aria-current", "page");

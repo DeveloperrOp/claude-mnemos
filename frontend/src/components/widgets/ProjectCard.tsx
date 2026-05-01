@@ -1,11 +1,11 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
+import { MessageSquare, BookOpen, ScrollText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { type ProjectMapEntry } from "@/types/Project";
@@ -64,7 +64,24 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1">
+            <Button asChild size="icon" variant="ghost" title={t("navigation.sessions")}>
+              <Link to={`/project/${project.name}/sessions`} aria-label={t("navigation.sessions")}>
+                <MessageSquare className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild size="icon" variant="ghost" title={t("navigation.pages")}>
+              <Link to={`/project/${project.name}/pages`} aria-label={t("navigation.pages")}>
+                <BookOpen className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild size="icon" variant="ghost" title={t("navigation.activity")}>
+              <Link to={`/project/${project.name}/activity`} aria-label={t("navigation.activity")}>
+                <ScrollText className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
           <Button asChild size="sm">
             <Link to={`/project/${project.name}`}>{t("common.open")}</Link>
           </Button>
@@ -85,15 +102,13 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
   if (!hint) return inner;
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button type="button" className="cursor-help text-left">
-            {inner}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">{hint}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" className="cursor-help text-left">
+          {inner}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{hint}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -28,7 +28,8 @@
     "metrics": "Метрики",
     "help": "Помощь",
     "global_settings": "Глобальные настройки",
-    "create_project": "+ Новый проект"
+    "create_project": "+ Новый проект",
+    "disabled_hint": "Сначала откройте проект"
   },
   "topbar": {
     "all_projects": "Все проекты",

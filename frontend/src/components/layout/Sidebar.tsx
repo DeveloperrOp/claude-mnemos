@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { NavLink, useParams } from "react-router";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavItem {
   to: (project?: string) => string;
@@ -37,15 +38,23 @@ interface SidebarLinkProps {
 }
 
 function SidebarLink({ to, icon, label, disabled }: SidebarLinkProps) {
+  const { t } = useTranslation();
   if (disabled) {
     return (
-      <span
-        data-disabled
-        className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground opacity-60"
-      >
-        <span className="w-5 text-center">{icon}</span>
-        <span>{label}</span>
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            data-disabled
+            className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground opacity-60"
+          >
+            <span className="w-5 text-center">{icon}</span>
+            <span>{label}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          {t("navigation.disabled_hint")}
+        </TooltipContent>
+      </Tooltip>
     );
   }
   return (

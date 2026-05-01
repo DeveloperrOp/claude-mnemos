@@ -28,7 +28,8 @@
     "metrics": "Metrics",
     "help": "Help",
     "global_settings": "Global settings",
-    "create_project": "+ New project"
+    "create_project": "+ New project",
+    "disabled_hint": "Open any project first"
   },
   "topbar": {
     "all_projects": "All projects",
