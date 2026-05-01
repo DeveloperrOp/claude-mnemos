@@ -32,6 +32,13 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from claude_mnemos.hooks.errors import (  # noqa: E402
+    install_excepthook,
+    record_exception,
+)
+
+install_excepthook("session_start")
+
 RECURSION_ENV = "MNEMOS_INJECT_RUNNING"
 # SessionStart payload `source` field — sources we silently skip:
 #   resume:  Claude is restoring an existing session; it already has prior
@@ -154,4 +161,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception as e:  # noqa: BLE001
+        record_exception(hook="session_start", exc=e, context={"argv": sys.argv})
+        # Exit 0 anyway — never block Claude Code.
+        sys.exit(0)

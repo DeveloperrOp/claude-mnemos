@@ -27,6 +27,13 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from claude_mnemos.hooks.errors import (  # noqa: E402
+    install_excepthook,
+    record_exception,
+)
+
+install_excepthook("session_end")
+
 from claude_mnemos.mapping.resolver import (  # noqa: E402
     ProjectResolver,
     ResolverAmbiguityError,
@@ -158,4 +165,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception as e:  # noqa: BLE001
+        record_exception(hook="session_end", exc=e, context={"argv": sys.argv})
+        # Exit 0 anyway — never block Claude Code.
+        sys.exit(0)

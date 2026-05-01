@@ -57,6 +57,12 @@
       "or_cli": "or via CLI:",
       "install_success": "Mnemos hooks installed. Restart Claude Code sessions to take effect.",
       "install_error": "Install failed: {{error}}"
+    },
+    "hook_errors": {
+      "title": "{{count}} recent hook error(s)",
+      "body": "Hook scripts crashed in the last 24h. Sessions in those windows may have been skipped.",
+      "more": "+ {{n}} more",
+      "log_path": "Full log: {{path}}"
     }
   },
   "project_view": {

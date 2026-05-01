@@ -104,6 +104,53 @@ def test_install_idempotent(client_with_fake_home):
         assert len(mnemos_blocks) == 1
 
 
+def test_errors_when_log_missing(client_with_fake_home, tmp_path, monkeypatch):
+    """No hook-errors file → empty list, count 0."""
+    monkeypatch.setenv("MNEMOS_HOOK_ERRORS_FILE", str(tmp_path / "missing.jsonl"))
+    client, _ = client_with_fake_home
+    r = client.get("/hooks/errors")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 0
+    assert data["entries"] == []
+
+
+def test_errors_returns_recent_entries_newest_first(client_with_fake_home, tmp_path, monkeypatch):
+    log_path = tmp_path / "errors.jsonl"
+    monkeypatch.setenv("MNEMOS_HOOK_ERRORS_FILE", str(log_path))
+
+    # Write three entries chronologically
+    import json as _json
+    entries_in = [
+        {"ts": "2026-05-01T10:00:00Z", "hook": "session_start", "kind": "exception", "message": "first"},
+        {"ts": "2026-05-01T11:00:00Z", "hook": "session_end",   "kind": "exception", "message": "second"},
+        {"ts": "2026-05-01T12:00:00Z", "hook": "session_start", "kind": "exception", "message": "third"},
+    ]
+    log_path.write_text("\n".join(_json.dumps(e) for e in entries_in) + "\n", encoding="utf-8")
+
+    client, _ = client_with_fake_home
+    r = client.get("/hooks/errors?limit=10")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 3
+    # Newest first
+    assert [e["message"] for e in data["entries"]] == ["third", "second", "first"]
+
+
+def test_errors_limit_clamps(client_with_fake_home, tmp_path, monkeypatch):
+    log_path = tmp_path / "errors.jsonl"
+    monkeypatch.setenv("MNEMOS_HOOK_ERRORS_FILE", str(log_path))
+    import json as _json
+    log_path.write_text(
+        "\n".join(_json.dumps({"ts": "x", "hook": "h", "kind": "info", "message": str(i)}) for i in range(20)) + "\n",
+        encoding="utf-8",
+    )
+    client, _ = client_with_fake_home
+    r = client.get("/hooks/errors?limit=5")
+    assert r.status_code == 200
+    assert r.json()["count"] == 5
+
+
 def test_install_preserves_foreign_hooks(client_with_fake_home):
     client, settings_path = client_with_fake_home
     settings_path.parent.mkdir(parents=True, exist_ok=True)

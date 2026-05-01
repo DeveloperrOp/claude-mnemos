@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from claude_mnemos import cli_hooks
+from claude_mnemos.hooks import errors as hook_errors
 
 router = APIRouter()
 
@@ -57,6 +58,21 @@ async def hooks_status() -> dict[str, Any]:
         "session_start": ss,
         "session_end": se,
         "all_installed": ss["installed"] and se["installed"],
+    }
+
+
+@router.get("/hooks/errors")
+async def hooks_errors(limit: int = 50) -> dict[str, Any]:
+    """Return recent hook-script errors (newest first).
+
+    ``limit`` cap defaults to 50, max 200 (the file is bounded at 200).
+    """
+    capped = max(1, min(limit, 200))
+    entries = hook_errors.read_recent(capped)
+    return {
+        "log_path": str(hook_errors._log_path()),
+        "count": len(entries),
+        "entries": entries,
     }
 
 
