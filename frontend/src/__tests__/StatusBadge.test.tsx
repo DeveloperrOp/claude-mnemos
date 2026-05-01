@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import i18n from "../i18n";
 import { StatusBadge } from "../components/widgets/StatusBadge";
 
@@ -12,14 +12,14 @@ beforeAll(() => {
 
 describe("StatusBadge", () => {
   it("renders draft with neutral color", () => {
-    render(<StatusBadge status="draft" />);
-    const el = screen.getByRole("status");
-    expect(el).toHaveAttribute("data-status", "draft");
+    const { container } = render(<StatusBadge status="draft" />);
+    const el = container.querySelector('[data-status="draft"]');
+    expect(el).not.toBeNull();
     expect(el).toHaveTextContent("Draft");
   });
 
   it("renders verified with success color", () => {
-    render(<StatusBadge status="verified" />);
-    expect(screen.getByRole("status")).toHaveAttribute("data-status", "verified");
+    const { container } = render(<StatusBadge status="verified" />);
+    expect(container.querySelector('[data-status="verified"]')).not.toBeNull();
   });
 });

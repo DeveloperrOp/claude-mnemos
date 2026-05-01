@@ -11,9 +11,9 @@ describe("MetricLabel", () => {
   });
 
   it("applies mono uppercase to the label", () => {
-    const { container } = render(<MetricLabel label="JOBS">03</MetricLabel>);
-    const label = container.querySelector("[data-role='label']");
-    expect(label?.className).toMatch(/font-mono/);
-    expect(label?.className).toMatch(/uppercase/);
+    render(<MetricLabel label="JOBS">03</MetricLabel>);
+    const labelEl = screen.getByText("JOBS");
+    expect(labelEl.className).toMatch(/font-mono/);
+    expect(labelEl.className).toMatch(/uppercase/);
   });
 });

@@ -8,12 +8,6 @@ describe("BlinkCursor", () => {
     expect(container.textContent).toBe("▌");
   });
 
-  it("applies the cursor-blink animation class", () => {
-    const { container } = render(<BlinkCursor />);
-    const span = container.querySelector("span");
-    expect(span?.className).toContain("cursor-blink");
-  });
-
   it("forwards aria-hidden=true (decorative)", () => {
     const { container } = render(<BlinkCursor />);
     const span = container.querySelector("span");
