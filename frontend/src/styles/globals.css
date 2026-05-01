@@ -1,100 +1,125 @@
 @import "tailwindcss";
 
-/* Map our CSS vars (defined below in :root and .dark) to Tailwind v4 tokens
-   so shadcn-ui classes like `bg-popover`, `bg-accent`, `text-popover-foreground`
-   actually generate CSS. Without this block they silently produce no styles
-   and dropdowns/popovers render with a transparent background. */
+/* New token system: cool blue-grey baseline (h=264) + lime accent (h=130).
+   shadcn-ergonomic names are mapped through @theme so existing class usage
+   (bg-card, text-popover-foreground, bg-accent, etc.) keeps working. */
 @theme {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--bg-elev-1);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--bg-elev-1);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--bg-elev-1);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--bg-elev-1);
+  --color-muted-foreground: var(--fg-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--bg);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 210 20% 98%;
-    --muted: 210 16% 95%;
-    --muted-foreground: 215 16% 47%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 199 89% 48%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --accent: 210 16% 92%;
-    --accent-foreground: 222 47% 11%;
-    --secondary: 210 16% 95%;
-    --secondary-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 20% 98%;
-    --radius: 0.5rem;
-    --chart-input: #3b82f6;
-    --chart-output: #10b981;
-    --chart-sessions: #f59e0b;
+    /* Light theme */
+    --bg:           oklch(99% 0.005 264);
+    --bg-elev-1:    oklch(97% 0.006 264);
+    --bg-elev-2:    oklch(94% 0.008 264);
+    --fg:           oklch(20% 0.02 264);
+    --fg-muted:     oklch(45% 0.015 264);
+    --fg-subtle:    oklch(60% 0.01 264);
+    --border:       oklch(90% 0.008 264);
+    --border-strong:oklch(80% 0.01 264);
+    --accent:       oklch(70% 0.22 130);
+    --accent-fg:    oklch(20% 0.05 130);
+    --accent-dim:   oklch(55% 0.12 130);
+    --success:      oklch(70% 0.22 145);
+    --warning:      oklch(75% 0.16 75);
+    --danger:       oklch(60% 0.22 25);
+    --info:         oklch(65% 0.15 240);
+
+    --radius: 0.375rem;
+
+    /* Charts: keep three-series ladder. accent → primary, info → secondary, warning → tertiary. */
+    --chart-input:    var(--accent);
+    --chart-output:   var(--info);
+    --chart-sessions: var(--warning);
+
+    /* Motion */
+    --motion-fast:   80ms;
+    --motion-medium: 150ms;
+    --motion-slow:   250ms;
+    --ease-out:      cubic-bezier(0.2, 0.7, 0.1, 1);
+    --ease-in-out:   cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 20% 98%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 222 47% 11%;
-    --muted: 217 19% 27%;
-    --muted-foreground: 215 14% 71%;
-    --border: 217 19% 27%;
-    --input: 217 19% 27%;
-    --ring: 199 89% 48%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 20% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 20% 98%;
-    --accent: 217 19% 27%;
-    --accent-foreground: 210 20% 98%;
-    --secondary: 217 19% 27%;
-    --secondary-foreground: 210 20% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 20% 98%;
-    --chart-input: #60a5fa;
-    --chart-output: #34d399;
-    --chart-sessions: #fbbf24;
+    --bg:           oklch(15% 0.012 264);
+    --bg-elev-1:    oklch(18% 0.014 264);
+    --bg-elev-2:    oklch(22% 0.016 264);
+    --fg:           oklch(95% 0.01 264);
+    --fg-muted:     oklch(65% 0.012 264);
+    --fg-subtle:    oklch(50% 0.01 264);
+    --border:       oklch(28% 0.014 264);
+    --border-strong:oklch(40% 0.018 264);
+    --accent:       oklch(85% 0.27 130);
+    --accent-fg:    oklch(15% 0.05 130);
+    --accent-dim:   oklch(60% 0.15 130);
+    --success:      oklch(80% 0.20 145);
+    --warning:      oklch(82% 0.18 75);
+    --danger:       oklch(70% 0.20 25);
+    --info:         oklch(75% 0.15 240);
   }
 
   body {
-    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11"; /* Geist optional ligatures */
   }
 
-  .prose h1 { @apply mt-6 mb-3 text-2xl font-bold; }
-  .prose h2 { @apply mt-5 mb-2 text-xl font-semibold; }
-  .prose h3 { @apply mt-4 mb-2 text-lg font-semibold; }
+  /* Signature motion keyframes */
+  @keyframes blink { 50% { opacity: 0 } }
+  .cursor-blink { animation: blink 1.06s steps(2, start) infinite; }
+
+  @keyframes pulse-accent {
+    0%, 100% { opacity: 0.6 }
+    50%      { opacity: 1.0 }
+  }
+  .pulse-accent { animation: pulse-accent 2s var(--ease-in-out) infinite; }
+
+  /* Markdown / prose blocks (Help, page bodies). Mono code, lime border-left
+     on fenced blocks. */
+  .prose h1 { @apply mt-6 mb-3 text-2xl font-semibold; font-family: var(--font-mono); }
+  .prose h2 { @apply mt-5 mb-2 text-xl font-semibold; font-family: var(--font-mono); }
+  .prose h3 { @apply mt-4 mb-2 text-lg font-semibold; font-family: var(--font-mono); }
   .prose p { @apply my-2 leading-relaxed; }
-  .prose code { @apply rounded bg-[hsl(var(--muted))] px-1 py-0.5 text-sm; }
-  .prose pre { @apply my-3 overflow-x-auto rounded-md bg-[hsl(var(--muted))] p-3 text-sm; }
-  .prose pre code { @apply bg-transparent p-0; }
+  .prose code {
+    @apply rounded px-1.5 py-0.5 text-sm;
+    background: var(--bg-elev-1);
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+  .prose pre {
+    @apply my-3 overflow-x-auto rounded-md p-3 text-sm;
+    background: var(--bg-elev-2);
+    border-left: 2px solid var(--accent);
+    font-family: var(--font-mono);
+  }
+  .prose pre code { background: transparent; padding: 0; color: inherit; }
   .prose ul { @apply my-2 ml-5 list-disc space-y-1; }
   .prose ol { @apply my-2 ml-5 list-decimal space-y-1; }
-  .prose blockquote { @apply my-3 border-l-4 border-[hsl(var(--border))] pl-3 italic; }
-  .prose a { @apply text-[hsl(var(--primary))] underline; }
+  .prose blockquote { @apply my-3 border-l-4 pl-3 italic; border-color: var(--border); }
+  .prose a { @apply underline; color: var(--accent); }
   .prose table { @apply my-3 w-full border-collapse text-sm; }
-  .prose th, .prose td { @apply border border-[hsl(var(--border))] px-2 py-1; }
-  .prose th { @apply bg-[hsl(var(--muted))] font-semibold; }
+  .prose th, .prose td { @apply px-2 py-1; border: 1px solid var(--border); }
+  .prose th { background: var(--bg-elev-1); @apply font-semibold; font-family: var(--font-mono); }
 }
