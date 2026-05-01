@@ -94,7 +94,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
     )
 
     try:
-        health = _wait_for_health(f"http://127.0.0.1:{port}/health")
+        health = _wait_for_health(f"http://127.0.0.1:{port}/api/health")
         assert health is not None, (
             "daemon did not start. stderr: "
             f"{proc.stderr.read().decode() if proc.stderr else ''}"
@@ -113,7 +113,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
 
         # 2. PATCH frontmatter -> status verified.
         r = httpx.patch(
-            f"{base}/pages/main/{page_rel}",
+            f"{base}/api/pages/main/{page_rel}",
             json={"frontmatter": {"status": "verified"}, "body": None},
             timeout=5.0,
         )
@@ -128,7 +128,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert "status: verified" in contents
 
         # 4. DELETE page -> 200 with trash_id.
-        r = httpx.delete(f"{base}/pages/main/{page_rel}", timeout=5.0)
+        r = httpx.delete(f"{base}/api/pages/main/{page_rel}", timeout=5.0)
         assert r.status_code == 200, r.text
         delete_body = r.json()
         assert delete_body["success"] is True
@@ -137,7 +137,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert not page_path.exists()
 
         # 5. GET /trash/main sees the entry with original_path.
-        r = httpx.get(f"{base}/trash/main", timeout=5.0)
+        r = httpx.get(f"{base}/api/trash/main", timeout=5.0)
         assert r.status_code == 200, r.text
         trash_payload = r.json()
         match = next(
@@ -149,7 +149,7 @@ def test_pages_trash_e2e_round_trip(tmp_path: Path):
         assert match["restorable"] is True
 
         # 6. POST /trash/main/{id}/restore -> 200, page is back at original location.
-        r = httpx.post(f"{base}/trash/main/{trash_id}/restore", timeout=5.0)
+        r = httpx.post(f"{base}/api/trash/main/{trash_id}/restore", timeout=5.0)
         assert r.status_code == 200, r.text
         restore_body = r.json()
         assert restore_body["success"] is True

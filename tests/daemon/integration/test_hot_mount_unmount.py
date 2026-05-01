@@ -58,7 +58,7 @@ def test_hot_mount_then_post_jobs(
             try:
                 if (
                     httpx.get(
-                        f"http://127.0.0.1:{PORT}/health", timeout=0.5
+                        f"http://127.0.0.1:{PORT}/api/health", timeout=0.5
                     ).status_code
                     == 200
                 ):
@@ -75,7 +75,7 @@ def test_hot_mount_then_post_jobs(
         vault = tmp_path / "live"
         vault.mkdir()
         r = httpx.post(
-            f"{base}/projects",
+            f"{base}/api/projects",
             json={
                 "name": "live",
                 "vault_root": str(vault),
@@ -92,7 +92,7 @@ def test_hot_mount_then_post_jobs(
         transcript = vault / "t.jsonl"
         transcript.write_text("{}\n", encoding="utf-8")
         r = httpx.post(
-            f"{base}/jobs",
+            f"{base}/api/jobs",
             json={
                 "kind": "ingest",
                 "payload": {

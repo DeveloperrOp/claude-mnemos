@@ -100,7 +100,7 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
     )
 
     try:
-        h = _wait_for_health(f"http://127.0.0.1:{port}/health")
+        h = _wait_for_health(f"http://127.0.0.1:{port}/api/health")
         assert h is not None, (
             "daemon did not start. stderr: "
             f"{proc.stderr.read().decode() if proc.stderr else ''}"
@@ -108,7 +108,7 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
 
         # Force raw_only via payload (no API key needed); project_name required.
         r = httpx.post(
-            f"http://127.0.0.1:{port}/jobs",
+            f"http://127.0.0.1:{port}/api/jobs",
             json={
                 "kind": "ingest",
                 "payload": {
@@ -126,7 +126,7 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
         deadline = time.monotonic() + 30.0
         final_status = None
         while time.monotonic() < deadline:
-            r = httpx.get(f"http://127.0.0.1:{port}/jobs/{job_id}", timeout=2.0)
+            r = httpx.get(f"http://127.0.0.1:{port}/api/jobs/{job_id}", timeout=2.0)
             if r.status_code == 200:
                 final_status = r.json().get("status")
                 if final_status in ("succeeded", "dead_letter", "failed"):

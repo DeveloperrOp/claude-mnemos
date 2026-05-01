@@ -83,7 +83,7 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
     )
 
     try:
-        assert _wait_for_health(f"http://127.0.0.1:{port}/health"), (
+        assert _wait_for_health(f"http://127.0.0.1:{port}/api/health"), (
             f"daemon did not respond on :{port} within timeout. "
             f"stderr: {proc.stderr.read().decode() if proc.stderr else ''}"
         )
@@ -94,13 +94,13 @@ def test_daemon_subprocess_lifecycle(tmp_path: Path):
         assert recorded_pid == proc.pid
 
         # Endpoints respond
-        r = httpx.get(f"http://127.0.0.1:{port}/version", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/version", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/vault/main", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/vault/main", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/activity/main", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/activity/main", timeout=2.0)
         assert r.status_code == 200
-        r = httpx.get(f"http://127.0.0.1:{port}/snapshots/main", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/snapshots/main", timeout=2.0)
         assert r.status_code == 200
 
     finally:

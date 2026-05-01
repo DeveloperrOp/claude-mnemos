@@ -85,7 +85,7 @@ def test_two_vault_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline:
             try:
-                r = httpx.get(f"http://127.0.0.1:{PORT}/health", timeout=0.5)
+                r = httpx.get(f"http://127.0.0.1:{PORT}/api/health", timeout=0.5)
                 if r.status_code == 200:
                     break
             except httpx.HTTPError:
@@ -99,7 +99,7 @@ def test_two_vault_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         assert (vault_b / ".jobs.db").is_file(), "beta .jobs.db not created"
 
         # GET /projects returns a list; both names should be present.
-        r = httpx.get(f"http://127.0.0.1:{PORT}/projects", timeout=5.0)
+        r = httpx.get(f"http://127.0.0.1:{PORT}/api/projects", timeout=5.0)
         assert r.status_code == 200, r.text
         projects = r.json()
         assert isinstance(projects, list)

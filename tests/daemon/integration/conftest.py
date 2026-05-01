@@ -30,7 +30,7 @@ def _wait_for_health(base_url: str, timeout: float = 10.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            r = httpx.get(f"{base_url}/health", timeout=0.5)
+            r = httpx.get(f"{base_url}/api/health", timeout=0.5)
             if r.status_code == 200:
                 return True
         except httpx.HTTPError:
