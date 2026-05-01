@@ -12,15 +12,15 @@ import { HealthBadge } from "@/components/widgets/HealthBadge";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
 
-const TILES: Array<{ key: string; emoji: string; path: string; plan: string }> = [
-  { key: "navigation.pages",        emoji: "📚", path: "pages",        plan: "#14b" },
-  { key: "navigation.sessions",     emoji: "💬", path: "sessions",     plan: "#14b" },
-  { key: "navigation.activity",     emoji: "📜", path: "activity",     plan: "#14b" },
-  { key: "navigation.suggestions",  emoji: "💡", path: "suggestions",  plan: "#14b" },
-  { key: "navigation.trash",        emoji: "🗑️", path: "trash",        plan: "#14b" },
-  { key: "navigation.snapshots",    emoji: "💾", path: "snapshots",    plan: "#14b" },
-  { key: "navigation.health",       emoji: "🩺", path: "health",       plan: "#14b" },
-  { key: "navigation.settings",     emoji: "⚙",  path: "settings",     plan: "#14c" },
+const TILES: Array<{ key: string; emoji: string; path: string; descKey: string }> = [
+  { key: "navigation.pages",       emoji: "📚", path: "pages",       descKey: "project_view.tile_desc.pages" },
+  { key: "navigation.sessions",    emoji: "💬", path: "sessions",    descKey: "project_view.tile_desc.sessions" },
+  { key: "navigation.activity",    emoji: "📜", path: "activity",    descKey: "project_view.tile_desc.activity" },
+  { key: "navigation.suggestions", emoji: "💡", path: "suggestions", descKey: "project_view.tile_desc.suggestions" },
+  { key: "navigation.trash",       emoji: "🗑️", path: "trash",       descKey: "project_view.tile_desc.trash" },
+  { key: "navigation.snapshots",   emoji: "💾", path: "snapshots",   descKey: "project_view.tile_desc.snapshots" },
+  { key: "navigation.health",      emoji: "🩺", path: "health",      descKey: "project_view.tile_desc.health" },
+  { key: "navigation.settings",    emoji: "⚙",  path: "settings",    descKey: "project_view.tile_desc.settings" },
 ];
 
 export function ProjectView() {
@@ -89,7 +89,7 @@ export function ProjectView() {
               </CardHeader>
               <CardContent>
                 <div className="text-xs text-muted-foreground">
-                  {t("project_view.coming_in", { plan: tile.plan })}
+                  {t(tile.descKey)}
                 </div>
               </CardContent>
             </Link>

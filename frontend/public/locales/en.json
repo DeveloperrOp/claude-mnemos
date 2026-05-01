@@ -80,7 +80,16 @@
     },
     "unknown_title": "Project not found",
     "unknown_hint": "This project is not registered. Return to Overview.",
-    "coming_in": "Coming in plan {{plan}}"
+    "tile_desc": {
+      "pages": "Atomic markdown pages extracted from your sessions.",
+      "sessions": "Chat history of this project — every Claude Code session.",
+      "activity": "Operation log with one-click undo for every change.",
+      "suggestions": "HITL ontology proposals — review and approve.",
+      "trash": "Soft-deleted pages, 30-day retention. Restorable.",
+      "snapshots": "Vault backups — daily, on-demand, before risky ops.",
+      "health": "Daemon, watchdog, queue, alerts at a glance.",
+      "settings": "Project configuration — vault path, CWD, ingest, locale."
+    }
   },
   "health": {
     "ok": "OK",
