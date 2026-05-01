@@ -65,7 +65,7 @@ def _handle_add(args: argparse.Namespace) -> int:
         "cwd_patterns": args.cwd_pattern,
     }
     try:
-        r = httpx.post(f"{_daemon_url()}/projects", json=body, timeout=2.0)
+        r = httpx.post(f"{_daemon_url()}/api/projects", json=body, timeout=2.0)
         if r.status_code == 201:
             print(f"added project {args.name!r}")
             return 0
@@ -156,7 +156,7 @@ def _handle_update(args: argparse.Namespace) -> int:
     if display_name is not None:
         body["display_name"] = display_name
     try:
-        r = httpx.patch(f"{_daemon_url()}/projects/{args.name}", json=body, timeout=2.0)
+        r = httpx.patch(f"{_daemon_url()}/api/projects/{args.name}", json=body, timeout=2.0)
         if r.status_code == 200:
             print(f"updated project {args.name!r}")
             return 0
@@ -195,7 +195,7 @@ def _handle_remove(args: argparse.Namespace) -> int:
             print("aborted")
             return 0
     try:
-        r = httpx.delete(f"{_daemon_url()}/projects/{args.name}", timeout=2.0)
+        r = httpx.delete(f"{_daemon_url()}/api/projects/{args.name}", timeout=2.0)
         if r.status_code in (200, 204):
             print(f"removed project {args.name!r}")
             return 0

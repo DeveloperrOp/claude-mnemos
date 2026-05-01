@@ -14,7 +14,7 @@ def _client() -> TestClient:
 
 
 def test_get_fs_home_returns_absolute_path() -> None:
-    resp = _client().get("/fs/home")
+    resp = _client().get("/api/fs/home")
     assert resp.status_code == 200
     body = resp.json()
     assert "home" in body
@@ -23,7 +23,7 @@ def test_get_fs_home_returns_absolute_path() -> None:
 
 def test_get_fs_home_returns_user_home() -> None:
     """Should mirror os.path.expanduser('~')."""
-    resp = _client().get("/fs/home")
+    resp = _client().get("/api/fs/home")
     assert resp.status_code == 200
     expected = os.path.expanduser("~")
     assert Path(resp.json()["home"]) == Path(expected)
@@ -34,7 +34,7 @@ def test_get_fs_browse_lists_directories(tmp_path: Path) -> None:
     (tmp_path / "beta").mkdir()
     (tmp_path / "file.txt").write_text("hello")  # files filtered out
 
-    resp = _client().get(f"/fs/browse?path={tmp_path}")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path}")
     assert resp.status_code == 200
     body = resp.json()
     assert Path(body["cwd"]) == tmp_path.resolve()
@@ -46,26 +46,26 @@ def test_get_fs_browse_lists_directories(tmp_path: Path) -> None:
 def test_get_fs_browse_parent_returns_parent_path(tmp_path: Path) -> None:
     sub = tmp_path / "child"
     sub.mkdir()
-    resp = _client().get(f"/fs/browse?path={sub}")
+    resp = _client().get(f"/api/fs/browse?path={sub}")
     assert resp.status_code == 200
     assert Path(resp.json()["parent"]) == tmp_path.resolve()
 
 
 def test_get_fs_browse_returns_400_for_relative_path() -> None:
-    resp = _client().get("/fs/browse?path=relative/path")
+    resp = _client().get("/api/fs/browse?path=relative/path")
     assert resp.status_code == 400
     assert "absolute" in resp.json()["detail"].lower()
 
 
 def test_get_fs_browse_returns_400_for_missing_path(tmp_path: Path) -> None:
-    resp = _client().get(f"/fs/browse?path={tmp_path / 'nonexistent'}")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path / 'nonexistent'}")
     assert resp.status_code == 400
 
 
 def test_get_fs_browse_returns_400_for_file_path(tmp_path: Path) -> None:
     f = tmp_path / "x.txt"
     f.write_text("hi")
-    resp = _client().get(f"/fs/browse?path={f}")
+    resp = _client().get(f"/api/fs/browse?path={f}")
     assert resp.status_code == 400
     assert "directory" in resp.json()["detail"].lower()
 
@@ -74,7 +74,7 @@ def test_get_fs_browse_truncates_at_limit(tmp_path: Path) -> None:
     """Folders >100 — truncated=true, entries capped at 100."""
     for i in range(105):
         (tmp_path / f"d{i:03d}").mkdir()
-    resp = _client().get(f"/fs/browse?path={tmp_path}")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path}")
     body = resp.json()
     assert len(body["entries"]) == 100
     assert body["truncated"] is True
@@ -83,14 +83,14 @@ def test_get_fs_browse_truncates_at_limit(tmp_path: Path) -> None:
 def test_get_fs_browse_sorts_case_insensitive(tmp_path: Path) -> None:
     (tmp_path / "Beta").mkdir()
     (tmp_path / "alpha").mkdir()
-    resp = _client().get(f"/fs/browse?path={tmp_path}")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path}")
     names = [e["name"] for e in resp.json()["entries"]]
     assert names == ["alpha", "Beta"]
 
 
 def test_post_fs_mkdir_creates_directory(tmp_path: Path) -> None:
     target = tmp_path / "new_folder"
-    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    resp = _client().post("/api/fs/mkdir", json={"path": str(target)})
     assert resp.status_code == 200
     assert Path(resp.json()["path"]) == target.resolve()
     assert target.is_dir()
@@ -99,27 +99,27 @@ def test_post_fs_mkdir_creates_directory(tmp_path: Path) -> None:
 def test_post_fs_mkdir_returns_400_when_target_exists(tmp_path: Path) -> None:
     target = tmp_path / "exists"
     target.mkdir()
-    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    resp = _client().post("/api/fs/mkdir", json={"path": str(target)})
     assert resp.status_code == 400
     assert "exists" in resp.json()["detail"].lower()
 
 
 def test_post_fs_mkdir_returns_400_when_parent_missing(tmp_path: Path) -> None:
     target = tmp_path / "parent" / "child"  # parent doesn't exist
-    resp = _client().post("/fs/mkdir", json={"path": str(target)})
+    resp = _client().post("/api/fs/mkdir", json={"path": str(target)})
     assert resp.status_code == 400
     assert "parent" in resp.json()["detail"].lower()
 
 
 def test_post_fs_mkdir_returns_400_for_relative_path() -> None:
-    resp = _client().post("/fs/mkdir", json={"path": "relative/here"})
+    resp = _client().post("/api/fs/mkdir", json={"path": "relative/here"})
     assert resp.status_code == 400
 
 
 def test_get_fs_drives_unix_returns_root(monkeypatch) -> None:
     """On Unix, /fs/drives returns single root entry."""
     monkeypatch.setattr("claude_mnemos.daemon.routes.fs.sys.platform", "linux")
-    resp = _client().get("/fs/drives")
+    resp = _client().get("/api/fs/drives")
     assert resp.status_code == 200
     body = resp.json()
     assert body["drives"] == [{"name": "/", "path": "/"}]
@@ -139,7 +139,7 @@ def test_get_fs_drives_windows_returns_drive_letters(monkeypatch) -> None:
         return real_exists(self)
 
     monkeypatch.setattr(Path, "exists", fake_exists)
-    resp = _client().get("/fs/drives")
+    resp = _client().get("/api/fs/drives")
     assert resp.status_code == 200
     drives = [d["path"] for d in resp.json()["drives"]]
     assert "C:\\" in drives
@@ -151,7 +151,7 @@ def test_get_fs_browse_with_include_files_returns_files_too(tmp_path: Path) -> N
     (tmp_path / "file.md").write_text("hello")
     (tmp_path / "image.png").write_bytes(b"\x00")
 
-    resp = _client().get(f"/fs/browse?path={tmp_path}&include_files=true")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path}&include_files=true")
     assert resp.status_code == 200
     entries = resp.json()["entries"]
     types = {e["name"]: e["type"] for e in entries}
@@ -164,7 +164,7 @@ def test_get_fs_browse_without_include_files_returns_only_directories(
     """Default behaviour unchanged — only directories."""
     (tmp_path / "subdir").mkdir()
     (tmp_path / "file.md").write_text("hi")
-    resp = _client().get(f"/fs/browse?path={tmp_path}")
+    resp = _client().get(f"/api/fs/browse?path={tmp_path}")
     body = resp.json()
     names = [e["name"] for e in body["entries"]]
     assert names == ["subdir"]

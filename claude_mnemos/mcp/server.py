@@ -148,7 +148,7 @@ TOOL_DEFS: list[types.Tool] = [
     types.Tool(
         name="run_lint",
         description=(
-            "Run lint check across the vault via the daemon (POST /lint/{project}/run). "
+            "Run lint check across the vault via the daemon (POST /api/lint/{project}/run). "
             "Saves results to <vault>/.lint-results.json. Daemon must be running."
         ),
         inputSchema=schemas.RUN_LINT,

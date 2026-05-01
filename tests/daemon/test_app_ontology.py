@@ -105,13 +105,13 @@ def _suggestion(
 
 
 async def test_run_happy(client: Any) -> None:
-    r = await client.post("/ontology/alpha/run")
+    r = await client.post("/api/ontology/alpha/run")
     assert r.status_code == 200
     assert r.json()["ok"] is True
 
 
 async def test_run_unknown_project_404(client: Any) -> None:
-    r = await client.post("/ontology/unknown/run")
+    r = await client.post("/api/ontology/unknown/run")
     assert r.status_code == 404
 
 
@@ -121,13 +121,13 @@ async def test_run_unknown_project_404(client: Any) -> None:
 
 
 async def test_list_empty(client: Any) -> None:
-    r = await client.get("/ontology/alpha/suggestions")
+    r = await client.get("/api/ontology/alpha/suggestions")
     assert r.status_code == 200
     assert r.json() == {"suggestions": [], "total": 0}
 
 
 async def test_list_unknown_project_404(client: Any) -> None:
-    r = await client.get("/ontology/unknown/suggestions")
+    r = await client.get("/api/ontology/unknown/suggestions")
     assert r.status_code == 404
 
 
@@ -137,7 +137,7 @@ async def test_list_pending_only_by_default(client: Any, alpha_vault: Path) -> N
     store.create(_suggestion(sid="ont-2026-04-26-bbbbbb"))
     store.archive_suggestion("ont-2026-04-26-bbbbbb")
 
-    r = await client.get("/ontology/alpha/suggestions")
+    r = await client.get("/api/ontology/alpha/suggestions")
     body = r.json()
     assert body["total"] == 1
 
@@ -148,7 +148,7 @@ async def test_list_all_status(client: Any, alpha_vault: Path) -> None:
     store.create(_suggestion(sid="ont-2026-04-26-bbbbbb"))
     store.archive_suggestion("ont-2026-04-26-bbbbbb")
 
-    r = await client.get("/ontology/alpha/suggestions?status=all")
+    r = await client.get("/api/ontology/alpha/suggestions?status=all")
     body = r.json()
     assert body["total"] == 2
 
@@ -163,7 +163,7 @@ async def test_approve_happy(client: Any, alpha_vault: Path) -> None:
     _write_page(alpha_vault, "wiki/entities/bar.md", body="B")
 
     create = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={
             "operation": "merge_entities",
             "affected_pages": ["wiki/entities/foo.md", "wiki/entities/bar.md"],
@@ -174,7 +174,7 @@ async def test_approve_happy(client: Any, alpha_vault: Path) -> None:
     assert create.status_code == 201
     sid = create.json()["frontmatter"]["id"]
 
-    r = await client.post(f"/ontology/alpha/suggestions/{sid}/approve")
+    r = await client.post(f"/api/ontology/alpha/suggestions/{sid}/approve")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True
@@ -186,7 +186,7 @@ async def test_approve_already_approved(client: Any, alpha_vault: Path) -> None:
     _write_page(alpha_vault, "wiki/entities/foo.md")
     _write_page(alpha_vault, "wiki/entities/bar.md")
     create = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={
             "operation": "merge_entities",
             "affected_pages": ["wiki/entities/foo.md", "wiki/entities/bar.md"],
@@ -195,20 +195,20 @@ async def test_approve_already_approved(client: Any, alpha_vault: Path) -> None:
     )
     assert create.status_code == 201
     sid = create.json()["frontmatter"]["id"]
-    r1 = await client.post(f"/ontology/alpha/suggestions/{sid}/approve")
+    r1 = await client.post(f"/api/ontology/alpha/suggestions/{sid}/approve")
     assert r1.status_code == 200
-    r2 = await client.post(f"/ontology/alpha/suggestions/{sid}/approve")
+    r2 = await client.post(f"/api/ontology/alpha/suggestions/{sid}/approve")
     assert r2.status_code == 409
     assert r2.json()["error"] == "ontology_apply_failed"
 
 
 async def test_approve_unknown_project_404(client: Any) -> None:
-    r = await client.post("/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/approve")
+    r = await client.post("/api/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/approve")
     assert r.status_code == 404
 
 
 async def test_approve_unknown_suggestion_409(client: Any) -> None:
-    r = await client.post("/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/approve")
+    r = await client.post("/api/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/approve")
     assert r.status_code == 409
     assert r.json()["error"] == "ontology_apply_failed"
 
@@ -221,7 +221,7 @@ async def test_approve_unknown_suggestion_409(client: Any) -> None:
 async def test_reject_happy(client: Any, alpha_vault: Path) -> None:
     store = SuggestionStore(alpha_vault)
     store.create(_suggestion(sid="ont-2026-04-26-aaaaaa"))
-    r = await client.post("/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa/reject")
+    r = await client.post("/api/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa/reject")
     assert r.status_code == 200
     assert r.json()["status"] == "rejected"
     reloaded = store.get("ont-2026-04-26-aaaaaa")
@@ -230,12 +230,12 @@ async def test_reject_happy(client: Any, alpha_vault: Path) -> None:
 
 
 async def test_reject_404(client: Any) -> None:
-    r = await client.post("/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/reject")
+    r = await client.post("/api/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/reject")
     assert r.status_code == 404
 
 
 async def test_reject_unknown_project_404(client: Any) -> None:
-    r = await client.post("/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/reject")
+    r = await client.post("/api/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/reject")
     assert r.status_code == 404
 
 
@@ -247,18 +247,18 @@ async def test_reject_unknown_project_404(client: Any) -> None:
 async def test_defer_happy(client: Any, alpha_vault: Path) -> None:
     store = SuggestionStore(alpha_vault)
     store.create(_suggestion(sid="ont-2026-04-26-aaaaaa"))
-    r = await client.post("/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa/defer")
+    r = await client.post("/api/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa/defer")
     assert r.status_code == 200
     assert r.json()["status"] == "deferred"
 
 
 async def test_defer_unknown_project_404(client: Any) -> None:
-    r = await client.post("/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/defer")
+    r = await client.post("/api/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa/defer")
     assert r.status_code == 404
 
 
 async def test_defer_404(client: Any) -> None:
-    r = await client.post("/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/defer")
+    r = await client.post("/api/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz/defer")
     assert r.status_code == 404
 
 
@@ -271,7 +271,7 @@ async def test_patch_happy(client: Any, alpha_vault: Path) -> None:
     store = SuggestionStore(alpha_vault)
     store.create(_suggestion(sid="ont-2026-04-26-aaaaaa"))
     r = await client.patch(
-        "/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa",
+        "/api/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa",
         json={"reason": "updated reason", "confidence": 0.9},
     )
     assert r.status_code == 200
@@ -284,7 +284,7 @@ async def test_patch_body_only(client: Any, alpha_vault: Path) -> None:
     store = SuggestionStore(alpha_vault)
     store.create(_suggestion(sid="ont-2026-04-26-aaaaaa"))
     r = await client.patch(
-        "/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa",
+        "/api/ontology/alpha/suggestions/ont-2026-04-26-aaaaaa",
         json={"body": "new body text"},
     )
     assert r.status_code == 200
@@ -293,7 +293,7 @@ async def test_patch_body_only(client: Any, alpha_vault: Path) -> None:
 
 async def test_patch_404(client: Any) -> None:
     r = await client.patch(
-        "/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz",
+        "/api/ontology/alpha/suggestions/ont-2026-04-26-zzzzzz",
         json={"reason": "x"},
     )
     assert r.status_code == 404
@@ -301,7 +301,7 @@ async def test_patch_404(client: Any) -> None:
 
 async def test_patch_unknown_project_404(client: Any) -> None:
     r = await client.patch(
-        "/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa",
+        "/api/ontology/unknown/suggestions/ont-2026-04-26-aaaaaa",
         json={"reason": "x"},
     )
     assert r.status_code == 404
@@ -317,7 +317,7 @@ async def test_create_merge_happy(client: Any, alpha_vault: Path) -> None:
     _write_page(alpha_vault, "wiki/entities/bar.md")
 
     r = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={
             "operation": "merge_entities",
             "affected_pages": ["wiki/entities/foo.md", "wiki/entities/bar.md"],
@@ -332,7 +332,7 @@ async def test_create_merge_happy(client: Any, alpha_vault: Path) -> None:
 
 async def test_create_merge_missing_target(client: Any) -> None:
     r = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={
             "operation": "merge_entities",
             "affected_pages": ["wiki/entities/foo.md", "wiki/entities/bar.md"],
@@ -343,7 +343,7 @@ async def test_create_merge_missing_target(client: Any) -> None:
 
 async def test_create_merge_one_source(client: Any) -> None:
     r = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={
             "operation": "merge_entities",
             "affected_pages": ["wiki/entities/foo.md"],
@@ -355,7 +355,7 @@ async def test_create_merge_one_source(client: Any) -> None:
 
 async def test_create_invalid_operation(client: Any) -> None:
     r = await client.post(
-        "/ontology/alpha/suggestions",
+        "/api/ontology/alpha/suggestions",
         json={"operation": "weird", "affected_pages": ["x.md"]},
     )
     assert r.status_code == 422
@@ -363,7 +363,7 @@ async def test_create_invalid_operation(client: Any) -> None:
 
 async def test_create_unknown_project_404(client: Any) -> None:
     r = await client.post(
-        "/ontology/unknown/suggestions",
+        "/api/ontology/unknown/suggestions",
         json={
             "operation": "delete_page",
             "affected_pages": ["wiki/entities/foo.md"],

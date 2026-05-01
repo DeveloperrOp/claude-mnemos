@@ -70,7 +70,7 @@ async def client(app: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 async def test_list_snapshots_empty(client: Any) -> None:
-    r = await client.get("/snapshots/alpha")
+    r = await client.get("/api/snapshots/alpha")
     assert r.status_code == 200
     assert r.json() == {"snapshots": []}
 
@@ -80,7 +80,7 @@ async def test_list_snapshots_returns_three_kinds(client: Any, alpha_vault: Path
     create_daily_snapshot(alpha_vault, date(2026, 4, 26))
     create_manual_snapshot(alpha_vault, label="release")
 
-    r = await client.get("/snapshots/alpha")
+    r = await client.get("/api/snapshots/alpha")
     body = r.json()
     assert len(body["snapshots"]) == 3
     kinds = {s["kind"] for s in body["snapshots"]}
@@ -88,7 +88,7 @@ async def test_list_snapshots_returns_three_kinds(client: Any, alpha_vault: Path
 
 
 async def test_list_snapshots_unknown_project_404(client: Any) -> None:
-    r = await client.get("/snapshots/ghost")
+    r = await client.get("/api/snapshots/ghost")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -98,7 +98,7 @@ async def test_list_snapshots_unknown_project_404(client: Any) -> None:
 # ---------------------------------------------------------------------------
 
 async def test_create_manual_snapshot_no_body(client: Any, alpha_vault: Path) -> None:
-    r = await client.post("/snapshots/alpha", json={})
+    r = await client.post("/api/snapshots/alpha", json={})
     assert r.status_code == 201
     body = r.json()
     assert body["kind"] == "manual"
@@ -107,20 +107,20 @@ async def test_create_manual_snapshot_no_body(client: Any, alpha_vault: Path) ->
 
 
 async def test_create_manual_snapshot_with_label(client: Any) -> None:
-    r = await client.post("/snapshots/alpha", json={"label": "release-1"})
+    r = await client.post("/api/snapshots/alpha", json={"label": "release-1"})
     assert r.status_code == 201
     assert r.json()["label"] == "release-1"
 
 
 async def test_create_manual_snapshot_traversal_label_rejected(client: Any) -> None:
     """Label that sanitizes to empty must return 400."""
-    r = await client.post("/snapshots/alpha", json={"label": "///"})
+    r = await client.post("/api/snapshots/alpha", json={"label": "///"})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "invalid_name"
 
 
 async def test_create_snapshot_unknown_project_404(client: Any) -> None:
-    r = await client.post("/snapshots/ghost", json={})
+    r = await client.post("/api/snapshots/ghost", json={})
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -132,14 +132,14 @@ async def test_create_snapshot_unknown_project_404(client: Any) -> None:
 async def test_delete_snapshot_known(client: Any, alpha_vault: Path) -> None:
     snap = create_daily_snapshot(alpha_vault, date(2026, 4, 26))
 
-    r = await client.request("DELETE", f"/snapshots/alpha/{snap.name}")
+    r = await client.request("DELETE", f"/api/snapshots/alpha/{snap.name}")
     assert r.status_code == 200
     assert r.json()["deleted"] == snap.name
     assert not snap.exists()
 
 
 async def test_delete_snapshot_missing_returns_404(client: Any) -> None:
-    r = await client.request("DELETE", "/snapshots/alpha/daily-2026-01-01")
+    r = await client.request("DELETE", "/api/snapshots/alpha/daily-2026-01-01")
     assert r.status_code == 404
 
 
@@ -165,13 +165,13 @@ async def test_delete_snapshot_unknown_prefix(client: Any, alpha_vault: Path) ->
     junk = alpha_vault / ".backups" / "random-stuff"
     junk.mkdir(parents=True)
 
-    r = await client.request("DELETE", "/snapshots/alpha/random-stuff")
+    r = await client.request("DELETE", "/api/snapshots/alpha/random-stuff")
     assert r.status_code == 400
     assert junk.exists()
 
 
 async def test_delete_snapshot_unknown_project_404(client: Any) -> None:
-    r = await client.request("DELETE", "/snapshots/ghost/daily-2026-01-01")
+    r = await client.request("DELETE", "/api/snapshots/ghost/daily-2026-01-01")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -233,7 +233,7 @@ async def test_restore_snapshot_writes_activity_entry(tmp_path: Path) -> None:
     app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.post(f"/snapshots/myvault/{snapshot_name}/restore")
+        r = await c.post(f"/api/snapshots/myvault/{snapshot_name}/restore")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True
@@ -252,16 +252,16 @@ async def test_restore_snapshot_writes_activity_entry(tmp_path: Path) -> None:
 
 
 async def test_restore_missing_snapshot_returns_404(client: Any) -> None:
-    r = await client.post("/snapshots/alpha/daily-2099-12-31/restore")
+    r = await client.post("/api/snapshots/alpha/daily-2099-12-31/restore")
     assert r.status_code == 404
 
 
 async def test_restore_invalid_name_returns_400(client: Any) -> None:
-    r = await client.post("/snapshots/alpha/random-stuff/restore")
+    r = await client.post("/api/snapshots/alpha/random-stuff/restore")
     assert r.status_code == 400
 
 
 async def test_restore_snapshot_unknown_project_404(client: Any) -> None:
-    r = await client.post("/snapshots/ghost/daily-2026-01-01/restore")
+    r = await client.post("/api/snapshots/ghost/daily-2026-01-01/restore")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"

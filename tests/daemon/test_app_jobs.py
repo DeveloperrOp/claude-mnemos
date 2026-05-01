@@ -72,7 +72,7 @@ def transcript_file(tmp_path: Path) -> str:
 
 async def test_post_creates_job(client, transcript_file):
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
@@ -91,20 +91,20 @@ async def test_get_lists_jobs(client, tmp_path: Path):
     b = tmp_path / "b.jsonl"
     b.write_text("[]", encoding="utf-8")
     await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": _PROJECT, "transcript_path": str(a)},
         },
     )
     await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": _PROJECT, "transcript_path": str(b)},
         },
     )
-    r = await client.get("/jobs")
+    r = await client.get("/api/jobs")
     assert r.status_code == 200
     body = r.json()
     assert len(body["jobs"]) == 2
@@ -112,7 +112,7 @@ async def test_get_lists_jobs(client, tmp_path: Path):
 
 
 async def test_get_filters_by_status(client):
-    r = await client.get("/jobs?status=running")
+    r = await client.get("/api/jobs?status=running")
     assert r.status_code == 200
     body = r.json()
     assert body["jobs"] == []
@@ -120,48 +120,48 @@ async def test_get_filters_by_status(client):
 
 async def test_get_by_id(client, transcript_file):
     create = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
         },
     )
     job_id = create.json()["id"]
-    r = await client.get(f"/jobs/{job_id}")
+    r = await client.get(f"/api/jobs/{job_id}")
     assert r.status_code == 200
     assert r.json()["id"] == job_id
 
 
 async def test_get_by_id_404(client):
-    r = await client.get("/jobs/nonexistent")
+    r = await client.get("/api/jobs/nonexistent")
     assert r.status_code == 404
 
 
 async def test_delete_cancels_queued(client, transcript_file):
     create = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": _PROJECT, "transcript_path": transcript_file},
         },
     )
     job_id = create.json()["id"]
-    r = await client.delete(f"/jobs/{job_id}")
+    r = await client.delete(f"/api/jobs/{job_id}")
     assert r.status_code == 204
-    assert (await client.get(f"/jobs/{job_id}")).status_code == 404
+    assert (await client.get(f"/api/jobs/{job_id}")).status_code == 404
 
 
 async def test_delete_nonqueued_returns_409(client, daemon):
     job = daemon.job_store.create(kind="ingest", payload={"transcript_path": "/x"})
     daemon.job_store.claim_next_ready(now=datetime.now(UTC))
-    r = await client.delete(f"/jobs/{job.id}")
+    r = await client.delete(f"/api/jobs/{job.id}")
     assert r.status_code == 409
 
 
 async def test_post_rejects_missing_project_name(client, transcript_file):
     # New contract: project_name is required in POST payload.
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={"kind": "ingest", "payload": {"transcript_path": transcript_file}},
     )
     assert r.status_code == 400
@@ -170,7 +170,7 @@ async def test_post_rejects_missing_project_name(client, transcript_file):
 
 async def test_post_rejects_unknown_project(client, transcript_file):
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {
@@ -185,7 +185,7 @@ async def test_post_rejects_unknown_project(client, transcript_file):
 
 async def test_post_rejects_missing_transcript_path(client):
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={"kind": "ingest", "payload": {"project_name": _PROJECT}},
     )
     assert r.status_code == 400
@@ -194,7 +194,7 @@ async def test_post_rejects_missing_transcript_path(client):
 
 async def test_post_rejects_nonexistent_transcript(client):
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {
@@ -211,7 +211,7 @@ async def test_post_accepts_existing_transcript(client, tmp_path: Path):
     transcript = tmp_path / "session.jsonl"
     transcript.write_text("[]", encoding="utf-8")
     r = await client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {

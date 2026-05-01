@@ -61,12 +61,12 @@ async def client(app: Any) -> Any:
 
 
 async def test_results_404_when_no_run(client: Any) -> None:
-    r = await client.get("/lint/alpha/results")
+    r = await client.get("/api/lint/alpha/results")
     assert r.status_code == 404
 
 
 async def test_results_unknown_project_404(client: Any) -> None:
-    r = await client.get("/lint/unknown_project/results")
+    r = await client.get("/api/lint/unknown_project/results")
     assert r.status_code == 404
 
 
@@ -76,19 +76,19 @@ async def test_results_unknown_project_404(client: Any) -> None:
 
 
 async def test_run_then_results_round_trip(client: Any) -> None:
-    r = await client.post("/lint/alpha/run")
+    r = await client.post("/api/lint/alpha/run")
     assert r.status_code == 200
     body = r.json()
     assert "run_id" in body
     assert "summary" in body
 
-    r = await client.get("/lint/alpha/results")
+    r = await client.get("/api/lint/alpha/results")
     assert r.status_code == 200
     assert r.json()["run_id"] == body["run_id"]
 
 
 async def test_run_unknown_project_404(client: Any) -> None:
-    r = await client.post("/lint/unknown_project/run")
+    r = await client.post("/api/lint/unknown_project/run")
     assert r.status_code == 404
 
 
@@ -98,12 +98,12 @@ async def test_run_unknown_project_404(client: Any) -> None:
 
 
 async def test_autofix_409_without_cached_run(client: Any) -> None:
-    r = await client.post("/lint/alpha/autofix")
+    r = await client.post("/api/lint/alpha/autofix")
     assert r.status_code == 409
 
 
 async def test_autofix_unknown_project_404(client: Any) -> None:
-    r = await client.post("/lint/unknown_project/autofix")
+    r = await client.post("/api/lint/unknown_project/autofix")
     assert r.status_code == 404
 
 
@@ -116,10 +116,10 @@ async def test_autofix_after_run(client: Any, alpha_vault: Path) -> None:
         encoding="utf-8",
     )
 
-    r = await client.post("/lint/alpha/run")
+    r = await client.post("/api/lint/alpha/run")
     assert r.status_code == 200
 
-    r = await client.post("/lint/alpha/autofix")
+    r = await client.post("/api/lint/alpha/autofix")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True

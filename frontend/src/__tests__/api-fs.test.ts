@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import { browseDirectory, listDrives, mkdir, getHome } from "../api/fs.api";
 
 let mock: MockAdapter;
 
 beforeEach(() => {
-  mock = new MockAdapter(axios);
+  mock = new MockAdapter(apiClient);
 });
 
 describe("fs API", () => {

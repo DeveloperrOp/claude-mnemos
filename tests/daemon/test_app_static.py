@@ -23,7 +23,7 @@ async def test_static_mount_skipped_when_no_index_html(tmp_path: Path) -> None:
     app = create_app(static_dir=static_dir)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        health = await client.get("/health")
+        health = await client.get("/api/health")
         root = await client.get("/")
     assert health.status_code == 200
     assert root.status_code == 404
@@ -41,7 +41,7 @@ async def test_static_mount_serves_index_when_present(tmp_path: Path) -> None:
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         root = await client.get("/")
-        health = await client.get("/health")
+        health = await client.get("/api/health")
     assert root.status_code == 200
     assert "html" in root.text.lower()
     assert health.status_code == 200

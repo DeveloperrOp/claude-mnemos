@@ -69,7 +69,7 @@ def daemon_with_one_vault(
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     with TestClient(daemon.app) as client:
         r = client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "default", "vault_root": str(vault), "cwd_patterns": []},
         )
         assert r.status_code == 201, f"POST /projects failed: {r.text}"
@@ -102,7 +102,7 @@ def test_usage_default_period(
     _daemon, client, vault = daemon_with_one_vault
     _seed(vault, sha="sha-a", sid="a", ti=10, to=20)
     _seed(vault, sha="sha-b", sid="b", ti=30, to=40)
-    r = client.get("/metrics/usage")
+    r = client.get("/api/metrics/usage")
     assert r.status_code == 200
     body = r.json()
     assert body["period_days"] == 30
@@ -118,7 +118,7 @@ def test_usage_explicit_period(
 ) -> None:
     _daemon, client, vault = daemon_with_one_vault
     _seed(vault, sha="sha-x", sid="x", ti=1, to=2)
-    r = client.get("/metrics/usage?period=7d")
+    r = client.get("/api/metrics/usage?period=7d")
     assert r.status_code == 200
     body = r.json()
     assert body["period_days"] == 7
@@ -129,7 +129,7 @@ def test_usage_by_project_returns_single_entry(
 ) -> None:
     _daemon, client, vault = daemon_with_one_vault
     _seed(vault, sha="sha-p", sid="p", ti=5, to=10)
-    r = client.get("/metrics/usage/by-project")
+    r = client.get("/api/metrics/usage/by-project")
     assert r.status_code == 200
     body = r.json()
     assert len(body["projects"]) == 1
@@ -144,7 +144,7 @@ def test_usage_top_sessions(
     _daemon, client, vault = daemon_with_one_vault
     _seed(vault, sha="sha-1", sid="small", ti=1, to=1)
     _seed(vault, sha="sha-2", sid="big", ti=100, to=200)
-    r = client.get("/metrics/usage/top-sessions?limit=2")
+    r = client.get("/api/metrics/usage/top-sessions?limit=2")
     assert r.status_code == 200
     body = r.json()
     assert len(body["sessions"]) == 2
@@ -157,7 +157,7 @@ def test_usage_timeline(
 ) -> None:
     _daemon, client, vault = daemon_with_one_vault
     _seed(vault, sha="sha-t", sid="t", ti=10, to=20)
-    r = client.get("/metrics/usage/timeline?period=7d")
+    r = client.get("/api/metrics/usage/timeline?period=7d")
     assert r.status_code == 200
     body = r.json()
     assert len(body["points"]) == 7
@@ -169,7 +169,7 @@ def test_usage_timeline(
 
 
 async def test_usage_bad_period_400(no_vault_client) -> None:
-    r = await no_vault_client.get("/metrics/usage?period=oops")
+    r = await no_vault_client.get("/api/metrics/usage?period=oops")
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "invalid_period_format"
 
@@ -235,7 +235,7 @@ def test_usage_includes_compression_fields(
     )
     log.save(vault)
 
-    r = client.get("/metrics/usage", params={"period": "30d"})
+    r = client.get("/api/metrics/usage", params={"period": "30d"})
     assert r.status_code == 200
     data = r.json()
     assert "avg_compression_ratio" in data
@@ -248,7 +248,7 @@ def test_usage_compression_null_when_no_events(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/metrics/usage", params={"period": "30d"})
+    r = client.get("/api/metrics/usage", params={"period": "30d"})
     assert r.status_code == 200
     data = r.json()
     assert data["avg_compression_ratio"] is None
@@ -286,7 +286,7 @@ def test_inject_timeline_returns_daily_points(
     )
     log.save(vault)
 
-    r = client.get("/metrics/inject/timeline", params={"period": "7d"})
+    r = client.get("/api/metrics/inject/timeline", params={"period": "7d"})
     assert r.status_code == 200
     data = r.json()
     assert "points" in data
@@ -301,7 +301,7 @@ def test_inject_timeline_empty_returns_zero_filled(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/metrics/inject/timeline", params={"period": "7d"})
+    r = client.get("/api/metrics/inject/timeline", params={"period": "7d"})
     assert r.status_code == 200
     points = r.json()["points"]
     assert len(points) == 7
@@ -336,7 +336,7 @@ def test_by_project_includes_compression_fields(
     )
     log.save(vault)
 
-    r = client.get("/metrics/usage/by-project", params={"period": "30d"})
+    r = client.get("/api/metrics/usage/by-project", params={"period": "30d"})
     assert r.status_code == 200
     data = r.json()
     assert "projects" in data
@@ -354,7 +354,7 @@ def test_by_project_compression_null_when_no_events(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/metrics/usage/by-project", params={"period": "30d"})
+    r = client.get("/api/metrics/usage/by-project", params={"period": "30d"})
     assert r.status_code == 200
     data = r.json()
     assert len(data["projects"]) >= 1

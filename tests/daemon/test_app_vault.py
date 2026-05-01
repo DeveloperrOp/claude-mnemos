@@ -63,7 +63,7 @@ async def client(app: Any) -> Any:
 
 
 async def test_empty_vault_zero_counts(client: Any, alpha_vault: Path) -> None:
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["vault"] == str(alpha_vault)
@@ -85,7 +85,7 @@ async def test_vault_counts_files(client: Any, alpha_vault: Path) -> None:
     (alpha_vault / "wiki" / "concepts" / "bar.md").write_text("z", encoding="utf-8")
     (alpha_vault / "wiki" / "concepts" / "baz.md").write_text("z", encoding="utf-8")
 
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     body = r.json()
     assert body["raw_chats"] == 2
     assert body["wiki_pages"] == 3
@@ -108,7 +108,7 @@ async def test_vault_counts_manifest(client: Any, alpha_vault: Path) -> None:
     )
     manifest.save(alpha_vault)
 
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     assert r.json()["manifest_processed"] == 1
 
 
@@ -126,7 +126,7 @@ async def test_vault_counts_activity(client: Any, alpha_vault: Path) -> None:
     )
     log.save(alpha_vault)
 
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     assert r.json()["activity_entries"] == 1
 
 
@@ -136,21 +136,21 @@ async def test_vault_counts_activity(client: Any, alpha_vault: Path) -> None:
 
 
 async def test_unknown_project_404(client: Any) -> None:
-    r = await client.get("/vault/ghost")
+    r = await client.get("/api/vault/ghost")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
 
 async def test_corrupt_activity_returns_503(client: Any, alpha_vault: Path) -> None:
     (alpha_vault / ".activity.json").write_text("not json", encoding="utf-8")
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     assert r.status_code == 503
     assert r.json()["error"] == "activity_corrupt"
 
 
 async def test_corrupt_manifest_returns_503(client: Any, alpha_vault: Path) -> None:
     (alpha_vault / ".manifest.json").write_text("not json", encoding="utf-8")
-    r = await client.get("/vault/alpha")
+    r = await client.get("/api/vault/alpha")
     assert r.status_code == 503
     assert r.json()["error"] == "manifest_corrupt"
 
@@ -159,6 +159,6 @@ async def test_no_daemon_503() -> None:
     app = create_app(daemon=None)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/vault/alpha")
+        r = await c.get("/api/vault/alpha")
     assert r.status_code == 503
     assert r.json()["detail"]["error"] == "daemon_unavailable"

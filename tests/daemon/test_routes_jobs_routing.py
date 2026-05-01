@@ -23,11 +23,11 @@ def daemon_with_two(
         a.mkdir()
         b.mkdir()
         client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "alpha", "vault_root": str(a), "cwd_patterns": []},
         )
         client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "beta", "vault_root": str(b), "cwd_patterns": []},
         )
         yield daemon, client, tmp_path
@@ -43,7 +43,7 @@ def test_jobs_post_routes_by_project_name(
     transcript_b.write_text("{}\n")
 
     r = client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": "alpha", "transcript_path": str(transcript_a)},
@@ -52,7 +52,7 @@ def test_jobs_post_routes_by_project_name(
     assert r.status_code == 201, r.text
 
     r = client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": "beta", "transcript_path": str(transcript_b)},
@@ -73,7 +73,7 @@ def test_jobs_post_missing_project_name_returns_400(
     t = tmp_path / "a" / "t.jsonl"
     t.write_text("{}\n")
     r = client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"transcript_path": str(t)},
@@ -90,7 +90,7 @@ def test_jobs_post_unknown_project_returns_400(
     t = tmp_path / "a" / "t.jsonl"
     t.write_text("{}\n")
     r = client.post(
-        "/jobs",
+        "/api/jobs",
         json={
             "kind": "ingest",
             "payload": {"project_name": "ghost", "transcript_path": str(t)},

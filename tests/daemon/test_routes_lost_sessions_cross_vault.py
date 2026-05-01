@@ -50,12 +50,12 @@ def daemon_with_two(
         vault_a.mkdir()
         vault_b.mkdir()
         ra = client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "alpha", "vault_root": str(vault_a), "cwd_patterns": []},
         )
         assert ra.status_code == 201, ra.text
         rb = client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "beta", "vault_root": str(vault_b), "cwd_patterns": []},
         )
         assert rb.status_code == 201, rb.text
@@ -104,7 +104,7 @@ def test_list_lost_sessions_cross_vault(
 
     _make_shared_transcripts(tmp_path, monkeypatch, "sess-1", "sess-2")
 
-    r = client.get("/lost-sessions")
+    r = client.get("/api/lost-sessions")
     assert r.status_code == 200, r.text
     body = r.json()
     items = body["sessions"]
@@ -135,14 +135,14 @@ def test_scan_invalidates_all_caches(
     tr = _make_shared_transcripts(tmp_path, monkeypatch, "before-1")
 
     # Warm cache via GET.
-    r1 = client.get("/lost-sessions")
+    r1 = client.get("/api/lost-sessions")
     assert r1.json()["total"] >= 1
 
     # Add a new file; without invalidation the cached count stays old.
     (tr / "after-1.jsonl").write_text("2", encoding="utf-8")
 
     # POST /scan should see the new file in BOTH vaults.
-    r2 = client.post("/lost-sessions/scan")
+    r2 = client.post("/api/lost-sessions/scan")
     assert r2.status_code == 200, r2.text
     body = r2.json()
     session_ids = {i["session_id"] for i in body["sessions"]}
@@ -171,7 +171,7 @@ def test_import_routes_to_specified_project(
     _make_shared_transcripts(tmp_path, monkeypatch, "target")
 
     r = client.post(
-        "/lost-sessions/target/import",
+        "/api/lost-sessions/target/import",
         json={"project_name": "alpha"},
     )
     assert r.status_code == 201, r.text
@@ -197,7 +197,7 @@ def test_import_missing_project_name_returns_400(
 
     _make_shared_transcripts(tmp_path, monkeypatch, "orphan")
 
-    r = client.post("/lost-sessions/orphan/import", json={})
+    r = client.post("/api/lost-sessions/orphan/import", json={})
     assert r.status_code == 400, r.text
     assert r.json()["detail"]["error"] == "missing_project_name"
 
@@ -213,7 +213,7 @@ def test_import_unknown_project_returns_404(
     _make_shared_transcripts(tmp_path, monkeypatch, "orphan")
 
     r = client.post(
-        "/lost-sessions/orphan/import",
+        "/api/lost-sessions/orphan/import",
         json={"project_name": "ghost"},
     )
     assert r.status_code == 404, r.text
@@ -230,7 +230,7 @@ def test_ignore_requires_project_name_400(
 
     _make_shared_transcripts(tmp_path, monkeypatch, "skipme")
 
-    r = client.post("/lost-sessions/skipme/ignore", json={})
+    r = client.post("/api/lost-sessions/skipme/ignore", json={})
     assert r.status_code == 400, r.text
     assert r.json()["detail"]["error"] == "missing_project_name"
 
@@ -248,7 +248,7 @@ def test_ignore_routes_to_specified_project(
     _make_shared_transcripts(tmp_path, monkeypatch, "ignoreme")
 
     r = client.post(
-        "/lost-sessions/ignoreme/ignore",
+        "/api/lost-sessions/ignoreme/ignore",
         json={"project_name": "alpha"},
     )
     assert r.status_code == 200, r.text

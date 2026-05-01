@@ -75,7 +75,7 @@ async def client(app: Any) -> Any:
 
 
 async def test_get_empty_list(client: Any) -> None:
-    r = await client.get("/trash/alpha")
+    r = await client.get("/api/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body == {"entries": [], "total": 0}
@@ -84,7 +84,7 @@ async def test_get_empty_list(client: Any) -> None:
 async def test_get_with_entries(client: Any, alpha_vault: Path) -> None:
     p = _seed(alpha_vault)
     apply_soft_delete(alpha_vault, p)
-    r = await client.get("/trash/alpha")
+    r = await client.get("/api/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
@@ -96,7 +96,7 @@ async def test_get_with_entries(client: Any, alpha_vault: Path) -> None:
 
 
 async def test_get_unknown_project_404(client: Any) -> None:
-    r = await client.get("/trash/unknown_project")
+    r = await client.get("/api/trash/unknown_project")
     assert r.status_code == 404
 
 
@@ -109,7 +109,7 @@ async def test_post_restore_success(client: Any, alpha_vault: Path) -> None:
     p = _seed(alpha_vault)
     delete = apply_soft_delete(alpha_vault, p)
     assert not p.exists()
-    r = await client.post(f"/trash/alpha/{delete.trash_id}/restore")
+    r = await client.post(f"/api/trash/alpha/{delete.trash_id}/restore")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["success"] is True
@@ -127,12 +127,12 @@ async def test_post_restore_collision_returns_409(
     delete = apply_soft_delete(alpha_vault, p)
     # Recreate at the original path so restore would collide.
     _seed(alpha_vault)
-    r = await client.post(f"/trash/alpha/{delete.trash_id}/restore")
+    r = await client.post(f"/api/trash/alpha/{delete.trash_id}/restore")
     assert r.status_code == 409, r.text
 
 
 async def test_post_restore_unknown_project_404(client: Any) -> None:
-    r = await client.post("/trash/unknown_project/some-id/restore")
+    r = await client.post("/api/trash/unknown_project/some-id/restore")
     assert r.status_code == 404
 
 
@@ -144,20 +144,20 @@ async def test_post_restore_unknown_project_404(client: Any) -> None:
 async def test_delete_one_dismisses(client: Any, alpha_vault: Path) -> None:
     p = _seed(alpha_vault)
     delete = apply_soft_delete(alpha_vault, p)
-    r = await client.delete(f"/trash/alpha/{delete.trash_id}")
+    r = await client.delete(f"/api/trash/alpha/{delete.trash_id}")
     assert r.status_code == 204
     assert not (alpha_vault / ".trash" / delete.trash_id).exists()
 
 
 async def test_delete_one_404(client: Any) -> None:
     r = await client.delete(
-        "/trash/alpha/deleted-nonexistent-2026-04-27-12-00-00-aaaaaaaa"
+        "/api/trash/alpha/deleted-nonexistent-2026-04-27-12-00-00-aaaaaaaa"
     )
     assert r.status_code == 404
 
 
 async def test_delete_one_unknown_project_404(client: Any) -> None:
-    r = await client.delete("/trash/unknown_project/some-id")
+    r = await client.delete("/api/trash/unknown_project/some-id")
     assert r.status_code == 404
 
 
@@ -171,7 +171,7 @@ async def test_delete_all_empties(client: Any, alpha_vault: Path) -> None:
     p2 = _seed(alpha_vault, "wiki/entities/bar.md")
     apply_soft_delete(alpha_vault, p1)
     apply_soft_delete(alpha_vault, p2)
-    r = await client.delete("/trash/alpha")
+    r = await client.delete("/api/trash/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["removed_count"] == 2
@@ -180,5 +180,5 @@ async def test_delete_all_empties(client: Any, alpha_vault: Path) -> None:
 
 
 async def test_delete_all_unknown_project_404(client: Any) -> None:
-    r = await client.delete("/trash/unknown_project")
+    r = await client.delete("/api/trash/unknown_project")
     assert r.status_code == 404

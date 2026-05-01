@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
 import i18n from "../i18n";
 import { apiClient } from "../api/client";
 import { PromptsSection } from "../components/settings/sections/PromptsSection";
@@ -65,7 +64,7 @@ beforeEach(() => {
   void i18n.changeLanguage("en");
   vi.spyOn(apiClient, "get");
   vi.spyOn(apiClient, "patch");
-  axiosMock = new MockAdapter(axios);
+  axiosMock = new MockAdapter(apiClient);
 });
 afterEach(() => {
   vi.restoreAllMocks();

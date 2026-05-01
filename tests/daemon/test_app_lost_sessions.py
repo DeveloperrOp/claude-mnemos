@@ -82,7 +82,7 @@ def transcripts_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 async def test_list_empty(client, transcripts_root: Path):
-    r = await client.get("/lost-sessions")
+    r = await client.get("/api/lost-sessions")
     assert r.status_code == 200
     assert r.json() == {"sessions": [], "total": 0}
 
@@ -90,7 +90,7 @@ async def test_list_empty(client, transcripts_root: Path):
 async def test_list_with_sessions(client, transcripts_root: Path):
     (transcripts_root / "alpha.jsonl").write_text("hi", encoding="utf-8")
     (transcripts_root / "beta.jsonl").write_text("ho", encoding="utf-8")
-    r = await client.get("/lost-sessions")
+    r = await client.get("/api/lost-sessions")
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 2
@@ -109,11 +109,11 @@ async def test_list_with_sessions(client, transcripts_root: Path):
 async def test_post_scan_invalidates_and_rescans(client, transcripts_root: Path):
     (transcripts_root / "before.jsonl").write_text("x", encoding="utf-8")
     # Warm cache via list
-    r1 = await client.get("/lost-sessions")
+    r1 = await client.get("/api/lost-sessions")
     assert r1.json()["total"] == 1
     # Add a new file; rescan should pick it up
     (transcripts_root / "after.jsonl").write_text("y", encoding="utf-8")
-    r = await client.post("/lost-sessions/scan")
+    r = await client.post("/api/lost-sessions/scan")
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 2
@@ -127,7 +127,7 @@ async def test_post_scan_invalidates_and_rescans(client, transcripts_root: Path)
 async def test_post_import_success(client, tmp_path: Path, transcripts_root: Path):
     (transcripts_root / "lostie.jsonl").write_text("body", encoding="utf-8")
     r = await client.post(
-        "/lost-sessions/lostie/import",
+        "/api/lost-sessions/lostie/import",
         json={"project_name": _PROJECT_NAME},
     )
     assert r.status_code == 201
@@ -143,7 +143,7 @@ async def test_post_import_missing_project_name_returns_400(
 ):
     """β2: missing project_name in body → 400."""
     (transcripts_root / "lostie.jsonl").write_text("body", encoding="utf-8")
-    r = await client.post("/lost-sessions/lostie/import", json={})
+    r = await client.post("/api/lost-sessions/lostie/import", json={})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_project_name"
 
@@ -152,7 +152,7 @@ async def test_post_import_with_nonexistent_transcript_returns_400(
     client, daemon, transcripts_root: Path
 ):
     r = await client.post(
-        "/lost-sessions/sid-x/import",
+        "/api/lost-sessions/sid-x/import",
         json={
             "project_name": _PROJECT_NAME,
             "transcript_path": "/no/such/file.jsonl",
@@ -170,7 +170,7 @@ async def test_post_import_with_nonexistent_transcript_returns_400(
 async def test_post_ignore_adds_sha(client, tmp_path: Path, transcripts_root: Path):
     (transcripts_root / "skipme.jsonl").write_text("zzz", encoding="utf-8")
     r = await client.post(
-        "/lost-sessions/skipme/ignore",
+        "/api/lost-sessions/skipme/ignore",
         json={"project_name": _PROJECT_NAME},
     )
     assert r.status_code == 200
@@ -189,6 +189,6 @@ async def test_post_ignore_missing_project_name_returns_400(
 ):
     """β2: missing project_name in body → 400."""
     (transcripts_root / "skipme.jsonl").write_text("zzz", encoding="utf-8")
-    r = await client.post("/lost-sessions/skipme/ignore", json={})
+    r = await client.post("/api/lost-sessions/skipme/ignore", json={})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_project_name"

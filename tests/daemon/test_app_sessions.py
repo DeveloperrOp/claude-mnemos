@@ -96,7 +96,7 @@ def _seed_manifest(vault: Path, *, sha: str, session_id: str) -> None:
 
 
 async def test_list_empty(client: Any) -> None:
-    r = await client.get("/sessions/alpha")
+    r = await client.get("/api/sessions/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body == {"sessions": [], "total": 0}
@@ -105,7 +105,7 @@ async def test_list_empty(client: Any) -> None:
 async def test_list_with_manifest_entries(client: Any, alpha_vault: Path) -> None:
     _seed_manifest(alpha_vault, sha="sha-aaa", session_id="abc")
     _seed_manifest(alpha_vault, sha="sha-bbb", session_id="def")
-    r = await client.get("/sessions/alpha")
+    r = await client.get("/api/sessions/alpha")
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 2
@@ -117,7 +117,7 @@ async def test_list_with_manifest_entries(client: Any, alpha_vault: Path) -> Non
 
 
 async def test_list_unknown_project_404(client: Any) -> None:
-    r = await client.get("/sessions/ghost")
+    r = await client.get("/api/sessions/ghost")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -127,7 +127,7 @@ async def test_list_unknown_project_404(client: Any) -> None:
 
 async def test_get_by_id(client: Any, alpha_vault: Path) -> None:
     _seed_manifest(alpha_vault, sha="sha-xyz", session_id="target")
-    r = await client.get("/sessions/alpha/target")
+    r = await client.get("/api/sessions/alpha/target")
     assert r.status_code == 200
     body = r.json()
     assert body["session_id"] == "target"
@@ -137,7 +137,7 @@ async def test_get_by_id(client: Any, alpha_vault: Path) -> None:
 
 
 async def test_get_404(client: Any) -> None:
-    r = await client.get("/sessions/alpha/nonexistent")
+    r = await client.get("/api/sessions/alpha/nonexistent")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "not_found"
 
@@ -151,7 +151,7 @@ async def test_post_ingest_creates_job(
     transcript = tmp_path / "newone.jsonl"
     transcript.write_text("[]", encoding="utf-8")
     r = await client.post(
-        "/sessions/alpha/newone/ingest",
+        "/api/sessions/alpha/newone/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 201
@@ -168,7 +168,7 @@ async def test_post_ingest_routes_to_alpha_job_store(
     transcript = tmp_path / "check.jsonl"
     transcript.write_text("{}", encoding="utf-8")
     r = await client.post(
-        "/sessions/alpha/check/ingest",
+        "/api/sessions/alpha/check/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 201
@@ -180,7 +180,7 @@ async def test_post_ingest_routes_to_alpha_job_store(
 
 
 async def test_post_ingest_400_missing_path(client: Any) -> None:
-    r = await client.post("/sessions/alpha/somesid/ingest", json={})
+    r = await client.post("/api/sessions/alpha/somesid/ingest", json={})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_or_invalid_transcript_path"
 
@@ -189,7 +189,7 @@ async def test_post_ingest_unknown_project_404(client: Any, tmp_path: Path) -> N
     transcript = tmp_path / "x.jsonl"
     transcript.write_text("{}", encoding="utf-8")
     r = await client.post(
-        "/sessions/ghost/somesid/ingest",
+        "/api/sessions/ghost/somesid/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 404

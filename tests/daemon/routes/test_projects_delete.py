@@ -31,7 +31,7 @@ def _add_project(
     client: TestClient, vault: Path, name: str = "p1"
 ) -> None:
     body = {"name": name, "vault_root": str(vault), "cwd_patterns": []}
-    resp = client.post("/projects", json=body)
+    resp = client.post("/api/projects", json=body)
     assert resp.status_code in (200, 201), resp.text
 
 
@@ -42,10 +42,10 @@ def test_delete_project_returns_204_on_success(
     vault = tmp_path / "v1"
     vault.mkdir()
     _add_project(client, vault, name="p1")
-    resp = client.delete("/projects/p1")
+    resp = client.delete("/api/projects/p1")
     assert resp.status_code == 204
     # Project gone from registry
-    assert client.get("/projects/p1").status_code == 404
+    assert client.get("/api/projects/p1").status_code == 404
     assert "p1" not in daemon.runtimes
 
 
@@ -53,7 +53,7 @@ def test_delete_project_returns_404_when_missing(
     live: tuple[MnemosDaemon, TestClient]
 ) -> None:
     _daemon, client = live
-    resp = client.delete("/projects/does-not-exist")
+    resp = client.delete("/api/projects/does-not-exist")
     assert resp.status_code == 404
 
 
@@ -65,11 +65,11 @@ def test_delete_project_removes_settings_file(
     vault.mkdir()
     _add_project(client, vault, name="p2")
     # Force a settings PATCH so the file exists.
-    r = client.patch("/settings/p2", json={"telemetry": {"opt_in": True}})
+    r = client.patch("/api/settings/p2", json={"telemetry": {"opt_in": True}})
     assert r.status_code == 200, r.text
     settings_path = daemon.settings_store.settings_dir / "p2.json"
     assert settings_path.exists()
-    resp = client.delete("/projects/p2")
+    resp = client.delete("/api/projects/p2")
     assert resp.status_code == 204
     assert not settings_path.exists()
 
@@ -85,7 +85,7 @@ def test_delete_project_blocks_when_jobs_running(
     daemon.runtimes["p3"].job_store.create(
         kind="ingest", payload={"transcript_path": "x"}
     )
-    resp = client.delete("/projects/p3")
+    resp = client.delete("/api/projects/p3")
     assert resp.status_code == 409
     detail = resp.json()["detail"]
     assert detail["error"] == "vault_busy"
@@ -102,6 +102,6 @@ def test_delete_project_force_overrides_jobs_running(
     daemon.runtimes["p4"].job_store.create(
         kind="ingest", payload={"transcript_path": "x"}
     )
-    resp = client.delete("/projects/p4?force=true")
+    resp = client.delete("/api/projects/p4?force=true")
     assert resp.status_code == 204
     assert "p4" not in daemon.runtimes

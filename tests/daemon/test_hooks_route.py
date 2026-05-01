@@ -26,13 +26,14 @@ def client_with_fake_home(tmp_path, monkeypatch):
 
     from fastapi import FastAPI
     app = FastAPI()
-    app.include_router(hooks_route.router)
+    # Match production wiring: all daemon routers live under /api/*
+    app.include_router(hooks_route.router, prefix="/api")
     return TestClient(app), fake_home / ".claude" / "settings.json"
 
 
 def test_status_when_settings_missing(client_with_fake_home):
     client, _ = client_with_fake_home
-    r = client.get("/hooks/status")
+    r = client.get("/api/hooks/status")
     assert r.status_code == 200
     data = r.json()
     assert data["settings_exists"] is False
@@ -50,7 +51,7 @@ def test_status_when_mnemos_installed(client_with_fake_home):
             "SessionEnd": [{"hooks": [{"type": "command", "command": "python /path/to/claude-mnemos/hooks/session_end.py"}]}],
         }
     }), encoding="utf-8")
-    r = client.get("/hooks/status")
+    r = client.get("/api/hooks/status")
     assert r.status_code == 200
     data = r.json()
     assert data["settings_exists"] is True
@@ -68,7 +69,7 @@ def test_status_with_foreign_only(client_with_fake_home):
             "SessionStart": [{"hooks": [{"type": "command", "command": "python /other/start.py"}]}],
         }
     }), encoding="utf-8")
-    r = client.get("/hooks/status")
+    r = client.get("/api/hooks/status")
     data = r.json()
     assert data["all_installed"] is False
     assert data["session_start"]["installed"] is False
@@ -78,7 +79,7 @@ def test_status_with_foreign_only(client_with_fake_home):
 def test_install_creates_settings_file_when_absent(client_with_fake_home):
     client, settings_path = client_with_fake_home
     assert not settings_path.exists()
-    r = client.post("/hooks/install")
+    r = client.post("/api/hooks/install")
     assert r.status_code == 200
     data = r.json()
     assert data["install_result"]["ok"] is True
@@ -88,8 +89,8 @@ def test_install_creates_settings_file_when_absent(client_with_fake_home):
 
 def test_install_idempotent(client_with_fake_home):
     client, settings_path = client_with_fake_home
-    r1 = client.post("/hooks/install")
-    r2 = client.post("/hooks/install")
+    r1 = client.post("/api/hooks/install")
+    r2 = client.post("/api/hooks/install")
     assert r1.status_code == 200
     assert r2.status_code == 200
     # Both events still have exactly one mnemos block after second install.
@@ -108,7 +109,7 @@ def test_errors_when_log_missing(client_with_fake_home, tmp_path, monkeypatch):
     """No hook-errors file → empty list, count 0."""
     monkeypatch.setenv("MNEMOS_HOOK_ERRORS_FILE", str(tmp_path / "missing.jsonl"))
     client, _ = client_with_fake_home
-    r = client.get("/hooks/errors")
+    r = client.get("/api/hooks/errors")
     assert r.status_code == 200
     data = r.json()
     assert data["count"] == 0
@@ -129,7 +130,7 @@ def test_errors_returns_recent_entries_newest_first(client_with_fake_home, tmp_p
     log_path.write_text("\n".join(_json.dumps(e) for e in entries_in) + "\n", encoding="utf-8")
 
     client, _ = client_with_fake_home
-    r = client.get("/hooks/errors?limit=10")
+    r = client.get("/api/hooks/errors?limit=10")
     assert r.status_code == 200
     data = r.json()
     assert data["count"] == 3
@@ -146,7 +147,7 @@ def test_errors_limit_clamps(client_with_fake_home, tmp_path, monkeypatch):
         encoding="utf-8",
     )
     client, _ = client_with_fake_home
-    r = client.get("/hooks/errors?limit=5")
+    r = client.get("/api/hooks/errors?limit=5")
     assert r.status_code == 200
     assert r.json()["count"] == 5
 
@@ -160,7 +161,7 @@ def test_install_preserves_foreign_hooks(client_with_fake_home):
             "SessionStart": [{"hooks": [{"type": "command", "command": "python /other/start.py"}]}],
         }
     }), encoding="utf-8")
-    r = client.post("/hooks/install")
+    r = client.post("/api/hooks/install")
     assert r.status_code == 200
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
     # Stop block preserved unchanged.

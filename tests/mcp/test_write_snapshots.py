@@ -18,7 +18,7 @@ def _client(handler) -> httpx.AsyncClient:
 async def test_create_snapshot_no_label():
     def handler(request):
         assert request.method == "POST"
-        assert request.url.path == "/snapshots/myproject"
+        assert request.url.path == "/api/snapshots/myproject"
         body = json.loads(request.content.decode())
         assert body == {}
         return httpx.Response(
@@ -35,7 +35,7 @@ async def test_create_snapshot_with_label():
     def handler(request):
         body = json.loads(request.content.decode())
         assert body == {"label": "release"}
-        assert request.url.path == "/snapshots/myproject"
+        assert request.url.path == "/api/snapshots/myproject"
         return httpx.Response(
             201,
             json={"name": "manual-x-release", "kind": "manual", "label": "release"},
@@ -59,13 +59,13 @@ async def test_create_snapshot_url_includes_project():
     async with _client(handler) as client:
         await create_snapshot(client, "http://daemon", project="alpha")
     assert "/alpha" in captured["path"]
-    assert captured["path"] == "/snapshots/alpha"
+    assert captured["path"] == "/api/snapshots/alpha"
 
 
 async def test_restore_snapshot_happy():
     def handler(request):
         assert request.method == "POST"
-        assert request.url.path == "/snapshots/myproject/daily-2026-04-26/restore"
+        assert request.url.path == "/api/snapshots/myproject/daily-2026-04-26/restore"
         return httpx.Response(
             200,
             json={
@@ -112,7 +112,7 @@ async def test_restore_snapshot_404():
 async def test_delete_snapshot_happy():
     def handler(request):
         assert request.method == "DELETE"
-        assert request.url.path == "/snapshots/myproject/daily-2026-04-26"
+        assert request.url.path == "/api/snapshots/myproject/daily-2026-04-26"
         return httpx.Response(200, json={"deleted": "daily-2026-04-26"})
 
     async with _client(handler) as client:
@@ -159,4 +159,4 @@ async def test_create_snapshot_trailing_slash_in_url():
 
     async with _client(handler) as client:
         await create_snapshot(client, "http://daemon/", project="myproject", label=None)
-    assert captured["path"] == "/snapshots/myproject"
+    assert captured["path"] == "/api/snapshots/myproject"

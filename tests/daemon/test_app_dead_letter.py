@@ -71,7 +71,7 @@ def _force_dead_letter(daemon, job_id: str) -> None:
 async def test_dead_letter_list(client, daemon):
     job = daemon.job_store.create(kind="ingest", payload={"transcript_path": "/x"})
     _force_dead_letter(daemon, job.id)
-    r = await client.get("/dead-letter")
+    r = await client.get("/api/dead-letter")
     assert r.status_code == 200
     body = r.json()
     assert len(body["jobs"]) == 1
@@ -81,7 +81,7 @@ async def test_dead_letter_list(client, daemon):
 async def test_dead_letter_retry(client, daemon):
     job = daemon.job_store.create(kind="ingest", payload={"transcript_path": "/x"})
     _force_dead_letter(daemon, job.id)
-    r = await client.post(f"/dead-letter/{job.id}/retry")
+    r = await client.post(f"/api/dead-letter/{job.id}/retry")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "queued"
@@ -89,18 +89,18 @@ async def test_dead_letter_retry(client, daemon):
 
 
 async def test_dead_letter_retry_404(client):
-    r = await client.post("/dead-letter/nonexistent/retry")
+    r = await client.post("/api/dead-letter/nonexistent/retry")
     assert r.status_code == 404
 
 
 async def test_dead_letter_dismiss(client, daemon):
     job = daemon.job_store.create(kind="ingest", payload={"transcript_path": "/x"})
     _force_dead_letter(daemon, job.id)
-    r = await client.delete(f"/dead-letter/{job.id}")
+    r = await client.delete(f"/api/dead-letter/{job.id}")
     assert r.status_code == 204
     assert daemon.job_store.get_by_id(job.id) is None
 
 
 async def test_dead_letter_dismiss_404(client):
-    r = await client.delete("/dead-letter/nonexistent")
+    r = await client.delete("/api/dead-letter/nonexistent")
     assert r.status_code == 404

@@ -18,7 +18,7 @@ def test_health_claude_cli_reports_installed_authenticated() -> None:
         "claude_mnemos.daemon.routes.health.check_claude_cli_auth",
         return_value=AuthStatus(installed=True, authenticated=True, binary_path="/x/claude"),
     ):
-        resp = _make_client().get("/health/claude-cli")
+        resp = _make_client().get("/api/health/claude-cli")
     assert resp.status_code == 200
     body = resp.json()
     assert body["installed"] is True
@@ -31,6 +31,6 @@ def test_health_claude_cli_reports_not_installed() -> None:
         "claude_mnemos.daemon.routes.health.check_claude_cli_auth",
         return_value=AuthStatus(installed=False, authenticated=False),
     ):
-        resp = _make_client().get("/health/claude-cli")
+        resp = _make_client().get("/api/health/claude-cli")
     assert resp.status_code == 200
     assert resp.json()["installed"] is False

@@ -17,7 +17,7 @@ def _client(handler) -> httpx.AsyncClient:
 async def test_undo_happy_path():
     def handler(request):
         assert request.method == "POST"
-        assert request.url.path == "/activity/myproject/abc123/undo"
+        assert request.url.path == "/api/activity/myproject/abc123/undo"
         return httpx.Response(
             200,
             json={

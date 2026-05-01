@@ -39,7 +39,7 @@ def daemon_with_one_vault(
         vault = tmp_path / "alpha"
         vault.mkdir()
         r = client.post(
-            "/projects",
+            "/api/projects",
             json={"name": "alpha", "vault_root": str(vault), "cwd_patterns": []},
         )
         assert r.status_code == 201, r.text
@@ -55,7 +55,7 @@ def test_dead_letter_list_returns_200_with_real_daemon(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/dead-letter")
+    r = client.get("/api/dead-letter")
     assert r.status_code == 200, r.text
     assert "jobs" in r.json()
 
@@ -64,7 +64,7 @@ def test_dead_letter_dismiss_unknown_returns_404(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.delete("/dead-letter/nonexistent-id")
+    r = client.delete("/api/dead-letter/nonexistent-id")
     # 404, not 503
     assert r.status_code == 404, r.text
 
@@ -77,7 +77,7 @@ def test_sessions_ingest_bad_path_returns_400_not_503(
     _daemon, client, _vault = daemon_with_one_vault
     # valid daemon + known project → reaches body validation, not 404/503
     r = client.post(
-        "/sessions/alpha/some-sid/ingest",
+        "/api/sessions/alpha/some-sid/ingest",
         json={"transcript_path": "/does/not/exist.jsonl"},
     )
     assert r.status_code == 400, r.text
@@ -92,7 +92,7 @@ def test_sessions_ingest_enqueues_job(
     transcript = tmp_path / "t.jsonl"
     transcript.write_text("{}")
     r = client.post(
-        "/sessions/alpha/some-sid/ingest",
+        "/api/sessions/alpha/some-sid/ingest",
         json={"transcript_path": str(transcript)},
     )
     assert r.status_code == 201, r.text
@@ -107,7 +107,7 @@ def test_lost_sessions_scan_returns_200(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.post("/lost-sessions/scan")
+    r = client.post("/api/lost-sessions/scan")
     assert r.status_code == 200, r.text
     body = r.json()
     assert "sessions" in body
@@ -118,7 +118,7 @@ def test_lost_sessions_list_returns_200(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/lost-sessions")
+    r = client.get("/api/lost-sessions")
     assert r.status_code == 200, r.text
 
 
@@ -129,7 +129,7 @@ def test_lost_sessions_import_unknown_returns_404_not_503(
     # β2: project_name is required in body; "alpha" is the mounted project.
     # Session "nonexistent" is not in the scan → 404 (not 503).
     r = client.post(
-        "/lost-sessions/nonexistent/import",
+        "/api/lost-sessions/nonexistent/import",
         json={"project_name": "alpha"},
     )
     assert r.status_code == 404, r.text
@@ -141,7 +141,7 @@ def test_health_watchdog_running_with_real_daemon(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/health")
+    r = client.get("/api/health")
     assert r.status_code == 200, r.text
     body = r.json()
     # Per-vault dict shape: watchdog state lives under vaults["alpha"]
@@ -152,7 +152,7 @@ def test_health_jobs_counters_with_real_daemon(
     daemon_with_one_vault: tuple[MnemosDaemon, TestClient, Path],
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    r = client.get("/health")
+    r = client.get("/api/health")
     assert r.status_code == 200, r.text
     body = r.json()
     # Counters live under vaults["alpha"] (not stuck at 0 due to missing job_store)
@@ -199,7 +199,7 @@ def test_pages_patch_uses_tracker_from_runtime(
     )
 
     r = client.patch(
-        "/pages/alpha/pages/test-page.md",
+        "/api/pages/alpha/pages/test-page.md",
         json={"frontmatter": {"status": "verified"}},
     )
     assert r.status_code == 200, r.text

@@ -41,14 +41,14 @@ def test_patch_project_settings_reloads_runtime(
     vault = tmp_path / "alpha"
     vault.mkdir()
     client.post(
-        "/projects",
+        "/api/projects",
         json={"name": "alpha", "vault_root": str(vault), "cwd_patterns": []},
     )
 
     # After mount the daily_snapshot job must be present.
     assert daemon.scheduler.get_job("daily_snapshot:alpha") is not None
 
-    r = client.patch("/settings/alpha", json={"snapshots": {"daily_enabled": False}})
+    r = client.patch("/api/settings/alpha", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200, r.text
 
     # reload_project_settings must have removed the job.
@@ -61,7 +61,7 @@ def test_patch_global_settings_updates_daemon_global_settings(
     """PATCH /settings/global must update daemon.global_settings in-memory."""
     daemon, client = daemon_with_app
 
-    r = client.patch("/settings/global", json={"daemon_port": 9876})
+    r = client.patch("/api/settings/global", json={"daemon_port": 9876})
     assert r.status_code == 200, r.text
 
     assert daemon.global_settings.daemon_port == 9876

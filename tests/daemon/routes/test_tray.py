@@ -19,7 +19,7 @@ def test_get_tray_status_returns_platform_info() -> None:
     fake_mgr = MagicMock(status=MagicMock(return_value=fake_status))
     with patch("claude_mnemos.daemon.routes.tray.get_autostart_manager", return_value=fake_mgr), \
          patch("claude_mnemos.daemon.routes.tray.platform_label", return_value="windows"):
-        resp = client.get("/tray/status")
+        resp = client.get("/api/tray/status")
     assert resp.status_code == 200
     body = resp.json()
     assert body["platform"] == "windows"
@@ -33,7 +33,7 @@ def test_post_tray_install_runs_subprocess() -> None:
         "claude_mnemos.daemon.routes.tray.subprocess.run",
         return_value=fake_completed,
     ) as run:
-        resp = client.post("/tray/install")
+        resp = client.post("/api/tray/install")
     assert resp.status_code == 200
     assert resp.json() == {"installed": True}
     cmd = run.call_args[0][0]
@@ -46,7 +46,7 @@ def test_post_tray_install_returns_500_on_failure() -> None:
     client = _make_client()
     fake_completed = MagicMock(returncode=1, stderr="powershell exit 1: nope")
     with patch("claude_mnemos.daemon.routes.tray.subprocess.run", return_value=fake_completed):
-        resp = client.post("/tray/install")
+        resp = client.post("/api/tray/install")
     assert resp.status_code == 500
     assert "powershell" in resp.json()["detail"]
 
@@ -55,7 +55,7 @@ def test_post_tray_uninstall_runs_subprocess() -> None:
     client = _make_client()
     fake_completed = MagicMock(returncode=0, stderr="")
     with patch("claude_mnemos.daemon.routes.tray.subprocess.run", return_value=fake_completed):
-        resp = client.post("/tray/uninstall")
+        resp = client.post("/api/tray/uninstall")
     assert resp.status_code == 200
     assert resp.json() == {"installed": False}
 
@@ -63,5 +63,5 @@ def test_post_tray_uninstall_runs_subprocess() -> None:
 def test_post_tray_install_returns_501_on_unsupported_platform() -> None:
     client = _make_client()
     with patch("claude_mnemos.daemon.routes.tray.platform_label", return_value="unsupported"):
-        resp = client.post("/tray/install")
+        resp = client.post("/api/tray/install")
     assert resp.status_code == 501

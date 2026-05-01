@@ -32,7 +32,7 @@ class HealthSnapshot:
 
 
 def _default_health_url() -> str:
-    return "http://localhost:5757/health"
+    return "http://localhost:5757/api/health"
 
 
 class RestartLimiter:

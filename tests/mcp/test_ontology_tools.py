@@ -69,7 +69,7 @@ async def test_apply_ontology_suggestion_happy():
         assert request.method == "POST"
         assert (
             request.url.path
-            == "/ontology/myproject/suggestions/ont-2026-04-26-aaaaaa/approve"
+            == "/api/ontology/myproject/suggestions/ont-2026-04-26-aaaaaa/approve"
         )
         return httpx.Response(
             200,
@@ -175,7 +175,7 @@ async def test_propose_ontology_change_happy():
             confidence=0.85,
         )
     assert result["frontmatter"]["id"] == "ont-2026-04-26-aaaaaa"
-    assert captured["path"] == "/ontology/myproject/suggestions"
+    assert captured["path"] == "/api/ontology/myproject/suggestions"
     assert captured["body"]["operation"] == "merge_entities"  # type: ignore[index]
     assert captured["body"]["proposed_target"] == "wiki/entities/foobar.md"  # type: ignore[index]
     assert captured["body"]["confidence"] == 0.85  # type: ignore[index]

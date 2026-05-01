@@ -21,7 +21,7 @@ async def run_lint(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             body = await call_daemon(
-                client, "POST", f"{daemon_url.rstrip('/')}/lint/{project}/run"
+                client, "POST", f"{daemon_url.rstrip('/')}/api/lint/{project}/run"
             )
     except DaemonUnreachableError as exc:
         return [

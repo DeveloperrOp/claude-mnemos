@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import { TrayStatusSchema } from "../types/Tray";
 import { getTrayStatus, installTray, uninstallTray } from "../api/tray.api";
 
 let mock: MockAdapter;
 
 beforeEach(() => {
-  mock = new MockAdapter(axios);
+  // Mock the apiClient instance — production calls go through it.
+  // baseURL is /api, so .onGet("/tray/status") matches the relative path.
+  mock = new MockAdapter(apiClient);
 });
 
 describe("tray API", () => {

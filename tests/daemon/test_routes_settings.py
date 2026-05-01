@@ -20,7 +20,7 @@ def client(tmp_path, monkeypatch):
 
 def test_get_settings_returns_defaults(client):
     c, _ = client
-    r = c.get("/settings/foo")
+    r = c.get("/api/settings/foo")
     assert r.status_code == 200
     data = r.json()
     assert data["snapshots"]["retention_days"] == 180
@@ -29,23 +29,23 @@ def test_get_settings_returns_defaults(client):
 
 def test_patch_settings_partial_persists(client):
     c, _ = client
-    r = c.patch("/settings/foo", json={"snapshots": {"retention_days": 30}})
+    r = c.patch("/api/settings/foo", json={"snapshots": {"retention_days": 30}})
     assert r.status_code == 200
     assert r.json()["snapshots"]["retention_days"] == 30
     assert r.json()["snapshots"]["daily_enabled"] is True
-    r2 = c.get("/settings/foo")
+    r2 = c.get("/api/settings/foo")
     assert r2.json()["snapshots"]["retention_days"] == 30
 
 
 def test_patch_invalid_value_returns_422(client):
     c, _ = client
-    r = c.patch("/settings/foo", json={"snapshots": {"retention_days": -1}})
+    r = c.patch("/api/settings/foo", json={"snapshots": {"retention_days": -1}})
     assert r.status_code == 422
 
 
 def test_get_global_returns_defaults(client):
     c, _ = client
-    r = c.get("/settings/global")
+    r = c.get("/api/settings/global")
     assert r.status_code == 200
     assert r.json()["locale"] == "uk"
     assert r.json()["daemon_port"] == 5757
@@ -53,7 +53,7 @@ def test_get_global_returns_defaults(client):
 
 def test_patch_global_persists(client):
     c, _ = client
-    r = c.patch("/settings/global", json={"locale": "en"})
+    r = c.patch("/api/settings/global", json={"locale": "en"})
     assert r.status_code == 200
     assert r.json()["locale"] == "en"
 
@@ -68,7 +68,7 @@ def test_patch_settings_triggers_daemon_reload_project_settings(tmp_path, monkey
     fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(daemon=fake_daemon)
     c = TestClient(app)
-    r = c.patch("/settings/foo", json={"snapshots": {"daily_enabled": False}})
+    r = c.patch("/api/settings/foo", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200
     fake_daemon.reload_project_settings.assert_called_once()
     call_args = fake_daemon.reload_project_settings.call_args
@@ -86,7 +86,7 @@ def test_patch_settings_triggers_reload_regardless_of_vault(tmp_path, monkeypatc
     fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(daemon=fake_daemon)
     c = TestClient(app)
-    r = c.patch("/settings/bar", json={"snapshots": {"daily_enabled": False}})
+    r = c.patch("/api/settings/bar", json={"snapshots": {"daily_enabled": False}})
     assert r.status_code == 200
     fake_daemon.reload_project_settings.assert_called_once()
     assert fake_daemon.reload_project_settings.call_args.args[0] == "bar"
@@ -97,5 +97,5 @@ def test_corrupt_global_returns_503(client):
     f = home / ".claude-mnemos" / "global-settings.json"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text("{not json")
-    r = c.get("/settings/global")
+    r = c.get("/api/settings/global")
     assert r.status_code == 503

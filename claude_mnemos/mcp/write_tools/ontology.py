@@ -16,7 +16,7 @@ async def apply_ontology_suggestion(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/ontology/{project}/suggestions/{suggestion_id}/approve",
+        f"{daemon_url.rstrip('/')}/api/ontology/{project}/suggestions/{suggestion_id}/approve",
     )
 
 
@@ -42,6 +42,6 @@ async def propose_ontology_change(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/ontology/{project}/suggestions",
+        f"{daemon_url.rstrip('/')}/api/ontology/{project}/suggestions",
         json_body=body,
     )

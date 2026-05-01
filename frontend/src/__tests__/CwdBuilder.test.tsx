@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import i18n from "../i18n";
 import { CwdBuilder } from "../components/onboarding/CwdBuilder";
 
@@ -34,7 +34,7 @@ beforeAll(() => {
 
 let mock: MockAdapter;
 beforeEach(() => {
-  mock = new MockAdapter(axios);
+  mock = new MockAdapter(apiClient);
   mock.onGet("/fs/home").reply(200, { home: "/home" });
   mock.onGet(/\/fs\/browse/).reply(200, {
     cwd: "/home",

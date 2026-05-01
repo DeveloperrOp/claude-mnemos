@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import i18n from "../i18n";
 import { DirectoryPicker } from "../components/picker/DirectoryPicker";
 
@@ -31,7 +31,7 @@ beforeAll(() => {
 let mock: MockAdapter;
 
 beforeEach(() => {
-  mock = new MockAdapter(axios);
+  mock = new MockAdapter(apiClient);
   localStorage.clear();
 });
 

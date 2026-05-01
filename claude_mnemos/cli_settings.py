@@ -1,8 +1,8 @@
 """CLI subgroup ``mnemos settings`` — get/set/reset per-project + global.
 
 Reads always direct file access. Writes try the daemon REST first
-(/settings/{name}, /settings/global — no /api/ prefix) and fall back to
-direct SettingsStore when offline.
+(/api/settings/{name}, /api/settings/global) and fall back to direct
+SettingsStore when offline.
 """
 
 from __future__ import annotations
@@ -78,9 +78,9 @@ def _handle_set(args: argparse.Namespace) -> int:
     patch = patch_dict_for_dot_path(args.key, parsed)
     target_global = getattr(args, "is_global", False)
     url = (
-        f"{_daemon_url()}/settings/global"
+        f"{_daemon_url()}/api/settings/global"
         if target_global
-        else f"{_daemon_url()}/settings/{args.project}"
+        else f"{_daemon_url()}/api/settings/{args.project}"
     )
     try:
         r = httpx.patch(url, json=patch, timeout=2.0)

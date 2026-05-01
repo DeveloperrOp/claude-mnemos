@@ -31,7 +31,7 @@ def _wait_until_ready(url: str, timeout: float = 20.0) -> None:
     last_exc: Exception | None = None
     while time.monotonic() < deadline:
         try:
-            r = httpx.get(f"{url}/health", timeout=0.5)
+            r = httpx.get(f"{url}/api/health", timeout=0.5)
             if r.status_code == 200:
                 return
         except httpx.HTTPError as exc:
@@ -102,7 +102,7 @@ def test_e2e_register_project_then_patch_settings(isolated_home: Path) -> None:
         _wait_until_ready(url)
 
         r = httpx.post(
-            f"{url}/projects",
+            f"{url}/api/projects",
             json={
                 "name": "myvault",
                 "vault_root": str(vault),
@@ -113,7 +113,7 @@ def test_e2e_register_project_then_patch_settings(isolated_home: Path) -> None:
         assert r.status_code == 201, r.text
 
         r = httpx.patch(
-            f"{url}/settings/myvault",
+            f"{url}/api/settings/myvault",
             json={"snapshots": {"retention_days": 7, "daily_enabled": False}},
             timeout=2.0,
         )
@@ -125,7 +125,7 @@ def test_e2e_register_project_then_patch_settings(isolated_home: Path) -> None:
         assert data["snapshots"]["retention_days"] == 7
 
         # Combined project view via GET /projects/{name}
-        r = httpx.get(f"{url}/projects/myvault", timeout=2.0)
+        r = httpx.get(f"{url}/api/projects/myvault", timeout=2.0)
         assert r.status_code == 200
         view = r.json()
         assert view["name"] == "myvault"
@@ -206,7 +206,7 @@ def test_e2e_settings_persist_across_daemon_restart(isolated_home: Path) -> None
     try:
         url = f"http://127.0.0.1:{port}"
         _wait_until_ready(url)
-        r = httpx.get(f"{url}/settings/x", timeout=2.0)
+        r = httpx.get(f"{url}/api/settings/x", timeout=2.0)
         assert r.status_code == 200
         assert r.json()["snapshots"]["retention_days"] == 11
     finally:

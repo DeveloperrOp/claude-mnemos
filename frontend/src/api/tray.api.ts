@@ -1,4 +1,4 @@
-import axios from "axios";
+import { apiClient } from "./client";
 import {
   InstallResultSchema,
   TrayStatusSchema,
@@ -7,16 +7,16 @@ import {
 } from "@/types/Tray";
 
 export async function getTrayStatus(): Promise<TrayStatus> {
-  const { data } = await axios.get("/tray/status");
+  const { data } = await apiClient.get("/tray/status");
   return TrayStatusSchema.parse(data);
 }
 
 export async function installTray(): Promise<InstallResult> {
-  const { data } = await axios.post("/tray/install");
+  const { data } = await apiClient.post("/tray/install");
   return InstallResultSchema.parse(data);
 }
 
 export async function uninstallTray(): Promise<InstallResult> {
-  const { data } = await axios.post("/tray/uninstall");
+  const { data } = await apiClient.post("/tray/uninstall");
   return InstallResultSchema.parse(data);
 }

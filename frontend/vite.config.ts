@@ -4,12 +4,10 @@ import path from "node:path";
 import fs from "node:fs";
 
 const DAEMON_URL = "http://127.0.0.1:5757";
-const PROXIED_PREFIXES = [
-  "/projects", "/sessions", "/snapshots", "/pages", "/trash",
-  "/lint", "/ontology", "/activity", "/vault", "/lost-sessions",
-  "/jobs", "/dead-letter", "/metrics", "/health", "/version",
-  "/alerts", "/settings",
-];
+// All daemon endpoints live under /api/* (see claude_mnemos/daemon/app.py).
+// One proxy rule covers everything; SPA routes like /lost-sessions are
+// served by Vite locally (no proxy) and by the daemon's SPA fallback in prod.
+const PROXIED_PREFIXES = ["/api"];
 
 /** Restore .gitkeep after emptyOutDir wipes it so the dir stays tracked. */
 function restoreGitkeep(): import("vite").Plugin {

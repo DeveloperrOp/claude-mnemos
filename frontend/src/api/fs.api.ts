@@ -1,4 +1,4 @@
-import axios from "axios";
+import { apiClient } from "./client";
 import {
   FsBrowseSchema,
   FsDrivesSchema,
@@ -11,7 +11,7 @@ import {
 } from "@/types/Fs";
 
 export async function getHome(): Promise<FsHome> {
-  const { data } = await axios.get("/fs/home");
+  const { data } = await apiClient.get("/fs/home");
   return FsHomeSchema.parse(data);
 }
 
@@ -21,16 +21,16 @@ export async function browseDirectory(
 ): Promise<FsBrowse> {
   const params: Record<string, string | boolean> = { path };
   if (opts?.includeFiles) params.include_files = true;
-  const { data } = await axios.get("/fs/browse", { params });
+  const { data } = await apiClient.get("/fs/browse", { params });
   return FsBrowseSchema.parse(data);
 }
 
 export async function listDrives(): Promise<FsDrives> {
-  const { data } = await axios.get("/fs/drives");
+  const { data } = await apiClient.get("/fs/drives");
   return FsDrivesSchema.parse(data);
 }
 
 export async function mkdir(path: string): Promise<FsMkdirResponse> {
-  const { data } = await axios.post("/fs/mkdir", { path });
+  const { data } = await apiClient.post("/fs/mkdir", { path });
   return FsMkdirResponseSchema.parse(data);
 }

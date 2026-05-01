@@ -67,7 +67,7 @@ def _try_post_to_daemon(
         return False
     try:
         response = httpx.post(
-            f"{daemon_url.rstrip('/')}/jobs",
+            f"{daemon_url.rstrip('/')}/api/jobs",
             json={
                 "kind": "ingest",
                 "payload": {

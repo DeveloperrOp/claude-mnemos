@@ -18,7 +18,7 @@ def client(tmp_path, monkeypatch):
 
 def test_get_projects_empty(client):
     c, _ = client
-    r = c.get("/projects")
+    r = c.get("/api/projects")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -30,9 +30,9 @@ def test_post_project_then_get(client):
         "vault_root": str(home / "v"),
         "cwd_patterns": ["~/code/x*"],
     }
-    r = c.post("/projects", json=body)
+    r = c.post("/api/projects", json=body)
     assert r.status_code == 201, r.text
-    r2 = c.get("/projects/x")
+    r2 = c.get("/api/projects/x")
     assert r2.status_code == 200
     data = r2.json()
     assert data["name"] == "x"
@@ -43,59 +43,59 @@ def test_post_project_then_get(client):
 def test_post_duplicate_returns_409(client):
     c, home = client
     body = {"name": "x", "vault_root": str(home / "v"), "cwd_patterns": []}
-    c.post("/projects", json=body)
-    r = c.post("/projects", json=body)
+    c.post("/api/projects", json=body)
+    r = c.post("/api/projects", json=body)
     assert r.status_code == 409
 
 
 def test_post_invalid_name_returns_422(client):
     c, home = client
     body = {"name": "Bad Name", "vault_root": str(home / "v"), "cwd_patterns": []}
-    r = c.post("/projects", json=body)
+    r = c.post("/api/projects", json=body)
     assert r.status_code == 422
 
 
 def test_get_unknown_returns_404(client):
     c, _ = client
-    assert c.get("/projects/nope").status_code == 404
+    assert c.get("/api/projects/nope").status_code == 404
 
 
 def test_patch_updates_fields(client):
     c, home = client
-    c.post("/projects", json={
+    c.post("/api/projects", json={
         "name": "x", "vault_root": str(home / "v"), "cwd_patterns": ["~/a"],
     })
-    r = c.patch("/projects/x", json={"cwd_patterns": ["~/b"]})
+    r = c.patch("/api/projects/x", json={"cwd_patterns": ["~/b"]})
     assert r.status_code == 200
     assert r.json()["cwd_patterns"] == ["~/b"]
 
 
 def test_patch_unknown_returns_404(client):
     c, _ = client
-    r = c.patch("/projects/nope", json={"cwd_patterns": []})
+    r = c.patch("/api/projects/nope", json={"cwd_patterns": []})
     assert r.status_code == 404
 
 
 def test_delete_removes_entry(client):
     c, home = client
-    c.post("/projects", json={
+    c.post("/api/projects", json={
         "name": "x", "vault_root": str(home / "v"), "cwd_patterns": [],
     })
-    r = c.delete("/projects/x")
+    r = c.delete("/api/projects/x")
     assert r.status_code == 204
-    assert c.get("/projects/x").status_code == 404
+    assert c.get("/api/projects/x").status_code == 404
 
 
 def test_delete_unknown_returns_404(client):
     c, _ = client
-    assert c.delete("/projects/nope").status_code == 404
+    assert c.delete("/api/projects/nope").status_code == 404
 
 
 def test_list_returns_all_after_multiple_adds(client):
     c, home = client
-    c.post("/projects", json={"name": "a", "vault_root": str(home / "va"), "cwd_patterns": []})
-    c.post("/projects", json={"name": "b", "vault_root": str(home / "vb"), "cwd_patterns": []})
-    r = c.get("/projects")
+    c.post("/api/projects", json={"name": "a", "vault_root": str(home / "va"), "cwd_patterns": []})
+    c.post("/api/projects", json={"name": "b", "vault_root": str(home / "vb"), "cwd_patterns": []})
+    r = c.get("/api/projects")
     names = sorted(e["name"] for e in r.json())
     assert names == ["a", "b"]
 
@@ -105,7 +105,7 @@ def test_corrupt_map_returns_503(client):
     f = home / ".claude-mnemos" / "project-map.json"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text("{not json")
-    r = c.get("/projects")
+    r = c.get("/api/projects")
     assert r.status_code == 503
 
 
@@ -118,10 +118,10 @@ def test_post_projects_accepts_display_name(client):
         "vault_root": str(home / "v"),
         "cwd_patterns": [],
     }
-    r = c.post("/projects", json=body)
+    r = c.post("/api/projects", json=body)
     assert r.status_code == 201, r.text
     assert r.json()["display_name"] == "Foo Project"
-    r2 = c.get("/projects/foo")
+    r2 = c.get("/api/projects/foo")
     assert r2.status_code == 200
     assert r2.json()["display_name"] == "Foo Project"
 
@@ -134,9 +134,9 @@ def test_post_projects_without_display_name_returns_null(client):
         "vault_root": str(home / "v"),
         "cwd_patterns": [],
     }
-    r = c.post("/projects", json=body)
+    r = c.post("/api/projects", json=body)
     assert r.status_code == 201, r.text
     assert r.json()["display_name"] is None
-    r2 = c.get("/projects/foo")
+    r2 = c.get("/api/projects/foo")
     assert r2.status_code == 200
     assert r2.json()["display_name"] is None

@@ -39,7 +39,7 @@ def test_post_projects_hot_mounts(
     daemon, client = live
     vault = tmp_path / "alpha"
     vault.mkdir()
-    r = client.post("/projects", json={
+    r = client.post("/api/projects", json={
         "name": "alpha",
         "vault_root": str(vault),
         "cwd_patterns": [],
@@ -67,13 +67,13 @@ def test_post_projects_mount_failure_rolls_back_map(
 
     monkeypatch.setattr(vr, "VaultObserver", _Boom)
 
-    r = client.post("/projects", json={
+    r = client.post("/api/projects", json={
         "name": "rb",
         "vault_root": str(vault),
         "cwd_patterns": [],
     })
     assert r.status_code == 500
-    list_r = client.get("/projects")
+    list_r = client.get("/api/projects")
     assert all(e["name"] != "rb" for e in list_r.json())
 
 
@@ -83,12 +83,12 @@ def test_delete_projects_busy_returns_409(
     daemon, client = live
     vault = tmp_path / "busy"
     vault.mkdir()
-    client.post("/projects", json={"name": "busy", "vault_root": str(vault), "cwd_patterns": []})
+    client.post("/api/projects", json={"name": "busy", "vault_root": str(vault), "cwd_patterns": []})
 
     daemon.runtimes["busy"].job_store.create(
         kind="ingest", payload={"transcript_path": "x"}
     )
-    r = client.delete("/projects/busy")
+    r = client.delete("/api/projects/busy")
     assert r.status_code == 409
     assert r.json()["detail"]["error"] == "vault_busy"
 
@@ -99,11 +99,11 @@ def test_delete_projects_force_drains(
     daemon, client = live
     vault = tmp_path / "drain"
     vault.mkdir()
-    client.post("/projects", json={"name": "drain", "vault_root": str(vault), "cwd_patterns": []})
+    client.post("/api/projects", json={"name": "drain", "vault_root": str(vault), "cwd_patterns": []})
     daemon.runtimes["drain"].job_store.create(
         kind="ingest", payload={"transcript_path": "x"}
     )
-    r = client.delete("/projects/drain?force=true")
+    r = client.delete("/api/projects/drain?force=true")
     assert r.status_code == 204
     assert "drain" not in daemon.runtimes
 
@@ -116,8 +116,8 @@ def test_patch_vault_root_remounts(
     old_vault.mkdir()
     new_vault = tmp_path / "new"
     new_vault.mkdir()
-    client.post("/projects", json={"name": "rm", "vault_root": str(old_vault), "cwd_patterns": []})
-    r = client.patch("/projects/rm", json={"vault_root": str(new_vault)})
+    client.post("/api/projects", json={"name": "rm", "vault_root": str(old_vault), "cwd_patterns": []})
+    r = client.patch("/api/projects/rm", json={"vault_root": str(new_vault)})
     assert r.status_code == 200
     assert daemon.runtimes["rm"].vault_root == new_vault
 
@@ -130,11 +130,11 @@ def test_patch_vault_root_busy_returns_409_without_changing_map(
     old_vault.mkdir()
     new_vault = tmp_path / "new2"
     new_vault.mkdir()
-    client.post("/projects", json={"name": "rm2", "vault_root": str(old_vault), "cwd_patterns": []})
+    client.post("/api/projects", json={"name": "rm2", "vault_root": str(old_vault), "cwd_patterns": []})
     daemon.runtimes["rm2"].job_store.create(
         kind="ingest", payload={"transcript_path": "x"}
     )
-    r = client.patch("/projects/rm2", json={"vault_root": str(new_vault)})
+    r = client.patch("/api/projects/rm2", json={"vault_root": str(new_vault)})
     assert r.status_code == 409
-    show = client.get("/projects/rm2").json()
+    show = client.get("/api/projects/rm2").json()
     assert show["vault_root"] == str(old_vault)  # map untouched

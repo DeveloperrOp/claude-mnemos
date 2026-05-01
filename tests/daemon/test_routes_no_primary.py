@@ -32,7 +32,7 @@ def test_metrics_usage_returns_zeros_when_no_daemon(client: TestClient) -> None:
     β2 behaviour: cross-vault route iterates all_runtimes() which returns []
     when daemon is None — no error, just an empty aggregation.
     """
-    r = client.get("/metrics/usage")
+    r = client.get("/api/metrics/usage")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["sessions_covered"] == 0
@@ -45,26 +45,26 @@ def test_lost_sessions_returns_empty_when_no_daemon(client: TestClient) -> None:
     β2 behaviour: cross-vault route iterates all_runtimes() which returns []
     when daemon is None — no error, just an empty result.
     """
-    r = client.get("/lost-sessions")
+    r = client.get("/api/lost-sessions")
     assert r.status_code == 200, r.text
     assert r.json() == {"sessions": [], "total": 0}
 
 
 def test_vault_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /vault/{project} returns 503 when daemon is None."""
-    r = client.get("/vault/alpha")
+    r = client.get("/api/vault/alpha")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
 
 
 def test_health_works_without_primary(client: TestClient) -> None:
-    r = client.get("/health")
+    r = client.get("/api/health")
     assert r.status_code == 200
 
 
 def test_projects_works_without_primary(client: TestClient) -> None:
-    r = client.get("/projects")
+    r = client.get("/api/projects")
     assert r.status_code == 200
 
 
@@ -74,14 +74,14 @@ def test_dead_letter_empty_without_daemon(client: TestClient) -> None:
     Cross-vault aggregation via all_runtimes() gracefully returns [] when no
     daemon is registered — no 503, consistent with /jobs behaviour.
     """
-    r = client.get("/dead-letter")
+    r = client.get("/api/dead-letter")
     assert r.status_code == 200
     assert r.json() == {"jobs": []}
 
 
 def test_trash_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /trash/{project} returns 503 when daemon is None."""
-    r = client.get("/trash/alpha")
+    r = client.get("/api/trash/alpha")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
@@ -89,7 +89,7 @@ def test_trash_project_route_503_without_daemon(client: TestClient) -> None:
 
 def test_lint_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /lint/{project}/results returns 503 when daemon is None."""
-    r = client.get("/lint/alpha/results")
+    r = client.get("/api/lint/alpha/results")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
@@ -97,7 +97,7 @@ def test_lint_project_route_503_without_daemon(client: TestClient) -> None:
 
 def test_ontology_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /ontology/{project}/suggestions returns 503 when daemon is None."""
-    r = client.get("/ontology/alpha/suggestions")
+    r = client.get("/api/ontology/alpha/suggestions")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"
@@ -105,7 +105,7 @@ def test_ontology_project_route_503_without_daemon(client: TestClient) -> None:
 
 def test_activity_project_route_503_without_daemon(client: TestClient) -> None:
     """GET /activity/{project} returns 503 when daemon is None."""
-    r = client.get("/activity/alpha")
+    r = client.get("/api/activity/alpha")
     assert r.status_code == 503
     body = r.json()
     assert body.get("detail", {}).get("error") == "daemon_unavailable"

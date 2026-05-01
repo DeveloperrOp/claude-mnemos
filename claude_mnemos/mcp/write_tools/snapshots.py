@@ -20,7 +20,7 @@ async def create_snapshot(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/snapshots/{project}",
+        f"{daemon_url.rstrip('/')}/api/snapshots/{project}",
         json_body=body,
     )
 
@@ -35,7 +35,7 @@ async def restore_snapshot(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/snapshots/{project}/{name}/restore",
+        f"{daemon_url.rstrip('/')}/api/snapshots/{project}/{name}/restore",
     )
 
 
@@ -49,5 +49,5 @@ async def delete_snapshot(
     return await call_daemon(
         client,
         "DELETE",
-        f"{daemon_url.rstrip('/')}/snapshots/{project}/{name}",
+        f"{daemon_url.rstrip('/')}/api/snapshots/{project}/{name}",
     )

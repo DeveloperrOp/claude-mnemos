@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import { getClaudeCliAuth } from "../api/claudeCli.api";
 
 let mock: MockAdapter;
 
 beforeEach(() => {
-  mock = new MockAdapter(axios);
+  mock = new MockAdapter(apiClient);
 });
 
 describe("Claude CLI auth API", () => {

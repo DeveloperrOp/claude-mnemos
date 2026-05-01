@@ -76,7 +76,7 @@ async def client(app: Any) -> Any:
 async def test_patch_frontmatter_success(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
     r = await client.patch(
-        "/pages/alpha/wiki/entities/foo.md",
+        "/api/pages/alpha/wiki/entities/foo.md",
         json={"frontmatter": {"status": "verified"}, "body": None},
     )
     assert r.status_code == 200, r.text
@@ -93,7 +93,7 @@ async def test_patch_frontmatter_success(client: Any, alpha_vault: Path) -> None
 async def test_patch_invalid_value_returns_422(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
     r = await client.patch(
-        "/pages/alpha/wiki/entities/foo.md",
+        "/api/pages/alpha/wiki/entities/foo.md",
         json={"frontmatter": {"status": "not_a_status"}, "body": None},
     )
     assert r.status_code == 422, r.text
@@ -101,7 +101,7 @@ async def test_patch_invalid_value_returns_422(client: Any, alpha_vault: Path) -
 
 async def test_patch_unknown_project_returns_404(client: Any) -> None:
     r = await client.patch(
-        "/pages/unknown-project/wiki/entities/foo.md",
+        "/api/pages/unknown-project/wiki/entities/foo.md",
         json={"frontmatter": {"status": "verified"}, "body": None},
     )
     assert r.status_code == 404, r.text
@@ -110,7 +110,7 @@ async def test_patch_unknown_project_returns_404(client: Any) -> None:
 
 async def test_patch_unknown_page_returns_404(client: Any, alpha_vault: Path) -> None:
     r = await client.patch(
-        "/pages/alpha/wiki/entities/nonexistent.md",
+        "/api/pages/alpha/wiki/entities/nonexistent.md",
         json={"frontmatter": {"status": "verified"}, "body": None},
     )
     assert r.status_code == 404, r.text
@@ -123,7 +123,7 @@ async def test_patch_unknown_page_returns_404(client: Any, alpha_vault: Path) ->
 
 async def test_post_verify_sets_verified_status(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
-    r = await client.post("/pages/alpha/wiki/entities/foo.md/verify")
+    r = await client.post("/api/pages/alpha/wiki/entities/foo.md/verify")
     assert r.status_code == 200, r.text
     from claude_mnemos.core.page_io import read_page
     parsed = read_page(alpha_vault / "wiki/entities/foo.md")
@@ -131,7 +131,7 @@ async def test_post_verify_sets_verified_status(client: Any, alpha_vault: Path) 
 
 
 async def test_verify_unknown_project_returns_404(client: Any) -> None:
-    r = await client.post("/pages/unknown-project/wiki/entities/foo.md/verify")
+    r = await client.post("/api/pages/unknown-project/wiki/entities/foo.md/verify")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -143,7 +143,7 @@ async def test_verify_unknown_project_returns_404(client: Any) -> None:
 
 async def test_post_archive_sets_archived_status(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
-    r = await client.post("/pages/alpha/wiki/entities/foo.md/archive")
+    r = await client.post("/api/pages/alpha/wiki/entities/foo.md/archive")
     assert r.status_code == 200, r.text
     from claude_mnemos.core.page_io import read_page
     parsed = read_page(alpha_vault / "wiki/entities/foo.md")
@@ -151,7 +151,7 @@ async def test_post_archive_sets_archived_status(client: Any, alpha_vault: Path)
 
 
 async def test_archive_unknown_project_returns_404(client: Any) -> None:
-    r = await client.post("/pages/unknown-project/wiki/entities/foo.md/archive")
+    r = await client.post("/api/pages/unknown-project/wiki/entities/foo.md/archive")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -163,7 +163,7 @@ async def test_archive_unknown_project_returns_404(client: Any) -> None:
 
 async def test_delete_creates_trash_entry(client: Any, alpha_vault: Path) -> None:
     p = _seed(alpha_vault)
-    r = await client.delete("/pages/alpha/wiki/entities/foo.md")
+    r = await client.delete("/api/pages/alpha/wiki/entities/foo.md")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["success"] is True
@@ -178,7 +178,7 @@ async def test_delete_creates_trash_entry(client: Any, alpha_vault: Path) -> Non
 
 
 async def test_delete_unknown_project_returns_404(client: Any) -> None:
-    r = await client.delete("/pages/unknown-project/wiki/entities/foo.md")
+    r = await client.delete("/api/pages/unknown-project/wiki/entities/foo.md")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -189,19 +189,19 @@ async def test_delete_unknown_project_returns_404(client: Any) -> None:
 
 
 async def test_backlinks_unknown_project_returns_404(client: Any) -> None:
-    r = await client.get("/pages/unknown-project/wiki/entities/foo.md/backlinks")
+    r = await client.get("/api/pages/unknown-project/wiki/entities/foo.md/backlinks")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
 
 async def test_backlinks_unknown_page_returns_404(client: Any, alpha_vault: Path) -> None:
-    r = await client.get("/pages/alpha/wiki/entities/nonexistent.md/backlinks")
+    r = await client.get("/api/pages/alpha/wiki/entities/nonexistent.md/backlinks")
     assert r.status_code == 404, r.text
 
 
 async def test_backlinks_empty_for_isolated_page(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
-    r = await client.get("/pages/alpha/wiki/entities/foo.md/backlinks")
+    r = await client.get("/api/pages/alpha/wiki/entities/foo.md/backlinks")
     assert r.status_code == 200, r.text
     body = r.json()
     assert "backlinks" in body
@@ -214,13 +214,13 @@ async def test_backlinks_empty_for_isolated_page(client: Any, alpha_vault: Path)
 
 
 async def test_list_pages_unknown_project_returns_404(client: Any) -> None:
-    r = await client.get("/pages/unknown-project")
+    r = await client.get("/api/pages/unknown-project")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
 
 async def test_list_pages_empty_vault(client: Any) -> None:
-    r = await client.get("/pages/alpha")
+    r = await client.get("/api/pages/alpha")
     assert r.status_code == 200, r.text
     body = r.json()
     assert "pages" in body
@@ -229,7 +229,7 @@ async def test_list_pages_empty_vault(client: Any) -> None:
 
 async def test_list_pages_returns_seeded_page(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
-    r = await client.get("/pages/alpha")
+    r = await client.get("/api/pages/alpha")
     assert r.status_code == 200, r.text
     body = r.json()
     assert len(body["pages"]) == 1
@@ -242,19 +242,19 @@ async def test_list_pages_returns_seeded_page(client: Any, alpha_vault: Path) ->
 
 
 async def test_get_page_unknown_project_returns_404(client: Any) -> None:
-    r = await client.get("/pages/unknown-project/wiki/entities/foo.md")
+    r = await client.get("/api/pages/unknown-project/wiki/entities/foo.md")
     assert r.status_code == 404, r.text
     assert r.json()["detail"]["error"] == "unknown_project"
 
 
 async def test_get_page_unknown_page_returns_404(client: Any, alpha_vault: Path) -> None:
-    r = await client.get("/pages/alpha/wiki/entities/nonexistent.md")
+    r = await client.get("/api/pages/alpha/wiki/entities/nonexistent.md")
     assert r.status_code == 404, r.text
 
 
 async def test_get_page_returns_content(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
-    r = await client.get("/pages/alpha/wiki/entities/foo.md")
+    r = await client.get("/api/pages/alpha/wiki/entities/foo.md")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["path"] == "wiki/entities/foo.md"

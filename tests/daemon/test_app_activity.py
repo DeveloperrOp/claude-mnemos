@@ -122,7 +122,7 @@ def vault_with_ingested(tmp_path: Path) -> Path:
 
 
 async def test_list_activity_empty(client: Any) -> None:
-    r = await client.get("/activity/alpha")
+    r = await client.get("/api/activity/alpha")
     assert r.status_code == 200
     assert r.json() == {"entries": [], "total": 0}
 
@@ -152,7 +152,7 @@ async def test_list_activity_returns_entries(alpha_vault: Path, daemon: _FakeDae
     app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity/alpha")
+        r = await c.get("/api/activity/alpha")
     body = r.json()
     assert body["total"] == 2
     # Newest first
@@ -178,14 +178,14 @@ async def test_list_activity_pagination(alpha_vault: Path, daemon: _FakeDaemon) 
     app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity/alpha?limit=2&offset=1")
+        r = await c.get("/api/activity/alpha?limit=2&offset=1")
     body = r.json()
     assert body["total"] == 5
     assert len(body["entries"]) == 2
 
 
 async def test_list_activity_unknown_project_404(client: Any) -> None:
-    r = await client.get("/activity/ghost")
+    r = await client.get("/api/activity/ghost")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -196,7 +196,7 @@ async def test_list_activity_unknown_project_404(client: Any) -> None:
 
 
 async def test_get_activity_unknown_id(client: Any) -> None:
-    r = await client.get("/activity/alpha/does-not-exist")
+    r = await client.get("/api/activity/alpha/does-not-exist")
     assert r.status_code == 404
 
 
@@ -216,13 +216,13 @@ async def test_get_activity_known_id(alpha_vault: Path, daemon: _FakeDaemon) -> 
     app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/activity/alpha/abcdef")
+        r = await c.get("/api/activity/alpha/abcdef")
     assert r.status_code == 200
     assert r.json()["id"] == "abcdef"
 
 
 async def test_get_activity_unknown_project_404(client: Any) -> None:
-    r = await client.get("/activity/ghost/some-id")
+    r = await client.get("/api/activity/ghost/some-id")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
 
@@ -257,7 +257,7 @@ async def test_undo_activity_success(tmp_path: Path) -> None:
     app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.post(f"/activity/myvault/{op_id}/undo")
+        r = await c.post(f"/api/activity/myvault/{op_id}/undo")
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True
@@ -295,20 +295,20 @@ async def test_undo_activity_already_undone_returns_409(tmp_path: Path) -> None:
     app = create_app(daemon=daemon_mock)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r1 = await c.post(f"/activity/myvault/{op_id}/undo")
+        r1 = await c.post(f"/api/activity/myvault/{op_id}/undo")
         assert r1.status_code == 200
-        r2 = await c.post(f"/activity/myvault/{op_id}/undo")
+        r2 = await c.post(f"/api/activity/myvault/{op_id}/undo")
     assert r2.status_code == 409
     assert r2.json()["error"] == "undo_failed"
 
 
 async def test_undo_unknown_id_returns_409(client: Any) -> None:
-    r = await client.post("/activity/alpha/no-such-entry/undo")
+    r = await client.post("/api/activity/alpha/no-such-entry/undo")
     assert r.status_code == 409
     assert r.json()["error"] == "undo_failed"
 
 
 async def test_undo_unknown_project_404(client: Any) -> None:
-    r = await client.post("/activity/ghost/some-id/undo")
+    r = await client.post("/api/activity/ghost/some-id/undo")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"

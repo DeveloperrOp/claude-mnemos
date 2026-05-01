@@ -854,7 +854,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     ).save()
 
     deadline = time.monotonic() + 5.0
-    health_url = f"http://{config.host}:{config.port}/health"
+    health_url = f"http://{config.host}:{config.port}/api/health"
     while time.monotonic() < deadline:
         try:
             r = httpx.get(health_url, timeout=0.5)
@@ -932,7 +932,7 @@ def _cmd_daemon_status(_args: argparse.Namespace) -> int:
     if state is None:
         print(json.dumps({"pid": pid, "status": "running"}, indent=2))
         return 0
-    health_url = f"http://{state.host}:{state.port}/health"
+    health_url = f"http://{state.host}:{state.port}/api/health"
     try:
         r = httpx.get(health_url, timeout=2.0)
         body = r.json()
@@ -1338,7 +1338,7 @@ def _post_or_delete_to_daemon(
 ) -> int:
     daemon_url = os.environ.get("MNEMOS_DAEMON_URL") or daemon_base_url()
     try:
-        r = httpx.request(method, f"{daemon_url}{path}", timeout=5.0)
+        r = httpx.request(method, f"{daemon_url}/api{path}", timeout=5.0)
     except httpx.HTTPError as exc:
         print(f"daemon unreachable at {daemon_url}: {exc}", file=sys.stderr)
         return 84
@@ -1382,8 +1382,12 @@ def _http_request_to_daemon(
     timeout: float = 10.0,
 ) -> tuple[httpx.Response | None, int | None]:
     """Send a request to the daemon. Returns (response, None) on success
-    or (None, exit_code) on transport failure."""
-    url = f"{_daemon_url()}{path}"
+    or (None, exit_code) on transport failure.
+
+    ``path`` is the bare REST path (e.g. ``/pages/foo``); the ``/api``
+    prefix is applied here so call-sites stay clean.
+    """
+    url = f"{_daemon_url()}/api{path}"
     try:
         r = httpx.request(method, url, json=json_body, timeout=timeout)
     except httpx.HTTPError as exc:

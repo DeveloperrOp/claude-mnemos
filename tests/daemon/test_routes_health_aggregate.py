@@ -39,7 +39,7 @@ def daemon_with_two_vaults_health(
     with TestClient(daemon.app) as client:
         for name, vault in (("alpha", a), ("beta", b)):
             r = client.post(
-                "/projects",
+                "/api/projects",
                 json={"name": name, "vault_root": str(vault), "cwd_patterns": []},
             )
             assert r.status_code == 201, f"POST /projects for {name} failed: {r.text}"
@@ -75,7 +75,7 @@ def test_health_lists_per_vault(
     daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_health
-    r = client.get("/health")
+    r = client.get("/api/health")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "ok"
@@ -92,7 +92,7 @@ def test_health_vault_values_are_typed(
     daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_health
-    r = client.get("/health")
+    r = client.get("/api/health")
     body = r.json()
     for name in ("alpha", "beta"):
         v = body["vaults"][name]
@@ -106,7 +106,7 @@ def test_health_empty_runtimes(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/health")
+    r = client.get("/api/health")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["vaults"] == {}
@@ -117,7 +117,7 @@ def test_health_no_top_level_vault_field(
     daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_health
-    body = client.get("/health").json()
+    body = client.get("/api/health").json()
     assert "vault" not in body
     assert "watchdog_running" not in body
     assert "jobs_queued" not in body
@@ -129,7 +129,7 @@ def test_health_jobs_alert_false_when_no_dead_letter(
     daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_health
-    body = client.get("/health").json()
+    body = client.get("/api/health").json()
     # Fresh vaults have no dead-letter jobs
     assert body["jobs_alert"] is False
 
@@ -138,7 +138,7 @@ def test_health_watchdog_running_in_vault_entry(
     daemon_with_two_vaults_health: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_health
-    body = client.get("/health").json()
+    body = client.get("/api/health").json()
     # With a real mounted vault the watchdog should be running
     assert body["vaults"]["alpha"]["watchdog_running"] is True
     assert body["vaults"]["beta"]["watchdog_running"] is True
@@ -149,7 +149,7 @@ def test_health_status_ok_when_all_healthy(
 ) -> None:
     """Status is 'ok' when all watchdogs are up and dead-letter count is low."""
     _daemon, client = daemon_with_two_vaults_health
-    body = client.get("/health").json()
+    body = client.get("/api/health").json()
     assert body["status"] == "ok"
 
 
@@ -163,5 +163,5 @@ def test_health_status_degraded_when_watchdog_down(
     assert observer is not None, "expected a running observer on alpha"
     # Patch _observer to None so is_running returns False
     monkeypatch.setattr(observer, "_observer", None)
-    body = client.get("/health").json()
+    body = client.get("/api/health").json()
     assert body["status"] == "degraded", f"expected degraded, got {body['status']}"

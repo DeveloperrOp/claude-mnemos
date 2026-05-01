@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MockAdapter from "axios-mock-adapter";
-import axios from "axios";
 import { Toaster } from "../components/ui/sonner";
 import i18n from "../i18n";
 import { apiClient } from "../api/client";
@@ -75,7 +74,7 @@ beforeAll(() => {
 let trayMock: MockAdapter;
 
 beforeEach(() => {
-  trayMock = new MockAdapter(axios);
+  trayMock = new MockAdapter(apiClient);
 });
 
 afterEach(() => {

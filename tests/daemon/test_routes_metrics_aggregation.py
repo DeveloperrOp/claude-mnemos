@@ -88,7 +88,7 @@ def daemon_with_two_vaults_metrics(
     with TestClient(daemon.app) as client:
         for name, vault in (("alpha", a), ("beta", b)):
             r = client.post(
-                "/projects",
+                "/api/projects",
                 json={"name": name, "vault_root": str(vault), "cwd_patterns": []},
             )
             assert r.status_code == 201, f"POST /projects for {name} failed: {r.text}"
@@ -123,7 +123,7 @@ def test_usage_aggregates_sessions_across_vaults(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage")
+    r = client.get("/api/metrics/usage")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["sessions_covered"] == 5 + 10  # 15
@@ -133,7 +133,7 @@ def test_usage_aggregates_tokens_across_vaults(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage")
+    r = client.get("/api/metrics/usage")
     assert r.status_code == 200, r.text
     body = r.json()
     # alpha: 5×1000=5000 in, 5×500=2500 out → 7500 injected
@@ -147,7 +147,7 @@ def test_usage_empty_runtimes(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/metrics/usage")
+    r = client.get("/api/metrics/usage")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["sessions_covered"] == 0
@@ -158,7 +158,7 @@ def test_usage_bad_period_returns_400(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/metrics/usage?period=oops")
+    r = client.get("/api/metrics/usage?period=oops")
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "invalid_period_format"
 
@@ -171,7 +171,7 @@ def test_usage_by_project_real_breakdown(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/by-project")
+    r = client.get("/api/metrics/usage/by-project")
     assert r.status_code == 200, r.text
     projects = {p["project"]: p for p in r.json()["projects"]}
     assert "alpha" in projects
@@ -182,7 +182,7 @@ def test_usage_by_project_has_correct_values(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/by-project")
+    r = client.get("/api/metrics/usage/by-project")
     assert r.status_code == 200, r.text
     projects = {p["project"]: p for p in r.json()["projects"]}
     assert projects["alpha"]["sessions_covered"] == 5
@@ -193,7 +193,7 @@ def test_usage_by_project_empty_when_no_runtimes(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/metrics/usage/by-project")
+    r = client.get("/api/metrics/usage/by-project")
     assert r.status_code == 200, r.text
     assert r.json() == {"projects": []}
 
@@ -206,7 +206,7 @@ def test_top_sessions_cross_vault_contains_both_vaults(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/top-sessions?limit=20")
+    r = client.get("/api/metrics/usage/top-sessions?limit=20")
     assert r.status_code == 200, r.text
     sessions = r.json()["sessions"]
     projects_seen = {s["project"] for s in sessions}
@@ -217,7 +217,7 @@ def test_top_sessions_sorted_descending(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/top-sessions?limit=5")
+    r = client.get("/api/metrics/usage/top-sessions?limit=5")
     assert r.status_code == 200, r.text
     sessions = r.json()["sessions"]
     if len(sessions) >= 2:
@@ -231,7 +231,7 @@ def test_top_sessions_respects_limit(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/top-sessions?limit=3")
+    r = client.get("/api/metrics/usage/top-sessions?limit=3")
     assert r.status_code == 200, r.text
     assert len(r.json()["sessions"]) == 3
 
@@ -240,7 +240,7 @@ def test_top_sessions_empty_runtimes(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/metrics/usage/top-sessions")
+    r = client.get("/api/metrics/usage/top-sessions")
     assert r.status_code == 200, r.text
     assert r.json() == {"sessions": []}
 
@@ -253,7 +253,7 @@ def test_timeline_merges_daily_no_duplicate_dates(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/timeline?period=30d")
+    r = client.get("/api/metrics/usage/timeline?period=30d")
     assert r.status_code == 200, r.text
     points = r.json()["points"]
     dates = [p["date"] for p in points]
@@ -264,7 +264,7 @@ def test_timeline_today_bucket_has_combined_sessions(
     daemon_with_two_vaults_metrics: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = daemon_with_two_vaults_metrics
-    r = client.get("/metrics/usage/timeline?period=30d")
+    r = client.get("/api/metrics/usage/timeline?period=30d")
     assert r.status_code == 200, r.text
     points = r.json()["points"]
     # The last point in the sorted list is today.
@@ -277,7 +277,7 @@ def test_timeline_empty_runtimes(
     empty_daemon: tuple[MnemosDaemon, TestClient],
 ) -> None:
     _daemon, client = empty_daemon
-    r = client.get("/metrics/usage/timeline?period=7d")
+    r = client.get("/api/metrics/usage/timeline?period=7d")
     assert r.status_code == 200, r.text
     points = r.json()["points"]
     # 7 zero-filled days

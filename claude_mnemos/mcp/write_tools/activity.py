@@ -16,5 +16,5 @@ async def undo_operation(
     return await call_daemon(
         client,
         "POST",
-        f"{daemon_url.rstrip('/')}/activity/{project}/{op_id}/undo",
+        f"{daemon_url.rstrip('/')}/api/activity/{project}/{op_id}/undo",
     )

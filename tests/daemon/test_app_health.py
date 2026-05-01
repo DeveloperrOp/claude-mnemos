@@ -23,7 +23,7 @@ async def client(app):
 
 
 async def test_health_returns_ok(client):
-    r = await client.get("/health")
+    r = await client.get("/api/health")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
@@ -33,7 +33,7 @@ async def test_health_includes_version(tmp_path: Path):
     app = create_app()
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     body = r.json()
     assert body["version"] == __version__
     assert "uptime_s" in body
@@ -63,14 +63,14 @@ async def test_health_includes_scheduler_jobs_when_daemon_attached(tmp_path: Pat
     app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     body = r.json()
     assert len(body["scheduler_jobs"]) == 1
     assert body["scheduler_jobs"][0]["id"] == "daily_snapshot"
 
 
 async def test_version_endpoint(client):
-    r = await client.get("/version")
+    r = await client.get("/api/version")
     assert r.status_code == 200
     body = r.json()
     assert body["version"] == __version__
@@ -99,7 +99,7 @@ async def test_unknown_route_falls_back_to_spa(client):
 
 async def test_health_default_empty_vaults(client):
     """No daemon attached → vaults dict is empty, alerts_count is 0."""
-    r = await client.get("/health")
+    r = await client.get("/api/health")
     body = r.json()
     assert body["vaults"] == {}
     assert body["alerts_count"] == 0
@@ -137,7 +137,7 @@ async def test_health_reports_running_observer(tmp_path: Path):
     app = create_app(daemon=daemon)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     body = r.json()
     assert body["vaults"]["alpha"]["watchdog_running"] is True
     assert body["alerts_count"] == 1
@@ -167,14 +167,14 @@ async def test_health_reports_observer_not_alive(tmp_path: Path):
     app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     body = r.json()
     assert body["vaults"]["alpha"]["watchdog_running"] is False
 
 
 async def test_health_jobs_counts_default(client):
     """No daemon → vaults empty, jobs_alert false."""
-    r = await client.get("/health")
+    r = await client.get("/api/health")
     body = r.json()
     assert body["vaults"] == {}
     assert body["jobs_alert"] is False
@@ -210,7 +210,7 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
     app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     store.close()
     body = r.json()
     assert body["vaults"]["alpha"]["jobs_dead_letter"] == 11
@@ -219,7 +219,7 @@ async def test_health_jobs_alert_threshold(tmp_path: Path):
 
 async def test_health_queue_paused_until_default_none(client):
     """No daemon attached → queue_paused_until is None."""
-    r = await client.get("/health")
+    r = await client.get("/api/health")
     body = r.json()
     assert body["queue_paused_until"] is None
 
@@ -259,7 +259,7 @@ async def test_health_queue_paused_until_aggregates_max(tmp_path: Path):
     app = create_app(daemon=FakeDaemon())
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/health")
+        r = await c.get("/api/health")
     store_a.close()
     store_b.close()
     body = r.json()
