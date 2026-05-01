@@ -22,8 +22,9 @@ const WORKFLOWS_KEYS = [
   "snapshot", "restore", "lint", "metrics", "rename", "delete",
 ] as const;
 const TROUBLESHOOTING_KEYS = [
-  "daemon_down", "ingest_failing", "inject_not_working", "mount_failed",
-  "no_subscription", "tray_issues", "tray_closed", "vault_spaces", "rate_limit",
+  "daemon_down", "daemon_crash_loop", "ingest_failing", "inject_not_working",
+  "suggestion_bombardment", "mount_failed", "no_subscription",
+  "tray_issues", "tray_closed", "vault_spaces", "rate_limit",
 ] as const;
 
 function MultiPara({ value }: { value: string }) {
