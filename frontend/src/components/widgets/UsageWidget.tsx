@@ -20,7 +20,7 @@ export function UsageWidget() {
 
   if (data.tokens_injected === 0) {
     return (
-      <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Syringe className="h-4 w-4" />
         <span>{t("usage.no_data")}</span>
       </div>
@@ -30,18 +30,18 @@ export function UsageWidget() {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-2 text-sm" title={t("usage.title")}>
-        <Syringe className="h-4 w-4 text-[hsl(var(--primary))]" />
+        <Syringe className="h-4 w-4 text-primary" />
         <span>{formatTokens(data.tokens_injected)}</span>
-        <span className="text-[hsl(var(--muted-foreground))]">·</span>
+        <span className="text-muted-foreground">·</span>
         <span>{data.sessions_covered}</span>
         {data.tokens_per_byte !== null && (
           <>
-            <span className="text-[hsl(var(--muted-foreground))]">·</span>
+            <span className="text-muted-foreground">·</span>
             <span>{formatTokensPerByte(data.tokens_per_byte)} tok/B</span>
           </>
         )}
       </div>
-      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs text-muted-foreground">
         {t("metrics.inject_events", { count: data.inject_events_count })}
         {data.avg_compression_ratio !== null && (
           <>

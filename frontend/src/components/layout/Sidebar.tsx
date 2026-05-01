@@ -75,7 +75,7 @@ export function Sidebar() {
   return (
     <nav
       aria-label="primary"
-      className="flex flex-col gap-1 border-r bg-[hsl(var(--muted))] p-3"
+      className="flex flex-col gap-1 border-r bg-muted p-3"
     >
       <SidebarLink to="/" icon="📊" label={t("navigation.overview")} />
 
