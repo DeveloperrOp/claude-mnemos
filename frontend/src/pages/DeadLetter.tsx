@@ -22,7 +22,7 @@ export function DeadLetter() {
   const jobs = dlQuery.data ?? [];
   if (jobs.length === 0) {
     return (
-      <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+      <div className="py-12 text-center text-muted-foreground">
         {t("dead_letter.no_failed")}
       </div>
     );
@@ -31,7 +31,7 @@ export function DeadLetter() {
   return (
     <div className="space-y-3">
       <h1 className="text-xl font-semibold">{t("dead_letter.title")}</h1>
-      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs text-muted-foreground">
         {t("dead_letter.showing_n", { count: jobs.length })}
       </div>
       <div className="space-y-2">

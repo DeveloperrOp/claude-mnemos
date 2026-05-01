@@ -16,7 +16,7 @@ export function UsageByProjectTable({ rows }: Props) {
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <div className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+          <div className="py-6 text-center text-sm text-muted-foreground">
             {t("metrics.empty")}
           </div>
         ) : (

@@ -120,7 +120,7 @@ export function PageEdit() {
               type="text"
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
-              className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -129,7 +129,7 @@ export function PageEdit() {
               <select
                 value={form.type}
                 onChange={(e) => update("type", e.target.value)}
-                className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
+                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
               >
                 {PAGE_TYPES.map((v) => (
                   <option key={v} value={v}>
@@ -143,7 +143,7 @@ export function PageEdit() {
               <select
                 value={form.status}
                 onChange={(e) => update("status", e.target.value)}
-                className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
+                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
               >
                 {PAGE_STATUSES.map((v) => (
                   <option key={v} value={v}>
@@ -166,7 +166,7 @@ export function PageEdit() {
                     update("confidence", n);
                   }
                 }}
-                className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
+                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
               />
             </div>
           </div>
@@ -179,7 +179,7 @@ export function PageEdit() {
                 const next = Array.from(e.target.selectedOptions).map((o) => o.value);
                 update("flavor", next);
               }}
-              className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
             >
               {PAGE_FLAVORS.map((v) => (
                 <option key={v} value={v}>
@@ -191,7 +191,7 @@ export function PageEdit() {
           <div>
             <label className="text-xs font-medium">
               {t("pages.editor.aliases")}{" "}
-              <span className="text-[hsl(var(--muted-foreground))]">
+              <span className="text-muted-foreground">
                 — {t("pages.editor.aliases_hint")}
               </span>
             </label>
@@ -199,7 +199,7 @@ export function PageEdit() {
               type="text"
               value={form.aliases}
               onChange={(e) => update("aliases", e.target.value)}
-              className="mt-1 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
           <div>
@@ -210,16 +210,16 @@ export function PageEdit() {
               id="page-body"
               value={form.body}
               onChange={(e) => update("body", e.target.value)}
-              className="mt-1 h-96 w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 font-mono text-sm"
+              className="mt-1 h-96 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("pages.editor.preview")}
           </div>
-          <div className="rounded-md border bg-[hsl(var(--background))] p-4">
+          <div className="rounded-md border bg-background p-4">
             <MarkdownView body={form.body} />
           </div>
         </div>

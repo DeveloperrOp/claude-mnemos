@@ -14,13 +14,13 @@ export function SnapshotFilters({ value, onChange }: Props) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-[hsl(var(--muted-foreground))]">
+      <span className="text-muted-foreground">
         {t("snapshots.filter_kind")}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as KindFilter)}
-        className="rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+        className="rounded-md border bg-background px-2 py-1"
       >
         {KINDS.map((k) => (
           <option key={k} value={k}>

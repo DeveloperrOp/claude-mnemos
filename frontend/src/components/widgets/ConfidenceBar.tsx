@@ -13,7 +13,7 @@ export function ConfidenceBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className="relative h-1.5 w-24 overflow-hidden rounded-full bg-[hsl(var(--muted))]"
+        className="relative h-1.5 w-24 overflow-hidden rounded-full bg-muted"
         role="meter"
         aria-valuenow={pct}
         aria-valuemin={0}

@@ -87,10 +87,10 @@ export function IngestOverridesSection({ slug }: Props) {
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="ml-6 w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm font-mono"
+            className="ml-6 w-full rounded-md border bg-background px-2 py-1 text-sm font-mono"
           />
         ) : (
-          <p className="ml-6 text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="ml-6 text-xs text-muted-foreground">
             {t("settings.section.ingest.using_default", {
               value: global?.default_model ?? "?",
             })}
@@ -113,7 +113,7 @@ export function IngestOverridesSection({ slug }: Props) {
           <select
             value={languageHint}
             onChange={(e) => setLanguageHint(e.target.value as LangHint)}
-            className="ml-6 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+            className="ml-6 rounded-md border bg-background px-2 py-1"
           >
             <option value="auto">auto</option>
             <option value="uk">uk</option>
@@ -121,7 +121,7 @@ export function IngestOverridesSection({ slug }: Props) {
             <option value="en">en</option>
           </select>
         ) : (
-          <p className="ml-6 text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="ml-6 text-xs text-muted-foreground">
             {t("settings.section.ingest.using_default", {
               value: global?.default_language_hint ?? "?",
             })}
@@ -153,10 +153,10 @@ export function IngestOverridesSection({ slug }: Props) {
               const v = parseInt(e.target.value, 10);
               if (!Number.isNaN(v)) setMaxInputTokens(v);
             }}
-            className="ml-6 w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm"
+            className="ml-6 w-32 rounded-md border bg-background px-2 py-1 text-sm"
           />
         ) : (
-          <p className="ml-6 text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="ml-6 text-xs text-muted-foreground">
             {t("settings.section.ingest.using_default", {
               value: String(global?.default_max_input_tokens ?? "?"),
             })}
@@ -182,10 +182,10 @@ export function IngestOverridesSection({ slug }: Props) {
               const v = parseInt(e.target.value, 10);
               if (!Number.isNaN(v)) setContextLimit(v);
             }}
-            className="ml-6 w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm"
+            className="ml-6 w-32 rounded-md border bg-background px-2 py-1 text-sm"
           />
         ) : (
-          <p className="ml-6 text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="ml-6 text-xs text-muted-foreground">
             {t("settings.section.ingest.using_default", { value: "—" })}
           </p>
         )}

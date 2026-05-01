@@ -45,7 +45,7 @@ export function GlobalGeneralSection() {
       errorMessage={mut.isError ? (mut.error as Error).message : null}
     >
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.general.locale")}
         </label>
         <div className="flex gap-3">
@@ -63,7 +63,7 @@ export function GlobalGeneralSection() {
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.general.daemon_port")}
         </label>
         <input
@@ -73,7 +73,7 @@ export function GlobalGeneralSection() {
           step={1}
           value={daemonPort}
           onChange={(e) => setDaemonPort(Number(e.target.value))}
-          className="w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="w-32 rounded-md border bg-background px-2 py-1"
         />
       </div>
     </SettingsAccordion>

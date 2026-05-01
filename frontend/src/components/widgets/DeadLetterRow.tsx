@@ -18,9 +18,9 @@ export function DeadLetterRow({ job: j }: { job: Job }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm">
+      <div className="flex items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
         <ProjectBadge name={j.project_name} />
-        <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-0.5 text-xs">
+        <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
           {j.kind}
         </span>
         <div className="min-w-0 flex-1">
@@ -28,11 +28,11 @@ export function DeadLetterRow({ job: j }: { job: Job }) {
             <span className="font-mono text-xs" title={j.id}>
               {j.id.slice(0, 8)}…
             </span>
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="text-xs text-muted-foreground">
               {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: JOB_MAX_ATTEMPTS })}
             </span>
             {j.finished_at && (
-              <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              <span className="text-xs text-muted-foreground">
                 · {formatDateTime(j.finished_at, i18n.language)}
               </span>
             )}

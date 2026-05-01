@@ -180,10 +180,10 @@ export function DirectoryPicker({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-2xl rounded-md border bg-[hsl(var(--background))] p-4 shadow-lg">
+      <div className="w-full max-w-2xl rounded-md border bg-background p-4 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t("picker.title")}</h2>
-          <button onClick={onClose} className="text-sm text-[hsl(var(--muted-foreground))]" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-sm text-muted-foreground" aria-label="Close">×</button>
         </div>
 
         <div className="mt-3 space-y-2">
@@ -192,18 +192,18 @@ export function DirectoryPicker({
             onChange={(e) => setPathInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") navigateTo(pathInputValue); }}
             placeholder={t("picker.path_placeholder")}
-            className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
           />
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={goToDrives}
-              className="text-xs text-[hsl(var(--primary))] underline"
+              className="text-xs text-primary underline"
             >
               🖥 {t("picker.computer")}
             </button>
-            <div className="flex flex-wrap gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+            <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
               {breadcrumbs.map((b, i) => (
                 <span key={b.path}>
                   {i > 0 && " > "}
@@ -222,13 +222,13 @@ export function DirectoryPicker({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t("picker.filter_placeholder")}
-            className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           />
         </div>
 
         {recent.length > 0 && !drivesView && (
           <div className="mt-3 border-t pt-2">
-            <div className="text-xs font-medium text-[hsl(var(--muted-foreground))]">{t("picker.recent")}</div>
+            <div className="text-xs font-medium text-muted-foreground">{t("picker.recent")}</div>
             <ul className="mt-1 space-y-0.5 text-xs">
               {recent.map((p) => (
                 <li key={p}>
@@ -245,19 +245,19 @@ export function DirectoryPicker({
         )}
 
         <div className="mt-3 max-h-64 overflow-y-auto rounded-md border">
-          {loading && <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">{t("picker.loading")}</div>}
+          {loading && <div className="p-3 text-sm text-muted-foreground">{t("picker.loading")}</div>}
           {error && <div className="p-3 text-sm text-red-700">{error}</div>}
           {!loading && !error && drivesView && drives.map((d) => (
             <button
               key={d.path}
               onClick={() => navigateTo(d.path)}
-              className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
             >
               💿 {d.name}
             </button>
           ))}
           {!loading && !error && !drivesView && visibleEntries.length === 0 && (
-            <div className="p-3 text-sm text-[hsl(var(--muted-foreground))]">{t("picker.empty")}</div>
+            <div className="p-3 text-sm text-muted-foreground">{t("picker.empty")}</div>
           )}
           {!loading && !error && !drivesView && visibleEntries.map((e) => {
             const isDir = e.type === "directory";
@@ -272,14 +272,14 @@ export function DirectoryPicker({
                     onSelect(e.path);
                   }
                 }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
               >
                 {isDir ? "📁" : "📄"} {e.name}
               </button>
             );
           })}
           {!drivesView && data?.truncated && (
-            <div className="p-2 text-xs text-[hsl(var(--muted-foreground))]">
+            <div className="p-2 text-xs text-muted-foreground">
               {t("picker.truncated")}
             </div>
           )}
@@ -290,7 +290,7 @@ export function DirectoryPicker({
             {!showNewFolder ? (
               <button
                 onClick={() => setShowNewFolder(true)}
-                className="text-xs text-[hsl(var(--primary))] underline"
+                className="text-xs text-primary underline"
               >
                 + {t("picker.new_folder")}
               </button>
@@ -300,7 +300,7 @@ export function DirectoryPicker({
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   placeholder={t("picker.folder_name")}
-                  className="flex-1 rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-sm font-mono"
+                  className="flex-1 rounded-md border bg-background px-2 py-1 text-sm font-mono"
                 />
                 <Button size="sm" onClick={handleMkdir}>{t("picker.create")}</Button>
                 <Button size="sm" variant="outline" onClick={() => { setShowNewFolder(false); setNewFolderName(""); }}>

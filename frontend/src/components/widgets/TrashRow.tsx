@@ -24,19 +24,19 @@ export function TrashRow({ entry: e }: { entry: TrashEntry }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm">
+      <div className="flex items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-mono">
               {e.page_basename ?? e.original_path ?? e.trash_id}
             </span>
             {e.operation_type && (
-              <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 {e.operation_type}
               </span>
             )}
           </div>
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("trash.deleted_at")}: {formatDateTime(e.deleted_at, i18n.language)}
           </div>
           {!e.restorable && e.restore_blocked_reason && (

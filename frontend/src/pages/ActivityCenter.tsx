@@ -39,7 +39,7 @@ export function ActivityCenter() {
   const total = activityQuery.data?.total ?? 0;
   if (total === 0) {
     return (
-      <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+      <div className="py-12 text-center text-muted-foreground">
         {t("activity.no_activity")}
       </div>
     );
@@ -52,7 +52,7 @@ export function ActivityCenter() {
         if (!group || group.entries.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {t(`activity.groups.${key}`)}
               <span className="ml-2 font-normal">({group.entries.length})</span>
             </h2>

@@ -41,12 +41,12 @@ export function LostSessions() {
       </div>
 
       {sessions.length === 0 ? (
-        <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+        <div className="py-12 text-center text-muted-foreground">
           {t("lost_sessions.no_lost")}
         </div>
       ) : (
         <>
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("lost_sessions.showing_n", { count: sessions.length })}
           </div>
           <div className="space-y-2">

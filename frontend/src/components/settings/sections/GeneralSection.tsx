@@ -73,9 +73,9 @@ export function GeneralSection({ project }: Props) {
           type="text"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
         />
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="text-xs text-muted-foreground">
           {t("settings.section.general.display_name_hint")}
         </p>
       </div>
@@ -89,17 +89,17 @@ export function GeneralSection({ project }: Props) {
             type="text"
             value={project.name}
             readOnly
-            className="flex-1 rounded-md border bg-[hsl(var(--muted))] px-3 py-2 text-sm font-mono"
+            className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono"
           />
           <button
             type="button"
             onClick={() => copy(project.name)}
-            className="text-xs text-[hsl(var(--primary))] underline"
+            className="text-xs text-primary underline"
           >
             {t("settings.section.general.copy")}
           </button>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="text-xs text-muted-foreground">
           {t("settings.section.general.slug_hint")}
         </p>
       </div>
@@ -113,7 +113,7 @@ export function GeneralSection({ project }: Props) {
             type="text"
             value={vaultRoot}
             onChange={(e) => setVaultRoot(e.target.value)}
-            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm font-mono"
           />
           <Button
             type="button"
@@ -126,12 +126,12 @@ export function GeneralSection({ project }: Props) {
           <button
             type="button"
             onClick={() => copy(vaultRoot)}
-            className="text-xs text-[hsl(var(--primary))] underline"
+            className="text-xs text-primary underline"
           >
             {t("settings.section.general.copy")}
           </button>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="text-xs text-muted-foreground">
           {t("settings.section.general.vault_hint")}
         </p>
         {vaultChanged && (

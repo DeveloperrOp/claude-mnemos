@@ -68,12 +68,12 @@ export function Snapshots() {
     <div className="space-y-3">
       {headerControls}
       {empty ? (
-        <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+        <div className="py-12 text-center text-muted-foreground">
           {t("snapshots.no_snapshots")}
         </div>
       ) : (
         <>
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("snapshots.showing_n", { count: filtered.length })}
           </div>
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -102,7 +102,7 @@ export function Snapshots() {
               onChange={(e) => setLabel(e.target.value)}
               maxLength={128}
               disabled={create.isPending}
-              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               placeholder={t("snapshots.create_label_placeholder")}
               autoFocus
             />

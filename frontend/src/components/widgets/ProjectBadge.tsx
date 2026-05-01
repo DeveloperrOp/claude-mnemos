@@ -9,14 +9,14 @@ interface Props {
 
 export function ProjectBadge({ name, linkTo = true, className }: Props) {
   const baseClasses = cn(
-    "inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-1.5 py-0.5 font-mono text-xs text-[hsl(var(--muted-foreground))]",
+    "inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground",
     className,
   );
   if (!linkTo) return <span className={baseClasses}>{name}</span>;
   return (
     <Link
       to={`/project/${encodeURIComponent(name)}`}
-      className={cn(baseClasses, "hover:bg-[hsl(var(--accent))] hover:underline")}
+      className={cn(baseClasses, "hover:bg-accent hover:underline")}
     >
       {name}
     </Link>

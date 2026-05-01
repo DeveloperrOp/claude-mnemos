@@ -48,7 +48,7 @@ export function PageFilters({ state, onChange }: Props) {
         placeholder={t("pages.filters.search_placeholder")}
         value={state.search}
         onChange={(e) => onChange({ ...state, search: e.target.value })}
-        className="w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+        className="w-full rounded-md border bg-background px-2 py-1"
       />
 
       <Section title={t("pages.filters.type")}>
@@ -88,7 +88,7 @@ export function PageFilters({ state, onChange }: Props) {
         <select
           value={state.sort}
           onChange={(e) => onChange({ ...state, sort: e.target.value as SortMode })}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1 text-xs"
+          className="w-full rounded-md border bg-background px-2 py-1 text-xs"
         >
           <option value="updated">{t("pages.filters.sort_updated")}</option>
           <option value="created">{t("pages.filters.sort_created")}</option>
@@ -111,7 +111,7 @@ export function PageFilters({ state, onChange }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <div className="text-xs font-semibold uppercase text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs font-semibold uppercase text-muted-foreground">
         {title}
       </div>
       {children}

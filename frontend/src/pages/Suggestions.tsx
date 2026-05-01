@@ -29,12 +29,12 @@ export function Suggestions() {
     <div className="space-y-3">
       <SuggestionFilters value={status} onChange={setStatus} />
       {items.length === 0 ? (
-        <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+        <div className="py-12 text-center text-muted-foreground">
           {t("suggestions.no_suggestions")}
         </div>
       ) : (
         <>
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("suggestions.showing_n", { count: items.length })}
           </div>
           <div className="grid gap-3 lg:grid-cols-2">

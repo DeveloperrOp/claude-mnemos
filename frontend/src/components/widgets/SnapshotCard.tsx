@@ -43,15 +43,15 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-1 text-xs">
-          <div className="text-[hsl(var(--muted-foreground))]">{formatDateTime(s.timestamp, i18n.language)}</div>
+          <div className="text-muted-foreground">{formatDateTime(s.timestamp, i18n.language)}</div>
           {s.label && (
             <div>
-              <span className="text-[hsl(var(--muted-foreground))]">{t("snapshots.label")}: </span>
+              <span className="text-muted-foreground">{t("snapshots.label")}: </span>
               <span>{s.label}</span>
             </div>
           )}
           {s.op_id && (
-            <div className="text-[hsl(var(--muted-foreground))]">
+            <div className="text-muted-foreground">
               {t("snapshots.op_id")}: <code>{s.op_id}</code>
               {s.op_type && (
                 <>
@@ -60,7 +60,7 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
               )}
             </div>
           )}
-          <div className="text-[hsl(var(--muted-foreground))]">
+          <div className="text-muted-foreground">
             {t("snapshots.size")}: {formatBytes(s.size_bytes)}
           </div>
           <div className="flex items-center gap-2 pt-2">

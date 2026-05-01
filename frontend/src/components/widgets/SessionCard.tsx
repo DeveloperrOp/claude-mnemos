@@ -21,7 +21,7 @@ interface Props {
 export function SessionCard({ project, session: s }: Props) {
   const { t, i18n } = useTranslation();
   return (
-    <Card className="transition-colors hover:bg-[hsl(var(--muted))]">
+    <Card className="transition-colors hover:bg-muted">
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <Link
@@ -44,24 +44,24 @@ export function SessionCard({ project, session: s }: Props) {
       <CardContent className="space-y-1 text-xs">
         {s.model && (
           <div>
-            <span className="text-[hsl(var(--muted-foreground))]">{t("sessions.model")}: </span>
+            <span className="text-muted-foreground">{t("sessions.model")}: </span>
             <code>{s.model}</code>
           </div>
         )}
         {(s.input_tokens !== null || s.output_tokens !== null) && (
-          <div className="text-[hsl(var(--muted-foreground))]">
-            {t("sessions.tokens_in")}: <span className="text-[hsl(var(--foreground))]">{s.input_tokens ?? "—"}</span>
+          <div className="text-muted-foreground">
+            {t("sessions.tokens_in")}: <span className="text-foreground">{s.input_tokens ?? "—"}</span>
             {" · "}
-            {t("sessions.tokens_out")}: <span className="text-[hsl(var(--foreground))]">{s.output_tokens ?? "—"}</span>
+            {t("sessions.tokens_out")}: <span className="text-foreground">{s.output_tokens ?? "—"}</span>
           </div>
         )}
         {s.created_pages.length > 0 && (
-          <div className="text-[hsl(var(--muted-foreground))]">
+          <div className="text-muted-foreground">
             {t("sessions.created_pages")}: {s.created_pages.length}
           </div>
         )}
         {s.ingested_at && (
-          <div className="text-[hsl(var(--muted-foreground))]">
+          <div className="text-muted-foreground">
             {t("sessions.ingested_at")}: {formatDateTime(s.ingested_at, i18n.language)}
           </div>
         )}

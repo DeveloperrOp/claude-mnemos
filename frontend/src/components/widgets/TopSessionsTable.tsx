@@ -14,11 +14,11 @@ export function TopSessionsTable({ rows }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{t("metrics.top_sessions_title")}</CardTitle>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("metrics.top_sessions_subtitle")}</p>
+        <p className="text-xs text-muted-foreground">{t("metrics.top_sessions_subtitle")}</p>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <div className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+          <div className="py-6 text-center text-sm text-muted-foreground">
             {t("metrics.empty")}
           </div>
         ) : (

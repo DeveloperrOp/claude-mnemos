@@ -8,14 +8,14 @@ export function DaemonDownAlert({ error }: { error: unknown }) {
         ⚠ {t("overview.daemon_down_title")}
       </h2>
       <p className="mb-2 text-sm">{t("overview.daemon_down_hint_cmd")}</p>
-      <pre className="mb-2 rounded bg-[hsl(var(--muted))] p-2 text-xs">
+      <pre className="mb-2 rounded bg-muted p-2 text-xs">
         {t("overview.daemon_down_hint_command")}
       </pre>
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <p className="text-sm text-muted-foreground">
         {t("overview.daemon_down_reconnect")}
       </p>
       {error instanceof Error && (
-        <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="mt-2 text-xs text-muted-foreground">
           {error.message}
         </p>
       )}

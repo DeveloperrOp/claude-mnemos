@@ -21,7 +21,7 @@ export function Trash() {
   const entries = trashQuery.data?.entries ?? [];
   if (entries.length === 0) {
     return (
-      <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+      <div className="py-12 text-center text-muted-foreground">
         {t("trash.no_entries")}
       </div>
     );
@@ -29,7 +29,7 @@ export function Trash() {
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs text-muted-foreground">
         {t("trash.showing_n", { count: entries.length })}
       </div>
       {entries.map((e) => (

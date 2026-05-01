@@ -69,7 +69,7 @@ function Help() {
         <ul className="space-y-1 text-sm">
           {SECTIONS.map((s) => (
             <li key={s}>
-              <a href={`#${s}`} className="text-[hsl(var(--primary))] hover:underline">
+              <a href={`#${s}`} className="text-primary hover:underline">
                 {t(`help.nav.${s}`)}
               </a>
             </li>
@@ -112,8 +112,8 @@ function Help() {
               <dl className="space-y-2 text-sm">
                 {GLOSSARY.map(([key, label]) => (
                   <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr]">
-                    <dt className="font-mono text-[hsl(var(--primary))]">{label}</dt>
-                    <dd className="text-[hsl(var(--muted-foreground))]">{t(`help.concepts.glossary_def_${key}`)}</dd>
+                    <dt className="font-mono text-primary">{label}</dt>
+                    <dd className="text-muted-foreground">{t(`help.concepts.glossary_def_${key}`)}</dd>
                   </div>
                 ))}
               </dl>
@@ -167,7 +167,7 @@ function Help() {
             <CardContent className="space-y-2 pt-4 text-sm">
               <MultiPara value={t("help.about.body")} />
               <div className="pt-2">
-                <span className="text-[hsl(var(--muted-foreground))]">{t("help.about.version_label")}: </span>
+                <span className="text-muted-foreground">{t("help.about.version_label")}: </span>
                 <code>{version}</code>
               </div>
             </CardContent>

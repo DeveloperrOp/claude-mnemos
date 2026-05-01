@@ -38,8 +38,8 @@ export function PageDetail() {
     return (
       <div className="mx-auto max-w-xl space-y-2 py-12 text-center">
         <h1 className="text-2xl font-semibold">{t("pages.not_found_title")}</h1>
-        <p className="text-[hsl(var(--muted-foreground))]">{pageRef}</p>
-        <Link to={`/project/${project}/pages`} className="text-[hsl(var(--primary))] underline">
+        <p className="text-muted-foreground">{pageRef}</p>
+        <Link to={`/project/${project}/pages`} className="text-primary underline">
           {t("pages.not_found_hint")}
         </Link>
       </div>
@@ -61,7 +61,7 @@ export function PageDetail() {
   return (
     <article className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <Link to={`/project/${project}/pages`} className="text-sm text-[hsl(var(--primary))] underline">
+        <Link to={`/project/${project}/pages`} className="text-sm text-primary underline">
           ← {t("navigation.pages")}
         </Link>
         <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ export function PageDetail() {
 
       <header className="space-y-2 border-b pb-4">
         <h1 data-testid="page-title" className="text-3xl font-bold">{fm.title}</h1>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>{t(`wiki.type.${fm.type}`)}</span>
           <StatusBadge status={fm.status} />
           <ConfidenceBar value={fm.confidence} />
@@ -130,7 +130,7 @@ export function PageDetail() {
         {backlinksQuery.isLoading ? (
           <Skeleton className="h-16" />
         ) : (backlinksQuery.data?.length ?? 0) === 0 ? (
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("pages.no_backlinks")}
           </div>
         ) : (
@@ -139,7 +139,7 @@ export function PageDetail() {
               <li key={b}>
                 <Link
                   to={pageHref(project!, b)}
-                  className="text-[hsl(var(--primary))] hover:underline"
+                  className="text-primary hover:underline"
                 >
                   {b}
                 </Link>

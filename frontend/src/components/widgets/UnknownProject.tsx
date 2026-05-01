@@ -8,12 +8,12 @@ export function UnknownProject({ name }: { name: string }) {
       <h1 className="text-2xl font-semibold">
         {t("project_view.unknown_title")}
       </h1>
-      <p className="text-[hsl(var(--muted-foreground))]">
-        <code className="rounded bg-[hsl(var(--muted))] px-1.5">{name}</code>
+      <p className="text-muted-foreground">
+        <code className="rounded bg-muted px-1.5">{name}</code>
         {" — "}
         {t("project_view.unknown_hint")}
       </p>
-      <Link to="/" className="text-[hsl(var(--primary))] underline">
+      <Link to="/" className="text-primary underline">
         {t("placeholder.back_link")}
       </Link>
     </div>

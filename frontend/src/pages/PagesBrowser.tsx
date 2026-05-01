@@ -87,7 +87,7 @@ export function PagesBrowser() {
   const totalPaths = pagesQuery.data?.length ?? 0;
   if (totalPaths === 0) {
     return (
-      <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+      <div className="py-12 text-center text-muted-foreground">
         {t("pages.no_pages")}
       </div>
     );
@@ -99,7 +99,7 @@ export function PagesBrowser() {
     <div className="grid grid-cols-[16rem_1fr] gap-6">
       <PageFilters state={filters} onChange={setFilters} />
       <div className="space-y-3">
-        <div className="text-xs text-[hsl(var(--muted-foreground))]">
+        <div className="text-xs text-muted-foreground">
           {t("pages.showing_n_of_m", { shown: filteredSorted.length, total: totalPaths })}
           {stillLoading && <> · {t("pages.loading_frontmatter")}</>}
         </div>

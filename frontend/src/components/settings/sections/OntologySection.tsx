@@ -66,7 +66,7 @@ export function OntologySection({ slug }: Props) {
         <span>{t("settings.section.ontology.auto_mode")}</span>
       </label>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.section.ontology.confidence_min")}
         </label>
         <input
@@ -76,11 +76,11 @@ export function OntologySection({ slug }: Props) {
           step={0.01}
           value={confMin}
           onChange={(e) => setConfMin(Number(e.target.value))}
-          className="w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="w-32 rounded-md border bg-background px-2 py-1"
         />
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.section.ontology.confidence_auto_apply")}
         </label>
         <input
@@ -90,7 +90,7 @@ export function OntologySection({ slug }: Props) {
           step={0.01}
           value={confAuto}
           onChange={(e) => setConfAuto(Number(e.target.value))}
-          className="w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="w-32 rounded-md border bg-background px-2 py-1"
         />
       </div>
     </SettingsAccordion>

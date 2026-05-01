@@ -29,7 +29,7 @@ export function SettingsAccordion({
   const saveLabel = saving ? t("settings.saving") : t("settings.save");
 
   return (
-    <section className="rounded-md border bg-[hsl(var(--background))]">
+    <section className="rounded-md border bg-background">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
@@ -37,14 +37,14 @@ export function SettingsAccordion({
         aria-expanded={open}
       >
         <span className="text-sm font-medium">{title}</span>
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+        <span className="text-xs text-muted-foreground">
           {open ? "▴" : "▾"}
         </span>
       </button>
       {open && (
         <div className="space-y-3 border-t px-4 py-3 text-sm">
           {hint && (
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">{hint}</p>
+            <p className="text-xs text-muted-foreground">{hint}</p>
           )}
           {children}
           {errorMessage && (

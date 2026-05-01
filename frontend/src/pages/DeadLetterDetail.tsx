@@ -26,8 +26,8 @@ export function DeadLetterDetail() {
     return (
       <div className="mx-auto max-w-xl space-y-2 py-12 text-center">
         <h1 className="text-2xl font-semibold">{t("dead_letter.not_found_title")}</h1>
-        <p className="text-[hsl(var(--muted-foreground))]">{jobId}</p>
-        <Link to="/dead-letter" className="text-[hsl(var(--primary))] underline">
+        <p className="text-muted-foreground">{jobId}</p>
+        <Link to="/dead-letter" className="text-primary underline">
           {t("dead_letter.not_found_hint")}
         </Link>
       </div>
@@ -39,7 +39,7 @@ export function DeadLetterDetail() {
   return (
     <article className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
-        <Link to="/dead-letter" className="text-sm text-[hsl(var(--primary))] underline">
+        <Link to="/dead-letter" className="text-sm text-primary underline">
           ←
         </Link>
         <div className="flex items-center gap-2">
@@ -71,26 +71,26 @@ export function DeadLetterDetail() {
           <ProjectBadge name={j.project_name} />
           <span className="font-mono text-xl">{j.id}</span>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="text-xs text-muted-foreground">
           {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: JOB_MAX_ATTEMPTS })}
           {j.finished_at && <> · {t("dead_letter.finished_at")}: {formatDateTime(j.finished_at, i18n.language)}</>}
         </p>
       </header>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.kind")}</dt>
+        <dt className="text-muted-foreground">{t("dead_letter.kind")}</dt>
         <dd><code>{j.kind}</code></dd>
-        <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.created_at")}</dt>
+        <dt className="text-muted-foreground">{t("dead_letter.created_at")}</dt>
         <dd>{formatDateTime(j.created_at, i18n.language)}</dd>
         {j.started_at && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.started_at")}</dt>
+            <dt className="text-muted-foreground">{t("dead_letter.started_at")}</dt>
             <dd>{formatDateTime(j.started_at, i18n.language)}</dd>
           </>
         )}
         {j.finished_at && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("dead_letter.finished_at")}</dt>
+            <dt className="text-muted-foreground">{t("dead_letter.finished_at")}</dt>
             <dd>{formatDateTime(j.finished_at, i18n.language)}</dd>
           </>
         )}
@@ -106,7 +106,7 @@ export function DeadLetterDetail() {
       {j.error_traceback && (
         <section>
           <h2 className="mb-2 text-sm font-semibold">{t("dead_letter.traceback")}</h2>
-          <pre className="overflow-x-auto rounded bg-[hsl(var(--muted))] p-3 text-xs">
+          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
             {j.error_traceback}
           </pre>
         </section>
@@ -114,7 +114,7 @@ export function DeadLetterDetail() {
 
       <section>
         <h2 className="mb-2 text-sm font-semibold">{t("dead_letter.payload")}</h2>
-        <pre className="overflow-x-auto rounded bg-[hsl(var(--muted))] p-3 text-xs">
+        <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
           {JSON.stringify(j.payload, null, 2)}
         </pre>
       </section>

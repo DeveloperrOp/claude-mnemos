@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 export function NoProjectsCallout() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto max-w-2xl rounded-lg border bg-[hsl(var(--muted))] p-6 text-center">
+    <div className="mx-auto max-w-2xl rounded-lg border bg-muted p-6 text-center">
       <h2 className="mb-3 text-lg font-semibold">
         🧠 {t("overview.no_projects_title")}
       </h2>
@@ -13,7 +13,7 @@ export function NoProjectsCallout() {
         <Link to="/onboarding">{t("overview.no_projects_cta")}</Link>
       </Button>
       <p className="mb-2 text-sm">{t("overview.no_projects_hint_cmd")}</p>
-      <pre className="rounded bg-[hsl(var(--background))] p-2 text-xs">
+      <pre className="rounded bg-background p-2 text-xs">
         {t("overview.no_projects_hint_command")}
       </pre>
     </div>

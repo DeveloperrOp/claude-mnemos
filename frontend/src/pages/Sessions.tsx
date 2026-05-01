@@ -36,7 +36,7 @@ export function Sessions() {
     return (
       <div className="space-y-3">
         <SessionFilters state={filters} onChange={setFilters} />
-        <div className="py-12 text-center text-[hsl(var(--muted-foreground))]">
+        <div className="py-12 text-center text-muted-foreground">
           {t("sessions.no_sessions")}
         </div>
       </div>
@@ -46,7 +46,7 @@ export function Sessions() {
   return (
     <div className="space-y-3">
       <SessionFilters state={filters} onChange={setFilters} />
-      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs text-muted-foreground">
         {t("sessions.showing_n_of_m", { shown: sessions.length, total })}
       </div>
       <div className="grid gap-3 lg:grid-cols-2">

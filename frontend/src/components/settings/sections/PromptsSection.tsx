@@ -69,7 +69,7 @@ export function PromptsSection({ slug }: Props) {
       errorMessage={mut.isError ? (mut.error as Error).message : null}
     >
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.section.prompts.custom_system_path")}
         </label>
         <div className="flex gap-2">
@@ -77,7 +77,7 @@ export function PromptsSection({ slug }: Props) {
             type="text"
             value={systemPath}
             onChange={(e) => setSystemPath(e.target.value)}
-            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
+            className="flex-1 rounded-md border bg-background px-2 py-1 font-mono text-xs"
           />
           <Button
             type="button"
@@ -90,7 +90,7 @@ export function PromptsSection({ slug }: Props) {
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.section.prompts.custom_extract_user_path")}
         </label>
         <div className="flex gap-2">
@@ -98,7 +98,7 @@ export function PromptsSection({ slug }: Props) {
             type="text"
             value={extractUserPath}
             onChange={(e) => setExtractUserPath(e.target.value)}
-            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono text-xs"
+            className="flex-1 rounded-md border bg-background px-2 py-1 font-mono text-xs"
           />
           <Button
             type="button"

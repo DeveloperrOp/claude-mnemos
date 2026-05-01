@@ -34,7 +34,7 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div
-          className="truncate text-xs text-[hsl(var(--muted-foreground))]"
+          className="truncate text-xs text-muted-foreground"
           title={project.vault_root}
         >
           {project.vault_root}
@@ -60,7 +60,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-0.5">
       <div className="text-lg font-semibold">{value}</div>
-      <div className="text-[10px] uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
     </div>

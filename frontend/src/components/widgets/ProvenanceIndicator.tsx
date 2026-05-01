@@ -9,7 +9,7 @@ export function ProvenanceIndicator({ counts }: Props) {
   const total = counts.extracted_pct + counts.inferred_pct + counts.ambiguous_pct;
   if (total === 0) return null;
   return (
-    <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <span title="extracted">
         <span aria-hidden="true">📋 </span>
         {counts.extracted_pct}%

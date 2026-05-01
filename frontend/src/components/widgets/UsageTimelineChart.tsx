@@ -22,7 +22,7 @@ export function UsageTimelineChart({ points }: Props) {
 
   if (isEmpty) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-md border bg-[hsl(var(--muted))] text-sm text-[hsl(var(--muted-foreground))]">
+      <div className="flex h-72 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
         {t("metrics.timeline_empty")}
       </div>
     );

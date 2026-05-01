@@ -21,10 +21,10 @@ export function ActivityDetail() {
     return (
       <div className="mx-auto max-w-xl space-y-2 py-12 text-center">
         <h1 className="text-2xl font-semibold">{t("activity.not_found_title")}</h1>
-        <p className="text-[hsl(var(--muted-foreground))]">{opId}</p>
+        <p className="text-muted-foreground">{opId}</p>
         <Link
           to={`/project/${project}/activity`}
-          className="text-[hsl(var(--primary))] underline"
+          className="text-primary underline"
         >
           {t("activity.not_found_hint")}
         </Link>
@@ -41,7 +41,7 @@ export function ActivityDetail() {
         <div className="flex items-center justify-between">
           <Link
             to={`/project/${project}/activity`}
-            className="text-sm text-[hsl(var(--primary))] underline"
+            className="text-sm text-primary underline"
           >
             ← {t("navigation.activity")}
           </Link>
@@ -61,18 +61,18 @@ export function ActivityDetail() {
           <h1 className="text-xl font-semibold">
             {t(`activity.op.${e.operation_type}`, e.operation_type)}
           </h1>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="text-xs text-muted-foreground">
             {e.id} · {e.timestamp}
           </p>
         </header>
 
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-[hsl(var(--muted-foreground))]">status</dt>
+          <dt className="text-muted-foreground">status</dt>
           <dd>{e.status}</dd>
 
           {e.snapshot_path && (
             <>
-              <dt className="text-[hsl(var(--muted-foreground))]">
+              <dt className="text-muted-foreground">
                 {t("activity.snapshot")}
               </dt>
               <dd className="break-all">
@@ -81,7 +81,7 @@ export function ActivityDetail() {
             </>
           )}
 
-          <dt className="text-[hsl(var(--muted-foreground))]">undo</dt>
+          <dt className="text-muted-foreground">undo</dt>
           <dd>
             {e.undone
               ? `${t("activity.undone")} ${e.undone_at ?? ""}`
@@ -101,7 +101,7 @@ export function ActivityDetail() {
                 <li key={p}>
                   <Link
                     to={pageHref(project!, p)}
-                    className="text-[hsl(var(--primary))] hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {p}
                   </Link>
@@ -113,7 +113,7 @@ export function ActivityDetail() {
 
         <section>
           <h2 className="mb-2 text-sm font-semibold">{t("activity.metadata")}</h2>
-          <pre className="overflow-x-auto rounded bg-[hsl(var(--muted))] p-3 text-xs">
+          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
             {JSON.stringify(e.metadata, null, 2)}
           </pre>
         </section>

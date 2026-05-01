@@ -19,7 +19,7 @@ export function Health() {
     return (
       <div className="mx-auto max-w-xl space-y-2 py-12 text-center">
         <h1 className="text-2xl font-semibold">{t("health.vault_not_mounted_title")}</h1>
-        <p className="text-[hsl(var(--muted-foreground))]">
+        <p className="text-muted-foreground">
           {project} — {t("health.vault_not_mounted_hint")}
         </p>
       </div>
@@ -52,7 +52,7 @@ export function Health() {
         <Card>
           <CardContent className="space-y-1 py-3">
             <div className="text-2xl font-semibold">{vh.jobs_queued}</div>
-            <div className="text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("health.jobs_queued")}
             </div>
           </CardContent>
@@ -60,7 +60,7 @@ export function Health() {
         <Card>
           <CardContent className="space-y-1 py-3">
             <div className="text-2xl font-semibold">{vh.jobs_running}</div>
-            <div className="text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("health.jobs_running")}
             </div>
           </CardContent>
@@ -68,13 +68,13 @@ export function Health() {
         <Card>
           <CardContent className="space-y-1 py-3">
             <div className="text-2xl font-semibold">{vh.jobs_dead_letter}</div>
-            <div className="text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("health.jobs_dead_letter")}
             </div>
             {vh.jobs_dead_letter > 0 && (
               <Link
                 to={`/dead-letter?project=${encodeURIComponent(project)}`}
-                className="text-xs text-[hsl(var(--primary))] underline"
+                className="text-xs text-primary underline"
               >
                 {t("health.view_failed_jobs")}
               </Link>
@@ -89,7 +89,7 @@ export function Health() {
         </CardHeader>
         <CardContent>
           {projectSchedulerJobs.length === 0 ? (
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+            <div className="text-sm text-muted-foreground">
               {t("health.no_scheduler_jobs")}
             </div>
           ) : (
@@ -115,7 +115,7 @@ export function Health() {
         </CardContent>
       </Card>
 
-      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+      <div className="text-xs text-muted-foreground">
         {t("health.alerts_count")}: {health?.alerts_count ?? 0}
       </div>
     </div>

@@ -63,20 +63,20 @@ export function SuggestionCard({ project, suggestion: s }: Props) {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="text-xs text-muted-foreground">
               {t("suggestions.confidence")}:
             </span>
             <ConfidenceBar value={fm.confidence} />
           </div>
 
           <div>
-            <div className="text-xs text-[hsl(var(--muted-foreground))]">
+            <div className="text-xs text-muted-foreground">
               {t("suggestions.affected_pages")}:
             </div>
             <ul className="mt-1 space-y-0.5 text-sm">
               {fm.affected_pages.map((p) => (
                 <li key={p}>
-                  <Link to={pageHref(project, p)} className="text-[hsl(var(--primary))] hover:underline">
+                  <Link to={pageHref(project, p)} className="text-primary hover:underline">
                     {p}
                   </Link>
                 </li>
@@ -86,24 +86,24 @@ export function SuggestionCard({ project, suggestion: s }: Props) {
 
           {fm.proposed_target && (
             <div className="text-sm">
-              <span className="text-[hsl(var(--muted-foreground))]">
+              <span className="text-muted-foreground">
                 {t("suggestions.proposed_target")}:
               </span>{" "}
-              <Link to={pageHref(project, fm.proposed_target)} className="text-[hsl(var(--primary))] hover:underline">
+              <Link to={pageHref(project, fm.proposed_target)} className="text-primary hover:underline">
                 {fm.proposed_target}
               </Link>
             </div>
           )}
 
           {fm.reason && (
-            <div className="rounded-md bg-[hsl(var(--muted))] px-3 py-2 text-sm italic">
+            <div className="rounded-md bg-muted px-3 py-2 text-sm italic">
               {t("suggestions.reason")}: {fm.reason}
             </div>
           )}
 
           {s.body && (
             <details>
-              <summary className="cursor-pointer text-xs text-[hsl(var(--muted-foreground))]">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
                 {t("suggestions.body_header")}
               </summary>
               <div className="mt-2">

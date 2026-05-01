@@ -50,7 +50,7 @@ export function TelemetrySection({ slug }: Props) {
         />
         <span>{t("settings.section.telemetry.opt_in")}</span>
       </label>
-      <p className="text-xs text-[hsl(var(--muted-foreground))]">
+      <p className="text-xs text-muted-foreground">
         {t("settings.section.telemetry.hint")}
       </p>
     </SettingsAccordion>

@@ -53,15 +53,15 @@ export function TypedConfirmDialog({
         </AlertDialogHeader>
         <div className="space-y-2">
           <label className="text-sm font-medium">{phraseLabel}</label>
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">
-            <code className="rounded bg-[hsl(var(--muted))] px-1.5 py-0.5">{expectedPhrase}</code>
+          <p className="text-xs text-muted-foreground">
+            <code className="rounded bg-muted px-1.5 py-0.5">{expectedPhrase}</code>
           </p>
           <input
             type="text"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             disabled={isPending}
-            className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             placeholder={t("confirm.typed_confirm_input_placeholder", { phrase: expectedPhrase })}
             autoFocus
           />

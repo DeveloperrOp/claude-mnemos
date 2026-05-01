@@ -29,7 +29,7 @@ function Metrics() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t("metrics.title")}</h1>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          <span className="text-xs text-muted-foreground">
             {t("metrics.period_filter_label")}:
           </span>
           {PERIODS.map((p) => (

@@ -27,8 +27,8 @@ export function SessionDetail() {
     return (
       <div className="mx-auto max-w-xl space-y-2 py-12 text-center">
         <h1 className="text-2xl font-semibold">{t("sessions.not_found_title")}</h1>
-        <p className="text-[hsl(var(--muted-foreground))]">{sid}</p>
-        <Link to={`/project/${project}/sessions`} className="text-[hsl(var(--primary))] underline">
+        <p className="text-muted-foreground">{sid}</p>
+        <Link to={`/project/${project}/sessions`} className="text-primary underline">
           {t("sessions.not_found_hint")}
         </Link>
       </div>
@@ -39,7 +39,7 @@ export function SessionDetail() {
   return (
     <article className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <Link to={`/project/${project}/sessions`} className="text-sm text-[hsl(var(--primary))] underline">
+        <Link to={`/project/${project}/sessions`} className="text-sm text-primary underline">
           ← {t("navigation.sessions")}
         </Link>
         <Button
@@ -76,31 +76,31 @@ export function SessionDetail() {
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
         {s.model && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("sessions.model")}</dt>
+            <dt className="text-muted-foreground">{t("sessions.model")}</dt>
             <dd><code>{s.model}</code></dd>
           </>
         )}
         {s.input_tokens !== null && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("sessions.tokens_in")}</dt>
+            <dt className="text-muted-foreground">{t("sessions.tokens_in")}</dt>
             <dd>{s.input_tokens.toLocaleString()}</dd>
           </>
         )}
         {s.output_tokens !== null && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("sessions.tokens_out")}</dt>
+            <dt className="text-muted-foreground">{t("sessions.tokens_out")}</dt>
             <dd>{s.output_tokens.toLocaleString()}</dd>
           </>
         )}
         {s.ingested_at && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("sessions.ingested_at")}</dt>
+            <dt className="text-muted-foreground">{t("sessions.ingested_at")}</dt>
             <dd>{s.ingested_at}</dd>
           </>
         )}
         {s.transcript_path && (
           <>
-            <dt className="text-[hsl(var(--muted-foreground))]">{t("sessions.transcript")}</dt>
+            <dt className="text-muted-foreground">{t("sessions.transcript")}</dt>
             <dd className="break-all"><code>{s.transcript_path}</code></dd>
           </>
         )}
@@ -109,7 +109,7 @@ export function SessionDetail() {
       <section>
         <h2 className="mb-2 text-sm font-semibold">{t("sessions.created_pages")}</h2>
         {s.created_pages.length === 0 ? (
-          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="text-xs text-muted-foreground">
             {t("sessions.no_pages_created")}
           </div>
         ) : (
@@ -118,7 +118,7 @@ export function SessionDetail() {
               <li key={p}>
                 <Link
                   to={pageHref(project!, p)}
-                  className="text-[hsl(var(--primary))] hover:underline"
+                  className="text-primary hover:underline"
                 >
                   {p}
                 </Link>

@@ -92,7 +92,7 @@ export function Onboarding() {
     <div className="mx-auto max-w-2xl space-y-6 py-8">
       <div>
         <h1 className="text-2xl font-semibold">{t("onboarding.title")}</h1>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{t("onboarding.subtitle")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("onboarding.subtitle")}</p>
       </div>
 
       <div className="space-y-2">
@@ -108,9 +108,9 @@ export function Onboarding() {
             if (!slugLocked) setSlug(deriveSlug(next));
           }}
           disabled={create.isPending}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
         />
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.display_name_hint")}</p>
+        <p className="text-xs text-muted-foreground">{t("onboarding.display_name_hint")}</p>
       </div>
 
       <div className="space-y-2">
@@ -119,13 +119,13 @@ export function Onboarding() {
           {!slugLocked ? (
             <button
               type="button"
-              className="text-xs text-[hsl(var(--primary))] underline"
+              className="text-xs text-primary underline"
               onClick={() => setSlugLocked(true)}
             >
               {t("onboarding.slug_edit")}
             </button>
           ) : (
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="text-xs text-muted-foreground">
               <button
                 type="button"
                 className="underline"
@@ -142,9 +142,9 @@ export function Onboarding() {
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
           disabled={!slugLocked || create.isPending}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono disabled:opacity-60"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-60"
         />
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.slug_hint")}</p>
+        <p className="text-xs text-muted-foreground">{t("onboarding.slug_hint")}</p>
         {showSlugInvalid && (
           <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.slug_invalid")}</p>
         )}
@@ -162,7 +162,7 @@ export function Onboarding() {
             value={vault}
             onChange={(e) => setVault(e.target.value)}
             disabled={create.isPending}
-            className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm font-mono"
           />
           <Button
             type="button"
@@ -174,26 +174,26 @@ export function Onboarding() {
             📁 {t("onboarding.vault_browse")}
           </Button>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.vault_hint")}</p>
+        <p className="text-xs text-muted-foreground">{t("onboarding.vault_hint")}</p>
       </div>
 
       <div className="space-y-2">
         <button
           type="button"
-          className="text-sm text-[hsl(var(--primary))] underline"
+          className="text-sm text-primary underline"
           onClick={() => setAdvancedOpen(!advancedOpen)}
         >
           {t("onboarding.advanced_toggle")}
         </button>
         {advancedOpen && (
-          <div className="space-y-2 rounded-md border bg-[hsl(var(--muted))] p-3">
+          <div className="space-y-2 rounded-md border bg-muted p-3">
             <label className="text-sm font-medium">{t("onboarding.cwd_label")}</label>
             <CwdBuilder
               patterns={cwdPatterns}
               onChange={setCwdPatterns}
               disabled={create.isPending}
             />
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">{t("onboarding.cwd_hint")}</p>
+            <p className="text-xs text-muted-foreground">{t("onboarding.cwd_hint")}</p>
           </div>
         )}
       </div>
@@ -215,16 +215,16 @@ export function Onboarding() {
             />
             {t("onboarding.autostart_label")}
           </label>
-          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          <p className="mt-1 text-xs text-muted-foreground">
             {t("onboarding.autostart_hint")}
           </p>
         </div>
       )}
 
       {cliAuth && (
-        <div className="mt-4 rounded-md border bg-[hsl(var(--background))] p-3 text-sm">
+        <div className="mt-4 rounded-md border bg-background p-3 text-sm">
           <div className="font-medium">{t("onboarding.cli_check_label")}</div>
-          <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          <div className="mt-1 text-xs text-muted-foreground">
             {cliAuth.installed && cliAuth.authenticated
               ? t("onboarding.cli_check_ok")
               : !cliAuth.installed

@@ -56,13 +56,13 @@ export function AutoIngestSection({ slug }: Props) {
         <span>{t("settings.section.auto_ingest.enabled")}</span>
       </label>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.section.auto_ingest.mode")}
         </label>
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as Mode)}
-          className="rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="rounded-md border bg-background px-2 py-1"
         >
           <option value="auto">auto</option>
           <option value="hybrid">hybrid</option>

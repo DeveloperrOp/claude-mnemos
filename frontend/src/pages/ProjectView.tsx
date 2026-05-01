@@ -44,7 +44,7 @@ export function ProjectView() {
       <header className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">{getProjectDisplayName(project)}</h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="text-sm text-muted-foreground">
             {project.vault_root}
           </p>
         </div>
@@ -80,7 +80,7 @@ export function ProjectView() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {TILES.map((tile) => (
-          <Card key={tile.path} className="transition-colors hover:bg-[hsl(var(--muted))]">
+          <Card key={tile.path} className="transition-colors hover:bg-muted">
             <Link to={`/project/${name}/${tile.path}`}>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -88,7 +88,7 @@ export function ProjectView() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                <div className="text-xs text-muted-foreground">
                   {t("project_view.coming_in", { plan: tile.plan })}
                 </div>
               </CardContent>
@@ -105,7 +105,7 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
     <Card>
       <CardContent className="space-y-1 py-3">
         <div className="text-2xl font-semibold">{value}</div>
-        <div className="text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
       </CardContent>

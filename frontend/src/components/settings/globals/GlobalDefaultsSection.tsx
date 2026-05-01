@@ -58,24 +58,24 @@ export function GlobalDefaultsSection() {
       errorMessage={mut.isError ? (mut.error as Error).message : null}
     >
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.defaults.default_model")}
         </label>
         <input
           type="text"
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full rounded-md border bg-[hsl(var(--background))] px-2 py-1 font-mono"
+          className="w-full rounded-md border bg-background px-2 py-1 font-mono"
         />
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.defaults.default_language_hint")}
         </label>
         <select
           value={langHint}
           onChange={(e) => setLangHint(e.target.value as LangHint)}
-          className="rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="rounded-md border bg-background px-2 py-1"
         >
           <option value="auto">auto</option>
           <option value="uk">uk</option>
@@ -84,7 +84,7 @@ export function GlobalDefaultsSection() {
         </select>
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.defaults.default_max_input_tokens")}
         </label>
         <input
@@ -96,11 +96,11 @@ export function GlobalDefaultsSection() {
             const v = parseInt(e.target.value, 10);
             if (!Number.isNaN(v)) setMaxInputTokens(v);
           }}
-          className="w-40 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="w-40 rounded-md border bg-background px-2 py-1"
         />
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-[hsl(var(--muted-foreground))]">
+        <label className="text-xs text-muted-foreground">
           {t("settings.global.defaults.default_retention_days")}
         </label>
         <input
@@ -112,7 +112,7 @@ export function GlobalDefaultsSection() {
             const v = parseInt(e.target.value, 10);
             if (!Number.isNaN(v)) setRetentionDays(v);
           }}
-          className="w-32 rounded-md border bg-[hsl(var(--background))] px-2 py-1"
+          className="w-32 rounded-md border bg-background px-2 py-1"
         />
       </div>
     </SettingsAccordion>
