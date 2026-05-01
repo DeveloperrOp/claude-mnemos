@@ -27,6 +27,24 @@ const TROUBLESHOOTING_KEYS = [
   "suggestion_bombardment", "mount_failed", "no_subscription",
   "tray_issues", "tray_closed", "vault_spaces", "rate_limit",
 ] as const;
+// [i18nKey, displayLabel]. Labels are technical terms — not localized.
+const GLOSSARY: ReadonlyArray<readonly [string, string]> = [
+  ["backoff", "backoff"],
+  ["compression_ratio", "compression_ratio"],
+  ["CWD", "CWD"],
+  ["frontmatter", "frontmatter"],
+  ["glob", "glob"],
+  ["HITL", "HITL"],
+  ["ingest", "ingest"],
+  ["inject", "inject"],
+  ["JSONL", "JSONL"],
+  ["Levenshtein_distance", "Levenshtein distance"],
+  ["orphan_page", "orphan page"],
+  ["pre_op_snapshot", "pre-op snapshot"],
+  ["provenance", "provenance"],
+  ["retention_policy", "retention policy"],
+  ["wikilinks", "wikilinks"],
+];
 
 function MultiPara({ value }: { value: string }) {
   // i18n string with \n\n paragraph separators → <p> per chunk.
@@ -85,6 +103,22 @@ function Help() {
         <section id="concepts" className="space-y-3">
           <h2 className="text-xl font-semibold">{t("help.concepts.heading")}</h2>
           <MultiPara value={t("help.concepts.intro")} />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("help.concepts.glossary_title")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-sm">{t("help.concepts.glossary_intro")}</p>
+              <dl className="space-y-2 text-sm">
+                {GLOSSARY.map(([key, label]) => (
+                  <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr]">
+                    <dt className="font-mono text-[hsl(var(--primary))]">{label}</dt>
+                    <dd className="text-[hsl(var(--muted-foreground))]">{t(`help.concepts.glossary_def_${key}`)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+          </Card>
           {CONCEPTS_KEYS.map((k) => (
             <Card key={k}>
               <CardHeader>
