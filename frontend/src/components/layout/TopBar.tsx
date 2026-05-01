@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/ui.store";
 import { ProjectSwitcher } from "./ProjectSwitcher";
+import { ThemeToggle } from "./ThemeToggle";
 import { UsageWidget } from "@/components/widgets/UsageWidget";
 
 const LOCALE_CYCLE = ["uk", "ru", "en"] as const;
@@ -36,6 +37,7 @@ export function TopBar() {
       </div>
       <div className="flex items-center gap-4">
         <UsageWidget />
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"
@@ -43,7 +45,6 @@ export function TopBar() {
         >
           {locale.toUpperCase()}
         </Button>
-        {/* Slot reserved for ThemeToggle (Phase 5) */}
       </div>
     </header>
   );

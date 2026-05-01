@@ -30,7 +30,7 @@ export function ChartContainer({
 export function ChartTooltipContent({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-xs shadow-md">
+    <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md">
       {label && <div className="mb-1 font-medium">{String(label)}</div>}
       {payload.map((entry) => (
         <div key={String(entry.dataKey)} className="flex items-center gap-2">
@@ -38,7 +38,7 @@ export function ChartTooltipContent({ active, payload, label }: Partial<TooltipC
             className="inline-block h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-[hsl(var(--muted-foreground))]">{entry.name}:</span>
+          <span className="text-muted-foreground">{entry.name}:</span>
           <span className="font-mono">{entry.value}</span>
         </div>
       ))}
