@@ -24,9 +24,12 @@ export function TopBar() {
   }, [i18n, locale]);
 
   return (
-    <header className="flex items-center justify-between border-b bg-[hsl(var(--background))] px-4 py-2">
+    <header className="flex items-center justify-between border-b bg-background px-4 py-2">
       <div className="flex items-center gap-3">
-        <Link to="/" className="font-semibold">
+        <Link
+          to="/"
+          className="font-mono text-base font-semibold uppercase tracking-widest text-foreground hover:text-primary transition-colors duration-[var(--motion-fast)]"
+        >
           claude-mnemos
         </Link>
         <ProjectSwitcher />
@@ -40,6 +43,7 @@ export function TopBar() {
         >
           {locale.toUpperCase()}
         </Button>
+        {/* Slot reserved for ThemeToggle (Phase 5) */}
       </div>
     </header>
   );

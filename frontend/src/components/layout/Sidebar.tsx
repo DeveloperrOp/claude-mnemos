@@ -41,7 +41,7 @@ function SidebarLink({ to, icon, label, disabled }: SidebarLinkProps) {
     return (
       <span
         data-disabled
-        className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 text-sm text-[hsl(var(--muted-foreground))] opacity-60"
+        className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground opacity-60"
       >
         <span className="w-5 text-center">{icon}</span>
         <span>{label}</span>
@@ -54,10 +54,10 @@ function SidebarLink({ to, icon, label, disabled }: SidebarLinkProps) {
       end
       className={({ isActive }) =>
         cn(
-          "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+          "relative flex items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-colors duration-[var(--motion-fast)]",
           isActive
-            ? "bg-[hsl(var(--primary))]/10 font-medium text-[hsl(var(--primary))]"
-            : "text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]",
+            ? "font-medium text-primary before:absolute before:left-0 before:top-0 before:h-full before:w-0.5 before:bg-primary"
+            : "text-foreground hover:bg-secondary",
         )
       }
     >
