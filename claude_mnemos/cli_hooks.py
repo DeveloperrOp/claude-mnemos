@@ -126,7 +126,7 @@ def _cmd_install(_args: argparse.Namespace) -> int:
         hooks[event] = filtered
 
     _save_settings(settings)
-    print("✓ mnemos hooks installed")
+    print("[OK] mnemos hooks installed")
     print(f"  SessionStart: {py} {ss_script}")
     print(f"  SessionEnd:   {py} {se_script}")
     print()
@@ -163,7 +163,7 @@ def _cmd_uninstall(_args: argparse.Namespace) -> int:
     if backup:
         print(f"backup → {backup}")
     _save_settings(settings)
-    print(f"✓ removed {removed} mnemos hook block(s)")
+    print(f"[OK] removed {removed} mnemos hook block(s)")
     return 0
 
 
@@ -187,12 +187,12 @@ def _cmd_status(_args: argparse.Namespace) -> int:
 
     print(f"settings file: {CLAUDE_SETTINGS}")
     print()
-    print(f"SessionStart: {'✓ mnemos installed' if ss_installed else '✗ no mnemos hook'}")
+    print(f"SessionStart: {'[OK] mnemos installed' if ss_installed else '[X]  no mnemos hook'}")
     for c in ss_cmds:
         marker = "  [mnemos]" if _is_mnemos_command(c) else "  [other]"
         print(f"{marker} {c}")
     print()
-    print(f"SessionEnd:   {'✓ mnemos installed' if se_installed else '✗ no mnemos hook'}")
+    print(f"SessionEnd:   {'[OK] mnemos installed' if se_installed else '[X]  no mnemos hook'}")
     for c in se_cmds:
         marker = "  [mnemos]" if _is_mnemos_command(c) else "  [other]"
         print(f"{marker} {c}")
