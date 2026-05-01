@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHealth } from "@/hooks/useHealth";
+import { MultiPara } from "@/components/help/MultiPara";
 
 const SECTIONS = [
   "intro",
@@ -45,18 +46,6 @@ const GLOSSARY: ReadonlyArray<readonly [string, string]> = [
   ["retention_policy", "retention policy"],
   ["wikilinks", "wikilinks"],
 ];
-
-function MultiPara({ value }: { value: string }) {
-  // i18n string with \n\n paragraph separators → <p> per chunk.
-  const paras = value.split(/\n\n+/).filter(Boolean);
-  return (
-    <div className="space-y-2">
-      {paras.map((p, i) => (
-        <p key={i} className="text-sm leading-relaxed whitespace-pre-line">{p}</p>
-      ))}
-    </div>
-  );
-}
 
 function Help() {
   const { t } = useTranslation();
