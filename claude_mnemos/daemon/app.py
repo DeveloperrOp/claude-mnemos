@@ -217,6 +217,10 @@ class SpaStaticFiles(StaticFiles):
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
+                # Browsers implicitly request /favicon.ico — we ship favicon.svg.
+                # Serve the SVG as fallback (Content-Type set to image/svg+xml).
+                if path == "favicon.ico":
+                    return await super().get_response("favicon.svg", scope)
                 # Fall back to index.html so client-side router (React Router)
                 # can resolve the path. Asset paths like /assets/foo.js still
                 # 404 normally because they DO exist as files when the bundle
