@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
 function colorFor(v: number): string {
-  if (v >= 0.85) return "bg-emerald-500";
-  if (v >= 0.6) return "bg-blue-500";
-  if (v >= 0.3) return "bg-amber-500";
-  return "bg-red-500";
+  if (v >= 0.85) return "bg-success";
+  if (v >= 0.6) return "bg-info";
+  if (v >= 0.3) return "bg-warning";
+  return "bg-danger";
 }
 
 export function ConfidenceBar({ value }: { value: number }) {

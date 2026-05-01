@@ -18,7 +18,7 @@ interface Props {
 // metadata is surfaced via a separate AlertTriangle icon so the UI can still
 // signal problems without relying on non-existent status values.
 const STATUS_COLOR: Record<"success", string> = {
-  success: "text-emerald-600",
+  success: "text-success",
 };
 
 function EntryIcon({ entry }: { entry: ActivityEntry }) {
@@ -27,7 +27,7 @@ function EntryIcon({ entry }: { entry: ActivityEntry }) {
     typeof entry.metadata["quarantined"] === "boolean" &&
     entry.metadata["quarantined"] === true;
   if (quarantined) {
-    return <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />;
+    return <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />;
   }
   return (
     <CheckCircle2

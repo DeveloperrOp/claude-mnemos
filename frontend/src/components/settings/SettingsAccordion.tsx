@@ -48,7 +48,7 @@ export function SettingsAccordion({
           )}
           {children}
           {errorMessage && (
-            <p className="text-xs text-red-700 dark:text-red-400">
+            <p className="text-xs text-danger">
               {errorMessage}
             </p>
           )}

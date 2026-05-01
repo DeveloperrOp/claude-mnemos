@@ -72,7 +72,7 @@ export function CwdBuilder({ patterns, onChange, disabled }: Props) {
                 onClick={() => remove(idx)}
                 disabled={disabled}
                 aria-label={t("cwd_builder.remove")}
-                className="text-xs text-muted-foreground hover:text-red-700"
+                className="text-xs text-muted-foreground hover:text-danger"
               >
                 ×
               </button>

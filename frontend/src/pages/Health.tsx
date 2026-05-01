@@ -39,8 +39,8 @@ export function Health() {
             <div
               className={`text-sm font-semibold ${
                 vh.watchdog_running
-                  ? "text-emerald-700 dark:text-emerald-400"
-                  : "text-amber-700 dark:text-amber-400"
+                  ? "text-success"
+                  : "text-warning"
               }`}
             >
               {vh.watchdog_running

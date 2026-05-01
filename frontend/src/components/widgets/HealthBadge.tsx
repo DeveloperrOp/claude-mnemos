@@ -15,20 +15,20 @@ function levelOf(vh: VaultHealth | undefined): Level {
 
 const STYLES: Record<Level, { dot: string; text: string }> = {
   ok: {
-    dot: "bg-emerald-500",
-    text: "text-emerald-700 dark:text-emerald-400",
+    dot: "bg-success",
+    text: "text-success",
   },
   warn: {
-    dot: "bg-amber-500",
-    text: "text-amber-700 dark:text-amber-400",
+    dot: "bg-warning",
+    text: "text-warning",
   },
   danger: {
-    dot: "bg-red-500",
-    text: "text-red-700 dark:text-red-400",
+    dot: "bg-danger",
+    text: "text-danger",
   },
   down: {
-    dot: "bg-zinc-400",
-    text: "text-zinc-600 dark:text-zinc-400",
+    dot: "bg-muted-foreground/40",
+    text: "text-muted-foreground",
   },
 };
 

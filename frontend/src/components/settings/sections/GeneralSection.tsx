@@ -135,7 +135,7 @@ export function GeneralSection({ project }: Props) {
           {t("settings.section.general.vault_hint")}
         </p>
         {vaultChanged && (
-          <p className="rounded-md border-2 border-amber-500 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          <p className="rounded-md border-2 border-warning bg-warning/10 p-2 text-xs text-warning">
             ⚠ {t("settings.section.general.vault_warn")}
           </p>
         )}

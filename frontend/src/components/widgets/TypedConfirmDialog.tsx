@@ -73,7 +73,7 @@ export function TypedConfirmDialog({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={!matches || isPending}
-            className="bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300"
+            className="bg-danger text-white hover:bg-danger disabled:bg-danger/20"
           >
             {isPending ? t("confirm.working") : confirmLabel}
           </AlertDialogAction>

@@ -64,17 +64,17 @@ export function DangerZoneSection({ project }: Props) {
   const showForceLink = errorStatus === 409;
 
   return (
-    <section className="rounded-md border-2 border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
-      <h3 className="text-sm font-semibold text-red-900 dark:text-red-300">
+    <section className="rounded-md border-2 border-danger/30 bg-danger/10 p-4">
+      <h3 className="text-sm font-semibold text-danger">
         {t("settings.danger.title")}
       </h3>
-      <p className="mt-1 text-xs text-red-800 dark:text-red-400">
+      <p className="mt-1 text-xs text-danger">
         {t("settings.danger.body")}
       </p>
       <Button
         variant="outline"
         size="sm"
-        className="mt-3 border-red-600 text-red-700 hover:bg-red-100 dark:hover:bg-red-900"
+        className="mt-3 border-danger text-danger hover:bg-danger/10 dark:hover:bg-danger"
         onClick={() => {
           setOpen(true);
           setConfirmInput("");
@@ -108,7 +108,7 @@ export function DangerZoneSection({ project }: Props) {
               />
             </div>
             {error && (
-              <div className="mt-2 rounded-md border border-amber-500 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2 text-xs text-warning">
                 {error}
                 {showForceLink && (
                   <button
@@ -129,7 +129,7 @@ export function DangerZoneSection({ project }: Props) {
                 size="sm"
                 onClick={() => handleDelete(false)}
                 disabled={!slugMatches || mut.isPending}
-                className="bg-red-600 text-white hover:bg-red-700"
+                className="bg-danger text-white hover:bg-danger"
               >
                 {mut.isPending
                   ? t("settings.danger.deleting")

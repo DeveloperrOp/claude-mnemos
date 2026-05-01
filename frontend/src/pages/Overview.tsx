@@ -45,7 +45,7 @@ export function Overview() {
       {showRateLimitBanner && (
         <div
           role="status"
-          className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm dark:border-amber-700 dark:bg-amber-950"
+          className="rounded-md border border-warning bg-warning/10 p-2 text-sm"
         >
           {t("overview.rate_limited_until", {
             time: new Date(pausedUntil!).toLocaleTimeString(),

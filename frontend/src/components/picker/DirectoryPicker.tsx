@@ -246,7 +246,7 @@ export function DirectoryPicker({
 
         <div className="mt-3 max-h-64 overflow-y-auto rounded-md border">
           {loading && <div className="p-3 text-sm text-muted-foreground">{t("picker.loading")}</div>}
-          {error && <div className="p-3 text-sm text-red-700">{error}</div>}
+          {error && <div className="p-3 text-sm text-danger">{error}</div>}
           {!loading && !error && drivesView && drives.map((d) => (
             <button
               key={d.path}

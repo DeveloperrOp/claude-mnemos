@@ -40,7 +40,7 @@ export function TrashRow({ entry: e }: { entry: TrashEntry }) {
             {t("trash.deleted_at")}: {formatDateTime(e.deleted_at, i18n.language)}
           </div>
           {!e.restorable && e.restore_blocked_reason && (
-            <div className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+            <div className="mt-1 flex items-center gap-1 text-xs text-warning">
               <AlertTriangle className="h-3 w-3" />
               <span>{t("trash.blocked")}: {e.restore_blocked_reason}</span>
             </div>
@@ -49,7 +49,7 @@ export function TrashRow({ entry: e }: { entry: TrashEntry }) {
         <div
           className={cn(
             "flex items-center gap-1 text-xs",
-            e.restorable ? "text-emerald-600" : "text-zinc-500",
+            e.restorable ? "text-success" : "text-muted-foreground",
           )}
         >
           {e.restorable ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}

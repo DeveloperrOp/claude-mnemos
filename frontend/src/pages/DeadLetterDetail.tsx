@@ -97,7 +97,7 @@ export function DeadLetterDetail() {
       </dl>
 
       {j.error && (
-        <section className="rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">
+        <section className="rounded bg-danger/10 p-3 text-sm text-danger">
           <div className="text-xs font-semibold uppercase">{t("dead_letter.error")}</div>
           <div>{j.error}</div>
         </section>

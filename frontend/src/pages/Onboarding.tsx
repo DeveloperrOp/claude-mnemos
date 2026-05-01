@@ -146,10 +146,10 @@ export function Onboarding() {
         />
         <p className="text-xs text-muted-foreground">{t("onboarding.slug_hint")}</p>
         {showSlugInvalid && (
-          <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.slug_invalid")}</p>
+          <p className="text-xs text-danger">{t("onboarding.slug_invalid")}</p>
         )}
         {nameTakenError && (
-          <p className="text-xs text-red-700 dark:text-red-400">{t("onboarding.name_taken")}</p>
+          <p className="text-xs text-danger">{t("onboarding.name_taken")}</p>
         )}
       </div>
 
@@ -199,7 +199,7 @@ export function Onboarding() {
       </div>
 
       {mountFailedDetail && (
-        <div className="rounded-md border-2 border-red-600 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+        <div className="rounded-md border-2 border-danger bg-danger/10 p-3 text-sm text-danger">
           <div className="font-semibold">{t("onboarding.mount_failed_title")}</div>
           <div className="mt-1 break-all font-mono text-xs">{mountFailedDetail}</div>
         </div>

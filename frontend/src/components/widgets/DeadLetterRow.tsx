@@ -38,7 +38,7 @@ export function DeadLetterRow({ job: j }: { job: Job }) {
             )}
           </div>
           {j.error && (
-            <div className="truncate text-xs text-red-700 dark:text-red-400" title={j.error}>
+            <div className="truncate text-xs text-danger" title={j.error}>
               {j.error}
             </div>
           )}

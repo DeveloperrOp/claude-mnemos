@@ -46,7 +46,7 @@ export function ConfirmDialog({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isPending}
-            className={cn(destructive && "bg-red-600 text-white hover:bg-red-700")}
+            className={cn(destructive && "bg-danger text-white hover:bg-danger")}
           >
             {isPending ? t("confirm.working") : confirmLabel}
           </AlertDialogAction>
