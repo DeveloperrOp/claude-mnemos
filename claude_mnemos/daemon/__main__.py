@@ -38,7 +38,9 @@ class _VaultDeprecated(argparse.Action):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos.daemon")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    run = sub.add_parser("run", help="Run the daemon in foreground")
+    run = sub.add_parser(
+        "run", aliases=["foreground"], help="Run the daemon in foreground"
+    )
     run.add_argument("--host", default="127.0.0.1")
     run.add_argument("--port", type=int, default=5757)
     run.add_argument(
@@ -84,7 +86,7 @@ def _build_config(args: argparse.Namespace) -> DaemonConfig:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.cmd != "run":
+    if args.cmd not in ("run", "foreground"):
         return 1
     config = _build_config(args)
     daemon = MnemosDaemon(config)
