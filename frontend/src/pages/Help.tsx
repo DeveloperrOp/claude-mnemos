@@ -19,7 +19,8 @@ const CONCEPTS_KEYS = [
 ] as const;
 const WORKFLOWS_KEYS = [
   "ingest", "edit_page", "approve_suggestion", "retry_failed",
-  "snapshot", "restore", "lint", "metrics", "rename", "delete",
+  "snapshot", "restore", "backup_vault",
+  "lint", "metrics", "rename", "delete", "migrate_vault",
 ] as const;
 const TROUBLESHOOTING_KEYS = [
   "daemon_down", "daemon_crash_loop", "ingest_failing", "inject_not_working",
