@@ -23,6 +23,10 @@
   --color-border: var(--border);
   --color-input: var(--border);
   --color-ring: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
 
   --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
@@ -35,14 +39,14 @@
     --bg-elev-1:    oklch(97% 0.006 264);
     --bg-elev-2:    oklch(94% 0.008 264);
     --fg:           oklch(20% 0.02 264);
-    --fg-muted:     oklch(45% 0.015 264);
+    --fg-muted:     oklch(40% 0.015 264);
     --fg-subtle:    oklch(60% 0.01 264);
     --border:       oklch(90% 0.008 264);
     --border-strong:oklch(80% 0.01 264);
     --accent:       oklch(70% 0.22 130);
-    --accent-fg:    oklch(20% 0.05 130);
+    --accent-fg:    oklch(15% 0.05 130);
     --accent-dim:   oklch(55% 0.12 130);
-    --success:      oklch(70% 0.22 145);
+    --success:      oklch(65% 0.16 160);
     --warning:      oklch(75% 0.16 75);
     --danger:       oklch(60% 0.22 25);
     --info:         oklch(65% 0.15 240);
@@ -58,8 +62,8 @@
     --motion-fast:   80ms;
     --motion-medium: 150ms;
     --motion-slow:   250ms;
-    --ease-out:      cubic-bezier(0.2, 0.7, 0.1, 1);
-    --ease-in-out:   cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-snap:    cubic-bezier(0.2, 0.7, 0.1, 1);
+    --ease-in-out-snap: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -72,9 +76,9 @@
     --border:       oklch(28% 0.014 264);
     --border-strong:oklch(40% 0.018 264);
     --accent:       oklch(85% 0.27 130);
-    --accent-fg:    oklch(15% 0.05 130);
+    --accent-fg:    oklch(10% 0.05 130);
     --accent-dim:   oklch(60% 0.15 130);
-    --success:      oklch(80% 0.20 145);
+    --success:      oklch(75% 0.16 160);
     --warning:      oklch(82% 0.18 75);
     --danger:       oklch(70% 0.20 25);
     --info:         oklch(75% 0.15 240);
@@ -83,7 +87,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11"; /* Geist optional ligatures */
+    font-feature-settings: "ss01", "cv11"; /* Geist: ss01 = stylistic set 1, cv11 = single-story 'l' */
   }
 
   /* Signature motion keyframes */
@@ -94,7 +98,7 @@
     0%, 100% { opacity: 0.6 }
     50%      { opacity: 1.0 }
   }
-  .pulse-accent { animation: pulse-accent 2s var(--ease-in-out) infinite; }
+  .pulse-accent { animation: pulse-accent 2s var(--ease-in-out-snap) infinite; }
 
   /* Markdown / prose blocks (Help, page bodies). Mono code, lime border-left
      on fenced blocks. */
