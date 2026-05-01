@@ -47,7 +47,12 @@
     "daemon_down_hint_cmd": "Запустите daemon:",
     "daemon_down_hint_command": "mnemos daemon start",
     "daemon_down_reconnect": "Дашборд переподключится автоматически.",
-    "rate_limited_until": "Rate limit — возобновится в {{time}}"
+    "rate_limited_until": "Rate limit — возобновится в {{time}}",
+    "hook_banner": {
+      "title": "Хуки mnemos не установлены",
+      "body": "Без них сессии не будут автоматически ingest'иться и Claude не получит контекст проекта при следующем запуске. Установи одной командой:",
+      "no_settings": "(Файл ~/.claude/settings.json пока отсутствует — install создаст его.)"
+    }
   },
   "project_view": {
     "open_in_obsidian": "Открыть в Obsidian",

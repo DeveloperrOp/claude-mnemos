@@ -4,6 +4,7 @@ import { useHealth } from "@/hooks/useHealth";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
 import { ProjectCard } from "@/components/widgets/ProjectCard";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
+import { HookStatusBanner } from "@/components/widgets/HookStatusBanner";
 import { NoProjectsCallout } from "@/components/widgets/NoProjectsCallout";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -42,6 +43,7 @@ export function Overview() {
 
   return (
     <div className="space-y-4">
+      <HookStatusBanner />
       {showRateLimitBanner && (
         <div
           role="status"

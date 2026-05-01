@@ -47,7 +47,12 @@
     "daemon_down_hint_cmd": "Start the daemon:",
     "daemon_down_hint_command": "mnemos daemon start",
     "daemon_down_reconnect": "The dashboard will reconnect automatically.",
-    "rate_limited_until": "Rate limited — resumes at {{time}}"
+    "rate_limited_until": "Rate limited — resumes at {{time}}",
+    "hook_banner": {
+      "title": "Mnemos hooks not installed",
+      "body": "Without these, sessions won't auto-ingest and Claude won't get project context on next launch. Install them with one command:",
+      "no_settings": "(No ~/.claude/settings.json found yet — running install will create one.)"
+    }
   },
   "project_view": {
     "open_in_obsidian": "Open in Obsidian",
