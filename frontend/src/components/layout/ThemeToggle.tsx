@@ -24,6 +24,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       aria-label={label}
+      title={label}
       onClick={() => setTheme(nextMode(current))}
       className="text-muted-foreground hover:text-foreground"
     >

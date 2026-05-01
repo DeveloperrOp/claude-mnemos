@@ -54,9 +54,12 @@
     "watchdog_down": "Watchdog stopped",
     "stats": {
       "sessions_covered": "Sessions covered",
+      "sessions_covered_hint": "Sessions whose markdown pages have been ingested into this vault and are available for inject.",
       "jobs_queued": "Queued",
+      "jobs_queued_hint": "Ingest jobs waiting in queue. They'll process in order. The daemon runs one at a time.",
       "jobs_running": "Running",
-      "jobs_dead_letter": "Failed"
+      "jobs_dead_letter": "Failed",
+      "jobs_dead_letter_hint": "Jobs that failed all retry attempts. Open Failed jobs to inspect the traceback and retry or dismiss."
     },
     "unknown_title": "Project not found",
     "unknown_hint": "This project is not registered. Return to Overview.",

@@ -54,9 +54,12 @@
     "watchdog_down": "Watchdog зупинено",
     "stats": {
       "sessions_covered": "Сесії з контекстом",
+      "sessions_covered_hint": "Сесії, чиї сторінки вже видобуті в цей vault і доступні для inject.",
       "jobs_queued": "В черзі",
+      "jobs_queued_hint": "Завдання ingest у черзі. Обробляються по одному.",
       "jobs_running": "Виконуються",
-      "jobs_dead_letter": "Помилки"
+      "jobs_dead_letter": "Помилки",
+      "jobs_dead_letter_hint": "Завдання, що впали після всіх спроб. Відкрий «Помилки» щоб подивитися traceback і повторити або видалити."
     },
     "unknown_title": "Проєкт не знайдено",
     "unknown_hint": "Цей проєкт не зареєстровано. Поверніться до Огляду.",

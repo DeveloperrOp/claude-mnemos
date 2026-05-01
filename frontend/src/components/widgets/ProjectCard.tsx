@@ -2,6 +2,12 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { type ProjectMapEntry } from "@/types/Project";
 import { type VaultHealth } from "@/types/Health";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
@@ -41,13 +47,25 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-center">
-          <Stat label={t("project_view.stats.sessions_covered")} value={formatNum(usage?.sessions_covered)} />
-          <Stat label={t("project_view.stats.jobs_queued")} value={formatNum(vault_health?.jobs_queued)} />
-          <Stat label={t("project_view.stats.jobs_dead_letter")} value={formatNum(vault_health?.jobs_dead_letter)} />
+          <Stat
+            label={t("project_view.stats.sessions_covered")}
+            value={formatNum(usage?.sessions_covered)}
+            hint={t("project_view.stats.sessions_covered_hint")}
+          />
+          <Stat
+            label={t("project_view.stats.jobs_queued")}
+            value={formatNum(vault_health?.jobs_queued)}
+            hint={t("project_view.stats.jobs_queued_hint")}
+          />
+          <Stat
+            label={t("project_view.stats.jobs_dead_letter")}
+            value={formatNum(vault_health?.jobs_dead_letter)}
+            hint={t("project_view.stats.jobs_dead_letter_hint")}
+          />
         </div>
 
         <div className="flex justify-end">
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm">
             <Link to={`/project/${project.name}`}>{t("common.open")}</Link>
           </Button>
         </div>
@@ -56,13 +74,26 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  const inner = (
     <div className="space-y-0.5">
       <div className="text-lg font-semibold">{value}</div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
     </div>
+  );
+  if (!hint) return inner;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" className="cursor-help text-left">
+            {inner}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">{hint}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

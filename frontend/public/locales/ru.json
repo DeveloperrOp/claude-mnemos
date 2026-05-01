@@ -54,9 +54,12 @@
     "watchdog_down": "Watchdog остановлен",
     "stats": {
       "sessions_covered": "Сессий с контекстом",
+      "sessions_covered_hint": "Сессии, чьи страницы уже извлечены в этот vault и доступны для inject.",
       "jobs_queued": "В очереди",
+      "jobs_queued_hint": "Задачи ingest в очереди. Обрабатываются по одной.",
       "jobs_running": "Выполняются",
-      "jobs_dead_letter": "Ошибки"
+      "jobs_dead_letter": "Ошибки",
+      "jobs_dead_letter_hint": "Задачи, упавшие после всех попыток. Откройте «Помилки» чтобы посмотреть traceback и повторить или удалить."
     },
     "unknown_title": "Проект не найден",
     "unknown_hint": "Этот проект не зарегистрирован. Вернитесь в Обзор.",
