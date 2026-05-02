@@ -265,3 +265,181 @@ def test_scan_sorted_by_mtime_desc(tmp_path: Path) -> None:
     result = scan_lost_sessions(vault, transcripts_root=transcripts_root)
     ids = [item.session_id for item in result]
     assert ids == ["new-sid", "old-sid"]
+
+
+def test_extract_cwd_and_preview_finds_both(tmp_path: Path) -> None:
+    """First user event with content + first event with cwd are extracted."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "test.jsonl"
+    jsonl.write_text(
+        "\n".join(
+            [
+                '{"type":"queue-operation","cwd":"D:\\\\code\\\\foo"}',
+                '{"type":"user","content":"hello mnemos"}',
+                '{"type":"assistant","content":"hi"}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert cwd == "D:\\code\\foo"
+    assert preview == "hello mnemos"
+
+
+def test_extract_preview_truncates_long_message(tmp_path: Path) -> None:
+    """Preview cuts at 200 chars and adds ellipsis."""
+    from claude_mnemos.core.lost_sessions import (
+        PREVIEW_MAX_CHARS,
+        _extract_cwd_and_preview,
+    )
+
+    long_msg = "lorem ipsum " * 50  # ~600 chars
+    jsonl = tmp_path / "long.jsonl"
+    jsonl.write_text(
+        json.dumps({"type": "user", "content": long_msg}) + "\n",
+        encoding="utf-8",
+    )
+    _cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert preview is not None
+    assert len(preview) <= PREVIEW_MAX_CHARS + 1  # +1 for ellipsis
+    assert preview.endswith("…")
+
+
+def test_extract_preview_handles_anthropic_content_blocks(tmp_path: Path) -> None:
+    """User content can be a list of {type: text, text: ...} blocks (Anthropic API style)."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "blocks.jsonl"
+    jsonl.write_text(
+        json.dumps(
+            {
+                "type": "user",
+                "content": [{"type": "text", "text": "from blocks"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert preview == "from blocks"
+
+
+def test_extract_handles_no_cwd_no_user(tmp_path: Path) -> None:
+    """File with neither cwd nor user events → both None."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "empty.jsonl"
+    jsonl.write_text(
+        json.dumps({"type": "queue-operation", "operation": "add"}) + "\n",
+        encoding="utf-8",
+    )
+    cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert cwd is None
+    assert preview is None
+
+
+def test_extract_tolerates_malformed_lines(tmp_path: Path) -> None:
+    """A bad JSON line in the middle doesn't break the scan; valid lines after still work."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "messy.jsonl"
+    jsonl.write_text(
+        "\n".join(
+            [
+                "{not valid json",
+                json.dumps({"type": "user", "content": "good"}),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert preview == "good"
+
+
+def test_extract_preview_from_real_claude_code_shape(tmp_path: Path) -> None:
+    """Real Claude Code transcripts wrap user content in event.message.content,
+    not event.content. Helper must dig one level deeper."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "real.jsonl"
+    jsonl.write_text(
+        json.dumps(
+            {
+                "type": "user",
+                "cwd": "/home/me/project",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "fix the failing test"},
+                    ],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert cwd == "/home/me/project"
+    assert preview == "fix the failing test"
+
+
+def test_extract_preview_skips_ide_opened_file_wrapper(tmp_path: Path) -> None:
+    """A first user event that's just an IDE notification should be skipped
+    in favour of the next real user message."""
+    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+
+    jsonl = tmp_path / "ide.jsonl"
+    jsonl.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "user",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "<ide_opened_file>The user opened foo.py</ide_opened_file>",
+                                }
+                            ],
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "user",
+                        "message": {
+                            "content": [{"type": "text", "text": "real prompt here"}],
+                        },
+                    }
+                ),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _cwd, preview = _extract_cwd_and_preview(jsonl)
+    assert preview == "real prompt here"
+
+
+def test_scan_lost_sessions_populates_cwd_and_preview(tmp_path: Path) -> None:
+    """End-to-end: scan_lost_sessions() returns LostSession with cwd + preview filled."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    transcripts_root = tmp_path / "transcripts"
+    proj = transcripts_root / "myproj"
+    proj.mkdir(parents=True)
+    payload = (
+        json.dumps({"type": "queue-operation", "cwd": r"C:\Users\test\code"})
+        + "\n"
+        + json.dumps({"type": "user", "content": "ingest me"})
+        + "\n"
+    )
+    (proj / "abc123.jsonl").write_text(payload, encoding="utf-8")
+
+    results = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+    assert len(results) == 1
+    entry = results[0]
+    assert entry.session_id == "abc123"
+    assert entry.cwd == r"C:\Users\test\code"
+    assert entry.preview == "ingest me"

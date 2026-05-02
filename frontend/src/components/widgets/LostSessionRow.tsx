@@ -38,6 +38,16 @@ export function LostSessionRow({ session: s }: { session: LostSession }) {
           <div className="text-xs text-muted-foreground" title={s.transcript_path}>
             {formatBytes(s.size_bytes)} · {formatDateTime(s.mtime, i18n.language)}
           </div>
+          {s.cwd && (
+            <div className="truncate font-mono text-xs text-muted-foreground" title={s.cwd}>
+              📁 {s.cwd}
+            </div>
+          )}
+          {s.preview && (
+            <div className="truncate text-xs italic text-muted-foreground/80" title={s.preview}>
+              “{s.preview}”
+            </div>
+          )}
         </div>
         <Button
           size="sm" variant="outline"
