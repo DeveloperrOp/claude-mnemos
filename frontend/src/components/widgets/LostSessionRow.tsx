@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, EyeOff } from "lucide-react";
+import { Download, EyeOff, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { ProjectBadge } from "./ProjectBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useLostSessionImport } from "@/hooks/useLostSessionImport";
 import { useLostSessionIgnore } from "@/hooks/useLostSessionIgnore";
+import { useProjects } from "@/hooks/useProjects";
 import { formatDateTime } from "@/lib/datetime";
+import { getProjectDisplayName } from "@/lib/projectDisplayName";
 import type { LostSession } from "@/types/LostSession";
 
 function formatBytes(n: number): string {
@@ -21,6 +31,8 @@ export function LostSessionRow({ session: s }: { session: LostSession }) {
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const importMut = useLostSessionImport();
   const ignoreMut = useLostSessionIgnore();
+  const projectsQuery = useProjects();
+  const projects = projectsQuery.data ?? [];
 
   return (
     <>
@@ -49,18 +61,39 @@ export function LostSessionRow({ session: s }: { session: LostSession }) {
             </div>
           )}
         </div>
-        <Button
-          size="sm" variant="outline"
-          disabled={importMut.isPending}
-          onClick={() => importMut.mutate({
-            session_id: s.session_id,
-            body: { project_name: s.project_name, transcript_path: s.transcript_path },
-          })}
-          title={t("lost_sessions.import_button")}
-        >
-          <Download className="mr-1 h-3 w-3" />
-          {t("lost_sessions.import_button")}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" disabled={importMut.isPending} title={t("lost_sessions.import_dropdown_hint")}>
+              <Download className="mr-1 h-3 w-3" />
+              {t("lost_sessions.import_button")}
+              <ChevronDown className="ml-1 h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[220px]">
+            <DropdownMenuLabel>{t("lost_sessions.import_to_project")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {projects.length === 0 ? (
+              <DropdownMenuItem disabled>{t("lost_sessions.no_projects")}</DropdownMenuItem>
+            ) : (
+              projects.map((p) => (
+                <DropdownMenuItem
+                  key={p.name}
+                  onClick={() => importMut.mutate({
+                    session_id: s.session_id,
+                    body: { project_name: p.name, transcript_path: s.transcript_path },
+                  })}
+                >
+                  <span className="flex-1 truncate">{getProjectDisplayName(p)}</span>
+                  {p.name === s.project_name && (
+                    <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">
+                      {t("lost_sessions.suggested")}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           size="sm" variant="outline"
           disabled={ignoreMut.isPending}
