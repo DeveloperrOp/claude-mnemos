@@ -7,6 +7,7 @@ import { useSnapshotCreate } from "@/hooks/useSnapshotCreate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { SnapshotCard } from "@/components/widgets/SnapshotCard";
+import { EmptyState } from "@/components/widgets/EmptyState";
 import { SnapshotFilters, type KindFilter } from "@/components/filters/SnapshotFilters";
 import {
   AlertDialog,
@@ -68,9 +69,22 @@ export function Snapshots() {
     <div className="space-y-3">
       {headerControls}
       {empty ? (
-        <div className="py-12 text-center text-muted-foreground">
-          {t("snapshots.no_snapshots")}
-        </div>
+        <EmptyState
+          icon="💾"
+          title={t("snapshots.empty.title")}
+          body={t("snapshots.empty.body")}
+          actions={
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => setCreateOpen(true)}
+              disabled={create.isPending}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              {t("snapshots.create_button")}
+            </Button>
+          }
+        />
       ) : (
         <>
           <div className="text-xs text-muted-foreground">

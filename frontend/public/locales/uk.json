@@ -106,7 +106,17 @@
     "alerts_count": "Сповіщення",
     "vault_not_mounted_title": "Vault не змонтовано",
     "vault_not_mounted_hint": "Запустіть через mnemos daemon start",
-    "view_failed_jobs": "Дивитись збійні задачі"
+    "view_failed_jobs": "Дивитись збійні задачі",
+    "alerts": {
+      "expand": "Розгорнути",
+      "collapse": "Згорнути",
+      "dismiss": "Сховати",
+      "clear_all": "Очистити всі",
+      "clear_all_confirm": "Сховати всі {{count}} сповіщень? Дію не можна скасувати.",
+      "cleared_all_toast": "Усі сповіщення приховано",
+      "empty": "Сповіщень немає",
+      "error": "Не вдалося оновити сповіщення"
+    }
   },
   "usage": {
     "title": "Використання",
@@ -325,7 +335,13 @@
     "delete_permanent_modal_title": "Видалити назавжди?",
     "delete_permanent_modal_desc": "Це незворотно. Введіть назву сторінки для підтвердження.",
     "delete_permanent_typed_label": "Введіть назву сторінки",
-    "delete_permanent_button": "Видалити назавжди"
+    "delete_permanent_button": "Видалити назавжди",
+    "bulk": {
+      "cleanup_blocked_button": "Очистити заблоковані ({{n}})",
+      "cleanup_blocked_confirm_title": "Видалити заблоковані записи назавжди?",
+      "cleanup_blocked_confirm_body": "Це назавжди видалить {{n}} записів з відсутніми або некоректними метаданими. Дію не можна скасувати.",
+      "cleanup_success_toast": "Видалено {{count}} заблокованих записів"
+    }
   },
   "snapshots": {
     "title": "Знімки",
@@ -341,6 +357,10 @@
     "op_type": "тип",
     "size": "розмір",
     "no_snapshots": "Немає знімків",
+    "empty": {
+      "title": "Знімків поки немає",
+      "body": "Знімки — автоматичні бекапи vault'у (щодня та перед ризикованими операціями). Кнопка «Створити снапшот» вище — щоб зробити просто зараз."
+    },
     "showing_n": "{{count}} знімків",
     "created_toast": "Снапшот створено",
     "deleted_toast": "Снапшот видалено",
@@ -428,6 +448,10 @@
   "dead_letter": {
     "title": "Збійні задачі",
     "no_failed": "Немає збоїв",
+    "empty": {
+      "title": "Немає збоїв",
+      "body": "Задачі автоматично перезапускаються до 4 разів. Усе, що падає після повторів, потрапляє сюди для розбору."
+    },
     "showing_n": "{{count}} задач",
     "kind": "тип",
     "attempt": "спроба",

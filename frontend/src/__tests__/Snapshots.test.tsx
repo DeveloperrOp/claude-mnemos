@@ -14,6 +14,7 @@ beforeAll(() => {
       filter_kind: "Kind",
       label: "label", op_id: "op", op_type: "type", size: "size",
       no_snapshots: "No snapshots", showing_n: "{{count}} snapshots",
+      empty: { title: "No snapshots yet", body: "Snapshots are automatic vault backups." },
       created_toast: "Snapshot created",
       deleted_toast: "Snapshot deleted",
       restored_toast: "Vault restored",
@@ -92,7 +93,7 @@ describe("Snapshots", () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { snapshots: [] } });
     render(wrap(<Snapshots />));
     await waitFor(() =>
-      expect(screen.getByText(/no snapshots/i)).toBeInTheDocument(),
+      expect(screen.getByText("No snapshots yet")).toBeInTheDocument(),
     );
   });
 });

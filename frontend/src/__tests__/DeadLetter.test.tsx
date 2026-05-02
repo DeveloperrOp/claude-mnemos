@@ -10,6 +10,7 @@ beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
     dead_letter: {
       title: "Failed jobs", no_failed: "No failed jobs",
+      empty: { title: "No failed jobs", body: "Jobs auto-retry up to 4 times." },
       showing_n: "{{count}} jobs", attempt_n_of_m: "Attempt {{n}}/{{max}}",
       finished_at: "finished",
       retry_button: "Retry", dismiss_button: "Dismiss",

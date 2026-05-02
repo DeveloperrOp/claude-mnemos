@@ -3,6 +3,7 @@ import { useDeadLetter } from "@/hooks/useDeadLetter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeadLetterRow } from "@/components/widgets/DeadLetterRow";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
+import { EmptyState } from "@/components/widgets/EmptyState";
 
 export function DeadLetter() {
   const { t } = useTranslation();
@@ -22,9 +23,11 @@ export function DeadLetter() {
   const jobs = dlQuery.data ?? [];
   if (jobs.length === 0) {
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        {t("dead_letter.no_failed")}
-      </div>
+      <EmptyState
+        icon="✓"
+        title={t("dead_letter.empty.title")}
+        body={t("dead_letter.empty.body")}
+      />
     );
   }
 

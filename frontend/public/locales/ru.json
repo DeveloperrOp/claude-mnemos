@@ -106,7 +106,17 @@
     "alerts_count": "Уведомления",
     "vault_not_mounted_title": "Vault не смонтирован",
     "vault_not_mounted_hint": "Запустите через mnemos daemon start",
-    "view_failed_jobs": "Посмотреть сбойные задачи"
+    "view_failed_jobs": "Посмотреть сбойные задачи",
+    "alerts": {
+      "expand": "Развернуть",
+      "collapse": "Свернуть",
+      "dismiss": "Скрыть",
+      "clear_all": "Очистить все",
+      "clear_all_confirm": "Скрыть все {{count}} уведомлений? Действие необратимо.",
+      "cleared_all_toast": "Все уведомления скрыты",
+      "empty": "Нет уведомлений",
+      "error": "Не удалось обновить уведомление"
+    }
   },
   "usage": {
     "title": "Использование",
@@ -325,7 +335,13 @@
     "delete_permanent_modal_title": "Удалить навсегда?",
     "delete_permanent_modal_desc": "Это необратимо. Введите имя страницы для подтверждения.",
     "delete_permanent_typed_label": "Введите имя страницы",
-    "delete_permanent_button": "Удалить навсегда"
+    "delete_permanent_button": "Удалить навсегда",
+    "bulk": {
+      "cleanup_blocked_button": "Очистить заблокированные ({{n}})",
+      "cleanup_blocked_confirm_title": "Удалить заблокированные записи навсегда?",
+      "cleanup_blocked_confirm_body": "Это навсегда удалит {{n}} записей с отсутствующими или некорректными метаданными. Действие необратимо.",
+      "cleanup_success_toast": "Удалено {{count}} заблокированных записей"
+    }
   },
   "snapshots": {
     "title": "Снимки",
@@ -341,6 +357,10 @@
     "op_type": "тип",
     "size": "размер",
     "no_snapshots": "Нет снимков",
+    "empty": {
+      "title": "Снимков пока нет",
+      "body": "Снимки — автоматические бэкапы vault'а (ежедневно и перед рискованными операциями). Кнопка «Создать снимок» сверху — чтобы сделать прямо сейчас."
+    },
     "showing_n": "{{count}} снимков",
     "created_toast": "Снапшот создан",
     "deleted_toast": "Снапшот удалён",
@@ -428,6 +448,10 @@
   "dead_letter": {
     "title": "Сбойные задачи",
     "no_failed": "Нет сбоев",
+    "empty": {
+      "title": "Нет упавших задач",
+      "body": "Задачи автоматически перезапускаются до 4 раз. Всё, что упало после повторов, попадает сюда для разбора."
+    },
     "showing_n": "{{count}} задач",
     "kind": "тип",
     "attempt": "попытка",

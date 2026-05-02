@@ -106,7 +106,17 @@
     "alerts_count": "Alerts",
     "vault_not_mounted_title": "Vault not mounted",
     "vault_not_mounted_hint": "Mount via mnemos daemon start",
-    "view_failed_jobs": "View failed jobs"
+    "view_failed_jobs": "View failed jobs",
+    "alerts": {
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "dismiss": "Dismiss",
+      "clear_all": "Clear all",
+      "clear_all_confirm": "Dismiss all {{count}} alerts? This cannot be undone.",
+      "cleared_all_toast": "All alerts cleared",
+      "empty": "No alerts",
+      "error": "Failed to update alert"
+    }
   },
   "usage": {
     "title": "Usage",
@@ -325,7 +335,13 @@
     "delete_permanent_modal_title": "Permanently delete?",
     "delete_permanent_modal_desc": "This cannot be undone. Type the page name to confirm.",
     "delete_permanent_typed_label": "Type the page name",
-    "delete_permanent_button": "Delete forever"
+    "delete_permanent_button": "Delete forever",
+    "bulk": {
+      "cleanup_blocked_button": "Cleanup blocked entries ({{n}})",
+      "cleanup_blocked_confirm_title": "Permanently delete blocked entries?",
+      "cleanup_blocked_confirm_body": "This permanently deletes {{n}} entries with missing or invalid metadata. Cannot be undone.",
+      "cleanup_success_toast": "Removed {{count}} blocked entries"
+    }
   },
   "snapshots": {
     "title": "Snapshots",
@@ -341,6 +357,10 @@
     "op_type": "type",
     "size": "size",
     "no_snapshots": "No snapshots yet",
+    "empty": {
+      "title": "No snapshots yet",
+      "body": "Snapshots are automatic vault backups (daily plus before risky operations). Use \"Create snapshot\" above to capture one now."
+    },
     "showing_n": "{{count}} snapshots",
     "created_toast": "Snapshot created",
     "deleted_toast": "Snapshot deleted",
@@ -428,6 +448,10 @@
   "dead_letter": {
     "title": "Failed jobs",
     "no_failed": "No failed jobs",
+    "empty": {
+      "title": "No failed jobs",
+      "body": "Jobs auto-retry up to 4 times. Anything that fails after retries lands here for inspection."
+    },
     "showing_n": "{{count}} jobs",
     "kind": "kind",
     "attempt": "attempt",

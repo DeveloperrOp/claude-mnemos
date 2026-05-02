@@ -13,9 +13,18 @@ interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 export function ChartContainer({
   className, children, height = 280, ...props
 }: ChartContainerProps) {
+  // Recharts ResponsiveContainer measures the parent on mount; if the parent
+  // is briefly 0/-1 wide before layout settles it logs `width(-1) and
+  // height(-1)` warnings. Guarantee non-zero dimensions with min-h/min-w and
+  // give ResponsiveContainer an explicit numeric height instead of "100%" so
+  // the first render never sees -1.
   return (
-    <div className={cn("w-full", className)} style={{ height }} {...props}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div
+      className={cn("w-full min-w-0", className)}
+      style={{ height, minHeight: height }}
+      {...props}
+    >
+      <ResponsiveContainer width="100%" height={height}>
         {children as React.ReactElement}
       </ResponsiveContainer>
     </div>
