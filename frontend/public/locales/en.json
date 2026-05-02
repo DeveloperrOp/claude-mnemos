@@ -351,7 +351,13 @@
     "imported_toast": "Import queued",
     "ignored_toast": "Marked ignored",
     "ignore_modal_title": "Mark session as ignored?",
-    "ignore_modal_desc": "This will hide the session from the lost-sessions list. The transcript file is not deleted."
+    "ignore_modal_desc": "This will hide the session from the lost-sessions list. The transcript file is not deleted.",
+    "read_open": "Read",
+    "read_close": "Hide",
+    "transcript_load_error": "Failed to load transcript: {{error}}",
+    "transcript_meta": "Showing {{shown}} of {{total}} messages",
+    "transcript_truncated": "list truncated, fetch with higher limit for more",
+    "message_truncated": "(content truncated)"
   },
   "suggestions": {
     "title": "Suggestions",

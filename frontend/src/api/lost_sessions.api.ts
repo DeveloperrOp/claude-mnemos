@@ -52,3 +52,30 @@ export async function ignoreLostSession(
   );
   return r.data as { ignored_count: number };
 }
+
+export interface TranscriptMessage {
+  role: "user" | "assistant" | "system" | "tool" | "other";
+  content: string;
+  truncated: boolean;
+  timestamp: string | null;
+}
+
+export interface TranscriptResponse {
+  session_id: string;
+  transcript_path: string;
+  messages: TranscriptMessage[];
+  total_messages: number;
+  returned_count: number;
+  truncated: boolean;
+}
+
+export async function getLostSessionTranscript(
+  session_id: string,
+  limit = 100,
+): Promise<TranscriptResponse> {
+  const r = await apiClient.get<TranscriptResponse>(
+    `/lost-sessions/${encodeURIComponent(session_id)}/transcript`,
+    { params: { limit } },
+  );
+  return r.data;
+}

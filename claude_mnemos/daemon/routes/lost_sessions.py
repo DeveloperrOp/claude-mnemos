@@ -65,6 +65,47 @@ async def rescan_route(request: Request) -> dict[str, Any]:
     return {"sessions": sessions, "total": len(sessions)}
 
 
+@router.get("/lost-sessions/{session_id}/transcript")
+async def read_transcript_route(
+    session_id: str, request: Request, limit: int = 100,
+) -> dict[str, Any]:
+    """Return parsed messages from a lost session's JSONL.
+
+    Looks up ``transcript_path`` via the per-vault ``LostSessionsCache``.
+    Returns 404 if ``session_id`` is not in any vault's current scan
+    results. ``limit`` is clamped to ``[1, 500]``.
+    """
+    capped = max(1, min(limit, 500))
+    entry = None
+    for runtime in all_runtimes(request):
+        cache = runtime.lost_sessions_cache
+        items = (
+            cache.get_or_scan(runtime.vault_root)
+            if cache is not None
+            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+        )
+        match = next((i for i in items if i.session_id == session_id), None)
+        if match is not None:
+            entry = match
+            break
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "lost_session_not_found", "session_id": session_id},
+        )
+    messages, total, truncated_overall = core_lost_sessions.read_transcript_messages(
+        Path(entry.transcript_path), limit=capped,
+    )
+    return {
+        "session_id": session_id,
+        "transcript_path": entry.transcript_path,
+        "messages": [m.model_dump() for m in messages],
+        "total_messages": total,
+        "returned_count": len(messages),
+        "truncated": truncated_overall,
+    }
+
+
 @router.post("/lost-sessions/{session_id}/import", status_code=201)
 async def import_route(
     session_id: str,

@@ -134,6 +134,9 @@ def _sha256_file(path: Path) -> str:
 PREVIEW_MAX_CHARS = 200
 PREVIEW_SCAN_LINES = 50  # Read at most N lines per file looking for cwd + first user message.
 
+TRANSCRIPT_MESSAGE_MAX_CHARS = 4000  # per message
+TRANSCRIPT_MAX_MESSAGES = 200        # per response
+
 # System-injected user messages we skip when picking a preview (we want what
 # the human actually typed, not IDE/shell metadata wrappers).
 _SYSTEM_PREVIEW_PREFIXES = (
@@ -327,6 +330,125 @@ class LostSessionsCache:
     def invalidate(self) -> None:
         self._items = None
         self._expires_at = 0.0
+
+
+class TranscriptMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant", "system", "tool", "other"]
+    content: str  # truncated to TRANSCRIPT_MESSAGE_MAX_CHARS
+    truncated: bool = False  # True if content was cut
+    timestamp: str | None = None
+
+
+def _classify_event(event: dict) -> tuple[str, str]:
+    """Classify event → (role, content_str). Returns ("", "") if no content."""
+    etype = event.get("type", "")
+    if etype not in ("user", "assistant"):
+        return "", ""
+    role = etype
+    # Two payload shapes:
+    #   1. event.content: str | list of content blocks
+    #   2. event.message.content: same (Anthropic SDK shape — newer transcripts)
+    payload = event.get("message")
+    source = payload if isinstance(payload, dict) else event
+    content = source.get("content")
+    if isinstance(content, str):
+        return role, content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "text":
+                t = block.get("text")
+                if isinstance(t, str):
+                    parts.append(t)
+            elif btype == "tool_use":
+                name = block.get("name", "?")
+                inp = block.get("input")
+                inp_str = json.dumps(inp, ensure_ascii=False)[:500] if inp is not None else ""
+                parts.append(f"<tool: {name}> {inp_str}")
+            elif btype == "tool_result":
+                tr = block.get("content")
+                if isinstance(tr, str):
+                    parts.append(f"<tool result> {tr[:500]}")
+                elif isinstance(tr, list):
+                    for tb in tr:
+                        if isinstance(tb, dict) and tb.get("type") == "text":
+                            parts.append(f"<tool result> {tb.get('text', '')[:500]}")
+        return role, "\n\n".join(parts)
+    return "", ""
+
+
+def read_transcript_messages(
+    transcript_path: Path,
+    *,
+    limit: int = TRANSCRIPT_MAX_MESSAGES,
+) -> tuple[list[TranscriptMessage], int, bool]:
+    """Parse JSONL and extract user/assistant messages.
+
+    Returns ``(messages, total_seen, truncated_overall)`` where:
+    - ``messages``: parsed messages (each truncated to
+      ``TRANSCRIPT_MESSAGE_MAX_CHARS``)
+    - ``total_seen``: how many message-events the file actually contains
+    - ``truncated_overall``: True if ``total_seen > limit`` (caller cut to limit)
+
+    System-prefixed user content (IDE/shell metadata) is reclassified as
+    ``role="system"`` so the UI can style it differently. Tool-use blocks
+    emit ``role="assistant"`` content with synthetic ``<tool: NAME> ARGS``
+    text. Unknown event types yield ``("", "")`` from ``_classify_event``
+    and are skipped.
+
+    Tolerant: malformed JSON lines are silently skipped; OSError yields
+    an empty result.
+    """
+    messages: list[TranscriptMessage] = []
+    total = 0
+    try:
+        with transcript_path.open("r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(event, dict):
+                    continue
+                role, content_str = _classify_event(event)
+                if not content_str:
+                    continue
+                # Detect system-prefixed user content (IDE/shell metadata)
+                stripped = content_str.lstrip()
+                if role == "user" and any(
+                    stripped.startswith(p) for p in _SYSTEM_PREVIEW_PREFIXES
+                ):
+                    role = "system"
+                total += 1
+                if len(messages) >= limit:
+                    continue  # keep counting total but stop appending
+                truncated = False
+                if len(content_str) > TRANSCRIPT_MESSAGE_MAX_CHARS:
+                    content_str = (
+                        content_str[:TRANSCRIPT_MESSAGE_MAX_CHARS].rstrip() + "…"
+                    )
+                    truncated = True
+                ts = event.get("timestamp")
+                messages.append(
+                    TranscriptMessage(
+                        role=role,  # type: ignore[arg-type]
+                        content=content_str,
+                        truncated=truncated,
+                        timestamp=ts if isinstance(ts, str) else None,
+                    )
+                )
+    except OSError:
+        return [], 0, False
+    truncated_overall = total > limit
+    return messages, total, truncated_overall
 
 
 def add_to_ignore(

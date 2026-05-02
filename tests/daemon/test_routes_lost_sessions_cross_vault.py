@@ -235,6 +235,51 @@ def test_ignore_requires_project_name_400(
     assert r.json()["detail"]["error"] == "missing_project_name"
 
 
+def test_transcript_endpoint_404_for_unknown(
+    daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+) -> None:
+    """GET /lost-sessions/{sid}/transcript with unknown session_id → 404."""
+    _daemon, client, _vault_a, _vault_b = daemon_with_two
+
+    r = client.get("/api/lost-sessions/no-such-session/transcript")
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"]["error"] == "lost_session_not_found"
+
+
+def test_transcript_endpoint_returns_messages(
+    daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GET /lost-sessions/{sid}/transcript returns parsed user/assistant messages."""
+    import json as _json
+
+    _daemon, client, _vault_a, _vault_b = daemon_with_two
+
+    # Build a real JSONL file with two messages and point the env var at it.
+    root = tmp_path / "transcripts"
+    root.mkdir(exist_ok=True)
+    jsonl = root / "live-sess.jsonl"
+    jsonl.write_text(
+        "\n".join([
+            _json.dumps({"type": "user", "content": "what's up"}),
+            _json.dumps({"type": "assistant", "content": "not much"}),
+        ]),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
+
+    r = client.get("/api/lost-sessions/live-sess/transcript?limit=10")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["session_id"] == "live-sess"
+    assert body["total_messages"] == 2
+    assert body["returned_count"] == 2
+    assert body["truncated"] is False
+    assert [m["role"] for m in body["messages"]] == ["user", "assistant"]
+    assert body["messages"][0]["content"] == "what's up"
+
+
 def test_ignore_routes_to_specified_project(
     daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
     tmp_path: Path,

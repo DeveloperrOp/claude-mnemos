@@ -443,3 +443,113 @@ def test_scan_lost_sessions_populates_cwd_and_preview(tmp_path: Path) -> None:
     assert entry.session_id == "abc123"
     assert entry.cwd == r"C:\Users\test\code"
     assert entry.preview == "ingest me"
+
+
+# ---------------------------------------------------------------------------
+# read_transcript_messages — parse JSONL → role-tagged messages for the
+# inline transcript reader on the dashboard.
+# ---------------------------------------------------------------------------
+
+
+def test_read_transcript_returns_user_assistant_messages(tmp_path: Path) -> None:
+    from claude_mnemos.core.lost_sessions import read_transcript_messages
+
+    jsonl = tmp_path / "t.jsonl"
+    jsonl.write_text(
+        "\n".join([
+            json.dumps({"type": "user", "content": "hello"}),
+            json.dumps({"type": "assistant", "content": "hi back"}),
+            json.dumps({"type": "queue-operation", "op": "x"}),  # skipped
+        ]),
+        encoding="utf-8",
+    )
+    msgs, total, trunc = read_transcript_messages(jsonl)
+    assert total == 2
+    assert trunc is False
+    assert [m.role for m in msgs] == ["user", "assistant"]
+    assert msgs[0].content == "hello"
+
+
+def test_read_transcript_truncates_long_message(tmp_path: Path) -> None:
+    from claude_mnemos.core.lost_sessions import (
+        TRANSCRIPT_MESSAGE_MAX_CHARS,
+        read_transcript_messages,
+    )
+
+    long_text = "x" * (TRANSCRIPT_MESSAGE_MAX_CHARS + 100)
+    jsonl = tmp_path / "long.jsonl"
+    jsonl.write_text(
+        json.dumps({"type": "user", "content": long_text}) + "\n",
+        encoding="utf-8",
+    )
+    msgs, _total, _trunc = read_transcript_messages(jsonl)
+    assert msgs[0].truncated is True
+    assert len(msgs[0].content) <= TRANSCRIPT_MESSAGE_MAX_CHARS + 1
+
+
+def test_read_transcript_handles_anthropic_message_shape(tmp_path: Path) -> None:
+    """event.message.content = [{type: text, text: ...}]."""
+    from claude_mnemos.core.lost_sessions import read_transcript_messages
+
+    jsonl = tmp_path / "ant.jsonl"
+    jsonl.write_text(
+        json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": "from anthropic"}]},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    msgs, _, _ = read_transcript_messages(jsonl)
+    assert len(msgs) == 1
+    assert msgs[0].role == "assistant"
+    assert msgs[0].content == "from anthropic"
+
+
+def test_read_transcript_extracts_tool_use_block(tmp_path: Path) -> None:
+    from claude_mnemos.core.lost_sessions import read_transcript_messages
+
+    jsonl = tmp_path / "tool.jsonl"
+    jsonl.write_text(
+        json.dumps({
+            "type": "assistant",
+            "content": [
+                {"type": "text", "text": "let me check"},
+                {"type": "tool_use", "name": "bash", "input": {"command": "ls"}},
+            ],
+        }) + "\n",
+        encoding="utf-8",
+    )
+    msgs, _, _ = read_transcript_messages(jsonl)
+    content = msgs[0].content
+    assert "let me check" in content
+    assert "<tool: bash>" in content
+    assert "ls" in content
+
+
+def test_read_transcript_limit_clamp(tmp_path: Path) -> None:
+    from claude_mnemos.core.lost_sessions import read_transcript_messages
+
+    jsonl = tmp_path / "many.jsonl"
+    lines = [json.dumps({"type": "user", "content": f"msg{i}"}) for i in range(50)]
+    jsonl.write_text("\n".join(lines), encoding="utf-8")
+    msgs, total, trunc = read_transcript_messages(jsonl, limit=5)
+    assert len(msgs) == 5
+    assert total == 50
+    assert trunc is True
+
+
+def test_read_transcript_classifies_system_metadata(tmp_path: Path) -> None:
+    """User content with <ide_opened_file> / <system-reminder> prefix is reclassified as 'system'."""
+    from claude_mnemos.core.lost_sessions import read_transcript_messages
+
+    jsonl = tmp_path / "sys.jsonl"
+    jsonl.write_text(
+        "\n".join([
+            json.dumps({"type": "user", "content": "<ide_opened_file>foo.py</ide_opened_file>"}),
+            json.dumps({"type": "user", "content": "real prompt"}),
+        ]),
+        encoding="utf-8",
+    )
+    msgs, _, _ = read_transcript_messages(jsonl)
+    assert msgs[0].role == "system"
+    assert msgs[1].role == "user"
