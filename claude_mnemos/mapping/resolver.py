@@ -55,7 +55,21 @@ class ProjectResolver:
         for entry in self._store.list_all():
             for pattern in entry.cwd_patterns:
                 pat_norm = _normalize(pattern)
-                if fnmatch.fnmatchcase(cwd_norm, pat_norm):
+                # Recursive form: trailing \* or \** means "this folder and any
+                # descendant". Without this expansion, fnmatch treats \* as
+                # "exactly one path segment of any chars" — which fails for
+                # cwd === base folder (no trailing segment) and for nested
+                # subdirectories. We canonicalize: strip the wildcard and
+                # match if cwd equals base or sits under base/.
+                base = pat_norm
+                if base.endswith(("\\**", "/**")):
+                    base = base[:-3]
+                elif base.endswith(("\\*", "/*")):
+                    base = base[:-2]
+                if base != pat_norm:  # had a trailing wildcard
+                    if cwd_norm == base or cwd_norm.startswith(base + "\\") or cwd_norm.startswith(base + "/"):
+                        candidates.append((entry, pattern, len(pat_norm)))
+                elif fnmatch.fnmatchcase(cwd_norm, pat_norm):
                     candidates.append((entry, pattern, len(pat_norm)))
         if not candidates:
             return None
