@@ -115,6 +115,31 @@
     "ratio_short": "compression ×{{ratio}}",
     "no_data": "No data yet"
   },
+  "usage_widget": {
+    "tooltip_tokens": "Total input + output tokens across all sessions in vault",
+    "tooltip_sessions": "Sessions ingested in vault",
+    "tooltip_tokens_per_byte": "Tokens per byte of raw transcript (compression efficiency)",
+    "tooltip_inject_events": "SessionStart hook injections in last 30 days",
+    "tooltip_avg_compression": "Average context-budget compression ratio"
+  },
+  "queue": {
+    "title": "Queue",
+    "filter_active": "Active",
+    "filter_all": "All",
+    "filter_queued": "Queued",
+    "filter_running": "Running",
+    "filter_succeeded": "Succeeded",
+    "filter_failed": "Failed",
+    "empty_title": "Queue empty",
+    "empty_body": "Ingest jobs will appear here after a new Claude session.",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "view_transcript": "View transcript",
+    "cancel_success": "Job cancelled",
+    "retry_success": "Job re-queued",
+    "traceback_show": "Show traceback",
+    "traceback_hide": "Hide traceback"
+  },
   "placeholder": {
     "title": "{{section}}",
     "body": "This section is coming in plan {{plan}}.",
@@ -208,6 +233,8 @@
     "showing_n_of_m": "{{shown}} of {{total}}",
     "ingest_button": "Ingest",
     "ingested_toast": "Ingest queued",
+    "reingest_button": "Re-ingest",
+    "reingest_toast": "Re-ingest queued — see Queue",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back"
   },

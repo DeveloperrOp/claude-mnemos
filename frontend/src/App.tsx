@@ -5,12 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "./components/layout/Layout";
 import { Overview } from "./pages/Overview";
 import { ProjectView } from "./pages/ProjectView";
-import { Placeholder } from "./pages/Placeholder";
 import { PagesBrowser } from "./pages/PagesBrowser";
 import { PageDetail } from "./pages/PageDetail";
 import { PageEdit } from "./pages/PageEdit";
 import { Sessions } from "./pages/Sessions";
 import { SessionDetail } from "./pages/SessionDetail";
+import { Queue } from "./pages/Queue";
 import { ActivityCenter } from "./pages/ActivityCenter";
 import { ActivityDetail } from "./pages/ActivityDetail";
 import { Trash } from "./pages/Trash";
@@ -56,7 +56,7 @@ const router = createBrowserRouter([
           { path: "trash", element: <Trash /> },
           { path: "snapshots", element: <Snapshots /> },
           { path: "health", element: <Health /> },
-          { path: "queue", element: <Placeholder section="Queue" plan="#14b" /> },
+          { path: "queue", element: <Queue /> },
           { path: "settings", element: <ProjectSettings /> },
         ],
       },

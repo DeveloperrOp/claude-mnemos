@@ -115,6 +115,31 @@
     "ratio_short": "стиснення ×{{ratio}}",
     "no_data": "Поки без даних"
   },
+  "usage_widget": {
+    "tooltip_tokens": "Усього токенів (вхід + вихід) по всіх сесіях у сховищі",
+    "tooltip_sessions": "Сесій інжещено у сховище",
+    "tooltip_tokens_per_byte": "Токенів на байт сирого транскрипта (ефективність стиснення)",
+    "tooltip_inject_events": "Ін'єкцій SessionStart-хука за останні 30 днів",
+    "tooltip_avg_compression": "Середнє стиснення контекстного бюджета"
+  },
+  "queue": {
+    "title": "Черга",
+    "filter_active": "Активні",
+    "filter_all": "Усі",
+    "filter_queued": "В черзі",
+    "filter_running": "Виконуються",
+    "filter_succeeded": "Успішні",
+    "filter_failed": "Невдалі",
+    "empty_title": "Черга порожня",
+    "empty_body": "Завдання ingest з'являться тут після нової Claude-сесії.",
+    "cancel": "Скасувати",
+    "retry": "Повторити",
+    "view_transcript": "Відкрити транскрипт",
+    "cancel_success": "Задачу скасовано",
+    "retry_success": "Задачу повторно поставлено в чергу",
+    "traceback_show": "Показати traceback",
+    "traceback_hide": "Сховати traceback"
+  },
   "placeholder": {
     "title": "{{section}}",
     "body": "Цей розділ з'явиться в плані {{plan}}.",
@@ -208,6 +233,8 @@
     "showing_n_of_m": "{{shown}} з {{total}}",
     "ingest_button": "Інжест",
     "ingested_toast": "Інжест у черзі",
+    "reingest_button": "Заново інжестити",
+    "reingest_toast": "Re-ingest у черзі — дивись Чергу",
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад"
   },

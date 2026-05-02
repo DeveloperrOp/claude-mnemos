@@ -115,6 +115,31 @@
     "ratio_short": "сжатие ×{{ratio}}",
     "no_data": "Пока без данных"
   },
+  "usage_widget": {
+    "tooltip_tokens": "Всего токенов (вход + выход) по всем сессиям в хранилище",
+    "tooltip_sessions": "Сессий загружено в хранилище",
+    "tooltip_tokens_per_byte": "Токенов на байт исходного транскрипта (эффективность сжатия)",
+    "tooltip_inject_events": "Инъекций SessionStart-хука за последние 30 дней",
+    "tooltip_avg_compression": "Среднее сжатие контекстного бюджета"
+  },
+  "queue": {
+    "title": "Очередь",
+    "filter_active": "Активные",
+    "filter_all": "Все",
+    "filter_queued": "В очереди",
+    "filter_running": "Выполняются",
+    "filter_succeeded": "Успешные",
+    "filter_failed": "Неудачные",
+    "empty_title": "Очередь пуста",
+    "empty_body": "Задачи ингеста появятся здесь после новой сессии Claude.",
+    "cancel": "Отменить",
+    "retry": "Повторить",
+    "view_transcript": "Открыть транскрипт",
+    "cancel_success": "Задача отменена",
+    "retry_success": "Задача повторно поставлена в очередь",
+    "traceback_show": "Показать traceback",
+    "traceback_hide": "Скрыть traceback"
+  },
   "placeholder": {
     "title": "{{section}}",
     "body": "Этот раздел появится в плане {{plan}}.",
@@ -208,6 +233,8 @@
     "showing_n_of_m": "{{shown}} из {{total}}",
     "ingest_button": "Ингест",
     "ingested_toast": "Ингест в очереди",
+    "reingest_button": "Заново ингестить",
+    "reingest_toast": "Re-ingest в очереди — открой Очередь",
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад"
   },
