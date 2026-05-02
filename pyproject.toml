@@ -44,6 +44,11 @@ dev = [
 [project.scripts]
 mnemos = "claude_mnemos.cli:main"
 mnemos-mcp = "claude_mnemos.mcp.__main__:main"
+
+# Tray runs as a windowed (no-console) process — uses pythonw.exe under
+# Windows so a black command-prompt window doesn't appear in taskbar /
+# alt-tab while the tray supervises the daemon in the background.
+[project.gui-scripts]
 mnemos-tray = "claude_mnemos.tray.__main__:main"
 
 [tool.hatch.build.targets.wheel]

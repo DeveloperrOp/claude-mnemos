@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from pathlib import Path
 
 import psutil
 
@@ -65,15 +66,25 @@ def _release_tray_lock() -> None:
 def _resolve_target() -> tuple[str, list[str]]:
     """Resolve the (executable, args) pair the OS autostart entry should launch.
 
-    Primary: ``mnemos-tray run`` if ``mnemos-tray`` is on PATH.
-    Fallback: ``<python> -m claude_mnemos.tray run`` — used only when the
-    console-script entry isn't available (e.g. running from a checkout
-    without ``pip install``).
+    Primary: ``mnemos-tray run`` if ``mnemos-tray`` is on PATH (built via the
+    ``[project.gui-scripts]`` entry → uses pythonw.exe under Windows, no
+    console window).
+    Fallback: ``<pythonw>/<python3> -m claude_mnemos.tray run`` — used only
+    when the gui-script entry isn't available (e.g. running from a checkout
+    without ``pip install``). On Windows we prefer ``pythonw.exe`` (silent
+    sibling of ``python.exe``) so the tray doesn't drag a black console
+    window into taskbar / alt-tab.
     """
     found = shutil.which("mnemos-tray")
     if found:
         return found, ["run"]
-    return sys.executable, ["-m", "claude_mnemos.tray", "run"]
+    # Windows fallback: swap python.exe → pythonw.exe to suppress the console.
+    exe = sys.executable
+    if sys.platform == "win32" and exe.lower().endswith("python.exe"):
+        candidate = exe[: -len("python.exe")] + "pythonw.exe"
+        if Path(candidate).exists():
+            exe = candidate
+    return exe, ["-m", "claude_mnemos.tray", "run"]
 
 
 def _cmd_run() -> int:
