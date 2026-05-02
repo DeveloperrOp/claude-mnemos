@@ -210,6 +210,68 @@ def test_list_sessions_job_without_transcript_path_falls_back_to_id(
     assert result[0].transcript_path is None
 
 
+def test_session_view_populates_cwd_and_preview_from_transcript(
+    tmp_path: Path,
+) -> None:
+    """Succeeded SessionView includes cwd+preview parsed from the transcript file."""
+    import json
+
+    transcript = tmp_path / "rich-sid.jsonl"
+    transcript.write_text(
+        "\n".join([
+            json.dumps({"type": "user", "cwd": "/home/u/proj", "content": "hi there"}),
+        ]),
+        encoding="utf-8",
+    )
+
+    m = Manifest()
+    m.add(
+        "sha-1",
+        _ingest_record(
+            "rich-sid",
+            ingested_at=datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC),
+            transcript_path=str(transcript),
+        ),
+    )
+    m.save(tmp_path)
+
+    result = list_sessions(tmp_path)
+    assert len(result) == 1
+    view = result[0]
+    assert view.cwd == "/home/u/proj"
+    assert view.preview == "hi there"
+
+
+def test_session_view_cwd_preview_none_when_transcript_missing(
+    tmp_path: Path,
+) -> None:
+    """SessionView tolerates missing/None transcript_path → cwd/preview both None."""
+    m = Manifest()
+    m.add(
+        "sha-1",
+        _ingest_record(
+            "no-tp",
+            ingested_at=datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC),
+            transcript_path=None,
+        ),
+    )
+    m.add(
+        "sha-2",
+        _ingest_record(
+            "bad-tp",
+            ingested_at=datetime(2026, 4, 26, 13, 0, 0, tzinfo=UTC),
+            transcript_path="/no/such/file.jsonl",
+        ),
+    )
+    m.save(tmp_path)
+
+    result = list_sessions(tmp_path)
+    assert len(result) == 2
+    for view in result:
+        assert view.cwd is None
+        assert view.preview is None
+
+
 def test_list_sessions_dead_letter_propagates_error(tmp_path: Path) -> None:
     with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
         job = store.create(

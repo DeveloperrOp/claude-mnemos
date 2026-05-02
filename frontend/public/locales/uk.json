@@ -246,7 +246,13 @@
     "reingest_button": "Заново інжестити",
     "reingest_toast": "Re-ingest у черзі — дивись Чергу",
     "not_found_title": "Сесію не знайдено",
-    "not_found_hint": "Повернутись назад"
+    "not_found_hint": "Повернутись назад",
+    "bulk_import": {
+      "banner_text": "У тебе {{n}} загублених сесій для цього проекту. Імпортувати всі?",
+      "button": "Імпортувати всі ({{n}})",
+      "success": "{{queued}} сесій поставлено в чергу",
+      "skipped": "{{skipped}} пропущено (інший проект)"
+    }
   },
   "activity": {
     "title": "Активність",

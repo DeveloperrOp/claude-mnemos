@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, Job, JobStore
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
@@ -33,6 +34,8 @@ class SessionView(BaseModel):
     raw_transcript_bytes: int | None
     created_pages: list[str] = Field(default_factory=list)
     error: str | None = None
+    cwd: str | None = None
+    preview: str | None = None
 
 
 class SessionNotFoundError(LookupError):
@@ -50,7 +53,21 @@ _JOB_STATUS_TO_SESSION_STATUS: dict[str, SessionStatus] = {
 }
 
 
+def _safe_cwd_preview(transcript_path: str | None) -> tuple[str | None, str | None]:
+    """Best-effort cwd+preview lookup; tolerate missing/unreadable transcript."""
+    if not transcript_path:
+        return None, None
+    try:
+        path = Path(transcript_path)
+        if not path.is_file():
+            return None, None
+        return _extract_cwd_and_preview(path)
+    except OSError:
+        return None, None
+
+
 def _session_view_from_record(record: IngestRecord) -> SessionView:
+    cwd, preview = _safe_cwd_preview(record.transcript_path)
     return SessionView(
         session_id=record.session_id,
         status=SessionStatus.SUCCEEDED,
@@ -62,6 +79,8 @@ def _session_view_from_record(record: IngestRecord) -> SessionView:
         raw_transcript_bytes=record.raw_transcript_bytes,
         created_pages=list(record.created_pages),
         error=None,
+        cwd=cwd,
+        preview=preview,
     )
 
 
@@ -87,6 +106,7 @@ def _session_view_from_job(job: Job) -> SessionView | None:
         return None
     raw = job.payload.get("transcript_path", "")
     transcript_path = raw if isinstance(raw, str) and raw else None
+    cwd, preview = _safe_cwd_preview(transcript_path)
     return SessionView(
         session_id=_sid_from_job(job),
         status=status,
@@ -98,6 +118,8 @@ def _session_view_from_job(job: Job) -> SessionView | None:
         raw_transcript_bytes=None,
         created_pages=[],
         error=job.error,
+        cwd=cwd,
+        preview=preview,
     )
 
 

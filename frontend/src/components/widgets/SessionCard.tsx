@@ -51,6 +51,16 @@ export function SessionCard({ project, session: s }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-1 text-xs">
+          {s.cwd && (
+            <div className="truncate font-mono text-xs text-muted-foreground" title={s.cwd}>
+              📁 {s.cwd}
+            </div>
+          )}
+          {s.preview && (
+            <div className="truncate text-xs italic text-muted-foreground/80" title={s.preview}>
+              “{s.preview}”
+            </div>
+          )}
           {s.model && (
             <div>
               <span className="text-muted-foreground">{t("sessions.model")}: </span>

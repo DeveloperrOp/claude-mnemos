@@ -29,6 +29,8 @@ export const SessionViewSchema = z.object({
   raw_transcript_bytes: z.number().int().nullable(),
   created_pages: z.array(z.string()),
   error: z.string().nullable(),
+  cwd: z.string().nullable().optional(),
+  preview: z.string().nullable().optional(),
 });
 export type SessionView = z.infer<typeof SessionViewSchema>;
 

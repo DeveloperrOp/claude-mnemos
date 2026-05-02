@@ -246,7 +246,13 @@
     "reingest_button": "Re-ingest",
     "reingest_toast": "Re-ingest queued — see Queue",
     "not_found_title": "Session not found",
-    "not_found_hint": "Go back"
+    "not_found_hint": "Go back",
+    "bulk_import": {
+      "banner_text": "You have {{n}} lost sessions for this project. Import all?",
+      "button": "Import all ({{n}})",
+      "success": "{{queued}} sessions queued for ingest",
+      "skipped": "{{skipped}} skipped (different project)"
+    }
   },
   "activity": {
     "title": "Activity",

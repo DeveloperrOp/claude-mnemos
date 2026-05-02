@@ -106,6 +106,72 @@ async def read_transcript_route(
     }
 
 
+@router.post("/lost-sessions/import-bulk", status_code=202)
+async def import_bulk_route(
+    request: Request, body: dict[str, Any]
+) -> dict[str, Any]:
+    """Enqueue ingest jobs for every lost session attributed to ``project_name``.
+
+    Body: ``{"project_name": str, "extract": bool? = True, "limit": int? = unbounded}``.
+
+    Returns: ``{"queued": int, "skipped": int, "session_ids": [str]}``.
+
+    Skipped: sessions whose enqueue raised. Failures are counted in ``skipped``,
+    not raised — caller can retry one-at-a-time via the regular import endpoint.
+
+    404 when ``project_name`` is not registered, 422 when missing,
+    503 when the target vault has no job_store mounted.
+    """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "missing_project_name"},
+        )
+    runtime = get_runtime(request, project_name)
+    if runtime.job_store is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "vault_unavailable", "project_name": project_name},
+        )
+
+    raw_limit = body.get("limit")
+    limit = raw_limit if isinstance(raw_limit, int) and raw_limit > 0 else None
+    extract = bool(body.get("extract", True))
+
+    cache = runtime.lost_sessions_cache
+    items = (
+        cache.get_or_scan(runtime.vault_root)
+        if cache is not None
+        else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+    )
+
+    queued = 0
+    skipped = 0
+    session_ids: list[str] = []
+    for entry in items:
+        if limit is not None and queued >= limit:
+            break
+        try:
+            runtime.job_store.create(
+                kind="ingest",
+                payload={
+                    "transcript_path": entry.transcript_path,
+                    "extract": extract,
+                },
+            )
+        except Exception:
+            skipped += 1
+            continue
+        queued += 1
+        session_ids.append(entry.session_id)
+
+    if queued > 0 and runtime.job_worker is not None:
+        runtime.job_worker.signal_wakeup()
+
+    return {"queued": queued, "skipped": skipped, "session_ids": session_ids}
+
+
 @router.post("/lost-sessions/{session_id}/import", status_code=201)
 async def import_route(
     session_id: str,

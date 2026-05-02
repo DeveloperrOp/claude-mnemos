@@ -192,3 +192,79 @@ async def test_post_ignore_missing_project_name_returns_400(
     r = await client.post("/api/lost-sessions/skipme/ignore", json={})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_project_name"
+
+
+# ---------------------------------------------------------------------------
+# POST /lost-sessions/import-bulk
+# ---------------------------------------------------------------------------
+
+
+async def test_post_import_bulk_empty(client, transcripts_root: Path):
+    """No lost sessions in target vault → queued=0, skipped=0."""
+    r = await client.post(
+        "/api/lost-sessions/import-bulk",
+        json={"project_name": _PROJECT_NAME},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body == {"queued": 0, "skipped": 0, "session_ids": []}
+
+
+async def test_post_import_bulk_three_match(
+    client, daemon, transcripts_root: Path
+):
+    """Three lost sessions all matching → queued=3, all enqueued in target store."""
+    for sid in ("a", "b", "c"):
+        (transcripts_root / f"{sid}.jsonl").write_text(sid, encoding="utf-8")
+
+    r = await client.post(
+        "/api/lost-sessions/import-bulk",
+        json={"project_name": _PROJECT_NAME},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body["queued"] == 3
+    assert body["skipped"] == 0
+    assert set(body["session_ids"]) == {"a", "b", "c"}
+
+    counts = daemon._runtime.job_store.count_by_status()
+    assert sum(counts.values()) == 3
+
+
+async def test_post_import_bulk_respects_limit(
+    client, daemon, transcripts_root: Path
+):
+    """limit=1 → only one job enqueued, regardless of how many lost exist."""
+    for sid in ("a", "b", "c"):
+        (transcripts_root / f"{sid}.jsonl").write_text(sid, encoding="utf-8")
+
+    r = await client.post(
+        "/api/lost-sessions/import-bulk",
+        json={"project_name": _PROJECT_NAME, "limit": 1},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body["queued"] == 1
+    assert len(body["session_ids"]) == 1
+
+    counts = daemon._runtime.job_store.count_by_status()
+    assert sum(counts.values()) == 1
+
+
+async def test_post_import_bulk_missing_project_name_returns_422(
+    client, transcripts_root: Path
+):
+    r = await client.post("/api/lost-sessions/import-bulk", json={})
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "missing_project_name"
+
+
+async def test_post_import_bulk_unknown_project_returns_404(
+    client, transcripts_root: Path
+):
+    r = await client.post(
+        "/api/lost-sessions/import-bulk",
+        json={"project_name": "ghost-project"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"
