@@ -63,6 +63,39 @@
       "body": "Hook scripts crashed in the last 24h. Sessions in those windows may have been skipped.",
       "more": "+ {{n}} more",
       "log_path": "Full log: {{path}}"
+    },
+    "kpi": {
+      "queue_label": "Queue",
+      "queue_format": "{{queued}} queued · {{running}} running · {{failed}} failed",
+      "active_label": "Active",
+      "active_format": "🟢 {{hot}} · 🟡 {{cooling}}",
+      "today_label": "Today",
+      "today_format": "{{ingest}} ingest · {{pages}} pages",
+      "tokens_label": "Tokens",
+      "lost_label": "Lost",
+      "lost_link": "→ Sort"
+    },
+    "running": {
+      "title": "Running now",
+      "elapsed": "{{seconds}}s elapsed",
+      "empty": "😴 Nothing running"
+    },
+    "active": {
+      "title": "Active sessions",
+      "empty": "No active sessions",
+      "dump_now_button": "Dump now",
+      "read_button": "Read",
+      "auto_dump_in": "auto-dump in {{remaining}}",
+      "auto_dump_overdue": "auto-dump pending"
+    },
+    "health_dot": {
+      "ok": "Healthy",
+      "warning": "Warnings",
+      "critical": "Critical",
+      "details_link": "→ Details"
+    },
+    "dump_now": {
+      "toast_success": "Queued for dump"
     }
   },
   "project_view": {
