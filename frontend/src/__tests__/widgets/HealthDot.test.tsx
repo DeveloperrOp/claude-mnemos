@@ -32,6 +32,13 @@ vi.mock("../../hooks/useHealth", () => ({
   }),
 }));
 
+vi.mock("../../hooks/useProjects", () => ({
+  useProjects: () => ({
+    data: [{ name: "alpha", display_name: "Alpha", vault_root: "/v" }],
+    isLoading: false,
+  }),
+}));
+
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient();
   return (
@@ -47,10 +54,10 @@ describe("HealthDot", () => {
     expect(screen.getByText(/Healthy/)).toBeDefined();
   });
 
-  it("links to /health", () => {
+  it("links to first project's health page", () => {
     render(wrap(<HealthDot />));
     const link = screen.getByRole("link");
-    expect(link.getAttribute("href")).toBe("/health");
+    expect(link.getAttribute("href")).toBe("/project/alpha/health");
   });
 
   it("shows the details link text", () => {
