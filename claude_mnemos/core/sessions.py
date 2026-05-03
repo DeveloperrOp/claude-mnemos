@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
+from claude_mnemos.core.transcript_helpers import _extract_cwd_and_preview
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, Job, JobStore
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 

@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -34,11 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.core.transcript_helpers import (
-    PREVIEW_MAX_CHARS,
     _SYSTEM_PREVIEW_PREFIXES,
-    _extract_cwd_and_preview,
-    _resolve_transcripts_root,
-    _sha256_file,
 )
 from claude_mnemos.state.manifest import Manifest
 
@@ -130,49 +126,32 @@ def scan_lost_sessions(
     """Return all transcripts under ``transcripts_root`` that are neither
     ingested (per manifest) nor explicitly ignored.
 
-    Resolution order for ``transcripts_root``:
-        argument > ``MNEMOS_TRANSCRIPTS_ROOT`` env var > ``~/.claude/projects``.
-
-    Missing roots return ``[]`` (no error). Unreadable files are skipped
-    silently — losing one entry is preferable to crashing the whole scan
-    because of an antivirus lock or a broken symlink.
+    Internal: delegates disk IO (rglob + stat + sha) to transcript_scanner._scan_sync.
     """
-    root = _resolve_transcripts_root(transcripts_root)
-    if not root.is_dir():
-        return []
+    from claude_mnemos.core.transcript_scanner import _scan_sync
 
     manifest = Manifest.load(vault)
     known_shas: set[str] = set(manifest.ingested.keys())
     ignored_shas: set[str] = LostSessionsIgnore.load(vault).ignored_shas
 
+    entries = _scan_sync(transcripts_root)
+
     results: list[LostSession] = []
-    for path in root.rglob("*.jsonl"):
-        # Defensive: rglob may yield broken symlinks or directories named
-        # like files on weird filesystems. Skip anything that is not a
-        # regular file we can stat.
-        if not path.is_file():
+    for e in entries:
+        if e.sha in known_shas or e.sha in ignored_shas:
             continue
-        try:
-            stat = path.stat()
-            sha = _sha256_file(path)
-        except OSError:
-            continue
-        if sha in known_shas or sha in ignored_shas:
-            continue
-        cwd, preview = _extract_cwd_and_preview(path)
         results.append(
             LostSession(
-                session_id=path.stem,
-                transcript_path=str(path.resolve()),
-                sha=sha,
-                size_bytes=stat.st_size,
-                mtime=datetime.fromtimestamp(stat.st_mtime, tz=UTC),
-                cwd=cwd,
-                preview=preview,
+                session_id=e.session_id,
+                transcript_path=e.transcript_path,
+                sha=e.sha,
+                size_bytes=e.size_bytes,
+                mtime=e.mtime,
+                cwd=e.cwd,
+                preview=e.preview,
             )
         )
-
-    results.sort(key=lambda item: item.mtime, reverse=True)
+    results.sort(key=lambda i: i.mtime, reverse=True)
     return results
 
 

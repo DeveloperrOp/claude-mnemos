@@ -17,6 +17,7 @@ from claude_mnemos.core.lost_sessions import (
     add_to_ignore,
     scan_lost_sessions,
 )
+from claude_mnemos.core.transcript_helpers import _extract_cwd_and_preview
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 
@@ -269,7 +270,6 @@ def test_scan_sorted_by_mtime_desc(tmp_path: Path) -> None:
 
 def test_extract_cwd_and_preview_finds_both(tmp_path: Path) -> None:
     """First user event with content + first event with cwd are extracted."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "test.jsonl"
     jsonl.write_text(
@@ -289,10 +289,7 @@ def test_extract_cwd_and_preview_finds_both(tmp_path: Path) -> None:
 
 def test_extract_preview_truncates_long_message(tmp_path: Path) -> None:
     """Preview cuts at 200 chars and adds ellipsis."""
-    from claude_mnemos.core.lost_sessions import (
-        PREVIEW_MAX_CHARS,
-        _extract_cwd_and_preview,
-    )
+    from claude_mnemos.core.transcript_helpers import PREVIEW_MAX_CHARS
 
     long_msg = "lorem ipsum " * 50  # ~600 chars
     jsonl = tmp_path / "long.jsonl"
@@ -308,7 +305,6 @@ def test_extract_preview_truncates_long_message(tmp_path: Path) -> None:
 
 def test_extract_preview_handles_anthropic_content_blocks(tmp_path: Path) -> None:
     """User content can be a list of {type: text, text: ...} blocks (Anthropic API style)."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "blocks.jsonl"
     jsonl.write_text(
@@ -327,7 +323,6 @@ def test_extract_preview_handles_anthropic_content_blocks(tmp_path: Path) -> Non
 
 def test_extract_handles_no_cwd_no_user(tmp_path: Path) -> None:
     """File with neither cwd nor user events → both None."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "empty.jsonl"
     jsonl.write_text(
@@ -341,7 +336,6 @@ def test_extract_handles_no_cwd_no_user(tmp_path: Path) -> None:
 
 def test_extract_tolerates_malformed_lines(tmp_path: Path) -> None:
     """A bad JSON line in the middle doesn't break the scan; valid lines after still work."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "messy.jsonl"
     jsonl.write_text(
@@ -360,7 +354,6 @@ def test_extract_tolerates_malformed_lines(tmp_path: Path) -> None:
 def test_extract_preview_from_real_claude_code_shape(tmp_path: Path) -> None:
     """Real Claude Code transcripts wrap user content in event.message.content,
     not event.content. Helper must dig one level deeper."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "real.jsonl"
     jsonl.write_text(
@@ -387,7 +380,6 @@ def test_extract_preview_from_real_claude_code_shape(tmp_path: Path) -> None:
 def test_extract_preview_skips_ide_opened_file_wrapper(tmp_path: Path) -> None:
     """A first user event that's just an IDE notification should be skipped
     in favour of the next real user message."""
-    from claude_mnemos.core.lost_sessions import _extract_cwd_and_preview
 
     jsonl = tmp_path / "ide.jsonl"
     jsonl.write_text(
