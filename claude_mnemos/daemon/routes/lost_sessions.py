@@ -14,6 +14,7 @@ Endpoints (URLs unchanged from β1/α; behaviour is now cross-vault):
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +117,9 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
 
 @router.get("/lost-sessions")
 async def list_lost_route(request: Request) -> dict[str, Any]:
-    sessions = _scan_all_vaults(request)
+    # Cross-vault scan walks JSONL files on disk; offload to a worker
+    # thread so the event loop stays responsive even with 500+ files.
+    sessions = await asyncio.to_thread(_scan_all_vaults, request)
     return {"sessions": sessions, "total": len(sessions)}
 
 
@@ -128,7 +131,9 @@ async def rescan_route(request: Request) -> dict[str, Any]:
         cache = runtime.lost_sessions_cache
         if cache is not None:
             cache.invalidate()
-    sessions = _scan_all_vaults(request)
+    # Cross-vault scan walks JSONL files on disk; offload to a worker
+    # thread to unblock the event loop during long rescans.
+    sessions = await asyncio.to_thread(_scan_all_vaults, request)
     return {"sessions": sessions, "total": len(sessions)}
 
 
