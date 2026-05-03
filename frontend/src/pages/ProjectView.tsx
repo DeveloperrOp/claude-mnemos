@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HealthBadge } from "@/components/widgets/HealthBadge";
+import { InjectPreview } from "@/components/widgets/InjectPreview";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
 
@@ -85,6 +86,8 @@ export function ProjectView() {
           value={vh?.jobs_dead_letter ?? "—"}
         />
       </div>
+
+      <InjectPreview project={name!} />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {TILES.map((tile) => (
