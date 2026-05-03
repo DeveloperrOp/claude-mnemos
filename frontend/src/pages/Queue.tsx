@@ -172,10 +172,19 @@ export function Queue() {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t("queue.title")}</h1>
-      </div>
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · queue</span>
+          <span className="font-mono tabular-nums text-[10px] text-muted-foreground">
+            {filterCount("all")} {t("queue.total_label", "total")}
+          </span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("queue.title")}
+        </h1>
+      </header>
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Button
