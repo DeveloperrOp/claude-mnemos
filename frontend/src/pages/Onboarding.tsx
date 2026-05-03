@@ -107,94 +107,102 @@ export function Onboarding() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold">{t("onboarding.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("onboarding.subtitle")}</p>
-      </div>
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · onboarding</span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("onboarding.title")}
+        </h1>
+        <p className="relative mt-2 text-sm text-muted-foreground">{t("onboarding.subtitle")}</p>
+      </header>
 
-      <div className="space-y-2">
-        <label htmlFor="onb-display" className="text-sm font-medium">{t("onboarding.display_name_label")}</label>
-        <input
-          id="onb-display"
-          type="text"
-          value={displayName}
-          onChange={(e) => {
-            const next = e.target.value;
-            setDisplayName(next);
-            setNameTakenError(false);
-            if (!slugLocked) setSlug(deriveSlug(next));
-          }}
-          disabled={create.isPending}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-        />
-        <p className="text-xs text-muted-foreground">{t("onboarding.display_name_hint")}</p>
-      </div>
+      <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-3">
+        <div className="space-y-2">
+          <label htmlFor="onb-display" className="text-sm font-medium">{t("onboarding.display_name_label")}</label>
+          <input
+            id="onb-display"
+            type="text"
+            value={displayName}
+            onChange={(e) => {
+              const next = e.target.value;
+              setDisplayName(next);
+              setNameTakenError(false);
+              if (!slugLocked) setSlug(deriveSlug(next));
+            }}
+            disabled={create.isPending}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-muted-foreground">{t("onboarding.display_name_hint")}</p>
+        </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label htmlFor="onb-slug" className="text-sm font-medium">{t("onboarding.slug_label")}</label>
-          {!slugLocked ? (
-            <button
-              type="button"
-              className="text-xs text-primary underline"
-              onClick={() => setSlugLocked(true)}
-            >
-              {t("onboarding.slug_edit")}
-            </button>
-          ) : (
-            <span className="text-xs text-muted-foreground">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label htmlFor="onb-slug" className="text-sm font-medium">{t("onboarding.slug_label")}</label>
+            {!slugLocked ? (
               <button
                 type="button"
-                className="underline"
-                onClick={() => { setSlugLocked(false); setSlug(deriveSlug(displayName)); }}
+                className="text-xs text-primary underline"
+                onClick={() => setSlugLocked(true)}
               >
-                {t("onboarding.slug_lock")}
+                {t("onboarding.slug_edit")}
               </button>
-            </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => { setSlugLocked(false); setSlug(deriveSlug(displayName)); }}
+                >
+                  {t("onboarding.slug_lock")}
+                </button>
+              </span>
+            )}
+          </div>
+          <input
+            id="onb-slug"
+            type="text"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            disabled={!slugLocked || create.isPending}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-60"
+          />
+          <p className="text-xs text-muted-foreground">{t("onboarding.slug_hint")}</p>
+          {showSlugInvalid && (
+            <p className="text-xs text-danger">{t("onboarding.slug_invalid")}</p>
+          )}
+          {nameTakenError && (
+            <p className="text-xs text-danger">{t("onboarding.name_taken")}</p>
           )}
         </div>
-        <input
-          id="onb-slug"
-          type="text"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          disabled={!slugLocked || create.isPending}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-60"
-        />
-        <p className="text-xs text-muted-foreground">{t("onboarding.slug_hint")}</p>
-        {showSlugInvalid && (
-          <p className="text-xs text-danger">{t("onboarding.slug_invalid")}</p>
-        )}
-        {nameTakenError && (
-          <p className="text-xs text-danger">{t("onboarding.name_taken")}</p>
-        )}
-      </div>
 
-      <div className="space-y-2">
-        <label htmlFor="onb-vault" className="text-sm font-medium">{t("onboarding.vault_label")}</label>
-        <div className="flex gap-2">
-          <input
-            id="onb-vault"
-            type="text"
-            value={vault}
-            onChange={(e) => setVault(e.target.value)}
-            disabled={create.isPending}
-            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm font-mono"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={create.isPending}
-            onClick={() => setVaultPickerOpen(true)}
-          >
-            📁 {t("onboarding.vault_browse")}
-          </Button>
+        <div className="space-y-2">
+          <label htmlFor="onb-vault" className="text-sm font-medium">{t("onboarding.vault_label")}</label>
+          <div className="flex gap-2">
+            <input
+              id="onb-vault"
+              type="text"
+              value={vault}
+              onChange={(e) => setVault(e.target.value)}
+              disabled={create.isPending}
+              className="flex-1 rounded-md border bg-background px-3 py-2 text-sm font-mono"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={create.isPending}
+              onClick={() => setVaultPickerOpen(true)}
+            >
+              📁 {t("onboarding.vault_browse")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("onboarding.vault_hint")}</p>
         </div>
-        <p className="text-xs text-muted-foreground">{t("onboarding.vault_hint")}</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-3">
         <button
           type="button"
           className="text-sm text-primary underline"
@@ -203,7 +211,7 @@ export function Onboarding() {
           {t("onboarding.advanced_toggle")}
         </button>
         {advancedOpen && (
-          <div className="space-y-2 rounded-md border bg-muted p-3">
+          <div className="space-y-2 rounded-md border border-border/60 bg-card/60 p-3">
             <label className="text-sm font-medium">{t("onboarding.cwd_label")}</label>
             <CwdBuilder
               patterns={cwdPatterns}
@@ -216,15 +224,15 @@ export function Onboarding() {
       </div>
 
       {mountFailedDetail && (
-        <div className="rounded-md border-2 border-danger bg-danger/10 p-3 text-sm text-danger">
-          <div className="font-semibold">{t("onboarding.mount_failed_title")}</div>
-          <div className="mt-1 break-all font-mono text-xs">{mountFailedDetail}</div>
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="eyebrow mb-2">{t("onboarding.mount_failed_title")}</div>
+          <div className="break-all font-mono text-xs">{mountFailedDetail}</div>
         </div>
       )}
 
       {trayStatus && (trayStatus.platform === "windows" || trayStatus.platform === "macos") && (
-        <div className="mt-4">
-          <label className="inline-flex items-center gap-2 text-sm">
+        <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-2">
+          <label className="inline-flex items-center gap-2 text-sm font-medium">
             <input
               type="checkbox"
               checked={autostartChecked}
@@ -232,16 +240,16 @@ export function Onboarding() {
             />
             {t("onboarding.autostart_label")}
           </label>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {t("onboarding.autostart_hint")}
           </p>
         </div>
       )}
 
       {cliAuth && (
-        <div className="mt-4 rounded-md border bg-background p-3 text-sm">
+        <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-2 text-sm">
           <div className="font-medium">{t("onboarding.cli_check_label")}</div>
-          <div className="mt-1 text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {cliAuth.installed && cliAuth.authenticated
               ? t("onboarding.cli_check_ok")
               : !cliAuth.installed
