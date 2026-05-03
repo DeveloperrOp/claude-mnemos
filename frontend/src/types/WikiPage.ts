@@ -60,8 +60,9 @@ export type WikiPageFrontmatter = z.infer<typeof WikiPageFrontmatterSchema>;
 
 export const PageDetailSchema = z.object({
   path: z.string(),
-  frontmatter: WikiPageFrontmatterSchema,
+  frontmatter: WikiPageFrontmatterSchema.nullable(),
   body: z.string(),
+  raw: z.boolean().optional(),
 });
 export type PageDetail = z.infer<typeof PageDetailSchema>;
 

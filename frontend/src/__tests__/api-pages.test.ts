@@ -60,8 +60,8 @@ describe("pages api", () => {
       },
     });
     const p = await getPage("alpha", "wiki/concepts/a.md");
-    expect(p.frontmatter.title).toBe("A");
-    expect(p.frontmatter.type).toBe("concept");
+    expect(p.frontmatter!.title).toBe("A");
+    expect(p.frontmatter!.type).toBe("concept");
     expect(p.body).toContain("# A");
   });
 
@@ -87,9 +87,9 @@ describe("pages api", () => {
       },
     });
     const p = await getPage("alpha", "wiki/concepts/b.md");
-    expect(p.frontmatter.provenance?.extracted_pct).toBe(80);
-    expect(p.frontmatter.provenance?.inferred_pct).toBe(15);
-    expect(p.frontmatter.provenance?.ambiguous_pct).toBe(5);
+    expect(p.frontmatter!.provenance?.extracted_pct).toBe(80);
+    expect(p.frontmatter!.provenance?.inferred_pct).toBe(15);
+    expect(p.frontmatter!.provenance?.ambiguous_pct).toBe(5);
   });
 
   it("getPage rejects malformed payload", async () => {

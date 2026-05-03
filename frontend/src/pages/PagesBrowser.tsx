@@ -46,10 +46,14 @@ export function PagesBrowser() {
     })),
   });
 
-  const loaded: PageDetail[] = useMemo(() => {
-    const out: PageDetail[] = [];
+  type LoadedWikiPage = PageDetail & { frontmatter: WikiPageFrontmatter };
+
+  const loaded: LoadedWikiPage[] = useMemo(() => {
+    const out: LoadedWikiPage[] = [];
     for (const q of detailQueries) {
-      if (q.data) out.push(q.data);
+      if (q.data && q.data.frontmatter !== null) {
+        out.push(q.data as LoadedWikiPage);
+      }
     }
     return out;
   }, [detailQueries]);

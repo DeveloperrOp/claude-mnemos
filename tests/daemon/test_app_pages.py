@@ -261,3 +261,21 @@ async def test_get_page_returns_content(client: Any, alpha_vault: Path) -> None:
     assert "frontmatter" in body
     assert "body" in body
     assert body["frontmatter"]["title"] == "Foo"
+    assert body.get("raw") is False
+
+
+async def test_get_raw_chat_page_returns_null_frontmatter(
+    client: Any, alpha_vault: Path
+) -> None:
+    """Raw chat dumps under raw/chats/ have no YAML frontmatter; the route must
+    return a graceful raw form instead of raising 500 (PageParseError)."""
+    raw = alpha_vault / "raw" / "chats" / "session-2026-04-29.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("# Chat dump\n\njust some markdown without frontmatter\n", encoding="utf-8")
+    r = await client.get("/api/pages/alpha/raw/chats/session-2026-04-29.md")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["path"] == "raw/chats/session-2026-04-29.md"
+    assert body["frontmatter"] is None
+    assert body["raw"] is True
+    assert "Chat dump" in body["body"]

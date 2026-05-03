@@ -24,7 +24,7 @@ from claude_mnemos.core.page_apply import (
     apply_patch,
     apply_soft_delete,
 )
-from claude_mnemos.core.page_io import read_page
+from claude_mnemos.core.page_io import PageParseError, read_page
 from claude_mnemos.core.pages import PageRefError, page_ref_to_path
 from claude_mnemos.core.wikilinks import find_files_referencing
 from claude_mnemos.daemon.routes._helpers import get_runtime
@@ -117,13 +117,26 @@ async def get_page(project: str, page_ref: str, request: Request) -> dict[str, A
     runtime = get_runtime(request, project)
     vault = runtime.vault_root
     page_path = _resolve_page(vault, page_ref)
-    parsed = read_page(page_path)
     rel = page_path.relative_to(vault).as_posix()
-    return {
-        "path": rel,
-        "frontmatter": parsed.frontmatter.model_dump(mode="json"),
-        "body": parsed.body,
-    }
+    # Wiki pages have YAML frontmatter; raw transcripts under raw/chats/ do
+    # not. Return either the parsed wiki page OR a raw dump with frontmatter:
+    # null so the frontend can render either form gracefully.
+    try:
+        parsed = read_page(page_path)
+        return {
+            "path": rel,
+            "frontmatter": parsed.frontmatter.model_dump(mode="json"),
+            "body": parsed.body,
+            "raw": False,
+        }
+    except PageParseError:
+        body = page_path.read_text(encoding="utf-8")
+        return {
+            "path": rel,
+            "frontmatter": None,
+            "body": body,
+            "raw": True,
+        }
 
 
 @router.patch("/pages/{project}/{page_ref:path}")

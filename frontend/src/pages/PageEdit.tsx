@@ -37,8 +37,15 @@ export function PageEdit() {
   const [discardOpen, setDiscardOpen] = useState(false);
 
   useEffect(() => {
+    if (pageQuery.data && pageQuery.data.frontmatter === null && project) {
+      navigate(`/project/${encodeURIComponent(project)}/pages/${cleanPath}`, { replace: true });
+    }
+  }, [pageQuery.data, project, cleanPath, navigate]);
+
+  useEffect(() => {
     if (pageQuery.data) {
       const fm = pageQuery.data.frontmatter;
+      if (fm === null) return;
       // Server-data sync into local form state — intentional initialization pattern.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({

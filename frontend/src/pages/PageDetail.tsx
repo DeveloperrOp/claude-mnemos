@@ -48,11 +48,13 @@ export function PageDetail() {
 
   const page = pageQuery.data!;
   const fm = page.frontmatter;
+  const isRaw = fm === null;
+  const fileStem = page.path.split("/").slice(-1)[0]?.replace(/\.md$/, "") ?? page.path;
   const obsidianUrl = project_entry
     ? `obsidian://open?vault=${encodeURIComponent(project_entry.vault_root)}&file=${encodeURIComponent(page.path)}`
     : null;
 
-  const wikilink = `[[${page.path.split("/").slice(-1)[0]?.replace(/\.md$/, "")}]]`;
+  const wikilink = `[[${fileStem}]]`;
 
   function copyWikilink() {
     void navigator.clipboard.writeText(wikilink);
@@ -64,49 +66,65 @@ export function PageDetail() {
         <Link to={`/project/${project}/pages`} className="text-sm text-primary underline">
           ← {t("navigation.pages")}
         </Link>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              navigate(
-                `/project/${encodeURIComponent(project!)}/pages/${pagePathSegments(pageRef)}/edit`,
-              )
-            }
-            title={t("pages.edit_button")}
-          >
-            <Pencil className="mr-1 h-3 w-3" /> {t("pages.edit_button")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={verify.isPending}
-            onClick={() => verify.mutate({ project: project!, page_ref: pageRef })}
-            title={t("pages.verify_button")}
-          >
-            <ShieldCheck className="mr-1 h-3 w-3" /> {t("pages.verify_button")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={remove.isPending}
-            onClick={() => setDeleteOpen(true)}
-            title={t("pages.delete_button")}
-          >
-            <Trash2 className="mr-1 h-3 w-3" /> {t("pages.delete_button")}
-          </Button>
-        </div>
+        {!isRaw && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                navigate(
+                  `/project/${encodeURIComponent(project!)}/pages/${pagePathSegments(pageRef)}/edit`,
+                )
+              }
+              title={t("pages.edit_button")}
+            >
+              <Pencil className="mr-1 h-3 w-3" /> {t("pages.edit_button")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={verify.isPending}
+              onClick={() => verify.mutate({ project: project!, page_ref: pageRef })}
+              title={t("pages.verify_button")}
+            >
+              <ShieldCheck className="mr-1 h-3 w-3" /> {t("pages.verify_button")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={remove.isPending}
+              onClick={() => setDeleteOpen(true)}
+              title={t("pages.delete_button")}
+            >
+              <Trash2 className="mr-1 h-3 w-3" /> {t("pages.delete_button")}
+            </Button>
+          </div>
+        )}
       </div>
 
       <header className="space-y-2 border-b pb-4">
-        <h1 data-testid="page-title" className="text-3xl font-bold">{fm.title}</h1>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span>{t(`wiki.type.${fm.type}`)}</span>
-          <StatusBadge status={fm.status} />
-          <ConfidenceBar value={fm.confidence} />
-          <FlavorTags flavors={fm.flavor} />
-          <ProvenanceIndicator counts={fm.provenance} />
-        </div>
+        <h1 data-testid="page-title" className="text-3xl font-bold">
+          {fm ? fm.title : fileStem}
+        </h1>
+        {fm ? (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>{t(`wiki.type.${fm.type}`)}</span>
+            <StatusBadge status={fm.status} />
+            <ConfidenceBar value={fm.confidence} />
+            <FlavorTags flavors={fm.flavor} />
+            <ProvenanceIndicator counts={fm.provenance} />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="rounded border border-muted-foreground/40 px-1.5 py-0.5 font-mono uppercase">
+              {t("pages.raw_badge")}
+            </span>
+            <span className="font-mono">{page.path}</span>
+          </div>
+        )}
+        {isRaw && (
+          <p className="text-xs text-muted-foreground">{t("pages.raw_hint")}</p>
+        )}
         <div className="flex items-center gap-2">
           {obsidianUrl && (
             <Button asChild size="sm" variant="outline">
@@ -116,10 +134,12 @@ export function PageDetail() {
               </a>
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={copyWikilink}>
-            <Copy className="mr-1 h-3 w-3" />
-            {t("pages.copy_wikilink")}
-          </Button>
+          {!isRaw && (
+            <Button size="sm" variant="ghost" onClick={copyWikilink}>
+              <Copy className="mr-1 h-3 w-3" />
+              {t("pages.copy_wikilink")}
+            </Button>
+          )}
         </div>
       </header>
 
