@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUsageTimeline } from "@/hooks/useUsageTimeline";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
 import { useTopSessions } from "@/hooks/useTopSessions";
@@ -26,62 +25,69 @@ function Metrics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t("metrics.title")}</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            {t("metrics.period_filter_label")}:
-          </span>
-          {PERIODS.map((p) => (
-            <Button
-              key={p}
-              size="sm"
-              variant={period === p ? "default" : "outline"}
-              onClick={() => setPeriod(p)}
-            >
-              {t(`metrics.period_${p}`)}
-            </Button>
-          ))}
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · metrics</span>
         </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("metrics.title")}
+        </h1>
+      </header>
+
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {t("metrics.period_filter_label")}:
+        </span>
+        {PERIODS.map((p) => (
+          <Button
+            key={p}
+            size="sm"
+            variant={period === p ? "default" : "outline"}
+            onClick={() => setPeriod(p)}
+          >
+            {t(`metrics.period_${p}`)}
+          </Button>
+        ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("metrics.timeline_title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {timeline.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <UsageTimelineChart points={timeline.data ?? []} />
-          )}
-        </CardContent>
-      </Card>
+      <div className="rounded-md border border-border/60 bg-card/40 p-4">
+        <div className="section-rail mb-4">
+          <span>{t("metrics.timeline_title")}</span>
+        </div>
+        {timeline.isLoading ? (
+          <Skeleton className="h-72" />
+        ) : (
+          <UsageTimelineChart points={timeline.data ?? []} />
+        )}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("metrics.compression_timeline_title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {compressionTimeline.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <CompressionTimelineChart points={compressionTimeline.data ?? []} />
-          )}
-        </CardContent>
-      </Card>
+      <div className="rounded-md border border-border/60 bg-card/40 p-4">
+        <div className="section-rail mb-4">
+          <span>{t("metrics.compression_timeline_title")}</span>
+        </div>
+        {compressionTimeline.isLoading ? (
+          <Skeleton className="h-72" />
+        ) : (
+          <CompressionTimelineChart points={compressionTimeline.data ?? []} />
+        )}
+      </div>
 
       <div className={cn("grid gap-4", "xl:grid-cols-2")}>
-        {byProject.isLoading ? (
-          <Skeleton className="h-48" />
-        ) : (
-          <UsageByProjectTable rows={byProject.data ?? []} />
-        )}
-        {top.isLoading ? (
-          <Skeleton className="h-48" />
-        ) : (
-          <TopSessionsTable rows={top.data ?? []} />
-        )}
+        <div className="rounded-md border border-border/60 bg-card/40 p-4">
+          {byProject.isLoading ? (
+            <Skeleton className="h-48" />
+          ) : (
+            <UsageByProjectTable rows={byProject.data ?? []} />
+          )}
+        </div>
+        <div className="rounded-md border border-border/60 bg-card/40 p-4">
+          {top.isLoading ? (
+            <Skeleton className="h-48" />
+          ) : (
+            <TopSessionsTable rows={top.data ?? []} />
+          )}
+        </div>
       </div>
     </div>
   );
