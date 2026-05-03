@@ -81,10 +81,13 @@ export function PagesBrowser() {
 
   if (pagesQuery.isLoading) {
     return (
-      <div className="grid grid-cols-[16rem_1fr] gap-6">
-        <Skeleton className="h-96" />
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <div className="grid grid-cols-[16rem_1fr] gap-6">
+          <Skeleton className="h-96" />
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
+          </div>
         </div>
       </div>
     );
@@ -93,45 +96,67 @@ export function PagesBrowser() {
   const totalPaths = pagesQuery.data?.length ?? 0;
   if (totalPaths === 0) {
     return (
-      <EmptyState
-        icon="📄"
-        title={t("pages_browser.empty.title")}
-        body={t("pages_browser.empty.body")}
-        actions={
-          <>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/lost-sessions">{t("pages_browser.empty.cta_lost")}</Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm">
-              <Link to={`/project/${project}/settings`}>
-                {t("pages_browser.empty.cta_settings")}
-              </Link>
-            </Button>
-          </>
-        }
-      />
+      <div className="space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-baseline gap-3">
+            <span className="eyebrow">claude-mnemos · pages</span>
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("navigation.pages")}
+          </h1>
+        </header>
+        <EmptyState
+          icon="📄"
+          title={t("pages_browser.empty.title")}
+          body={t("pages_browser.empty.body")}
+          actions={
+            <>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/lost-sessions">{t("pages_browser.empty.cta_lost")}</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link to={`/project/${project}/settings`}>
+                  {t("pages_browser.empty.cta_settings")}
+                </Link>
+              </Button>
+            </>
+          }
+        />
+      </div>
     );
   }
 
   const stillLoading = detailQueries.some((q) => q.isLoading);
 
   return (
-    <div className="grid grid-cols-[16rem_1fr] gap-6">
-      <PageFilters state={filters} onChange={setFilters} />
-      <div className="space-y-3">
-        <div className="text-xs text-muted-foreground">
-          {t("pages.showing_n_of_m", { shown: filteredSorted.length, total: totalPaths })}
-          {stillLoading && <> · {t("pages.loading_frontmatter")}</>}
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-baseline gap-3">
+          <span className="eyebrow">claude-mnemos · pages</span>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {filteredSorted.map((p) => (
-            <PageCard
-              key={p.path}
-              project={project}
-              path={p.path}
-              frontmatter={p.frontmatter}
-            />
-          ))}
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("navigation.pages")}
+        </h1>
+      </header>
+      <div className="grid grid-cols-[16rem_1fr] gap-6">
+        <PageFilters state={filters} onChange={setFilters} />
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            {t("pages.showing_n_of_m", { shown: filteredSorted.length, total: totalPaths })}
+            {stillLoading && <> · {t("pages.loading_frontmatter")}</>}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {filteredSorted.map((p) => (
+              <PageCard
+                key={p.path}
+                project={project}
+                path={p.path}
+                frontmatter={p.frontmatter}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
