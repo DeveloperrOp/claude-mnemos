@@ -215,23 +215,42 @@ def test_hook_silence_quiet_when_dir_missing(tmp_path: Path) -> None:
 # ─── 5. disk_low ────────────────────────────────────────────
 
 
-def test_disk_low_triggers(tmp_path: Path) -> None:
+async def test_disk_low_triggers(tmp_path: Path) -> None:
     rt = _FakeRuntime("alpha", tmp_path / "vault")
     rt.vault_root.mkdir(parents=True, exist_ok=True)
     fake_usage = MagicMock(total=1000, free=10, used=990)  # 1% free
     with patch("claude_mnemos.core.health_checks.shutil.disk_usage", return_value=fake_usage):
-        a = check_disk_low({"alpha": rt})
+        a = await check_disk_low({"alpha": rt})
     assert a is not None
     assert a.severity == "critical"
     assert a.context["vaults"][0]["project"] == "alpha"
 
 
-def test_disk_low_quiet_when_plenty(tmp_path: Path) -> None:
+async def test_disk_low_quiet_when_plenty(tmp_path: Path) -> None:
     rt = _FakeRuntime("alpha", tmp_path / "vault")
     rt.vault_root.mkdir(parents=True, exist_ok=True)
     fake_usage = MagicMock(total=1000, free=900, used=100)
     with patch("claude_mnemos.core.health_checks.shutil.disk_usage", return_value=fake_usage):
-        assert check_disk_low({"alpha": rt}) is None
+        assert await check_disk_low({"alpha": rt}) is None
+
+
+async def test_disk_low_uses_to_thread(tmp_path: Path) -> None:
+    """Regression: shutil.disk_usage must run via asyncio.to_thread so the
+    event loop is not blocked by a slow/unresponsive volume.
+    """
+    rt = _FakeRuntime("alpha", tmp_path / "vault")
+    rt.vault_root.mkdir(parents=True, exist_ok=True)
+    fake_usage = MagicMock(total=1000, free=900, used=100)
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        return fake_usage
+
+    with patch(
+        "claude_mnemos.core.health_checks.asyncio.to_thread",
+        side_effect=fake_to_thread,
+    ) as to_thread:
+        await check_disk_low({"alpha": rt})
+    assert to_thread.called
 
 
 # ─── 6. project_map_broken ──────────────────────────────────
@@ -281,7 +300,7 @@ def test_daemon_uptime_warning_quiet_when_not_started() -> None:
 # ─── run_all_checks ─────────────────────────────────────────
 
 
-def test_run_all_checks_continues_after_failing_detector(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_run_all_checks_continues_after_failing_detector(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("USERPROFILE", str(home))
@@ -289,19 +308,19 @@ def test_run_all_checks_continues_after_failing_detector(tmp_path: Path, monkeyp
     daemon = _FakeDaemon(started_seconds_ago=10.0)  # uptime warning fires
     sched = MagicMock()
     sched.get_job.side_effect = RuntimeError("boom")
-    alerts = run_all_checks(daemon=daemon, scheduler=sched, runtimes={})
+    alerts = await run_all_checks(daemon=daemon, scheduler=sched, runtimes={})
     # The crashing detector is dropped; uptime detector still fires.
     ids = {a.id for a in alerts}
     assert "daemon_uptime_warning" in ids
     assert "auto_dump_overdue" not in ids
 
 
-def test_run_all_checks_returns_only_active(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_run_all_checks_returns_only_active(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("HOME", str(home))
     daemon = _FakeDaemon(started_seconds_ago=3600.0)
     sched = _make_scheduler(next_run_in_seconds=1800)
-    alerts = run_all_checks(daemon=daemon, scheduler=sched, runtimes={})
+    alerts = await run_all_checks(daemon=daemon, scheduler=sched, runtimes={})
     assert all(isinstance(a.id, str) for a in alerts)

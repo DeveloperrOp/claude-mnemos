@@ -16,6 +16,7 @@ Detectors (final list):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
 import time
@@ -297,13 +298,18 @@ def check_hook_silence(
 # ─── 5. disk_low ─────────────────────────────────────────────────
 
 
-def check_disk_low(
+async def check_disk_low(
     runtimes: dict[str, "VaultRuntime"],
     *,
     now: datetime | None = None,
     threshold: float = 0.05,
 ) -> StoredAlert | None:
-    """Critical when any vault's filesystem has less than ``threshold`` (default 5%) free."""
+    """Critical when any vault's filesystem has less than ``threshold`` (default 5%) free.
+
+    ``shutil.disk_usage`` performs a blocking ``statvfs``/``GetDiskFreeSpaceExW``
+    syscall that can stall on a slow/unresponsive volume; offload it to a
+    thread so the event loop keeps serving requests during the cron tick.
+    """
     n = now if now is not None else utcnow()
     low: list[dict[str, Any]] = []
     for project_name, rt in runtimes.items():
@@ -311,7 +317,7 @@ def check_disk_low(
         if vault_root is None or not Path(vault_root).exists():
             continue
         try:
-            usage = shutil.disk_usage(str(vault_root))
+            usage = await asyncio.to_thread(shutil.disk_usage, str(vault_root))
         except OSError:
             continue
         if usage.total <= 0:
@@ -399,7 +405,7 @@ def check_daemon_uptime_warning(
 # ─── Orchestrator ────────────────────────────────────────────────
 
 
-def run_all_checks(
+async def run_all_checks(
     *,
     daemon: "MnemosDaemon",
     scheduler: "AsyncIOScheduler",
@@ -409,25 +415,36 @@ def run_all_checks(
     """Run all 7 detectors. Each is wrapped in try/except so one bad detector
     cannot kill the cron. Returns the list of currently-active alerts (None
     entries dropped).
+
+    ``check_disk_low`` is async (so the blocking syscall stays off the event
+    loop); other detectors are sync and called directly.
     """
     n = now if now is not None else utcnow()
     out: list[StoredAlert] = []
 
-    detectors = [
+    sync_detectors: list[tuple[str, Any]] = [
         ("auto_dump_overdue", lambda: check_auto_dump_overdue(scheduler, now=n)),
         ("ingest_failure_streak", lambda: check_ingest_failure_streak(runtimes, now=n)),
         ("runaway_jobs", lambda: check_runaway_jobs(runtimes, now=n)),
         ("hook_silence", lambda: check_hook_silence(runtimes, now=n)),
-        ("disk_low", lambda: check_disk_low(runtimes, now=n)),
         ("project_map_broken", lambda: check_project_map_broken(now=n)),
         ("daemon_uptime_warning", lambda: check_daemon_uptime_warning(daemon, now=n)),
     ]
-    for name, fn in detectors:
+    for name, fn in sync_detectors:
         try:
             alert = fn()
         except Exception:
             logger.exception("health detector %s raised", name)
-            continue
+            alert = None
         if alert is not None:
             out.append(alert)
+
+    try:
+        disk_alert = await check_disk_low(runtimes, now=n)
+    except Exception:
+        logger.exception("health detector disk_low raised")
+        disk_alert = None
+    if disk_alert is not None:
+        out.append(disk_alert)
+
     return out

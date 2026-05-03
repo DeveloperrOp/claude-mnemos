@@ -218,7 +218,7 @@ class MnemosDaemon:
             try:
                 from claude_mnemos.core.health_checks import run_all_checks
 
-                new_alerts = run_all_checks(
+                new_alerts = await run_all_checks(
                     daemon=self, scheduler=self.scheduler, runtimes=self.runtimes
                 )
                 for alert in new_alerts:
