@@ -36,7 +36,7 @@ async def client(app):
 
 
 async def test_alerts_empty(client):
-    r = await client.get("/api/alerts")
+    r = await client.get("/api/watchdog-events")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -61,7 +61,7 @@ async def test_alerts_returns_newest_first(client, daemon: _FakeDaemon):
         detected_at=datetime(2026, 4, 27, 14, 2, tzinfo=UTC),
     )
 
-    r = await client.get("/api/alerts")
+    r = await client.get("/api/watchdog-events")
     assert r.status_code == 200
     body = r.json()
     assert [item["id"] for item in body] == [a3.id, a2.id, a1.id]
@@ -74,14 +74,14 @@ async def test_delete_existing_returns_204(client, daemon: _FakeDaemon):
         message="m",
         detected_at=datetime(2026, 4, 27, 14, 0, tzinfo=UTC),
     )
-    r = await client.delete(f"/api/alerts/{a.id}")
+    r = await client.delete(f"/api/watchdog-events/{a.id}")
     assert r.status_code == 204
-    r = await client.get("/api/alerts")
+    r = await client.get("/api/watchdog-events")
     assert all(item["id"] != a.id for item in r.json())
 
 
 async def test_delete_missing_returns_404(client):
-    r = await client.delete("/api/alerts/nonexistent")
+    r = await client.delete("/api/watchdog-events/nonexistent")
     assert r.status_code == 404
 
 
@@ -89,7 +89,7 @@ async def test_alerts_no_daemon_returns_empty(tmp_path: Path):
     app = create_app(daemon=None)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.get("/api/alerts")
+        r = await c.get("/api/watchdog-events")
     assert r.status_code == 200
     assert r.json() == []
 
@@ -98,5 +98,5 @@ async def test_alerts_no_daemon_delete_returns_404(tmp_path: Path):
     app = create_app(daemon=None)
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        r = await c.delete("/api/alerts/anything")
+        r = await c.delete("/api/watchdog-events/anything")
     assert r.status_code == 404

@@ -123,7 +123,7 @@ body
         # follow-up modify is unambiguous.
         def seed_was_observed() -> bool:
             try:
-                r = httpx.get(f"http://127.0.0.1:{port}/api/alerts", timeout=2.0)
+                r = httpx.get(f"http://127.0.0.1:{port}/api/watchdog-events", timeout=2.0)
                 if r.status_code != 200:
                     return False
                 return any(
@@ -169,7 +169,7 @@ body
         # path. The project is pre-registered so no "not in project-map" alert
         # is expected; external_create alerts may exist (initial write was
         # external from daemon's perspective) — they're informational, not errors.
-        r = httpx.get(f"http://127.0.0.1:{port}/api/alerts", timeout=2.0)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/watchdog-events", timeout=2.0)
         assert r.status_code == 200
         unexpected = [
             a

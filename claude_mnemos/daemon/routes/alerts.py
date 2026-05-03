@@ -18,7 +18,7 @@ def _alerts(request: Request) -> Alerts | None:
     return alerts
 
 
-@router.get("/alerts", response_model=list[WatchdogAlertResponse])
+@router.get("/watchdog-events", response_model=list[WatchdogAlertResponse])
 async def list_alerts(request: Request) -> list[WatchdogAlertResponse]:
     alerts = _alerts(request)
     if alerts is None:
@@ -35,7 +35,7 @@ async def list_alerts(request: Request) -> list[WatchdogAlertResponse]:
     ]
 
 
-@router.delete("/alerts/{alert_id}", status_code=204)
+@router.delete("/watchdog-events/{alert_id}", status_code=204)
 async def clear_alert(alert_id: str, request: Request) -> Response:
     alerts = _alerts(request)
     if alerts is None or not alerts.clear(alert_id):

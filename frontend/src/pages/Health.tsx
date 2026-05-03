@@ -5,8 +5,11 @@ import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealth } from "@/hooks/useHealth";
-import { useAlerts } from "@/hooks/useAlerts";
-import { useDismissAlert, useDismissAllAlerts } from "@/hooks/useDismissAlert";
+import { useWatchdogEvents } from "@/hooks/useWatchdogEvents";
+import {
+  useDismissWatchdogEvent,
+  useDismissAllWatchdogEvents,
+} from "@/hooks/useDismissWatchdogEvent";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { formatDateTime } from "@/lib/datetime";
 
@@ -14,9 +17,9 @@ export function Health() {
   const { name: project } = useParams<{ name: string }>();
   const { t, i18n } = useTranslation();
   const healthQuery = useHealth();
-  const alertsQuery = useAlerts();
-  const dismiss = useDismissAlert();
-  const dismissAll = useDismissAllAlerts();
+  const alertsQuery = useWatchdogEvents();
+  const dismiss = useDismissWatchdogEvent();
+  const dismissAll = useDismissAllWatchdogEvents();
   const [alertsExpanded, setAlertsExpanded] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
 
