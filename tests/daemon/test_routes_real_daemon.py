@@ -89,7 +89,11 @@ def test_sessions_ingest_enqueues_job(
     tmp_path: Path,
 ) -> None:
     _daemon, client, _vault = daemon_with_one_vault
-    transcript = tmp_path / "t.jsonl"
+    # Place the transcript under the canonical transcripts root
+    # (HOME/.claude/projects/) so the path-traversal guard accepts it.
+    transcripts_root = tmp_path / ".claude" / "projects" / "alpha"
+    transcripts_root.mkdir(parents=True, exist_ok=True)
+    transcript = transcripts_root / "t.jsonl"
     transcript.write_text("{}")
     r = client.post(
         "/api/sessions/alpha/some-sid/ingest",
