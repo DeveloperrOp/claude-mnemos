@@ -54,10 +54,21 @@ export function Snapshots() {
 
   if (snapshotsQuery.isLoading) {
     return (
-      <div className="space-y-3">
-        {headerControls}
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
+      <div className="space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-baseline gap-3">
+            <span className="eyebrow">claude-mnemos · snapshots</span>
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("snapshots.title")}
+          </h1>
+        </header>
+        <div className="space-y-3">
+          {headerControls}
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}
+          </div>
         </div>
       </div>
     );
@@ -66,35 +77,46 @@ export function Snapshots() {
   const empty = (snapshotsQuery.data ?? []).length === 0;
 
   return (
-    <div className="space-y-3">
-      {headerControls}
-      {empty ? (
-        <EmptyState
-          icon="💾"
-          title={t("snapshots.empty.title")}
-          body={t("snapshots.empty.body")}
-          actions={
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() => setCreateOpen(true)}
-              disabled={create.isPending}
-            >
-              <Plus className="mr-1 h-3 w-3" />
-              {t("snapshots.create_button")}
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          <div className="text-xs text-muted-foreground">
-            {t("snapshots.showing_n", { count: filtered.length })}
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((s) => <SnapshotCard key={s.name} snapshot={s} />)}
-          </div>
-        </>
-      )}
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-baseline gap-3">
+          <span className="eyebrow">claude-mnemos · snapshots</span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("snapshots.title")}
+        </h1>
+      </header>
+      <div className="space-y-3">
+        {headerControls}
+        {empty ? (
+          <EmptyState
+            icon="💾"
+            title={t("snapshots.empty.title")}
+            body={t("snapshots.empty.body")}
+            actions={
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => setCreateOpen(true)}
+                disabled={create.isPending}
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                {t("snapshots.create_button")}
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <div className="text-xs text-muted-foreground">
+              {t("snapshots.showing_n", { count: filtered.length })}
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((s) => <SnapshotCard key={s.name} snapshot={s} />)}
+            </div>
+          </>
+        )}
+      </div>
 
       <AlertDialog
         open={createOpen}
