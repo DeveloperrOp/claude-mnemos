@@ -37,14 +37,27 @@ export function ActivityDetail() {
 
   return (
     <>
-      <article className="mx-auto max-w-2xl space-y-4">
-        <div className="flex items-center justify-between">
-          <Link
-            to={`/project/${project}/activity`}
-            className="text-sm text-primary underline"
-          >
-            ← {t("navigation.activity")}
-          </Link>
+      <article className="mx-auto max-w-3xl space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-center justify-between gap-3">
+            <span className="eyebrow">claude-mnemos · activity</span>
+            <Link
+              to={`/project/${project}/activity`}
+              className="text-xs text-primary underline"
+            >
+              ← back
+            </Link>
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t(`activity.op.${e.operation_type}`, e.operation_type)}
+          </h1>
+          <p className="relative mt-2 text-xs text-muted-foreground">
+            {e.id} · {e.timestamp}
+          </p>
+        </header>
+
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -57,48 +70,42 @@ export function ActivityDetail() {
           </Button>
         </div>
 
-        <header className="space-y-2 border-b pb-4">
-          <h1 className="text-xl font-semibold">
-            {t(`activity.op.${e.operation_type}`, e.operation_type)}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {e.id} · {e.timestamp}
-          </p>
-        </header>
+        <div className="rounded-md border border-border/60 bg-card/40 p-4">
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">status</dt>
+            <dd>{e.status}</dd>
 
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">status</dt>
-          <dd>{e.status}</dd>
+            {e.snapshot_path && (
+              <>
+                <dt className="text-muted-foreground">
+                  {t("activity.snapshot")}
+                </dt>
+                <dd className="break-all">
+                  <code>{e.snapshot_path}</code>
+                </dd>
+              </>
+            )}
 
-          {e.snapshot_path && (
-            <>
-              <dt className="text-muted-foreground">
-                {t("activity.snapshot")}
-              </dt>
-              <dd className="break-all">
-                <code>{e.snapshot_path}</code>
-              </dd>
-            </>
-          )}
-
-          <dt className="text-muted-foreground">undo</dt>
-          <dd>
-            {e.undone
-              ? `${t("activity.undone")} ${e.undone_at ?? ""}`
-              : canUndo
-                ? t("activity.can_undo")
-                : t("activity.cannot_undo")}
-          </dd>
-        </dl>
+            <dt className="text-muted-foreground">undo</dt>
+            <dd>
+              {e.undone
+                ? `${t("activity.undone")} ${e.undone_at ?? ""}`
+                : canUndo
+                  ? t("activity.can_undo")
+                  : t("activity.cannot_undo")}
+            </dd>
+          </dl>
+        </div>
 
         {e.affected_pages.length > 0 && (
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">
-              {t("activity.affected_pages", { count: e.affected_pages.length })}
-            </h2>
-            <ul className="space-y-1 text-sm">
-              {e.affected_pages.map((p) => (
-                <li key={p}>
+          <section className="rounded-md border border-border/60 bg-card/40 p-4">
+            <div className="section-rail mb-3">
+              <span>{t("activity.affected_pages", { count: e.affected_pages.length })}</span>
+              <span className="ml-auto font-mono tabular-nums text-foreground/70">{e.affected_pages.length}</span>
+            </div>
+            <ul className="stagger divide-y divide-border/50">
+              {e.affected_pages.map((p, i) => (
+                <li key={p} style={{ ["--i" as string]: i }} className="py-2 text-sm">
                   <Link
                     to={pageHref(project!, p)}
                     className="text-primary hover:underline"
@@ -111,8 +118,10 @@ export function ActivityDetail() {
           </section>
         )}
 
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">{t("activity.metadata")}</h2>
+        <section className="rounded-md border border-border/60 bg-card/40 p-4">
+          <div className="section-rail mb-3">
+            <span>{t("activity.metadata")}</span>
+          </div>
           <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
             {JSON.stringify(e.metadata, null, 2)}
           </pre>
