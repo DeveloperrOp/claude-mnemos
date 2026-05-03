@@ -133,14 +133,35 @@ SUMMARY_CHARS = 200
 InjectMode = Literal["empty", "full", "trimmed"]
 
 
+@dataclass(frozen=True, slots=True)
+class ScoredPage:
+    """One ranked candidate page with its computed score and inclusion flag.
+
+    ``path`` is vault-relative, POSIX-style (e.g. ``wiki/concepts/foo.md``).
+    ``included`` is True when the page made it into the packed context within
+    the char budget (``i < candidates_packed`` in the sorted-by-score order).
+    """
+    path: str
+    slug: str
+    score: float
+    included: bool
+
+
 @dataclass(frozen=True)
 class InjectStats:
-    """Counts emitted alongside the inject context for telemetry (§15)."""
+    """Counts emitted alongside the inject context for telemetry (§15).
+
+    ``pages_ranked`` exposes the per-page scoring detail that
+    ``inject-preview`` previously had to re-derive by mirroring the head of
+    this function. New callers should consume it directly instead of
+    re-walking the seed/graph/score pipeline.
+    """
     tokens_full: int       # ceil(chars_full / 4)
     tokens_actual: int     # ceil(chars_actual / 4)
     candidates_total: int
     candidates_packed: int
     mode: InjectMode
+    pages_ranked: tuple[ScoredPage, ...] = ()
 
 
 _EMPTY_STATS = InjectStats(
@@ -149,6 +170,7 @@ _EMPTY_STATS = InjectStats(
     candidates_total=0,
     candidates_packed=0,
     mode="empty",
+    pages_ranked=(),
 )
 
 
@@ -270,12 +292,23 @@ def build_adaptive_context_with_stats(
     else:
         mode = "trimmed"
 
+    pages_ranked = tuple(
+        ScoredPage(
+            path=f"wiki/{slug}.md",
+            slug=slug,
+            score=round(score, 4),
+            included=i < packed,
+        )
+        for i, (score, slug, _parsed) in enumerate(scored)
+    )
+
     stats = InjectStats(
         tokens_full=_ceil_div(chars_full, 4),
         tokens_actual=_ceil_div(chars_actual, 4),
         candidates_total=len(scored),
         candidates_packed=packed,
         mode=mode,
+        pages_ranked=pages_ranked,
     )
     return context, stats
 

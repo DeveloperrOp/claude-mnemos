@@ -5,10 +5,9 @@ would inject for this project right now (text, token estimate, page list,
 budget ratio). Backed by a 30-second TTLCache per project name to avoid
 recomputing the graph + scoring on every refetch.
 
-Reuses :func:`build_adaptive_context_with_stats` for the canonical text +
-token counts. Re-runs the seed/graph/score pipeline locally to expose a
-ranked page list with hop-scoring metadata (which the public stats struct
-intentionally collapses).
+Consumes :func:`build_adaptive_context_with_stats` for the canonical text,
+token counts AND the ranked candidate pages — `InjectStats.pages_ranked`
+now carries everything the route used to re-derive locally.
 """
 
 from __future__ import annotations
@@ -21,13 +20,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from claude_mnemos.core.graph import build_page_graph_with_pages, pages_within_k_hops
-from claude_mnemos.core.session_start import (
-    _cwd_segment,
-    _seeds_from_manifest,
-    build_adaptive_context_with_stats,
-    score_page,
-)
+from claude_mnemos.core.session_start import build_adaptive_context_with_stats
 from claude_mnemos.core.ttl_cache import TTLCache
 from claude_mnemos.daemon.routes._helpers import get_runtime
 
@@ -79,63 +72,27 @@ def _representative_cwd(runtime: Any) -> Path:
     return Path(runtime.vault_root)
 
 
-def _build_pages_list(
-    vault: Path, *, cwd: Path, packed_count: int
-) -> list[dict[str, Any]]:
-    """Re-derive the ranked candidate list with per-page scores.
-
-    Mirrors the head of :func:`build_adaptive_context_with_stats` so the
-    sorted order and `included` flag match what was actually packed.
-    """
-    seeds = _seeds_from_manifest(vault, recent=10)
-    if not seeds:
-        return []
-    wiki_root = vault / "wiki"
-    if not wiki_root.is_dir():
-        return []
-    graph, pages = build_page_graph_with_pages(vault)
-    candidates = pages_within_k_hops(graph, seeds, k=2)
-    if not candidates:
-        return []
-    cwd_seg = _cwd_segment(cwd)
-    now = datetime.now(UTC)
-
-    scored: list[tuple[float, str, str]] = []
-    for slug, hop in candidates.items():
-        parsed = pages.get(slug)
-        if parsed is None:
-            continue
-        score = score_page(
-            parsed, hop_distance=hop, cwd_segment=cwd_seg, now=now
-        )
-        # path = wiki/<slug>.md (vault-relative, POSIX-style for the UI)
-        path = f"wiki/{slug}.md"
-        scored.append((score, slug, path))
-    scored.sort(key=lambda t: t[0], reverse=True)
-
-    out: list[dict[str, Any]] = []
-    for i, (score, slug, path) in enumerate(scored):
-        out.append(
-            {
-                "path": path,
-                "slug": slug,
-                "score": round(score, 4),
-                "included": i < packed_count,
-            }
-        )
-    return out
-
-
 def _compute_preview_sync(vault: Path, cwd: Path) -> dict[str, Any]:
-    """Run the full inject computation synchronously (CPU-bound)."""
+    """Run the full inject computation synchronously (CPU-bound).
+
+    The ranked pages list comes straight from ``stats.pages_ranked`` —
+    no need to re-walk seeds → graph → score, the public function already
+    did it.
+    """
     context, stats = build_adaptive_context_with_stats(
         vault,
         cwd=cwd,
         max_chars=DEFAULT_MAX_CHARS,
     )
-    pages_list = _build_pages_list(
-        vault, cwd=cwd, packed_count=stats.candidates_packed
-    )
+    pages_list: list[dict[str, Any]] = [
+        {
+            "path": p.path,
+            "slug": p.slug,
+            "score": p.score,
+            "included": p.included,
+        }
+        for p in stats.pages_ranked
+    ]
     tokens_estimate = stats.tokens_actual
     limit = DEFAULT_MAX_CHARS // 4  # token budget = char budget / 4 (same heuristic)
     ratio = (tokens_estimate / limit) if limit else 0.0

@@ -291,3 +291,38 @@ def test_build_adaptive_context_wrapper_drops_stats(tmp_path: Path) -> None:
     out = build_adaptive_context(tmp_path, cwd=tmp_path, max_chars=2000)
     assert isinstance(out, str)
     assert "concepts/a" in out
+
+
+def test_build_adaptive_context_with_stats_exposes_pages_ranked(tmp_path: Path) -> None:
+    """``stats.pages_ranked`` carries one ScoredPage per scored candidate,
+    sorted by score desc, with ``included`` set for the packed prefix.
+
+    Regression for A5: inject-preview previously had to mirror the head of
+    this function — now it can read the public field instead.
+    """
+    for i in range(3):
+        _write_full_page(tmp_path, f"concepts/p{i}", body=f"body{i}")
+    pages_seeded = [f"wiki/concepts/p{i}.md" for i in range(3)]
+    _seed_manifest(tmp_path, sessions=[("s1", pages_seeded)])
+
+    _, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=10_000,
+    )
+    assert len(stats.pages_ranked) == stats.candidates_total
+    assert len(stats.pages_ranked) >= 3
+    # Sorted by score descending.
+    scores = [p.score for p in stats.pages_ranked]
+    assert scores == sorted(scores, reverse=True)
+    # Vault-relative POSIX paths.
+    assert all(p.path.startswith("wiki/") and p.path.endswith(".md") for p in stats.pages_ranked)
+    # First N entries (i < candidates_packed) carry included=True.
+    for i, p in enumerate(stats.pages_ranked):
+        assert p.included is (i < stats.candidates_packed)
+
+
+def test_build_adaptive_context_with_stats_empty_pages_ranked_when_empty(tmp_path: Path) -> None:
+    (tmp_path / "wiki").mkdir()
+    _, stats = build_adaptive_context_with_stats(
+        tmp_path, cwd=tmp_path, max_chars=1000,
+    )
+    assert stats.pages_ranked == ()
