@@ -67,11 +67,11 @@ class TTLCache(Generic[T]):
         if should_compute:
             try:
                 result = await fn()
-                inflight.set_result(result)
                 async with self._lock:
                     self._value = result
                     self._expires_at = time.monotonic() + self.ttl_s
                     self._inflight = None
+                inflight.set_result(result)
                 return result
             except BaseException as e:
                 async with self._lock:
