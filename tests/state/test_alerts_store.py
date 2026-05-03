@@ -131,3 +131,34 @@ def test_save_uses_atomic_write(store_path: Path) -> None:
     data = json.loads(store_path.read_text(encoding="utf-8"))
     assert data["version"] == 1
     assert len(data["alerts"]) == 1
+
+
+def test_purge_old_drops_dismissed_past_retention(store_path: Path) -> None:
+    s = AlertsStore.load(store_path)
+    old = _now() - timedelta(days=45)
+    fresh = _now() - timedelta(days=5)
+    # Old + dismissed → purged
+    s.alerts.append(_make("old_dismissed", first_seen=old, last_seen=old, dismissed=True))
+    # Old + not dismissed → kept (operator may want to see lingering active alerts)
+    s.alerts.append(_make("old_active", first_seen=old, last_seen=old))
+    # Fresh + dismissed → kept (still within retention)
+    s.alerts.append(_make("fresh_dismissed", first_seen=fresh, last_seen=fresh, dismissed=True))
+    removed = s.purge_old(retention_days=30)
+    assert removed == 1
+    ids = {a.id for a in s.alerts}
+    assert ids == {"old_active", "fresh_dismissed"}
+
+
+def test_load_from_disk_purges_at_load(store_path: Path) -> None:
+    s = AlertsStore.load(store_path)
+    old = _now() - timedelta(days=60)
+    s.alerts.append(_make("ancient", first_seen=old, last_seen=old, dismissed=True))
+    s.save()
+    s2 = AlertsStore.load_from_disk(store_path)
+    assert all(a.id != "ancient" for a in s2.alerts)
+
+
+def test_lock_is_per_instance(store_path: Path) -> None:
+    s1 = AlertsStore.load(store_path)
+    s2 = AlertsStore.load(store_path)
+    assert s1._lock is not s2._lock

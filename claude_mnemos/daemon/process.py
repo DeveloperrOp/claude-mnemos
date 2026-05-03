@@ -20,6 +20,7 @@ from claude_mnemos.core.auto_dump import auto_dump_stale
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
+from claude_mnemos.state.alerts_store import AlertsStore
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 from claude_mnemos.state.settings import GlobalSettings, ProjectSettings, SettingsStore
 
@@ -42,6 +43,10 @@ class MnemosDaemon:
     def __init__(self, config: DaemonConfig) -> None:
         self.config = config
         self.alerts = Alerts()
+        # Persistent health-alerts store (singleton owned by the daemon).
+        # Cron tasks and route handlers reuse this instance instead of
+        # re-loading from disk on every call.
+        self.alerts_store: AlertsStore = AlertsStore.load_from_disk()
         self.project_store = ProjectStore()
         self.settings_store = SettingsStore()
         self.global_settings: GlobalSettings = self.settings_store.get_global()
@@ -212,15 +217,13 @@ class MnemosDaemon:
         async def _health_checks_task() -> None:
             try:
                 from claude_mnemos.core.health_checks import run_all_checks
-                from claude_mnemos.state.alerts_store import AlertsStore
 
                 new_alerts = run_all_checks(
                     daemon=self, scheduler=self.scheduler, runtimes=self.runtimes
                 )
-                store = AlertsStore.load()
                 for alert in new_alerts:
-                    store.upsert(alert)
-                store.save()
+                    self.alerts_store.upsert(alert)
+                self.alerts_store.save()
             except Exception:
                 logger.exception("health_checks_task failed")
 

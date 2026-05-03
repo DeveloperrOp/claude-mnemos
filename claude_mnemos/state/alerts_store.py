@@ -7,38 +7,38 @@ runaway-job, hook-silence, disk-low, project-map-broken, daemon-uptime-warning).
 
 Concurrency:
 - Writes go through ``atomic_write`` (sibling tmp + os.replace; Windows-safe).
-- Reads always reload from disk so multiple processes (CLI + daemon) see fresh state.
-- Within the daemon process a re-entrant lock guards upsert/silence/dismiss
-  sequences against concurrent cron ticks.
+- Inside the daemon process the store is a singleton owned by ``MnemosDaemon``;
+  a per-instance ``threading.RLock`` guards upsert/silence/dismiss sequences
+  against concurrent cron ticks. (asyncio.Lock would force converting all
+  callers to async; the existing codebase pattern is threading.RLock and the
+  guarded sections are CPU-only.)
+- Outside the daemon (CLI, tests) callers use ``AlertsStore.load(path)``
+  which reads from disk into a fresh instance.
 """
 
 from __future__ import annotations
 
 import json
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from claude_mnemos.core.atomic import atomic_write
+from claude_mnemos.core.clock import utcnow
 
 HOME_CONFIG_DIRNAME = ".claude-mnemos"
 ALERTS_FILENAME = "alerts.json"
 
 Severity = Literal["info", "warning", "critical"]
 
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+DEFAULT_PURGE_RETENTION_DAYS = 30
 
 
 def home_alerts_path() -> Path:
     return Path.home() / HOME_CONFIG_DIRNAME / ALERTS_FILENAME
-
-
-_LOCK = threading.RLock()
 
 
 class StoredAlert(BaseModel):
@@ -63,7 +63,11 @@ class AlertsStore(BaseModel):
 
     # Path used for save() — not part of the persisted schema. Excluded from
     # model_dump output.
-    _path: Path | None = None
+    _path: Path | None = PrivateAttr(default=None)
+    # Per-instance lock — guards mutations against concurrent cron ticks
+    # within the daemon process. ``default_factory`` ensures each instance
+    # gets its own lock (a class-level ``threading.RLock()`` would be shared).
+    _lock: threading.RLock = PrivateAttr(default_factory=threading.RLock)
 
     @classmethod
     def load(cls, path: Path | None = None) -> "AlertsStore":
@@ -80,6 +84,19 @@ class AlertsStore(BaseModel):
             # Corrupt file: start fresh in memory; first save() rewrites it.
             inst = cls()
         inst._path = target
+        return inst
+
+    @classmethod
+    def load_from_disk(cls, path: Path | None = None) -> "AlertsStore":
+        """Load the singleton-style instance for the daemon process.
+
+        Identical to ``load()`` but additionally runs ``purge_old()`` so the
+        daemon never starts with stale dismissed alerts. The result is intended
+        to live for the daemon's lifetime; route handlers should reuse it
+        rather than calling ``load()`` per request.
+        """
+        inst = cls.load(path)
+        inst.purge_old()
         return inst
 
     def save(self) -> None:
@@ -100,7 +117,7 @@ class AlertsStore(BaseModel):
         always carries first_seen=last_seen=now; we keep the original first_seen
         so the UI can show "first detected 2h ago".)
         """
-        with _LOCK:
+        with self._lock:
             for i, existing in enumerate(self.alerts):
                 if existing.id == alert.id:
                     merged = existing.model_copy(
@@ -113,32 +130,54 @@ class AlertsStore(BaseModel):
                         }
                     )
                     self.alerts[i] = merged
+                    self.purge_old()
                     return merged
             self.alerts.append(alert)
+            self.purge_old()
             return alert
 
     def silence(self, alert_id: str, duration: timedelta) -> StoredAlert | None:
-        with _LOCK:
+        with self._lock:
             for i, a in enumerate(self.alerts):
                 if a.id == alert_id:
                     self.alerts[i] = a.model_copy(
-                        update={"silenced_until": _utcnow() + duration}
+                        update={"silenced_until": utcnow() + duration}
                     )
+                    self.purge_old()
                     return self.alerts[i]
             return None
 
     def dismiss(self, alert_id: str) -> StoredAlert | None:
-        with _LOCK:
+        with self._lock:
             for i, a in enumerate(self.alerts):
                 if a.id == alert_id:
                     self.alerts[i] = a.model_copy(update={"dismissed": True})
+                    self.purge_old()
                     return self.alerts[i]
             return None
+
+    def purge_old(
+        self, retention_days: int = DEFAULT_PURGE_RETENTION_DAYS
+    ) -> int:
+        """Remove dismissed alerts whose ``last_seen`` is older than
+        ``retention_days`` days. Returns the count of removed entries.
+
+        Called once at load_from_disk() and after every mutation so the file
+        cannot grow unboundedly.
+        """
+        with self._lock:
+            cutoff = utcnow() - timedelta(days=retention_days)
+            before = len(self.alerts)
+            self.alerts = [
+                a for a in self.alerts
+                if not (a.dismissed and a.last_seen < cutoff)
+            ]
+            return before - len(self.alerts)
 
     # ─── Queries ──────────────────────────────────────────────────
 
     def active_alerts(self, *, now: datetime | None = None) -> list[StoredAlert]:
-        n = now if now is not None else _utcnow()
+        n = now if now is not None else utcnow()
         out: list[StoredAlert] = []
         for a in self.alerts:
             if a.dismissed:
@@ -149,7 +188,7 @@ class AlertsStore(BaseModel):
         return out
 
     def silenced_alerts(self, *, now: datetime | None = None) -> list[StoredAlert]:
-        n = now if now is not None else _utcnow()
+        n = now if now is not None else utcnow()
         return [
             a for a in self.alerts
             if not a.dismissed

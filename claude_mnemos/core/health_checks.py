@@ -19,10 +19,11 @@ from __future__ import annotations
 import logging
 import shutil
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from claude_mnemos.core.clock import utcnow
 from claude_mnemos.state.alerts_store import StoredAlert
 
 if TYPE_CHECKING:
@@ -34,10 +35,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _make(
     *,
     id_: str,
@@ -47,7 +44,7 @@ def _make(
     context: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> StoredAlert:
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     return StoredAlert(
         id=id_,
         detector=detector,
@@ -73,7 +70,7 @@ def check_auto_dump_overdue(
     Cron is hourly (minute=0), so under healthy operation next_run_time is
     always ≤ 1h ahead. > 2h overdue ⇒ scheduler is wedged or job evicted.
     """
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     job = scheduler.get_job("auto_dump_global")
     if job is None:
         return _make(
@@ -118,7 +115,7 @@ def check_ingest_failure_streak(
     Uses ``JobStore.list_by_status(None)`` to walk recent jobs; we sort in
     Python by ``finished_at`` descending so cross-vault ordering is correct.
     """
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     cutoff = n - timedelta(hours=24)
     recent: list[tuple[datetime, str, str]] = []  # (finished_at, status, project)
     for project_name, rt in runtimes.items():
@@ -167,7 +164,7 @@ def check_runaway_jobs(
     now: datetime | None = None,
 ) -> StoredAlert | None:
     """Warn when any running ingest job started more than 30 minutes ago."""
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     cutoff = n - timedelta(minutes=30)
     runaways: list[dict[str, Any]] = []
     for project_name, rt in runtimes.items():
@@ -238,7 +235,7 @@ def check_hook_silence(
     Edge case: if no JSONL files exist at all, return None (user may simply
     not be using Claude Code right now).
     """
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     pd = projects_dir if projects_dir is not None else _claude_projects_dir()
     if not pd.exists() or not pd.is_dir():
         return None
@@ -307,7 +304,7 @@ def check_disk_low(
     threshold: float = 0.05,
 ) -> StoredAlert | None:
     """Critical when any vault's filesystem has less than ``threshold`` (default 5%) free."""
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     low: list[dict[str, Any]] = []
     for project_name, rt in runtimes.items():
         vault_root = getattr(rt, "vault_root", None)
@@ -349,7 +346,7 @@ def check_disk_low(
 
 def check_project_map_broken(*, now: datetime | None = None) -> StoredAlert | None:
     """Critical when ``project-map.json`` fails to load / parse."""
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     try:
         from claude_mnemos.state.projects import ProjectStore
 
@@ -382,7 +379,7 @@ def check_daemon_uptime_warning(
     threshold so the alert is not re-emitted; the auto-dismiss-after-10-min
     UX is implemented client-side via the ``first_seen`` timestamp.
     """
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     started = getattr(daemon, "started_at_monotonic", 0.0)
     if started <= 0.0:
         return None
@@ -413,7 +410,7 @@ def run_all_checks(
     cannot kill the cron. Returns the list of currently-active alerts (None
     entries dropped).
     """
-    n = now if now is not None else _utcnow()
+    n = now if now is not None else utcnow()
     out: list[StoredAlert] = []
 
     detectors = [
