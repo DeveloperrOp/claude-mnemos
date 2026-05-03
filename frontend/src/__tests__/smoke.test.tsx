@@ -34,6 +34,7 @@ describe("App smoke", () => {
     await waitFor(() =>
       expect(screen.getByRole("banner")).toBeInTheDocument(),
     );
-    expect(screen.getByText("claude-mnemos")).toBeInTheDocument();
+    // Brand split into two spans: "claude" / "mnemos"
+    expect(screen.getByText("mnemos")).toBeInTheDocument();
   });
 });

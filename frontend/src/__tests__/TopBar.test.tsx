@@ -36,7 +36,9 @@ function wrap(ui: React.ReactNode) {
 describe("TopBar", () => {
   it("renders the brand", () => {
     render(wrap(<TopBar />));
-    expect(screen.getByText("claude-mnemos")).toBeInTheDocument();
+    // Brand is split into two spans: "claude" / "mnemos"
+    expect(screen.getByText("claude")).toBeInTheDocument();
+    expect(screen.getByText("mnemos")).toBeInTheDocument();
   });
 
   it("locale switcher cycles uk → ru → en → uk", async () => {

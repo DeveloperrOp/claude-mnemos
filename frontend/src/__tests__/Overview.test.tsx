@@ -166,7 +166,8 @@ describe("Overview", () => {
     });
     render(wrap(<Overview />));
     await waitFor(() =>
-      expect(screen.getByText("alpha")).toBeInTheDocument(),
+      // ProjectCard renders "alpha" in eyebrow + as fallback display name → multiple matches.
+      expect(screen.getAllByText("alpha").length).toBeGreaterThan(0),
     );
   });
 
@@ -234,7 +235,7 @@ describe("Overview", () => {
       return { data: { projects: [] } };
     });
     render(wrap(<Overview />));
-    await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("alpha").length).toBeGreaterThan(0));
     expect(screen.queryByText(/rate limited/i)).not.toBeInTheDocument();
   });
 
@@ -268,7 +269,7 @@ describe("Overview", () => {
       return { data: { projects: [] } };
     });
     render(wrap(<Overview />));
-    await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("alpha").length).toBeGreaterThan(0));
     expect(screen.queryByText(/rate limited/i)).not.toBeInTheDocument();
   });
 });
