@@ -35,7 +35,8 @@ export function Sessions() {
 
   if (sessionsQuery.isLoading) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-6">
+        <Skeleton className="h-14 w-full" />
         {[1, 2, 3].map((i) => <Skeleton key={i} className="h-32" />)}
       </div>
     );
@@ -81,7 +82,16 @@ export function Sessions() {
 
   if (total === 0) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-center justify-between gap-3">
+            <span className="eyebrow">claude-mnemos · sessions</span>
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("sessions.title", "Sessions")}
+          </h1>
+        </header>
         {lostBanner}
         <SessionFilters state={filters} onChange={setFilters} />
         <EmptyState
@@ -106,7 +116,19 @@ export function Sessions() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · sessions</span>
+          <span className="font-mono tabular-nums text-[10px] text-muted-foreground">
+            {total} {t("sessions.total_label", "total")}
+          </span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("sessions.title", "Sessions")}
+        </h1>
+      </header>
       {lostBanner}
       <SessionFilters state={filters} onChange={setFilters} />
       <div className="text-xs text-muted-foreground">

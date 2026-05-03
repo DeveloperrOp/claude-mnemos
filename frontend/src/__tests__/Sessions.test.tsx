@@ -9,7 +9,7 @@ import { Sessions } from "../pages/Sessions";
 beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
     sessions: {
-      title: "Sessions", filter_status: "Status", limit: "Limit",
+      title: "Sessions", filter_status: "Status", limit: "Limit", total_label: "total",
       status: { succeeded: "Succeeded", queued: "Queued", running: "Running", failed: "Failed", dead_letter: "Dead-letter" },
       no_sessions: "No sessions",
       empty: { title: "No sessions ingested yet", body: "body", cta_settings: "Check CWD", cta_lost: "Import lost" },
