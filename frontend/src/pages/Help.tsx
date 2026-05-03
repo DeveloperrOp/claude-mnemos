@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHealth } from "@/hooks/useHealth";
 import { MultiPara } from "@/components/help/MultiPara";
 
@@ -53,115 +52,116 @@ function Help() {
   const version = health.data?.version ?? "—";
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
-      <nav className="sticky top-4 hidden self-start lg:block">
-        <ul className="space-y-1 text-sm">
-          {SECTIONS.map((s) => (
-            <li key={s}>
-              <a href={`#${s}`} className="text-primary hover:underline">
-                {t(`help.nav.${s}`)}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · help</span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("help.title")}
+        </h1>
+      </header>
 
-      <div className="space-y-10">
-        <h1 className="text-2xl font-semibold">{t("help.title")}</h1>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
+        <nav className="sticky top-4 hidden self-start lg:block">
+          <ul className="space-y-1 text-sm">
+            {SECTIONS.map((s) => (
+              <li key={s}>
+                <a href={`#${s}`} className="text-primary hover:underline">
+                  {t(`help.nav.${s}`)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="space-y-10">
 
         <section id="intro" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.intro.heading")}</h2>
+          <div className="section-rail">
+            <span>{t("help.intro.heading")}</span>
+          </div>
           <MultiPara value={t("help.intro.body")} />
         </section>
 
         <section id="quickstart" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.quickstart.heading")}</h2>
+          <div className="section-rail">
+            <span>{t("help.quickstart.heading")}</span>
+          </div>
           <MultiPara value={t("help.quickstart.intro")} />
           {QUICKSTART_STEPS.map((k) => (
-            <Card key={k}>
-              <CardHeader>
-                <CardTitle className="text-base">{t(`help.quickstart.${k}_title`)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MultiPara value={t(`help.quickstart.${k}_body`)} />
-              </CardContent>
-            </Card>
+            <div key={k} className="rounded-md border border-border/60 bg-card/40 p-4">
+              <h3 className="font-semibold text-base mb-2">{t(`help.quickstart.${k}_title`)}</h3>
+              <MultiPara value={t(`help.quickstart.${k}_body`)} />
+            </div>
           ))}
         </section>
 
         <section id="concepts" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.concepts.heading")}</h2>
+          <div className="section-rail">
+            <span>{t("help.concepts.heading")}</span>
+          </div>
           <MultiPara value={t("help.concepts.intro")} />
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t("help.concepts.glossary_title")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-3 text-sm">{t("help.concepts.glossary_intro")}</p>
-              <dl className="space-y-2 text-sm">
-                {GLOSSARY.map(([key, label]) => (
-                  <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr]">
-                    <dt className="font-mono text-primary">{label}</dt>
-                    <dd className="text-muted-foreground">{t(`help.concepts.glossary_def_${key}`)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
+          <div className="rounded-md border border-border/60 bg-card/40 p-4">
+            <h3 className="font-semibold text-base mb-3">{t("help.concepts.glossary_title")}</h3>
+            <p className="mb-3 text-sm">{t("help.concepts.glossary_intro")}</p>
+            <dl className="space-y-2 text-sm">
+              {GLOSSARY.map(([key, label]) => (
+                <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr]">
+                  <dt className="font-mono text-primary">{label}</dt>
+                  <dd className="text-muted-foreground">{t(`help.concepts.glossary_def_${key}`)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
           {CONCEPTS_KEYS.map((k) => (
-            <Card key={k}>
-              <CardHeader>
-                <CardTitle className="text-base">{t(`help.concepts.${k}_title`)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MultiPara value={t(`help.concepts.${k}_body`)} />
-              </CardContent>
-            </Card>
+            <div key={k} className="rounded-md border border-border/60 bg-card/40 p-4">
+              <h3 className="font-semibold text-base mb-2">{t(`help.concepts.${k}_title`)}</h3>
+              <MultiPara value={t(`help.concepts.${k}_body`)} />
+            </div>
           ))}
         </section>
 
         <section id="workflows" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.workflows.heading")}</h2>
+          <div className="section-rail">
+            <span>{t("help.workflows.heading")}</span>
+          </div>
           <MultiPara value={t("help.workflows.intro")} />
           {WORKFLOWS_KEYS.map((k) => (
-            <Card key={k}>
-              <CardHeader>
-                <CardTitle className="text-base">{t(`help.workflows.${k}_title`)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MultiPara value={t(`help.workflows.${k}_body`)} />
-              </CardContent>
-            </Card>
+            <div key={k} className="rounded-md border border-border/60 bg-card/40 p-4">
+              <h3 className="font-semibold text-base mb-2">{t(`help.workflows.${k}_title`)}</h3>
+              <MultiPara value={t(`help.workflows.${k}_body`)} />
+            </div>
           ))}
         </section>
 
         <section id="troubleshooting" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.troubleshooting.heading")}</h2>
+          <div className="section-rail">
+            <span>{t("help.troubleshooting.heading")}</span>
+          </div>
           <MultiPara value={t("help.troubleshooting.intro")} />
           {TROUBLESHOOTING_KEYS.map((k) => (
-            <Card key={k}>
-              <CardHeader>
-                <CardTitle className="text-base">{t(`help.troubleshooting.${k}_title`)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MultiPara value={t(`help.troubleshooting.${k}_body`)} />
-              </CardContent>
-            </Card>
+            <div key={k} className="rounded-md border border-border/60 bg-card/40 p-4">
+              <h3 className="font-semibold text-base mb-2">{t(`help.troubleshooting.${k}_title`)}</h3>
+              <MultiPara value={t(`help.troubleshooting.${k}_body`)} />
+            </div>
           ))}
         </section>
 
         <section id="about" className="space-y-3">
-          <h2 className="text-xl font-semibold">{t("help.about.heading")}</h2>
-          <Card>
-            <CardContent className="space-y-2 pt-4 text-sm">
-              <MultiPara value={t("help.about.body")} />
-              <div className="pt-2">
-                <span className="text-muted-foreground">{t("help.about.version_label")}: </span>
-                <code>{version}</code>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="section-rail">
+            <span>{t("help.about.heading")}</span>
+          </div>
+          <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-3 text-sm">
+            <MultiPara value={t("help.about.body")} />
+            <div className="pt-2">
+              <span className="text-muted-foreground">{t("help.about.version_label")}: </span>
+              <code>{version}</code>
+            </div>
+          </div>
         </section>
+        </div>
       </div>
     </div>
   );
