@@ -234,6 +234,16 @@ class SpaStaticFiles(StaticFiles):
 
     _ASSET_PREFIXES = ("assets/", "fonts/", "locales/")
 
+    # Static-asset file extensions that always 404 at any path depth (real
+    # missing-resource error). Application route segments may legitimately
+    # contain dots (".md" page paths) — those fall through to index.html.
+    _ASSET_EXTENSIONS = (
+        ".js", ".css", ".map",
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+        ".woff", ".woff2", ".ttf", ".eot",
+        ".json", ".webmanifest", ".xml", ".txt",
+    )
+
     async def get_response(self, path: str, scope: Any) -> Any:  # type: ignore[override]
         try:
             return await super().get_response(path, scope)
@@ -245,10 +255,18 @@ class SpaStaticFiles(StaticFiles):
                 # OS-native form on Windows ("assets\\foo.js") while our
                 # prefix tests use POSIX style ("assets/").
                 normalised = path.replace("\\", "/")
-                # Real asset 404s — paths under known build-output prefixes
-                # — should remain 404 so missing-bundle bugs are visible.
+                # Build-output prefixes always 404 (missing-bundle visibility).
                 if any(normalised.startswith(p) for p in self._ASSET_PREFIXES):
                     raise
+                # Top-level static-asset extensions (.js, .css, images, fonts,
+                # .json etc) also keep 404 — they never legitimately exist as
+                # application routes. .md is intentionally NOT in the list so
+                # wiki-page URLs (/project/.../pages/foo.md) hit SPA fallback.
+                last_segment = normalised.rsplit("/", 1)[-1]
+                if "." in last_segment:
+                    ext = "." + last_segment.rsplit(".", 1)[-1].lower()
+                    if ext in self._ASSET_EXTENSIONS:
+                        raise
                 # Everything else is an application route — let the SPA
                 # take over.
                 return await super().get_response("index.html", scope)
