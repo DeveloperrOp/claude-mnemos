@@ -212,22 +212,40 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
 
 
 class SpaStaticFiles(StaticFiles):
-    """StaticFiles subclass with SPA fallback to index.html on 404."""
+    """StaticFiles subclass with SPA fallback to index.html on 404.
+
+    Routing rules for 404s:
+      • favicon.ico → serve favicon.svg as a fallback.
+      • Anything under assets/, fonts/, locales/ → keep the 404 (real
+        missing-asset error from the build).
+      • Anything else (application routes like /project/.../pages/X.md or
+        /metrics, /help, etc) → fall back to index.html so React Router can
+        resolve the path on the client.
+
+    The previous heuristic — "any segment containing a dot is an asset" —
+    was too aggressive: `.md` page paths and other route segments with
+    dots got blocked from SPA fallback, breaking direct-navigation /
+    hard-refresh on those URLs.
+    """
+
+    _ASSET_PREFIXES = ("assets/", "fonts/", "locales/")
 
     async def get_response(self, path: str, scope: Any) -> Any:  # type: ignore[override]
         try:
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
-                # Browsers implicitly request /favicon.ico — we ship favicon.svg.
-                # Serve the SVG as fallback (Content-Type set to image/svg+xml).
                 if path == "favicon.ico":
                     return await super().get_response("favicon.svg", scope)
-                # Fall back to index.html so client-side router (React Router)
-                # can resolve the path. Asset paths like /assets/foo.js still
-                # 404 normally because they DO exist as files when the bundle
-                # is built; missing-asset 404s are real errors.
-                if "." in path.rsplit("/", 1)[-1]:
+                # Normalise Windows path separators — Starlette passes the
+                # OS-native form on Windows ("assets\\foo.js") while our
+                # prefix tests use POSIX style ("assets/").
+                normalised = path.replace("\\", "/")
+                # Real asset 404s — paths under known build-output prefixes
+                # — should remain 404 so missing-bundle bugs are visible.
+                if any(normalised.startswith(p) for p in self._ASSET_PREFIXES):
                     raise
+                # Everything else is an application route — let the SPA
+                # take over.
                 return await super().get_response("index.html", scope)
             raise
