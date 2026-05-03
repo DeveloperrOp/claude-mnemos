@@ -133,7 +133,12 @@ def main() -> int:
         _eprint("missing transcript_path in payload; skipping")
         return 0
 
-    cwd_raw = payload.get("cwd") or os.getcwd()
+    cwd_raw = payload.get("cwd")
+    if not cwd_raw:
+        cwd_raw = os.getcwd()
+        _eprint(
+            f"WARNING: hook payload missing cwd, using process cwd: {cwd_raw}"
+        )
     cwd = Path(cwd_raw)
 
     try:

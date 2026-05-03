@@ -110,6 +110,22 @@ def test_hook_resolves_match_and_fallback_subprocess(isolated_home):
     assert b"not registered" not in r.stderr
 
 
+def test_hook_warns_when_cwd_missing_falls_back_to_process_cwd(isolated_home):
+    """When the hook payload omits ``cwd`` we fall back to ``os.getcwd()`` —
+    surface that decision to stderr so an operator running the hook outside
+    Claude Code can spot the misuse and pass an explicit cwd next time.
+    """
+    home, env = isolated_home
+    transcript = home / "t.jsonl"
+    transcript.write_text("{}")
+    payload = {"transcript_path": str(transcript)}  # no cwd
+    r = _run_hook(payload, env)
+    assert r.returncode == 0
+    err = r.stderr.decode()
+    assert "WARNING" in err
+    assert "missing cwd" in err
+
+
 def test_hook_ambiguous_cwd_silent_skip(isolated_home):
     home, env = isolated_home
     map_dir = home / ".claude-mnemos"
