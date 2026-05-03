@@ -45,9 +45,9 @@ function SidebarLink({ to, icon, label, disabled }: SidebarLinkProps) {
         <TooltipTrigger asChild>
           <span
             data-disabled
-            className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground opacity-60"
+            className="flex cursor-not-allowed items-center gap-2.5 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground/50"
           >
-            <span className="w-5 text-center">{icon}</span>
+            <span className="w-4 text-center text-[13px] grayscale opacity-60">{icon}</span>
             <span>{label}</span>
           </span>
         </TooltipTrigger>
@@ -63,16 +63,24 @@ function SidebarLink({ to, icon, label, disabled }: SidebarLinkProps) {
       end
       className={({ isActive }) =>
         cn(
-          "relative flex items-center gap-2 rounded-md px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-colors duration-[var(--motion-fast)]",
+          "relative flex items-center gap-2.5 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-all duration-[var(--motion-fast)]",
           isActive
-            ? "font-medium text-primary before:absolute before:left-0 before:top-0 before:h-full before:w-0.5 before:bg-primary"
-            : "text-foreground hover:bg-secondary",
+            ? "text-foreground bg-accent/5 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[2px] before:bg-accent"
+            : "text-muted-foreground hover:text-foreground hover:bg-card/60",
         )
       }
     >
-      <span className="w-5 text-center">{icon}</span>
+      <span className="w-4 text-center text-[13px]">{icon}</span>
       <span>{label}</span>
     </NavLink>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-3 pt-3 pb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/60">
+      {children}
+    </div>
   );
 }
 
@@ -84,11 +92,11 @@ export function Sidebar() {
   return (
     <nav
       aria-label="primary"
-      className="flex flex-col gap-1 border-r bg-muted p-3"
+      className="flex flex-col gap-0.5 border-r border-border/60 bg-card/30 py-2"
     >
       <SidebarLink to="/" icon="📊" label={t("navigation.overview")} />
 
-      <div className="my-2 border-t" />
+      <SectionLabel>{t("navigation.section_project", "Project")}</SectionLabel>
 
       {PROJECT_ITEMS.map((item) => (
         <SidebarLink
@@ -100,7 +108,7 @@ export function Sidebar() {
         />
       ))}
 
-      <div className="my-2 border-t" />
+      <SectionLabel>{t("navigation.section_global", "Global")}</SectionLabel>
 
       {GLOBAL_ITEMS.map((item) => (
         <SidebarLink

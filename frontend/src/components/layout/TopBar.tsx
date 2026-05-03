@@ -25,23 +25,35 @@ export function TopBar() {
   }, [i18n, locale]);
 
   return (
-    <header className="flex items-center justify-between border-b bg-background px-4 py-2">
-      <div className="flex items-center gap-3">
+    <header className="relative flex items-center justify-between border-b border-border/60 bg-card/40 px-4 py-2.5">
+      {/* Lime hairline bottom edge — operational signature */}
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
+
+      <div className="flex items-center gap-4">
         <Link
           to="/"
-          className="font-mono text-base font-semibold uppercase tracking-widest text-foreground hover:text-primary transition-colors duration-[var(--motion-fast)]"
+          className="group flex items-baseline gap-1.5 font-mono text-sm font-medium uppercase tracking-[0.16em]"
         >
-          claude-mnemos
+          <span className="text-foreground transition-colors group-hover:text-accent">
+            claude
+          </span>
+          <span className="text-accent">/</span>
+          <span className="text-muted-foreground transition-colors group-hover:text-foreground">
+            mnemos
+          </span>
         </Link>
+        <span className="h-4 w-px bg-border" />
         <ProjectSwitcher />
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <UsageWidget />
+        <span className="h-4 w-px bg-border" />
         <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setLocale(nextLocale(locale))}
+          className="h-7 px-2 font-mono text-[10px] tracking-[0.14em]"
         >
           {locale.toUpperCase()}
         </Button>
