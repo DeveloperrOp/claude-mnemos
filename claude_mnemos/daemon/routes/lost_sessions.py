@@ -340,13 +340,26 @@ async def ignore_selection_route(
             status_code=422, detail={"error": "missing_project_name"}
         )
     raw_shas = body.get("shas")
-    if not isinstance(raw_shas, list) or not all(isinstance(x, str) and x for x in raw_shas):
+    if (
+        not isinstance(raw_shas, list)
+        or not raw_shas
+        or not all(isinstance(x, str) and x for x in raw_shas)
+    ):
         raise HTTPException(
             status_code=422,
-            detail={"error": "invalid_shas", "detail": "shas must be a non-empty list of strings"},
+            detail={
+                "error": "invalid_shas",
+                "detail": "shas must be a non-empty list of non-empty strings",
+            },
         )
-    if not raw_shas:
-        raise HTTPException(status_code=422, detail={"error": "empty_shas"})
+    if len(raw_shas) > 1000:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "too_many_shas",
+                "detail": "shas list capped at 1000 entries per request",
+            },
+        )
 
     runtime = get_runtime(request, project_name)
 

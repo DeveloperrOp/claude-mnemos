@@ -395,12 +395,28 @@ async def test_post_ignore_selection_missing_project_name_returns_422(client):
     assert r.status_code == 422
 
 
-async def test_post_ignore_selection_empty_shas_returns_422(client):
+async def test_post_ignore_selection_rejects_empty(client):
+    """Empty shas list → 422 ``invalid_shas`` (consolidated validation)."""
     r = await client.post(
         "/api/lost-sessions/ignore-selection",
         json={"project_name": _PROJECT_NAME, "shas": []},
     )
     assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "invalid_shas"
+
+
+async def test_post_ignore_selection_rejects_oversized(client):
+    """1001 shas in one request → 422 ``too_many_shas``. Guards against an
+    accidental UI loop POSTing the entire vault's worth of shas."""
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={
+            "project_name": _PROJECT_NAME,
+            "shas": [f"sha{i}" for i in range(1001)],
+        },
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "too_many_shas"
 
 
 async def test_post_ignore_selection_unknown_project_returns_404(client):
