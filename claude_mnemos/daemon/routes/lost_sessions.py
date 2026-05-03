@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core import lost_sessions as core_lost_sessions
+from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.state.jobs import JobStore
@@ -98,6 +99,7 @@ async def list_lost_route(request: Request) -> dict[str, Any]:
 @router.post("/lost-sessions/scan")
 async def rescan_route(request: Request) -> dict[str, Any]:
     """Invalidate caches in every mounted vault, then rescan."""
+    invalidate_transcripts_cache()
     for runtime in all_runtimes(request):
         cache = runtime.lost_sessions_cache
         if cache is not None:

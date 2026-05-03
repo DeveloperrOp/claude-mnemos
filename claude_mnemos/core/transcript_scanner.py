@@ -8,6 +8,7 @@ same files.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,6 +19,9 @@ from claude_mnemos.core.transcript_helpers import (
     _resolve_transcripts_root,
     _sha256_file,
 )
+from claude_mnemos.core.ttl_cache import TTLCache
+
+log = logging.getLogger(__name__)
 
 
 class TranscriptEntry(BaseModel):
@@ -28,6 +32,9 @@ class TranscriptEntry(BaseModel):
     mtime: datetime
     cwd: str | None = None
     preview: str | None = None
+
+
+_TRANSCRIPTS_CACHE: TTLCache[list[TranscriptEntry]] = TTLCache(ttl_s=10.0)
 
 
 def _scan_sync(transcripts_root: Path | None) -> list[TranscriptEntry]:
@@ -42,7 +49,8 @@ def _scan_sync(transcripts_root: Path | None) -> list[TranscriptEntry]:
             stat = path.stat()
             sha = _sha256_file(path)
             cwd, preview = _extract_cwd_and_preview(path)
-        except OSError:
+        except OSError as exc:
+            log.warning("scan_transcripts: skipping %s: %s", path, exc)
             continue
         out.append(
             TranscriptEntry(
@@ -62,6 +70,21 @@ def _scan_sync(transcripts_root: Path | None) -> list[TranscriptEntry]:
 async def scan_transcripts(
     *, transcripts_root: Path | None = None
 ) -> list[TranscriptEntry]:
-    """Async wrapper — runs blocking scan in default executor."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _scan_sync, transcripts_root)
+    """Async scanner with 10s TTL cache.
+
+    NOTE: cache key is implicit (single global cache). If multiple
+    transcripts_root values are used in the same process, the cache
+    will conflate them. This is fine for production (one root per
+    daemon) but tests that switch transcripts_root via monkeypatch
+    must call invalidate_transcripts_cache() between calls.
+    """
+    async def _compute() -> list[TranscriptEntry]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _scan_sync, transcripts_root)
+
+    return await _TRANSCRIPTS_CACHE.get_or_compute(_compute)
+
+
+def invalidate_transcripts_cache() -> None:
+    """Drop the cache. Used by tests + POST /lost-sessions/scan / scan-active."""
+    _TRANSCRIPTS_CACHE.invalidate()

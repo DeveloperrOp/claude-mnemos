@@ -16,6 +16,14 @@ from claude_mnemos.core.active_sessions import (
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 
+@pytest.fixture(autouse=True)
+def _clear_transcripts_cache():
+    from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+    invalidate_transcripts_cache()
+    yield
+    invalidate_transcripts_cache()
+
+
 def _write_jsonl_with_mtime(root: Path, name: str, mtime_ago: timedelta, cwd: str | None = None) -> Path:
     """Write a jsonl and set its mtime to `now - mtime_ago`."""
     payload: dict[str, object] = {"sid": name}
@@ -168,8 +176,11 @@ async def test_scan_attributes_assigned_session_to_project(
     root.mkdir()
     monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
 
+    from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+
     # Test 1: Recent session (15 min ago) with matching cwd → hot + assigned
     _write_jsonl_with_mtime(root, "hot-assigned", timedelta(minutes=15), cwd=str(work_dir))
+    invalidate_transcripts_cache()
     out = await scan_active_sessions([])
     assert len(out) == 1
     assert out[0].session_id == "hot-assigned"
@@ -182,6 +193,7 @@ async def test_scan_attributes_assigned_session_to_project(
 
     # Test 2: Older session (3 hours ago) with matching cwd → cooling + assigned
     _write_jsonl_with_mtime(root, "cool-assigned", timedelta(hours=3), cwd=str(work_dir))
+    invalidate_transcripts_cache()
     out = await scan_active_sessions([])
     assert len(out) == 1
     assert out[0].session_id == "cool-assigned"

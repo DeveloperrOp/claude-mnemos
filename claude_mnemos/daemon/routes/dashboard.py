@@ -14,7 +14,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core.active_sessions import scan_active_sessions
+from claude_mnemos.core.transcript_scanner import (
+    invalidate_transcripts_cache,
+    scan_transcripts as _scan_transcripts_async,
+)
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
+from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -55,9 +60,29 @@ def _kpi_for(runtimes: list[Any]) -> dict[str, Any]:
     return {
         "queue": queue,
         "today": {"ingest_count": today_ingest, "pages_count": today_pages},
+        # TODO(v2): tokens_today aggregator from inject_metrics
         "tokens_today": 0,
         "lost_total": 0,
     }
+
+
+async def _compute_lost_total(runtimes: list[Any]) -> int:
+    """Count of transcripts not ingested in any vault.
+
+    Same union-manifest approach as scan_active_sessions, no mtime filter.
+    """
+    entries = await _scan_transcripts_async()
+    if not entries:
+        return 0
+    ingested: set[str] = set()
+    for rt in runtimes:
+        try:
+            m = Manifest.load(rt.vault_root)
+        except Exception as exc:
+            log.debug("lost_total manifest-load failed for %s: %s", rt.name, exc)
+            continue
+        ingested.update(m.ingested.keys())
+    return sum(1 for e in entries if e.sha not in ingested)
 
 
 def _running_jobs_for(runtimes: list[Any]) -> list[dict[str, Any]]:
@@ -98,6 +123,12 @@ async def dashboard_snapshot(request: Request) -> dict[str, Any]:
     except Exception as exc:
         log.warning("kpi aggregator failed: %s", exc)
         errors.append(f"kpi: {exc}")
+
+    try:
+        kpi["lost_total"] = await _compute_lost_total(runtimes)
+    except Exception as exc:
+        log.warning("lost_total aggregator failed: %s", exc)
+        errors.append(f"lost_total: {exc}")
 
     try:
         sessions = await scan_active_sessions(runtimes)
@@ -149,6 +180,7 @@ async def dump_now_route(
 
 @router.post("/dashboard/scan-active")
 async def scan_active_route(request: Request) -> dict[str, Any]:
+    invalidate_transcripts_cache()
     runtimes = list(all_runtimes(request))
     sessions = await scan_active_sessions(runtimes)
     return {"scanned": len(sessions)}

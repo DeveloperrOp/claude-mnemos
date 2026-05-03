@@ -14,6 +14,14 @@ from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 
 
+@pytest.fixture(autouse=True)
+def _clear_transcripts_cache():
+    from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+    invalidate_transcripts_cache()
+    yield
+    invalidate_transcripts_cache()
+
+
 class _FakeRuntime:
     def __init__(self, name: str, vault: Path) -> None:
         self.name = name

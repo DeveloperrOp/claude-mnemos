@@ -17,6 +17,14 @@ from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 
 
+@pytest.fixture(autouse=True)
+def _clear_transcripts_cache():
+    from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+    invalidate_transcripts_cache()
+    yield
+    invalidate_transcripts_cache()
+
+
 _PROJECT = "alpha"
 
 

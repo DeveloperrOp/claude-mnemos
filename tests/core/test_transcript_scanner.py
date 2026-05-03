@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -13,6 +14,14 @@ from claude_mnemos.core.transcript_scanner import (
     TranscriptEntry,
     scan_transcripts,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_transcripts_cache():
+    from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+    invalidate_transcripts_cache()
+    yield
+    invalidate_transcripts_cache()
 
 
 def _write_jsonl(
@@ -76,3 +85,35 @@ async def test_scan_recursive(tmp_path: Path) -> None:
     _write_jsonl(nested, "nested-sess")
     out = await scan_transcripts(transcripts_root=root)
     assert {e.session_id for e in out} == {"nested-sess"}
+
+
+@pytest.mark.asyncio
+async def test_transcripts_cache_dedupes_concurrent(tmp_path: Path) -> None:
+    """Two concurrent calls share one disk scan."""
+    from claude_mnemos.core import transcript_scanner as ts
+
+    root = tmp_path / "transcripts"
+    root.mkdir()
+    _write_jsonl(root, "x")
+
+    ts.invalidate_transcripts_cache()
+
+    # Hijack _scan_sync to count calls
+    original = ts._scan_sync
+    calls = 0
+    def counting_scan(rt):
+        nonlocal calls
+        calls += 1
+        return original(rt)
+    ts._scan_sync = counting_scan
+    try:
+        results = await asyncio.gather(
+            ts.scan_transcripts(transcripts_root=root),
+            ts.scan_transcripts(transcripts_root=root),
+            ts.scan_transcripts(transcripts_root=root),
+        )
+        assert all(len(r) == 1 for r in results)
+        assert calls == 1
+    finally:
+        ts._scan_sync = original
+        ts.invalidate_transcripts_cache()
