@@ -11,46 +11,55 @@ from claude_mnemos.daemon.process import MnemosDaemon
 
 
 @pytest.mark.asyncio
-async def test_daemon_registers_auto_dump_cron(
+async def test_register_auto_dump_cron_adds_job(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Verify that auto_dump_global cron is registered after _bootstrap_runtimes."""
+    """Calling _register_auto_dump_cron must add 'auto_dump_global' to scheduler.
+
+    This validates that the production method (called from run()) does its job.
+    """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     try:
-        # Replicate the sequence in daemon.run():
-        # 1. _bootstrap_runtimes
-        # 2. register cron job
-        # 3. scheduler.start()
+        # Bootstrap minimal vault state (zero projects is fine).
         await daemon._bootstrap_runtimes()
 
-        # Manually register the cron job the way daemon.run() does.
-        # This is testing that the cron was registered before scheduler.start().
-        async def _auto_dump_task() -> None:
-            from claude_mnemos.core.auto_dump import auto_dump_stale
-            await auto_dump_stale(daemon.runtimes)
+        # Call the production helper directly — this is what run() does.
+        daemon._register_auto_dump_cron()
 
-        daemon.scheduler.add_job(
-            _auto_dump_task,
-            "cron",
-            minute=0,
-            id="auto_dump_global",
-            replace_existing=True,
-        )
-
-        # Now start the scheduler
-        daemon.scheduler.start()
-
-        # Verify the job is registered
+        # Now scheduler must have the cron job registered (state is on the scheduler,
+        # which doesn't need .start() to inspect get_jobs()).
         job_ids = {j.id for j in daemon.scheduler.get_jobs()}
         assert "auto_dump_global" in job_ids
 
-        # Verify the job details (it should be a cron job running at minute=0)
-        jobs = {j.id: j for j in daemon.scheduler.get_jobs()}
-        assert "auto_dump_global" in jobs
-        job = jobs["auto_dump_global"]
-        assert "cron" in str(job.trigger).lower()
+        # And the closure attribute is exposed for the catch-up create_task() call.
+        assert callable(daemon._auto_dump_task_fn)
+    finally:
+        await daemon._shutdown_runtimes()
+        if daemon.scheduler.running:
+            daemon.scheduler.shutdown(wait=False)
+
+
+@pytest.mark.asyncio
+async def test_register_auto_dump_cron_exposes_task_fn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After _register_auto_dump_cron, daemon._auto_dump_task_fn is callable."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
+    try:
+        await daemon._bootstrap_runtimes()
+        daemon._register_auto_dump_cron()
+
+        # The task function must be set and callable (for the catch-up asyncio.create_task call).
+        assert hasattr(daemon, "_auto_dump_task_fn")
+        assert callable(daemon._auto_dump_task_fn)
+
+        # Verify it can be awaited (it's an async function).
+        import inspect
+        assert inspect.iscoroutinefunction(daemon._auto_dump_task_fn)
     finally:
         await daemon._shutdown_runtimes()
         if daemon.scheduler.running:

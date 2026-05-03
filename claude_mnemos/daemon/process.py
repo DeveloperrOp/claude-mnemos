@@ -80,22 +80,13 @@ class MnemosDaemon:
             await self._bootstrap_runtimes()
 
             # Auto-dump safety net (P0+P1 spec). Runs hourly.
-            async def _auto_dump_task() -> None:
-                await auto_dump_stale(self.runtimes)
-
-            self.scheduler.add_job(
-                _auto_dump_task,
-                "cron",
-                minute=0,
-                id="auto_dump_global",
-                replace_existing=True,
-            )
+            self._register_auto_dump_cron()
 
             self.scheduler.start()
 
             # Catch-up immediately after bootstrap — addresses any stale sessions
             # that accumulated while the daemon was down.
-            asyncio.create_task(_auto_dump_task())
+            asyncio.create_task(self._auto_dump_task_fn())
 
             await self._serve_uvicorn()
         finally:
@@ -182,6 +173,28 @@ class MnemosDaemon:
                 logger.warning("vault %s mount failed: %s", entry.name, exc)
                 continue
             self.runtimes[entry.name] = runtime
+
+    def _register_auto_dump_cron(self) -> None:
+        """Register the auto_dump_global hourly cron task.
+
+        Called from run() after bootstrap, before scheduler.start().
+        The closure is stored in self._auto_dump_task_fn for the catch-up
+        create_task() call.
+        """
+        async def _auto_dump_task() -> None:
+            try:
+                await auto_dump_stale(self.runtimes)
+            except Exception:
+                logger.exception("auto_dump_task failed")
+
+        self._auto_dump_task_fn = _auto_dump_task
+        self.scheduler.add_job(
+            _auto_dump_task,
+            "cron",
+            minute=0,
+            id="auto_dump_global",
+            replace_existing=True,
+        )
 
     # ─── Dynamic vault management (Task 14) ───────────────────────
 
