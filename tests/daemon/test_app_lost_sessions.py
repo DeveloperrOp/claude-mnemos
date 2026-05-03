@@ -96,9 +96,9 @@ async def test_list_with_sessions(client, transcripts_root: Path):
     assert body["total"] == 2
     sids = {s["session_id"] for s in body["sessions"]}
     assert sids == {"alpha", "beta"}
-    # β2: every item has project_name.
+    # cwd-based attribution: with no cwd in transcript, sessions are unassigned.
     for item in body["sessions"]:
-        assert item["project_name"] == _PROJECT_NAME
+        assert item["project_name"] == "__unassigned__"
 
 
 # ---------------------------------------------------------------------------
@@ -268,3 +268,142 @@ async def test_post_import_bulk_unknown_project_returns_404(
     )
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
+
+
+# ---------------------------------------------------------------------------
+# POST /lost-sessions/import-selection (multi-select flow)
+# ---------------------------------------------------------------------------
+
+
+async def test_post_import_selection_picks_only_listed(
+    client, daemon, transcripts_root: Path
+):
+    """Five sessions exist; selection of two → queued=2, only those enqueued."""
+    for sid in ("a", "b", "c", "d", "e"):
+        (transcripts_root / f"{sid}.jsonl").write_text(sid, encoding="utf-8")
+
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"project_name": _PROJECT_NAME, "session_ids": ["b", "d"]},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body["queued"] == 2
+    assert body["skipped"] == 0
+    assert body["missing"] == []
+    assert set(body["session_ids"]) == {"b", "d"}
+
+    counts = daemon._runtime.job_store.count_by_status()
+    assert sum(counts.values()) == 2
+
+
+async def test_post_import_selection_reports_missing_ids(
+    client, transcripts_root: Path
+):
+    """IDs not in scan results → reported in 'missing', do not block others."""
+    (transcripts_root / "real.jsonl").write_text("x", encoding="utf-8")
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"project_name": _PROJECT_NAME, "session_ids": ["real", "ghost"]},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body["queued"] == 1
+    assert body["session_ids"] == ["real"]
+    assert body["missing"] == ["ghost"]
+
+
+async def test_post_import_selection_missing_project_name_returns_422(client):
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"session_ids": ["a"]},
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "missing_project_name"
+
+
+async def test_post_import_selection_empty_ids_returns_422(client):
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"project_name": _PROJECT_NAME, "session_ids": []},
+    )
+    assert r.status_code == 422
+
+
+async def test_post_import_selection_invalid_ids_returns_422(client):
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"project_name": _PROJECT_NAME, "session_ids": [123, "a"]},
+    )
+    assert r.status_code == 422
+
+
+async def test_post_import_selection_unknown_project_returns_404(client):
+    r = await client.post(
+        "/api/lost-sessions/import-selection",
+        json={"project_name": "ghost", "session_ids": ["a"]},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"
+
+
+# ---------------------------------------------------------------------------
+# POST /lost-sessions/ignore-selection (multi-select flow)
+# ---------------------------------------------------------------------------
+
+
+async def test_post_ignore_selection_adds_multiple(
+    client, tmp_path: Path, transcripts_root: Path
+):
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"project_name": _PROJECT_NAME, "shas": ["sha1", "sha2", "sha3"]},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ignored_count"] == 3
+    assert body["added"] == 3
+
+    loaded = LostSessionsIgnore.load(tmp_path)
+    assert loaded.ignored_shas == {"sha1", "sha2", "sha3"}
+
+
+async def test_post_ignore_selection_idempotent_for_existing(
+    client, tmp_path: Path, transcripts_root: Path
+):
+    """Re-ignoring already-ignored shas: added=0, count stable."""
+    await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"project_name": _PROJECT_NAME, "shas": ["sha1", "sha2"]},
+    )
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"project_name": _PROJECT_NAME, "shas": ["sha1", "sha2", "sha3"]},
+    )
+    body = r.json()
+    assert body["ignored_count"] == 3
+    assert body["added"] == 1
+
+
+async def test_post_ignore_selection_missing_project_name_returns_422(client):
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"shas": ["a"]},
+    )
+    assert r.status_code == 422
+
+
+async def test_post_ignore_selection_empty_shas_returns_422(client):
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"project_name": _PROJECT_NAME, "shas": []},
+    )
+    assert r.status_code == 422
+
+
+async def test_post_ignore_selection_unknown_project_returns_404(client):
+    r = await client.post(
+        "/api/lost-sessions/ignore-selection",
+        json={"project_name": "ghost", "shas": ["sha1"]},
+    )
+    assert r.status_code == 404

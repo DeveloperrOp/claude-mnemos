@@ -53,6 +53,49 @@ export async function ignoreLostSession(
   return r.data as { ignored_count: number };
 }
 
+export interface ImportSelectionBody {
+  project_name: string;
+  session_ids: string[];
+  extract?: boolean;
+}
+
+export interface ImportSelectionResponse {
+  queued: number;
+  skipped: number;
+  missing: string[];
+  session_ids: string[];
+}
+
+export async function importLostSessionsSelection(
+  body: ImportSelectionBody,
+): Promise<ImportSelectionResponse> {
+  const r = await apiClient.post(
+    "/lost-sessions/import-selection",
+    body,
+  );
+  return r.data as ImportSelectionResponse;
+}
+
+export interface IgnoreSelectionBody {
+  project_name: string;
+  shas: string[];
+}
+
+export interface IgnoreSelectionResponse {
+  ignored_count: number;
+  added: number;
+}
+
+export async function ignoreLostSessionsSelection(
+  body: IgnoreSelectionBody,
+): Promise<IgnoreSelectionResponse> {
+  const r = await apiClient.post(
+    "/lost-sessions/ignore-selection",
+    body,
+  );
+  return r.data as IgnoreSelectionResponse;
+}
+
 export interface TranscriptMessage {
   role: "user" | "assistant" | "system" | "tool" | "other";
   content: string;

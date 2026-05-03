@@ -27,7 +27,17 @@ function formatBytes(n: number): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
-export function LostSessionRow({ session: s }: { session: LostSession }) {
+interface LostSessionRowProps {
+  session: LostSession;
+  selected?: boolean;
+  onToggleSelected?: (sessionId: string) => void;
+}
+
+export function LostSessionRow({
+  session: s,
+  selected,
+  onToggleSelected,
+}: LostSessionRowProps) {
   const { t, i18n } = useTranslation();
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -35,11 +45,25 @@ export function LostSessionRow({ session: s }: { session: LostSession }) {
   const ignoreMut = useLostSessionIgnore();
   const projectsQuery = useProjects();
   const projects = projectsQuery.data ?? [];
+  const showCheckbox = onToggleSelected !== undefined;
 
   return (
     <>
-      <div className="rounded-md border bg-background">
+      <div
+        className={`rounded-md border bg-background ${
+          selected ? "border-primary/60 bg-primary/5" : ""
+        }`}
+      >
         <div className="flex items-center gap-3 px-3 py-2 text-sm">
+          {showCheckbox && (
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={() => onToggleSelected!(s.session_id)}
+              aria-label={t("lost_sessions.selection.row_checkbox_aria")}
+              className="h-4 w-4 cursor-pointer accent-primary"
+            />
+          )}
           <ProjectBadge name={s.project_name} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">

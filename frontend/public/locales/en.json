@@ -186,6 +186,8 @@
     "copy_wikilink": "Copy wikilink",
     "not_found_title": "Page not found",
     "not_found_hint": "Go back",
+    "raw_badge": "Raw",
+    "raw_hint": "Raw markdown without frontmatter (e.g. a chat dump). Edit, verify and delete are only available for wiki pages.",
     "editor": {
       "title": "Edit page",
       "title_field": "Title",
@@ -248,10 +250,16 @@
     "not_found_title": "Session not found",
     "not_found_hint": "Go back",
     "bulk_import": {
-      "banner_text": "You have {{n}} lost sessions for this project. Import all?",
+      "banner_text": "You have {{n}} lost sessions for this project.",
+      "choose_button": "Choose what to import",
       "button": "Import all ({{n}})",
       "success": "{{queued}} sessions queued for ingest",
       "skipped": "{{skipped}} skipped (different project)"
+    },
+    "lost_inline": {
+      "banner": "Lost sessions for this project: {{n}}",
+      "expand": "Expand ▾",
+      "collapse": "Collapse ▴"
     }
   },
   "activity": {
@@ -410,7 +418,31 @@
     "transcript_load_error": "Failed to load transcript: {{error}}",
     "transcript_meta": "Showing {{shown}} of {{total}} messages",
     "transcript_truncated": "list truncated, fetch with higher limit for more",
-    "message_truncated": "(content truncated)"
+    "message_truncated": "(content truncated)",
+    "selection": {
+      "filter_project": "Project",
+      "all_projects": "All projects",
+      "unassigned_filter": "Unassigned",
+      "unassigned_label": "unassigned",
+      "unassigned_import_blocked": "Selection contains unassigned sessions — pick a project manually via single-import.",
+      "search_placeholder": "Search by cwd, preview or session_id…",
+      "showing_n_of_m": "{{shown}} of {{total}}",
+      "empty_filtered": "No sessions match the current filter.",
+      "select_all": "Select all ({{n}})",
+      "deselect_all": "Clear selection",
+      "select_all_aria": "Select all filtered sessions",
+      "row_checkbox_aria": "Select this session",
+      "bar_count": "{{n}} selected",
+      "bar_import": "Import",
+      "bar_ignore": "Ignore",
+      "bar_clear": "Cancel",
+      "import_toast": "Queued: {{n}}",
+      "ignore_toast": "Ignored: {{n}}",
+      "confirm_import_title": "Import {{n}} sessions?",
+      "confirm_import_desc": "Each session creates a separate ingest job. May take time and consume LLM tokens (unless ingesting with --no-llm).",
+      "confirm_ignore_title": "Ignore {{n}} sessions?",
+      "confirm_ignore_desc": "Sessions will be hidden from the lost-sessions list. Transcript files are not deleted."
+    }
   },
   "suggestions": {
     "title": "Suggestions",

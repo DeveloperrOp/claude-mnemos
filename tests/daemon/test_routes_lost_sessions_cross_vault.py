@@ -74,12 +74,22 @@ def _make_shared_transcripts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     *session_ids: str,
+    cwd: str | None = None,
 ) -> Path:
-    """Create a shared transcripts dir with .jsonl files; set MNEMOS_TRANSCRIPTS_ROOT."""
+    """Create a shared transcripts dir with .jsonl files; set MNEMOS_TRANSCRIPTS_ROOT.
+
+    Each .jsonl has the same single line with the given ``cwd``. If ``cwd`` is
+    None, the file omits cwd and the resolver will mark the session unassigned.
+    """
+    import json as _json
+
     root = tmp_path / "transcripts"
     root.mkdir(exist_ok=True)
     for sid in session_ids:
-        (root / f"{sid}.jsonl").write_text(f"{{\"sid\":\"{sid}\"}}", encoding="utf-8")
+        payload: dict[str, str] = {"sid": sid}
+        if cwd is not None:
+            payload["cwd"] = cwd
+        (root / f"{sid}.jsonl").write_text(_json.dumps(payload), encoding="utf-8")
     monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
     return root
 
@@ -89,16 +99,17 @@ def _make_shared_transcripts(
 # ---------------------------------------------------------------------------
 
 
-def test_list_lost_sessions_cross_vault(
+def test_list_lost_sessions_cross_vault_dedupe_unassigned(
     daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """GET /lost-sessions aggregates both vaults; every item has project_name.
+    """GET /lost-sessions: dedupe by sha; cwd-less sessions are __unassigned__.
 
-    Both vaults scan the same transcripts root. The total is
-    num_files * num_vaults because each vault sees the same files as "lost"
-    (neither has ingested them). Every result item must carry project_name.
+    With the cwd-based attribution fix, each session appears exactly once.
+    Sessions whose cwd does not match any project's cwd_patterns (or has no
+    cwd at all) are tagged ``project_name="__unassigned__"`` — NOT attributed
+    to whichever vault happened to surface them.
     """
     _daemon, client, _vault_a, _vault_b = daemon_with_two
 
@@ -109,19 +120,91 @@ def test_list_lost_sessions_cross_vault(
     body = r.json()
     items = body["sessions"]
 
-    # Both vaults contribute — 2 files × 2 vaults = 4 items.
-    assert body["total"] == 4
+    # Dedupe: 2 files × 2 vaults = 2 unique sessions, not 4.
+    assert body["total"] == 2
 
-    # Every item must have project_name set.
+    # Both sessions are unassigned because cwd_patterns are empty in both projects
+    # AND the test transcripts have no cwd.
     project_names = {item["project_name"] for item in items}
-    assert project_names == {"alpha", "beta"}
+    assert project_names == {"__unassigned__"}
+    assert {i["session_id"] for i in items} == {"sess-1", "sess-2"}
 
-    alpha_items = [i for i in items if i["project_name"] == "alpha"]
-    beta_items = [i for i in items if i["project_name"] == "beta"]
-    assert len(alpha_items) == 2
-    assert len(beta_items) == 2
-    assert {i["session_id"] for i in alpha_items} == {"sess-1", "sess-2"}
-    assert {i["session_id"] for i in beta_items} == {"sess-1", "sess-2"}
+
+def test_list_lost_sessions_attributes_by_cwd(
+    daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A session whose cwd matches a project's cwd_patterns is attributed there."""
+    _daemon, client, _vault_a, _vault_b = daemon_with_two
+
+    # Re-register alpha with a cwd pattern so the resolver attributes the
+    # session to alpha. ProjectStore.update is the supported API.
+    from claude_mnemos.state.projects import ProjectStore
+
+    work_dir = tmp_path / "alpha-work"
+    work_dir.mkdir()
+    ProjectStore().update("alpha", cwd_patterns=[str(work_dir)])
+
+    _make_shared_transcripts(
+        tmp_path, monkeypatch, "alpha-sess", cwd=str(work_dir)
+    )
+
+    r = client.post("/api/lost-sessions/scan")
+    assert r.status_code == 200, r.text
+    items = r.json()["sessions"]
+
+    target = [i for i in items if i["session_id"] == "alpha-sess"]
+    assert len(target) == 1
+    assert target[0]["project_name"] == "alpha"
+
+
+def test_list_lost_sessions_excludes_globally_ingested(
+    daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A session ingested in ANY vault must not appear as lost in any vault.
+
+    Before the fix, vault_alpha would still show beta's ingested sessions as
+    "lost for alpha". After the fix, a session present in any manifest is
+    excluded from the cross-vault view entirely.
+    """
+    daemon, client, vault_a, vault_b = daemon_with_two
+
+    _make_shared_transcripts(tmp_path, monkeypatch, "shared-sess")
+
+    # Manually mark "shared-sess" as ingested in vault_b's manifest.
+    from datetime import UTC, datetime
+
+    from claude_mnemos.state.manifest import IngestRecord, Manifest
+
+    # Compute the sha the scanner uses (sha256 of file bytes).
+    import hashlib
+
+    transcript_path = tmp_path / "transcripts" / "shared-sess.jsonl"
+    sha = hashlib.sha256(transcript_path.read_bytes()).hexdigest()
+
+    manifest = Manifest.load(vault_b)
+    manifest.ingested[sha] = IngestRecord(
+        session_id="shared-sess",
+        ingested_at=datetime.now(tz=UTC),
+        raw_path="raw/chats/shared-sess.md",
+        source_path=None,
+        model=None,
+        input_tokens=None,
+        output_tokens=None,
+        transcript_path=str(transcript_path),
+    )
+    manifest.save(vault_b)
+
+    # Invalidate caches and rescan.
+    r = client.post("/api/lost-sessions/scan")
+    assert r.status_code == 200
+    items = r.json()["sessions"]
+
+    # shared-sess must NOT appear (it's globally ingested via vault_b).
+    assert all(i["session_id"] != "shared-sess" for i in items)
 
 
 def test_scan_invalidates_all_caches(
@@ -141,23 +224,15 @@ def test_scan_invalidates_all_caches(
     # Add a new file; without invalidation the cached count stays old.
     (tr / "after-1.jsonl").write_text("2", encoding="utf-8")
 
-    # POST /scan should see the new file in BOTH vaults.
+    # POST /scan invalidates the per-vault caches so the new file is picked up.
     r2 = client.post("/api/lost-sessions/scan")
     assert r2.status_code == 200, r2.text
     body = r2.json()
     session_ids = {i["session_id"] for i in body["sessions"]}
+    # Dedupe: each new file appears exactly once in the aggregated list.
     assert "after-1" in session_ids, f"Expected 'after-1' in {session_ids}"
-    # Both vaults see the new file.
-    new_for_alpha = [
-        i for i in body["sessions"]
-        if i["session_id"] == "after-1" and i["project_name"] == "alpha"
-    ]
-    new_for_beta = [
-        i for i in body["sessions"]
-        if i["session_id"] == "after-1" and i["project_name"] == "beta"
-    ]
-    assert len(new_for_alpha) == 1
-    assert len(new_for_beta) == 1
+    new_items = [i for i in body["sessions"] if i["session_id"] == "after-1"]
+    assert len(new_items) == 1
 
 
 def test_import_routes_to_specified_project(

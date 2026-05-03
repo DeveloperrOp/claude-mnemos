@@ -21,20 +21,46 @@ from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core import lost_sessions as core_lost_sessions
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
+from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.state.jobs import JobStore
+from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
 
+UNASSIGNED_PROJECT = "__unassigned__"
+
 
 def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
-    """Cross-vault scan with project attribution.
+    """Cross-vault scan with cwd-based project attribution.
 
-    For each mounted runtime, read from its LostSessionsCache (preferred) or
-    run a synchronous scan.  Every returned item is serialised to a dict and
-    annotated with ``project_name``.
+    Loss-session attribution is determined by ``cwd`` (resolved against the
+    project-map) — NOT by the vault that surfaced the session in its scan.
+    A session is included once (deduped by sha) and only if it is not
+    ingested in ANY mounted vault. ``project_name`` is the name of the
+    project whose ``cwd_patterns`` match the session's cwd, or
+    ``"__unassigned__"`` if cwd matches no registered project (or is null).
+
+    This fixes a long-standing leakage where every vault would surface
+    every other vault's sessions as "lost" simply because they were
+    missing from its own manifest.
     """
+    runtimes = list(all_runtimes(request))
+
+    # Union of ingested shas across every mounted vault — the true
+    # "globally ingested" set. A session present in ANY manifest is not lost.
+    global_ingested: set[str] = set()
+    for runtime in runtimes:
+        try:
+            manifest = Manifest.load(runtime.vault_root)
+        except Exception:
+            continue
+        global_ingested.update(manifest.ingested.keys())
+
+    resolver = ProjectResolver()
+
+    seen_shas: set[str] = set()
     out: list[dict[str, Any]] = []
-    for runtime in all_runtimes(request):
+    for runtime in runtimes:
         cache = runtime.lost_sessions_cache
         items = (
             cache.get_or_scan(runtime.vault_root)
@@ -42,8 +68,23 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
             else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
         )
         for item in items:
+            if item.sha in seen_shas:
+                continue
+            if item.sha in global_ingested:
+                continue
+            seen_shas.add(item.sha)
+
+            assigned = UNASSIGNED_PROJECT
+            if item.cwd:
+                try:
+                    entry = resolver.resolve_by_cwd(Path(item.cwd))
+                    if entry is not None:
+                        assigned = entry.name
+                except (ResolverAmbiguityError, OSError):
+                    pass
+
             d = item.model_dump(mode="json")
-            d["project_name"] = runtime.name
+            d["project_name"] = assigned
             out.append(d)
     return out
 
@@ -170,6 +211,132 @@ async def import_bulk_route(
         runtime.job_worker.signal_wakeup()
 
     return {"queued": queued, "skipped": skipped, "session_ids": session_ids}
+
+
+@router.post("/lost-sessions/import-selection", status_code=202)
+async def import_selection_route(
+    request: Request, body: dict[str, Any]
+) -> dict[str, Any]:
+    """Enqueue ingest jobs for an explicit list of session_ids in one project.
+
+    Body: ``{"project_name": str, "session_ids": [str], "extract": bool? = True}``.
+
+    Returns: ``{"queued": int, "skipped": int, "missing": [str], "session_ids": [str]}``.
+
+    * ``missing`` — session_ids not found in the target vault's scan results.
+    * ``skipped`` — sessions whose enqueue raised (counted separately).
+
+    Differences from ``/import-bulk``: caller picks exactly which sessions go
+    in. The frontend uses this for the multi-select flow on the Lost Sessions
+    page.
+    """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=422, detail={"error": "missing_project_name"}
+        )
+    raw_ids = body.get("session_ids")
+    if not isinstance(raw_ids, list) or not all(isinstance(x, str) and x for x in raw_ids):
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_session_ids", "detail": "session_ids must be a non-empty list of strings"},
+        )
+    if not raw_ids:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "empty_session_ids"},
+        )
+    runtime = get_runtime(request, project_name)
+    if runtime.job_store is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "vault_unavailable", "project_name": project_name},
+        )
+
+    extract = bool(body.get("extract", True))
+
+    cache = runtime.lost_sessions_cache
+    items = (
+        cache.get_or_scan(runtime.vault_root)
+        if cache is not None
+        else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+    )
+    by_id = {i.session_id: i for i in items}
+
+    queued = 0
+    skipped = 0
+    missing: list[str] = []
+    session_ids: list[str] = []
+    for sid in raw_ids:
+        entry = by_id.get(sid)
+        if entry is None:
+            missing.append(sid)
+            continue
+        try:
+            runtime.job_store.create(
+                kind="ingest",
+                payload={
+                    "transcript_path": entry.transcript_path,
+                    "extract": extract,
+                },
+            )
+        except Exception:
+            skipped += 1
+            continue
+        queued += 1
+        session_ids.append(entry.session_id)
+
+    if queued > 0 and runtime.job_worker is not None:
+        runtime.job_worker.signal_wakeup()
+
+    return {
+        "queued": queued,
+        "skipped": skipped,
+        "missing": missing,
+        "session_ids": session_ids,
+    }
+
+
+@router.post("/lost-sessions/ignore-selection", status_code=200)
+async def ignore_selection_route(
+    request: Request, body: dict[str, Any]
+) -> dict[str, Any]:
+    """Add multiple SHAs to the ignore list of one project vault.
+
+    Body: ``{"project_name": str, "shas": [str]}``.
+    Returns: ``{"ignored_count": int, "added": int}``.
+
+    ``added`` counts how many of the requested shas were newly ignored.
+    Already-ignored shas are silently no-op.
+    """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=422, detail={"error": "missing_project_name"}
+        )
+    raw_shas = body.get("shas")
+    if not isinstance(raw_shas, list) or not all(isinstance(x, str) and x for x in raw_shas):
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_shas", "detail": "shas must be a non-empty list of strings"},
+        )
+    if not raw_shas:
+        raise HTTPException(status_code=422, detail={"error": "empty_shas"})
+
+    runtime = get_runtime(request, project_name)
+
+    ignore = core_lost_sessions.LostSessionsIgnore.load(runtime.vault_root)
+    before = set(ignore.ignored_shas)
+    ignore.ignored_shas.update(raw_shas)
+    added = len(ignore.ignored_shas) - len(before)
+    if added > 0:
+        ignore.save(runtime.vault_root, tracker=runtime.tracker)
+
+    cache = runtime.lost_sessions_cache
+    if cache is not None:
+        cache.invalidate()
+
+    return {"ignored_count": len(ignore.ignored_shas), "added": added}
 
 
 @router.post("/lost-sessions/{session_id}/import", status_code=201)

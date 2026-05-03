@@ -186,6 +186,8 @@
     "copy_wikilink": "Скопіювати wikilink",
     "not_found_title": "Сторінку не знайдено",
     "not_found_hint": "Повернутись назад",
+    "raw_badge": "Raw",
+    "raw_hint": "Сирий markdown без frontmatter (наприклад, дамп чату). Редагування, верифікація та видалення доступні лише для wiki-сторінок.",
     "editor": {
       "title": "Редагувати сторінку",
       "title_field": "Заголовок",
@@ -248,10 +250,16 @@
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад",
     "bulk_import": {
-      "banner_text": "У тебе {{n}} загублених сесій для цього проекту. Імпортувати всі?",
+      "banner_text": "У тебе {{n}} загублених сесій для цього проекту.",
+      "choose_button": "Обрати які імпортувати",
       "button": "Імпортувати всі ({{n}})",
       "success": "{{queued}} сесій поставлено в чергу",
       "skipped": "{{skipped}} пропущено (інший проект)"
+    },
+    "lost_inline": {
+      "banner": "Загублені сесії цього проєкту: {{n}}",
+      "expand": "Розгорнути ▾",
+      "collapse": "Згорнути ▴"
     }
   },
   "activity": {
@@ -410,7 +418,33 @@
     "transcript_load_error": "Не вдалося завантажити транскрипт: {{error}}",
     "transcript_meta": "Показано {{shown}} з {{total}} повідомлень",
     "transcript_truncated": "список обрізано, збільш ліміт для більшого",
-    "message_truncated": "(вміст обрізано)"
+    "message_truncated": "(вміст обрізано)",
+    "selection": {
+      "filter_project": "Проєкт",
+      "all_projects": "Усі проєкти",
+      "unassigned_filter": "Без призначення",
+      "unassigned_label": "не призначено",
+      "unassigned_import_blocked": "Серед обраних є сесії без призначення — оберіть проєкт вручну через одиночний імпорт.",
+      "search_placeholder": "Пошук за cwd, превʼю або session_id…",
+      "showing_n_of_m": "{{shown}} з {{total}}",
+      "empty_filtered": "Немає сесій під поточний фільтр.",
+      "select_all": "Обрати всі ({{n}})",
+      "deselect_all": "Зняти вибір",
+      "select_all_aria": "Обрати усі сесії з фільтра",
+      "row_checkbox_aria": "Обрати цю сесію",
+      "bar_count_one": "{{count}} обрано",
+      "bar_count_other": "{{count}} обрано",
+      "bar_count": "{{n}} обрано",
+      "bar_import": "Імпортувати",
+      "bar_ignore": "Ігнорувати",
+      "bar_clear": "Скасувати",
+      "import_toast": "Додано в чергу: {{n}}",
+      "ignore_toast": "Додано до ігнору: {{n}}",
+      "confirm_import_title": "Імпортувати {{n}} сесій?",
+      "confirm_import_desc": "Кожна сесія створить окрему задачу в черзі інжесту. Це може зайняти час і витратити токени LLM (якщо інжест не у --no-llm режимі).",
+      "confirm_ignore_title": "Ігнорувати {{n}} сесій?",
+      "confirm_ignore_desc": "Сесії будуть приховані зі списку загублених. Файли транскриптів не видаляються."
+    }
   },
   "suggestions": {
     "title": "Пропозиції",

@@ -186,6 +186,8 @@
     "copy_wikilink": "Скопировать wikilink",
     "not_found_title": "Страница не найдена",
     "not_found_hint": "Вернуться назад",
+    "raw_badge": "Raw",
+    "raw_hint": "Сырой markdown без frontmatter (например, дамп чата). Редактирование, верификация и удаление доступны только для wiki-страниц.",
     "editor": {
       "title": "Редактировать страницу",
       "title_field": "Заголовок",
@@ -248,10 +250,16 @@
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад",
     "bulk_import": {
-      "banner_text": "У тебя {{n}} потерянных сессий для этого проекта. Импортировать все?",
+      "banner_text": "У тебя {{n}} потерянных сессий для этого проекта.",
+      "choose_button": "Выбрать какие импортировать",
       "button": "Импортировать все ({{n}})",
       "success": "{{queued}} сессий поставлены в очередь",
       "skipped": "{{skipped}} пропущено (другой проект)"
+    },
+    "lost_inline": {
+      "banner": "Потерянные сессии этого проекта: {{n}}",
+      "expand": "Развернуть ▾",
+      "collapse": "Свернуть ▴"
     }
   },
   "activity": {
@@ -410,7 +418,31 @@
     "transcript_load_error": "Не удалось загрузить транскрипт: {{error}}",
     "transcript_meta": "Показано {{shown}} из {{total}} сообщений",
     "transcript_truncated": "список обрезан, увеличьте лимит для большего",
-    "message_truncated": "(содержимое обрезано)"
+    "message_truncated": "(содержимое обрезано)",
+    "selection": {
+      "filter_project": "Проект",
+      "all_projects": "Все проекты",
+      "unassigned_filter": "Без назначения",
+      "unassigned_label": "не назначено",
+      "unassigned_import_blocked": "Среди выбранных есть сессии без назначения — выбери проект вручную через одиночный импорт.",
+      "search_placeholder": "Поиск по cwd, превью или session_id…",
+      "showing_n_of_m": "{{shown}} из {{total}}",
+      "empty_filtered": "Под текущий фильтр сессий нет.",
+      "select_all": "Выбрать все ({{n}})",
+      "deselect_all": "Снять выбор",
+      "select_all_aria": "Выбрать все сессии из фильтра",
+      "row_checkbox_aria": "Выбрать эту сессию",
+      "bar_count": "{{n}} выбрано",
+      "bar_import": "Импортировать",
+      "bar_ignore": "Игнорировать",
+      "bar_clear": "Отменить",
+      "import_toast": "Добавлено в очередь: {{n}}",
+      "ignore_toast": "Добавлено в игнор: {{n}}",
+      "confirm_import_title": "Импортировать {{n}} сессий?",
+      "confirm_import_desc": "Каждая сессия создаст отдельную задачу в очереди ингеста. Может занять время и потратить токены LLM (если ингест не в --no-llm режиме).",
+      "confirm_ignore_title": "Игнорировать {{n}} сессий?",
+      "confirm_ignore_desc": "Сессии будут скрыты из списка потерянных. Файлы транскриптов не удаляются."
+    }
   },
   "suggestions": {
     "title": "Предложения",
