@@ -52,6 +52,7 @@ def ingest(
     extract: bool = True,
     dry_run: bool = False,
     today: date,
+    raw_filename_suffix: str = "",
 ) -> IngestResult:
     """Full ingest pipeline. All vault writes go through StagingTransaction.
 
@@ -88,7 +89,9 @@ def ingest(
 
         activity = ActivityLog.load(vault_root)
 
-        raw_relative = Path("raw/chats") / f"{session_id}.md"
+        # Build raw filename with optional suffix (e.g., "-precompact")
+        raw_filename = f"{session_id}{raw_filename_suffix}.md"
+        raw_relative = Path("raw/chats") / raw_filename
         raw_body = _render_raw_transcript(messages)
 
         with StagingTransaction(vault_root, operation_id=session_id) as txn:

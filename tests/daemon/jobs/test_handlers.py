@@ -24,7 +24,7 @@ def _job(payload: dict) -> Job:
 async def test_ingest_handler_invokes_ingest_with_payload(tmp_path: Path):
     calls: list[dict] = []
 
-    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today, raw_filename_suffix=""):
         calls.append({
             "jsonl_path": jsonl_path,
             "vault_root": vault_root,
@@ -68,7 +68,7 @@ async def test_ingest_handler_propagates_exception(tmp_path: Path):
 async def test_ingest_handler_payload_overrides(tmp_path: Path):
     seen: dict = {}
 
-    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today, raw_filename_suffix=""):
         seen["extract"] = extract
         seen["dry_run"] = dry_run
 
@@ -91,7 +91,7 @@ async def test_ingest_handler_payload_overrides(tmp_path: Path):
 async def test_ingest_handler_keeps_extract_true_when_llm_present(tmp_path: Path):
     seen: dict = {}
 
-    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today, raw_filename_suffix=""):
         seen["extract"] = extract
         seen["llm_client"] = llm_client
 
@@ -111,7 +111,7 @@ async def test_ingest_handler_keeps_extract_true_when_llm_present(tmp_path: Path
 async def test_ingest_handler_downgrades_extract_when_no_llm(tmp_path: Path):
     seen: dict = {}
 
-    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today):
+    def fake_ingest(jsonl_path, vault_root, *, cfg, llm_client, extract, dry_run, today, raw_filename_suffix=""):
         seen["extract"] = extract
 
     handler = IngestHandler(

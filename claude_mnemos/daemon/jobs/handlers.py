@@ -45,6 +45,7 @@ class IngestHandler:
         transcript_path = Path(job.payload["transcript_path"])
         extract_requested = bool(job.payload.get("extract", True))
         dry_run = bool(job.payload.get("dry_run", False))
+        raw_filename_suffix = str(job.payload.get("raw_filename_suffix", ""))
 
         cfg = self._cfg_factory()
         llm = self._llm_factory(cfg) if extract_requested else None
@@ -64,6 +65,7 @@ class IngestHandler:
                 extract=effective_extract,
                 dry_run=dry_run,
                 today=date.today(),
+                raw_filename_suffix=raw_filename_suffix,
             )
         except RateLimitError as exc:
             # Pause the queue so worker stops dequeuing until reset_at.
