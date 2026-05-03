@@ -221,13 +221,19 @@ def check_hook_silence(
     projects_dir: Path | None = None,
 ) -> StoredAlert | None:
     """Warn when there are recent JSONL writes in ``~/.claude/projects/`` (last
-    6h) but no successful ingest jobs in the same window.
+    6h) but no successful **ingest** jobs in the same window.
 
-    Heuristic interpretation of "successful SessionEnd/PreCompact hook log":
-    a successful hook always enqueues an ingest job. So a recent JSONL
-    without any ingest activity in 6h is a strong signal the hook isn't
+    Heuristic interpretation: a successful SessionEnd/PreCompact hook always
+    enqueues an ingest job. So a recent JSONL without any successful
+    ``kind == "ingest"`` activity in 6h is a strong signal the hook isn't
     firing (most common cause: hooks not installed or installed but pointing
-    at the wrong project).
+    at the wrong project). Other successful job kinds (e.g. ``lint``) are
+    irrelevant — they don't prove hooks are firing.
+
+    Heuristic limit: this assumes the operator runs at least one Claude Code
+    session per 6h while working. A 6h+ idle gap with hooks healthy is
+    indistinguishable from broken hooks; users who don't use CC every day
+    can dismiss the alert.
 
     Edge case: if no JSONL files exist at all, return None (user may simply
     not be using Claude Code right now).
@@ -258,17 +264,22 @@ def check_hook_silence(
     if not recent_jsonls:
         return None
 
-    # Look for any ingest job that succeeded in the last 6h.
+    # Look for any ingest job that succeeded in the last 6h. Limit raised to
+    # 200 (was 20) so a busy queue can't bury the legitimate older success
+    # behind 20+ recent non-ingest jobs. Filter explicitly by
+    # kind == "ingest": a successful lint job does NOT prove hooks fire.
     cutoff = n - timedelta(hours=6)
     for rt in runtimes.values():
         store = getattr(rt, "job_store", None)
         if store is None:
             continue
         try:
-            succeeded = store.list_by_status("succeeded", limit=20)
+            succeeded = store.list_by_status("succeeded", limit=200)
         except Exception:
             continue
         for j in succeeded:
+            if j.kind != "ingest":
+                continue
             finished = getattr(j, "finished_at", None)
             if finished is not None and finished >= cutoff:
                 return None
