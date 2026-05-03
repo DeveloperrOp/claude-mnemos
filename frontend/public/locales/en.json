@@ -94,6 +94,21 @@
       "critical": "Critical",
       "details_link": "→ Details"
     },
+    "health_alerts": {
+      "title": "Alerts",
+      "severity": {
+        "info": "info",
+        "warning": "warn",
+        "critical": "critical"
+      },
+      "snooze_label": "Snooze",
+      "snooze_1h": "Snooze 1h",
+      "snooze_24h": "Snooze 24h",
+      "snooze_forever": "Forever",
+      "dismiss": "Dismiss",
+      "show_more": "Show {{count}} more",
+      "show_less": "Show less"
+    },
     "dump_now": {
       "toast_success": "Queued for dump"
     }
@@ -164,6 +179,16 @@
     "tooltip_tokens_per_byte": "Tokens per byte of raw transcript (compression efficiency)",
     "tooltip_inject_events": "SessionStart hook injections in last 30 days",
     "tooltip_avg_compression": "Average context-budget compression ratio"
+  },
+  "inject_preview": {
+    "title": "INJECT CONTEXT",
+    "tokens_label": "tokens",
+    "limit_label": "limit",
+    "truncated": "TRUNCATED",
+    "pages_count": "Pages included ({{count}})",
+    "preview_show": "Show preview",
+    "preview_hide": "Hide preview",
+    "computed_at": "computed {{ago}}"
   },
   "queue": {
     "title": "Queue",
