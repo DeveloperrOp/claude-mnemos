@@ -45,19 +45,26 @@ export function LostSessions() {
   const sessions = lostQuery.data?.sessions ?? [];
 
   return (
-    <div className="space-y-3 pb-24">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t("lost_sessions.title")}</h1>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => scan.mutate()}
-          disabled={scan.isPending}
-        >
-          <RefreshCw className={`mr-1 h-3 w-3 ${scan.isPending ? "animate-spin" : ""}`} />
-          {scan.isPending ? t("lost_sessions.scanning") : t("lost_sessions.scan")}
-        </Button>
-      </div>
+    <div className="space-y-6 pb-24">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · lost sessions</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => scan.mutate()}
+            disabled={scan.isPending}
+            className="h-8"
+          >
+            <RefreshCw className={`mr-1 h-3 w-3 ${scan.isPending ? "animate-spin" : ""}`} />
+            {scan.isPending ? t("lost_sessions.scanning") : t("lost_sessions.scan")}
+          </Button>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("lost_sessions.title")}
+        </h1>
+      </header>
 
       <LostSessionsManager
         sessions={sessions}
