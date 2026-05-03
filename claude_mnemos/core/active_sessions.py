@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel
 
 from claude_mnemos.core.transcript_scanner import scan_transcripts
+from claude_mnemos.core.uningested_sessions import global_ingested_shas
 from claude_mnemos.mapping.resolver import (
     ProjectResolver,
     ResolverAmbiguityError,
 )
-from claude_mnemos.state.manifest import Manifest
 
 if TYPE_CHECKING:
     from claude_mnemos.daemon.vault_runtime import VaultRuntime
@@ -39,17 +39,6 @@ class ActiveSession(BaseModel):
     auto_dump_at: datetime | None
 
 
-def _global_ingested_shas(runtimes: list["VaultRuntime"]) -> set[str]:
-    out: set[str] = set()
-    for rt in runtimes:
-        try:
-            manifest = Manifest.load(rt.vault_root)
-        except Exception:
-            continue
-        out.update(manifest.ingested.keys())
-    return out
-
-
 async def scan_active_sessions(
     runtimes: list["VaultRuntime"],
     *,
@@ -63,7 +52,7 @@ async def scan_active_sessions(
     now = datetime.now(tz=UTC)
     cutoff = now - timedelta(hours=cooling_threshold_hours)
     hot_cutoff = now - timedelta(minutes=HOT_THRESHOLD_MIN)
-    ingested = _global_ingested_shas(runtimes)
+    ingested = global_ingested_shas(runtimes)
 
     # Pre-fetch project entries once; reuse for all cwd resolutions.
     _resolver_entries_source = ProjectResolver()

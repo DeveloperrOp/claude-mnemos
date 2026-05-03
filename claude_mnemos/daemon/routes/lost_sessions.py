@@ -23,10 +23,10 @@ from fastapi import APIRouter, HTTPException, Request
 from claude_mnemos.core import lost_sessions as core_lost_sessions
 from claude_mnemos.core.transcript_helpers import _resolve_transcripts_root
 from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
+from claude_mnemos.core.uningested_sessions import global_ingested_shas
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.state.jobs import JobStore
-from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
 
@@ -74,13 +74,7 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
 
     # Union of ingested shas across every mounted vault — the true
     # "globally ingested" set. A session present in ANY manifest is not lost.
-    global_ingested: set[str] = set()
-    for runtime in runtimes:
-        try:
-            manifest = Manifest.load(runtime.vault_root)
-        except Exception:
-            continue
-        global_ingested.update(manifest.ingested.keys())
+    global_ingested = global_ingested_shas(runtimes)
 
     resolver = ProjectResolver()
 

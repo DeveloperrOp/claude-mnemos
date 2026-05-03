@@ -18,8 +18,8 @@ from claude_mnemos.core.transcript_scanner import (
     invalidate_transcripts_cache,
     scan_transcripts as _scan_transcripts_async,
 )
+from claude_mnemos.core.uningested_sessions import global_ingested_shas
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
-from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -74,14 +74,7 @@ async def _compute_lost_total(runtimes: list[Any]) -> int:
     entries = await _scan_transcripts_async()
     if not entries:
         return 0
-    ingested: set[str] = set()
-    for rt in runtimes:
-        try:
-            m = Manifest.load(rt.vault_root)
-        except Exception as exc:
-            log.debug("lost_total manifest-load failed for %s: %s", rt.name, exc)
-            continue
-        ingested.update(m.ingested.keys())
+    ingested = global_ingested_shas(runtimes)
     return sum(1 for e in entries if e.sha not in ingested)
 
 
