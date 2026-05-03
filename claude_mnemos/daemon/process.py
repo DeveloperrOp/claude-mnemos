@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
+from claude_mnemos.core.auto_dump import auto_dump_stale
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
@@ -77,7 +78,25 @@ class MnemosDaemon:
         self.started_at_monotonic = time.monotonic()
         try:
             await self._bootstrap_runtimes()
+
+            # Auto-dump safety net (P0+P1 spec). Runs hourly.
+            async def _auto_dump_task() -> None:
+                await auto_dump_stale(self.runtimes)
+
+            self.scheduler.add_job(
+                _auto_dump_task,
+                "cron",
+                minute=0,
+                id="auto_dump_global",
+                replace_existing=True,
+            )
+
             self.scheduler.start()
+
+            # Catch-up immediately after bootstrap — addresses any stale sessions
+            # that accumulated while the daemon was down.
+            asyncio.create_task(_auto_dump_task())
+
             await self._serve_uvicorn()
         finally:
             await self._shutdown_runtimes()
