@@ -68,21 +68,37 @@ class TTLCache(Generic[T]):
             try:
                 result = await fn()
                 async with self._lock:
-                    self._value = result
-                    self._expires_at = time.monotonic() + self.ttl_s
-                    self._inflight = None
-                inflight.set_result(result)
+                    # Only commit the result to the cache if our inflight
+                    # future is still the active one. invalidate() may have
+                    # cleared self._inflight while we were computing — in
+                    # that case we still resolve waiters with our result
+                    # (they're already awaiting `inflight`), but we do NOT
+                    # repopulate self._value, so the next caller will
+                    # trigger a fresh compute as the operator requested.
+                    if self._inflight is inflight:
+                        self._value = result
+                        self._expires_at = time.monotonic() + self.ttl_s
+                        self._inflight = None
+                    inflight.set_result(result)
                 return result
             except BaseException as e:
                 async with self._lock:
-                    self._inflight = None
-                inflight.set_exception(e)
+                    if self._inflight is inflight:
+                        self._inflight = None
+                    inflight.set_exception(e)
                 raise
         else:
             # We're not computing; await the inflight future
             return await inflight
 
     def invalidate(self) -> None:
-        """Invalidate cached value, forcing recompute on next call."""
+        """Invalidate cached value, forcing recompute on next call.
+
+        Safe to call concurrently with an in-flight ``get_or_compute``: the
+        in-flight future will still resolve its existing waiters with the
+        computed value, but the cache will not be repopulated, so the next
+        caller after invalidation will trigger a fresh compute.
+        """
         self._value = _MISSING
         self._expires_at = None
+        self._inflight = None

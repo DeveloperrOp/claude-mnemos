@@ -86,6 +86,47 @@ async def test_concurrent_callers_share_inflight_future() -> None:
 
 
 @pytest.mark.asyncio
+async def test_invalidate_during_inflight_does_not_corrupt_state() -> None:
+    """If invalidate() runs while compute is still in flight, the cache
+    must end in a clean state — t1's existing waiters get their result,
+    but the cache is NOT repopulated, so the next caller after invalidate
+    triggers a fresh compute."""
+    cache: TTLCache[int] = TTLCache(ttl_s=60.0)
+    n_calls = 0
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_compute() -> int:
+        nonlocal n_calls
+        n_calls += 1
+        started.set()
+        await release.wait()
+        return n_calls
+
+    # Start the first compute
+    t1 = asyncio.create_task(cache.get_or_compute(slow_compute))
+    await started.wait()
+
+    # Invalidate while compute is still running
+    cache.invalidate()
+
+    # Release the in-flight compute — t1 should complete cleanly
+    release.set()
+    result1 = await t1
+    assert result1 == 1
+
+    # Next call after invalidate must trigger fresh compute
+    started.clear()
+    release.clear()
+    t2 = asyncio.create_task(cache.get_or_compute(slow_compute))
+    await started.wait()
+    release.set()
+    result2 = await t2
+    assert result2 == 2
+    assert n_calls == 2
+
+
+@pytest.mark.asyncio
 async def test_exception_propagates_and_cache_self_heals() -> None:
     """Exception propagates to all waiters, cache self-heals on next call."""
     cache: TTLCache[int] = TTLCache(ttl_s=60.0)
