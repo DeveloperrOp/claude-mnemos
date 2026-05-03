@@ -61,7 +61,38 @@ export function PageDetail() {
   }
 
   return (
-    <article className="mx-auto max-w-3xl space-y-4">
+    <article className="mx-auto max-w-3xl space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-baseline gap-3">
+          <span className="eyebrow">claude-mnemos · page</span>
+        </div>
+        <h1 data-testid="page-title" className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {fm ? fm.title : fileStem}
+        </h1>
+        <div className="relative mt-3 flex flex-wrap items-center gap-3 text-xs">
+          {fm ? (
+            <>
+              <span className="text-foreground/70">{t(`wiki.type.${fm.type}`)}</span>
+              <StatusBadge status={fm.status} />
+              <ConfidenceBar value={fm.confidence} />
+              <FlavorTags flavors={fm.flavor} />
+              <ProvenanceIndicator counts={fm.provenance} />
+            </>
+          ) : (
+            <>
+              <span className="rounded border border-muted-foreground/40 px-1.5 py-0.5 font-mono uppercase">
+                {t("pages.raw_badge")}
+              </span>
+              <span className="font-mono text-muted-foreground">{page.path}</span>
+            </>
+          )}
+        </div>
+        {isRaw && (
+          <p className="relative mt-2 text-xs text-muted-foreground">{t("pages.raw_hint")}</p>
+        )}
+      </header>
+
       <div className="flex items-center justify-between gap-2">
         <Link to={`/project/${project}/pages`} className="text-sm text-primary underline">
           ← {t("navigation.pages")}
@@ -100,53 +131,35 @@ export function PageDetail() {
             </Button>
           </div>
         )}
-      </div>
-
-      <header className="space-y-2 border-b pb-4">
-        <h1 data-testid="page-title" className="text-3xl font-bold">
-          {fm ? fm.title : fileStem}
-        </h1>
-        {fm ? (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span>{t(`wiki.type.${fm.type}`)}</span>
-            <StatusBadge status={fm.status} />
-            <ConfidenceBar value={fm.confidence} />
-            <FlavorTags flavors={fm.flavor} />
-            <ProvenanceIndicator counts={fm.provenance} />
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span className="rounded border border-muted-foreground/40 px-1.5 py-0.5 font-mono uppercase">
-              {t("pages.raw_badge")}
-            </span>
-            <span className="font-mono">{page.path}</span>
-          </div>
-        )}
         {isRaw && (
-          <p className="text-xs text-muted-foreground">{t("pages.raw_hint")}</p>
-        )}
-        <div className="flex items-center gap-2">
-          {obsidianUrl && (
-            <Button asChild size="sm" variant="outline">
-              <a href={obsidianUrl}>
-                <ExternalLink className="mr-1 h-3 w-3" />
-                {t("pages.open_in_obsidian")}
-              </a>
-            </Button>
-          )}
-          {!isRaw && (
+          <div className="flex items-center gap-2">
+            {obsidianUrl && (
+              <Button asChild size="sm" variant="outline">
+                <a href={obsidianUrl}>
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  {t("pages.open_in_obsidian")}
+                </a>
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={copyWikilink}>
               <Copy className="mr-1 h-3 w-3" />
               {t("pages.copy_wikilink")}
             </Button>
-          )}
-        </div>
-      </header>
+          </div>
+        )}
+      </div>
 
       <MarkdownView body={page.body} />
 
-      <section className="border-t pt-4">
-        <h2 className="mb-2 text-sm font-semibold">{t("pages.backlinks")}</h2>
+      <section>
+        <div className="section-rail mb-3">
+          <span>{t("pages.backlinks")}</span>
+          {(backlinksQuery.data?.length ?? 0) > 0 && (
+            <span className="ml-auto font-mono tabular-nums text-foreground/70">
+              {backlinksQuery.data?.length ?? 0}
+            </span>
+          )}
+        </div>
         {backlinksQuery.isLoading ? (
           <Skeleton className="h-16" />
         ) : (backlinksQuery.data?.length ?? 0) === 0 ? (
