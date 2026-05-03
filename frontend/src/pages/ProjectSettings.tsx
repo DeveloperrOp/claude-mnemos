@@ -24,8 +24,16 @@ export function ProjectSettings() {
   if (!project) return <div>{t("settings.loading")}</div>;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-3 py-6">
-      <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
+    <div className="mx-auto max-w-3xl space-y-6 py-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · settings</span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("settings.title")}
+        </h1>
+      </header>
 
       <GeneralSection project={project} />
       <LocaleSection slug={project.name} />
