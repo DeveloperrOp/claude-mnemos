@@ -38,3 +38,6 @@ frontend/.vite/
 # Built frontend artefacts (only .gitkeep is tracked)
 claude_mnemos/daemon/static/*
 !claude_mnemos/daemon/static/.gitkeep
+
+# Brainstorming visual companion sessions
+.superpowers/
