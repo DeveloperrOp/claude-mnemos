@@ -16,7 +16,6 @@ import pytest
 from httpx import ASGITransport
 
 from claude_mnemos.core.lost_sessions import LOST_SESSIONS_IGNORE_FILENAME, LostSessionsIgnore
-from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
@@ -24,39 +23,24 @@ from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 _PROJECT_NAME = "test-vault"
 
 
-class _FakeRuntime:
-    """Minimal VaultRuntime shim for single-vault lost-sessions tests."""
-
-    def __init__(self, vault: Path) -> None:
-        self.name = _PROJECT_NAME
-        self.vault_root = vault
-        self.tracker = OurWritesTracker(ttl_s=60.0)
-        self.job_store = JobStore(vault / JOBS_DB_FILENAME)
-        self.job_worker = None
-        self.lost_sessions_cache = None  # no TTL cache → synchronous scan
-
-
-class _FakeDaemon:
-    def __init__(self, vault: Path) -> None:
-        self.alerts = Alerts()
-        self.started_at_monotonic = 0.0
-        self._runtime = _FakeRuntime(vault)
-        # Expose runtimes dict so all_runtimes() / get_runtime() work.
-        self.runtimes: dict[str, _FakeRuntime] = {_PROJECT_NAME: self._runtime}
-
-    def scheduler_jobs_info(self) -> list[object]:
-        return []
-
-
 @pytest.fixture
-def daemon(tmp_path: Path):
-    d = _FakeDaemon(tmp_path)
+def daemon(tmp_path: Path, fake_runtime_factory, fake_daemon_factory):
+    job_store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    runtime = fake_runtime_factory(
+        tmp_path,
+        name=_PROJECT_NAME,
+        tracker=OurWritesTracker(ttl_s=60.0),
+        job_store=job_store,
+        job_worker=None,
+        lost_sessions_cache=None,
+    )
+    d = fake_daemon_factory(runtime)
     yield d
-    d._runtime.job_store.close()
+    job_store.close()
 
 
 @pytest.fixture
-def app(tmp_path: Path, daemon: _FakeDaemon):
+def app(tmp_path: Path, daemon):
     return create_app(daemon=daemon)
 
 
@@ -245,7 +229,7 @@ async def test_post_import_bulk_three_match(
     assert body["skipped"] == 0
     assert set(body["session_ids"]) == {"a", "b", "c"}
 
-    counts = daemon._runtime.job_store.count_by_status()
+    counts = daemon.runtimes[_PROJECT_NAME].job_store.count_by_status()
     assert sum(counts.values()) == 3
 
 
@@ -265,7 +249,7 @@ async def test_post_import_bulk_respects_limit(
     assert body["queued"] == 1
     assert len(body["session_ids"]) == 1
 
-    counts = daemon._runtime.job_store.count_by_status()
+    counts = daemon.runtimes[_PROJECT_NAME].job_store.count_by_status()
     assert sum(counts.values()) == 1
 
 
@@ -311,7 +295,7 @@ async def test_post_import_selection_picks_only_listed(
     assert body["missing"] == []
     assert set(body["session_ids"]) == {"b", "d"}
 
-    counts = daemon._runtime.job_store.count_by_status()
+    counts = daemon.runtimes[_PROJECT_NAME].job_store.count_by_status()
     assert sum(counts.values()) == 2
 
 

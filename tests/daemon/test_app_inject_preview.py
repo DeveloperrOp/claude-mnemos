@@ -19,22 +19,13 @@ from claude_mnemos.state.projects import ProjectMapEntry
 _PROJECT = "alpha"
 
 
-class _FakeRuntime:
-    def __init__(self, vault: Path) -> None:
-        self.name = _PROJECT
-        self.vault_root = vault
-        self.project = ProjectMapEntry(
-            name=_PROJECT,
-            display_name=_PROJECT,
-            vault_root=vault,
-            cwd_patterns=[str(vault.parent / "code")],
-        )
-
-
-class _FakeDaemon:
-    def __init__(self, vault: Path) -> None:
-        self._runtime = _FakeRuntime(vault)
-        self.runtimes: dict[str, _FakeRuntime] = {_PROJECT: self._runtime}
+def _make_project_entry(vault: Path) -> ProjectMapEntry:
+    return ProjectMapEntry(
+        name=_PROJECT,
+        display_name=_PROJECT,
+        vault_root=vault,
+        cwd_patterns=[str(vault.parent / "code")],
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -90,8 +81,11 @@ def _seed_manifest(vault: Path, pages: list[str]) -> None:
 
 
 @pytest.fixture
-def app(vault: Path):
-    daemon = _FakeDaemon(vault)
+def app(vault: Path, fake_runtime_factory, fake_daemon_factory):
+    runtime = fake_runtime_factory(
+        vault, name=_PROJECT, project=_make_project_entry(vault),
+    )
+    daemon = fake_daemon_factory(runtime)
     return create_app(daemon=daemon)
 
 
