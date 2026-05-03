@@ -104,39 +104,47 @@ export function PageEdit() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t("pages.editor.title")}</h1>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={cancel} disabled={patchMut.isPending}>
-            <X className="mr-1 h-3 w-3" />
-            {t("pages.editor.cancel")}
-          </Button>
-          <Button size="sm" onClick={save} disabled={patchMut.isPending}>
-            <Save className="mr-1 h-3 w-3" />
-            {patchMut.isPending ? t("confirm.working") : t("pages.editor.save")}
-          </Button>
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-baseline gap-3">
+          <span className="eyebrow">claude-mnemos · editor</span>
         </div>
-      </div>
+        <div className="relative mt-2 flex items-center justify-between gap-3">
+          <h1 className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("pages.editor.title")}
+          </h1>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={cancel} disabled={patchMut.isPending}>
+              <X className="mr-1 h-3 w-3" />
+              {t("pages.editor.cancel")}
+            </Button>
+            <Button size="sm" onClick={save} disabled={patchMut.isPending}>
+              <Save className="mr-1 h-3 w-3" />
+              {patchMut.isPending ? t("confirm.working") : t("pages.editor.save")}
+            </Button>
+          </div>
+        </div>
+      </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium">{t("pages.editor.title_field")}</label>
+            <label className="eyebrow">{t("pages.editor.title_field")}</label>
             <input
               type="text"
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              className="mt-2 w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-xs font-medium">{t("pages.editor.type")}</label>
+              <label className="eyebrow">{t("pages.editor.type")}</label>
               <select
                 value={form.type}
                 onChange={(e) => update("type", e.target.value)}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                className="mt-2 w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
               >
                 {PAGE_TYPES.map((v) => (
                   <option key={v} value={v}>
@@ -146,11 +154,11 @@ export function PageEdit() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium">{t("pages.editor.status")}</label>
+              <label className="eyebrow">{t("pages.editor.status")}</label>
               <select
                 value={form.status}
                 onChange={(e) => update("status", e.target.value)}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                className="mt-2 w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
               >
                 {PAGE_STATUSES.map((v) => (
                   <option key={v} value={v}>
@@ -160,7 +168,7 @@ export function PageEdit() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium">{t("pages.editor.confidence")}</label>
+              <label className="eyebrow">{t("pages.editor.confidence")}</label>
               <input
                 type="number"
                 step="0.05"
@@ -173,12 +181,12 @@ export function PageEdit() {
                     update("confidence", n);
                   }
                 }}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                className="mt-2 w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
               />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium">{t("pages.editor.flavor")}</label>
+            <label className="eyebrow">{t("pages.editor.flavor")}</label>
             <select
               multiple
               value={form.flavor}
@@ -186,7 +194,7 @@ export function PageEdit() {
                 const next = Array.from(e.target.selectedOptions).map((o) => o.value);
                 update("flavor", next);
               }}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              className="mt-2 w-full rounded-md border border-border/60 bg-background px-2 py-1.5 text-sm"
             >
               {PAGE_FLAVORS.map((v) => (
                 <option key={v} value={v}>
@@ -196,37 +204,35 @@ export function PageEdit() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium">
-              {t("pages.editor.aliases")}{" "}
-              <span className="text-muted-foreground">
-                — {t("pages.editor.aliases_hint")}
+            <label className="eyebrow">
+              {t("pages.editor.aliases")}
+              <span className="ml-2 font-sans text-[10px] text-muted-foreground">
+                {t("pages.editor.aliases_hint")}
               </span>
             </label>
             <input
               type="text"
               value={form.aliases}
               onChange={(e) => update("aliases", e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              className="mt-2 w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label htmlFor="page-body" className="text-xs font-medium">
+            <label htmlFor="page-body" className="eyebrow">
               {t("pages.editor.body_label")}
             </label>
             <textarea
               id="page-body"
               value={form.body}
               onChange={(e) => update("body", e.target.value)}
-              className="mt-1 h-96 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
+              className="mt-2 h-96 w-full rounded-md border border-border/60 bg-background px-3 py-2 font-mono text-sm"
             />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t("pages.editor.preview")}
-          </div>
-          <div className="rounded-md border bg-background p-4">
+        <div className="space-y-3">
+          <div className="eyebrow">{t("pages.editor.preview")}</div>
+          <div className="rounded-md border border-border/60 bg-card/40 p-4 ring-1 ring-border/50">
             <MarkdownView body={form.body} />
           </div>
         </div>
