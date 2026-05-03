@@ -159,6 +159,34 @@ async def test_inject_preview_unknown_project_returns_404(
     assert body["detail"]["error"] == "unknown_project"
 
 
+def test_cache_for_evicts_lru_after_max() -> None:
+    """Filling the LRU map past _MAX_CACHED_PROJECTS evicts the oldest entry."""
+    inject_preview_module._PROJECT_CACHES.clear()
+    cap = inject_preview_module._MAX_CACHED_PROJECTS
+    # Fill cap entries.
+    for i in range(cap):
+        inject_preview_module._cache_for(f"p{i}")
+    assert len(inject_preview_module._PROJECT_CACHES) == cap
+    # Touch p0 so it's now most-recently-used.
+    inject_preview_module._cache_for("p0")
+    # Add one more — the oldest (now p1, since p0 was just refreshed) is evicted.
+    inject_preview_module._cache_for("new")
+    assert len(inject_preview_module._PROJECT_CACHES) == cap
+    assert "p1" not in inject_preview_module._PROJECT_CACHES
+    assert "p0" in inject_preview_module._PROJECT_CACHES
+    assert "new" in inject_preview_module._PROJECT_CACHES
+
+
+def test_invalidate_project_cache_drops_entry() -> None:
+    inject_preview_module._PROJECT_CACHES.clear()
+    inject_preview_module._cache_for("alpha")
+    assert "alpha" in inject_preview_module._PROJECT_CACHES
+    inject_preview_module.invalidate_project_cache("alpha")
+    assert "alpha" not in inject_preview_module._PROJECT_CACHES
+    # Idempotent.
+    inject_preview_module.invalidate_project_cache("alpha")
+
+
 async def test_inject_preview_uses_ttl_cache(
     client: httpx.AsyncClient, vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

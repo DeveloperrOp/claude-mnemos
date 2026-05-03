@@ -14,6 +14,7 @@ intentionally collapses).
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -35,16 +36,34 @@ router = APIRouter()
 DEFAULT_MAX_CHARS = 40_000
 DEFAULT_TTL_S = 30.0
 PREVIEW_TEXT_CHARS = 5_000
+_MAX_CACHED_PROJECTS = 50
 
-_PROJECT_CACHES: dict[str, TTLCache[dict[str, Any]]] = {}
+# LRU-bounded per-project TTL caches. Without the bound, a daemon that has
+# repeatedly mounted/unmounted projects (or seen 100+ vaults over its
+# lifetime) would accumulate entries forever.
+_PROJECT_CACHES: "OrderedDict[str, TTLCache[dict[str, Any]]]" = OrderedDict()
 
 
 def _cache_for(project_name: str) -> TTLCache[dict[str, Any]]:
     cache = _PROJECT_CACHES.get(project_name)
     if cache is None:
+        if len(_PROJECT_CACHES) >= _MAX_CACHED_PROJECTS:
+            # Evict the least-recently-used entry.
+            _PROJECT_CACHES.popitem(last=False)
         cache = TTLCache(ttl_s=DEFAULT_TTL_S)
         _PROJECT_CACHES[project_name] = cache
+    else:
+        # Mark as most-recently-used.
+        _PROJECT_CACHES.move_to_end(project_name)
     return cache
+
+
+def invalidate_project_cache(project_name: str) -> None:
+    """Drop the inject-preview cache for a project. Call on unmount/remount
+    so a project that re-mounts with a different vault_root doesn't see a
+    stale preview from the previous mount.
+    """
+    _PROJECT_CACHES.pop(project_name, None)
 
 
 def _representative_cwd(runtime: Any) -> Path:
