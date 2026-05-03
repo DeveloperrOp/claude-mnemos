@@ -25,6 +25,8 @@ beforeAll(async () => {
     {
       common: { open: "Open" },
       overview: {
+        title: "Overview",
+        projects_heading: "Projects",
         no_projects_title: "Brain of your projects will appear here",
         no_projects_cta: "Create your first project",
         no_projects_hint_cmd: "Register your first project:",
@@ -34,6 +36,36 @@ beforeAll(async () => {
         daemon_down_hint_command: "mnemos daemon start",
         daemon_down_reconnect: "Dashboard will reconnect automatically.",
         rate_limited_until: "Rate limited — resumes at {{time}}",
+        kpi: {
+          queue_label: "Queue",
+          queue_format: "{{queued}} queued · {{running}} running · {{failed}} failed",
+          active_label: "Active",
+          active_format: "🟢 {{hot}} · 🟡 {{cooling}}",
+          today_label: "Today",
+          today_format: "{{ingest}} ingest · {{pages}} pages",
+          tokens_label: "Tokens",
+          lost_label: "Lost",
+          lost_link: "→ Sort",
+        },
+        running: {
+          title: "Running now",
+          elapsed: "{{seconds}}s elapsed",
+          empty: "Nothing",
+        },
+        active: {
+          title: "Active sessions",
+          empty: "No active",
+          dump_now_button: "Dump",
+          read_button: "Read",
+          auto_dump_in: "in {{remaining}}",
+          auto_dump_overdue: "now",
+        },
+        health_dot: {
+          ok: "OK",
+          warning: "warn",
+          critical: "crit",
+          details_link: "→",
+        },
       },
       project_view: {
         stats: {
@@ -238,5 +270,60 @@ describe("Overview", () => {
     render(wrap(<Overview />));
     await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
     expect(screen.queryByText(/rate limited/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Overview operational widgets", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  const SNAPSHOT = {
+    kpi: {
+      queue: { queued: 0, running: 0, failed: 0 },
+      active: { hot: 0, cooling: 0 },
+      today: { ingest_count: 0, pages_count: 0 },
+      tokens_today: 0,
+      lost_total: 0,
+    },
+    active_sessions: [],
+    running_jobs: [],
+    errors: [],
+  };
+
+  it("renders KpiBar + RunningJobsLive + ActiveSessionsLive sections after snapshot loads", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/projects")
+        return {
+          data: [{ name: "alpha", vault_root: "/a", cwd_patterns: [] }],
+        };
+      if (url === "/health")
+        return {
+          data: {
+            status: "ok",
+            version: "0.1",
+            uptime_s: 0,
+            alerts_count: 0,
+            vaults: {
+              alpha: {
+                watchdog_running: true,
+                jobs_queued: 0,
+                jobs_running: 0,
+                jobs_dead_letter: 0,
+              },
+            },
+            jobs_alert: false,
+            scheduler_jobs: [],
+          },
+        };
+      if (url === "/dashboard/snapshot") return { data: SNAPSHOT };
+      return { data: { projects: [] } };
+    });
+    render(wrap(<Overview />));
+    await waitFor(() =>
+      expect(screen.getByText(/Running now/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Active sessions/)).toBeInTheDocument();
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    // KpiBar present (data-testid="kpi-*" tiles rendered)
+    expect(document.querySelector('[data-testid="kpi-queue"]')).not.toBeNull();
   });
 });
