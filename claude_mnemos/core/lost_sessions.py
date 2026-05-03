@@ -98,14 +98,12 @@ class LostSessionsIgnore(BaseModel):
             + "\n"
         )
 
-    def save(self, vault: Path, *, tracker: object | None = None) -> None:
+    def save(self, vault: Path) -> None:
         """Atomically persist the ignore file to ``<vault>/...``.
 
-        ``tracker`` is accepted for forward compatibility with activity
-        tracking but is not consumed here yet — Plan #13a intentionally keeps
-        this state file out of the activity log because users edit it directly.
+        This file is intentionally kept out of the activity log because users
+        edit it directly (Plan #13a).
         """
-        del tracker  # currently unused; kept for API symmetry with manifest.save
         path = vault / LOST_SESSIONS_IGNORE_FILENAME
         atomic_write(path, self.serialize_to_string())
 
@@ -312,12 +310,7 @@ def read_transcript_messages(
     return messages, total, truncated_overall
 
 
-def add_to_ignore(
-    vault: Path,
-    sha: str,
-    *,
-    tracker: object | None = None,
-) -> LostSessionsIgnore:
+def add_to_ignore(vault: Path, sha: str) -> LostSessionsIgnore:
     """Add ``sha`` to the ignore list and persist. Returns the updated model.
 
     Idempotent: re-adding an already-ignored SHA is a no-op (no error, no
@@ -325,5 +318,5 @@ def add_to_ignore(
     """
     ignore = LostSessionsIgnore.load(vault)
     ignore.ignored_shas.add(sha)
-    ignore.save(vault, tracker=tracker)
+    ignore.save(vault)
     return ignore

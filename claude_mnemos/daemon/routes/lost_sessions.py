@@ -355,7 +355,7 @@ async def ignore_selection_route(
     ignore.ignored_shas.update(raw_shas)
     added = len(ignore.ignored_shas) - len(before)
     if added > 0:
-        ignore.save(runtime.vault_root, tracker=runtime.tracker)
+        ignore.save(runtime.vault_root)
 
     cache = runtime.lost_sessions_cache
     if cache is not None:
@@ -466,9 +466,7 @@ async def ignore_route(
             )
         sha = match.sha
 
-    ignore = core_lost_sessions.add_to_ignore(
-        runtime.vault_root, sha, tracker=runtime.tracker
-    )
+    ignore = core_lost_sessions.add_to_ignore(runtime.vault_root, sha)
     cache = runtime.lost_sessions_cache
     if cache is not None:
         cache.invalidate()
