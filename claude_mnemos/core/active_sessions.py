@@ -64,7 +64,10 @@ async def scan_active_sessions(
     cutoff = now - timedelta(hours=cooling_threshold_hours)
     hot_cutoff = now - timedelta(minutes=HOT_THRESHOLD_MIN)
     ingested = _global_ingested_shas(runtimes)
-    resolver = ProjectResolver()
+
+    # Pre-fetch project entries once; reuse for all cwd resolutions.
+    _resolver_entries_source = ProjectResolver()
+    resolver = ProjectResolver(entries=_resolver_entries_source.list_all())
 
     out: list[ActiveSession] = []
     for e in entries:

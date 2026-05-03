@@ -27,21 +27,30 @@ def _normalize(p: str | Path) -> str:
 
 
 class ProjectResolver:
-    def __init__(self, store: ProjectStore | None = None) -> None:
+    def __init__(
+        self,
+        store: ProjectStore | None = None,
+        *,
+        entries: list[ProjectMapEntry] | None = None,
+    ) -> None:
         self._store = store if store is not None else ProjectStore()
+        self._entries: list[ProjectMapEntry] | None = entries
+
+    def _get_entries(self) -> list[ProjectMapEntry]:
+        return self._entries if self._entries is not None else self._store.list_all()
 
     def list_all(self) -> list[ProjectMapEntry]:
-        return self._store.list_all()
+        return self._get_entries()
 
     def resolve_by_name(self, name: str) -> ProjectMapEntry | None:
-        for e in self._store.list_all():
+        for e in self._get_entries():
             if e.name == name:
                 return e
         return None
 
     def resolve_by_vault(self, vault_root: Path) -> ProjectMapEntry | None:
         target = Path(vault_root).expanduser().resolve()
-        for e in self._store.list_all():
+        for e in self._get_entries():
             try:
                 if Path(e.vault_root).expanduser().resolve() == target:
                     return e
@@ -52,7 +61,7 @@ class ProjectResolver:
     def resolve_by_cwd(self, cwd: Path) -> ProjectMapEntry | None:
         cwd_norm = _normalize(cwd)
         candidates: list[tuple[ProjectMapEntry, str, int]] = []
-        for entry in self._store.list_all():
+        for entry in self._get_entries():
             for pattern in entry.cwd_patterns:
                 pat_norm = _normalize(pattern)
                 # Recursive form: trailing \* or \** means "this folder and any

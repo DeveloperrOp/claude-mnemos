@@ -134,3 +134,57 @@ async def test_auto_dump_at_set_for_assigned_only(
     assert len(out) == 1
     assert out[0].project_name == "__unassigned__"
     assert out[0].auto_dump_at is None
+
+
+@pytest.mark.asyncio
+async def test_scan_attributes_assigned_session_to_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sessions with cwd matching registered project are assigned with correct status."""
+    from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
+
+    # Setup: tmp home for ProjectStore
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+    # Register project with cwd pattern
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    store = ProjectStore(map_path=home / ".claude-mnemos" / "project-map.json")
+    store.add(
+        ProjectMapEntry(
+            name="alpha",
+            vault_root=vault,
+            cwd_patterns=[str(work_dir)],
+        )
+    )
+
+    # Setup transcripts
+    root = tmp_path / "transcripts"
+    root.mkdir()
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
+
+    # Test 1: Recent session (15 min ago) with matching cwd → hot + assigned
+    _write_jsonl_with_mtime(root, "hot-assigned", timedelta(minutes=15), cwd=str(work_dir))
+    out = await scan_active_sessions([])
+    assert len(out) == 1
+    assert out[0].session_id == "hot-assigned"
+    assert out[0].project_name == "alpha"
+    assert out[0].status == "hot"
+    assert out[0].auto_dump_at is not None
+
+    # Clean up for next test
+    (root / "hot-assigned.jsonl").unlink()
+
+    # Test 2: Older session (3 hours ago) with matching cwd → cooling + assigned
+    _write_jsonl_with_mtime(root, "cool-assigned", timedelta(hours=3), cwd=str(work_dir))
+    out = await scan_active_sessions([])
+    assert len(out) == 1
+    assert out[0].session_id == "cool-assigned"
+    assert out[0].project_name == "alpha"
+    assert out[0].status == "cooling"
+    assert out[0].auto_dump_at is not None
