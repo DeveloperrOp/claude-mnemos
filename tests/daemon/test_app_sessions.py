@@ -146,8 +146,9 @@ async def test_get_404(client: Any) -> None:
 
 
 async def test_post_ingest_creates_job(
-    client: Any, tmp_path: Path
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     transcript = tmp_path / "newone.jsonl"
     transcript.write_text("[]", encoding="utf-8")
     r = await client.post(
@@ -162,9 +163,10 @@ async def test_post_ingest_creates_job(
 
 
 async def test_post_ingest_routes_to_alpha_job_store(
-    client: Any, daemon: _FakeDaemon, tmp_path: Path
+    client: Any, daemon: _FakeDaemon, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Job is created in alpha's job_store, not some other vault's."""
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     transcript = tmp_path / "check.jsonl"
     transcript.write_text("{}", encoding="utf-8")
     r = await client.post(
@@ -185,7 +187,10 @@ async def test_post_ingest_400_missing_path(client: Any) -> None:
     assert r.json()["detail"]["error"] == "missing_or_invalid_transcript_path"
 
 
-async def test_post_ingest_unknown_project_404(client: Any, tmp_path: Path) -> None:
+async def test_post_ingest_unknown_project_404(
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     transcript = tmp_path / "x.jsonl"
     transcript.write_text("{}", encoding="utf-8")
     r = await client.post(
@@ -194,3 +199,20 @@ async def test_post_ingest_unknown_project_404(client: Any, tmp_path: Path) -> N
     )
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
+
+
+async def test_post_ingest_rejects_path_outside_transcripts_root(
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Path-traversal: existing file outside MNEMOS_TRANSCRIPTS_ROOT → 400."""
+    root = tmp_path / "transcripts_root"
+    root.mkdir()
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("{}", encoding="utf-8")
+    r = await client.post(
+        "/api/sessions/alpha/sid-x/ingest",
+        json={"transcript_path": str(outside)},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "transcript_outside_root"

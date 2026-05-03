@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core import lost_sessions as core_lost_sessions
+from claude_mnemos.core.transcript_helpers import _resolve_transcripts_root
 from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
@@ -29,6 +30,29 @@ from claude_mnemos.state.manifest import Manifest
 router = APIRouter()
 
 UNASSIGNED_PROJECT = "__unassigned__"
+
+
+def _validate_transcript_path(transcript_path: str) -> Path:
+    """Reject paths outside the canonical transcripts root.
+
+    Defends against path-traversal where a client passes an arbitrary
+    absolute path (e.g. ``/etc/passwd``) and the daemon would otherwise
+    happily ingest it. The canonical root is ``MNEMOS_TRANSCRIPTS_ROOT``
+    or ``~/.claude/projects/``.
+    """
+    root = _resolve_transcripts_root(None).resolve()
+    candidate = Path(transcript_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "transcript_outside_root",
+                "detail": f"transcript_path must be under {root}",
+            },
+        )
+    return candidate
 
 
 def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
@@ -379,14 +403,18 @@ async def import_route(
                 },
             )
         transcript_path = match.transcript_path
-    elif not Path(transcript_path).is_file():
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "transcript_not_found",
-                "transcript_path": transcript_path,
-            },
-        )
+    else:
+        if not Path(transcript_path).is_file():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "transcript_not_found",
+                    "transcript_path": transcript_path,
+                },
+            )
+        # Reject path-traversal: client-supplied path must be under the
+        # canonical transcripts root.
+        _validate_transcript_path(transcript_path)
 
     if runtime.job_store is None:
         raise HTTPException(

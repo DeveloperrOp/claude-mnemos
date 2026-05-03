@@ -162,6 +162,24 @@ async def test_post_import_with_nonexistent_transcript_returns_400(
     assert r.json()["detail"]["error"] == "transcript_not_found"
 
 
+async def test_post_import_rejects_path_outside_transcripts_root(
+    client, daemon, transcripts_root: Path, tmp_path: Path
+):
+    """Path-traversal attempt: client supplies an existing file outside the
+    canonical transcripts root → must return 400 ``transcript_outside_root``."""
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("{}", encoding="utf-8")
+    r = await client.post(
+        "/api/lost-sessions/sid-x/import",
+        json={
+            "project_name": _PROJECT_NAME,
+            "transcript_path": str(outside),
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "transcript_outside_root"
+
+
 # ---------------------------------------------------------------------------
 # POST /lost-sessions/{sid}/ignore
 # ---------------------------------------------------------------------------

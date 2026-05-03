@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core import sessions as core_sessions
+from claude_mnemos.core.transcript_helpers import _resolve_transcripts_root
 from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.state.jobs import JobStore
 
@@ -87,6 +88,20 @@ async def ingest_session_route(
         raise HTTPException(
             status_code=400,
             detail={"error": "missing_or_invalid_transcript_path"},
+        )
+    # Reject path-traversal: client-supplied path must live under the
+    # canonical transcripts root (MNEMOS_TRANSCRIPTS_ROOT or
+    # ~/.claude/projects/).
+    root = _resolve_transcripts_root(None).resolve()
+    try:
+        Path(transcript_path).resolve().relative_to(root)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "transcript_outside_root",
+                "detail": f"transcript_path must be under {root}",
+            },
         )
     if runtime.job_store is None:
         raise HTTPException(
