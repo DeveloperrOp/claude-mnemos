@@ -41,16 +41,24 @@ export function ProjectView() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">{getProjectDisplayName(project)}</h1>
-          <p className="text-sm text-muted-foreground">
-            {project.vault_root}
-          </p>
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · project</span>
+          <div className="flex items-center gap-2">
+            <HealthBadge vault_health={vh} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <HealthBadge vault_health={vh} />
-          <Button variant="outline" size="sm" asChild>
+        <div className="relative mt-3 flex items-end justify-between gap-3">
+          <div>
+            <h1 className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+              {getProjectDisplayName(project)}
+            </h1>
+            <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+              {project.vault_root}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" asChild className="shrink-0">
             <a href={obsidianUrl}>
               {t("project_view.open_in_obsidian")}
               <ExternalLink className="ml-1 h-3 w-3" />
@@ -80,15 +88,15 @@ export function ProjectView() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {TILES.map((tile) => (
-          <Card key={tile.path} className="transition-colors hover:bg-muted">
-            <Link to={`/project/${name}/${tile.path}`}>
+          <Card key={tile.path} className="relative overflow-hidden border-border/60 bg-card/40 transition-colors hover:border-accent/40 hover:bg-card/60">
+            <Link to={`/project/${name}/${tile.path}`} className="block">
               <CardHeader>
-                <CardTitle className="text-base">
+                <CardTitle className="text-base font-medium">
                   {tile.emoji} {t(tile.key)}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-muted-foreground">
+                <div className="font-mono text-[11px] text-muted-foreground leading-relaxed">
                   {t(tile.descKey)}
                 </div>
               </CardContent>
@@ -102,10 +110,12 @@ export function ProjectView() {
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <Card>
-      <CardContent className="space-y-1 py-3">
-        <div className="text-2xl font-semibold">{value}</div>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+    <Card className="border-border/60 bg-card/40 hover:bg-card/60 transition-colors">
+      <CardContent className="space-y-2 py-3">
+        <div className="hero-num text-3xl">
+          {value}
+        </div>
+        <div className="eyebrow text-[10px]">
           {label}
         </div>
       </CardContent>
