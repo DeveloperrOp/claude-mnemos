@@ -39,13 +39,16 @@ function wrap(ui: React.ReactNode) {
 describe("KpiBar", () => {
   it("renders all five tiles with values", () => {
     render(wrap(<KpiBar data={KPI} />));
+    // Hero (active) + 4 compact tiles by testid
     expect(screen.getByTestId("kpi-queue")).toBeDefined();
-    expect(screen.getByText(/3 queued/)).toBeDefined();
     expect(screen.getByTestId("kpi-active")).toBeDefined();
     expect(screen.getByTestId("kpi-today")).toBeDefined();
     expect(screen.getByTestId("kpi-tokens")).toBeDefined();
     expect(screen.getByTestId("kpi-lost")).toBeDefined();
-    expect(screen.getByText(/1304/)).toBeDefined();
+    // Compact queue format is "queued/running/failed"
+    expect(screen.getByText("3/1/0")).toBeDefined();
+    // Lost shows raw number
+    expect(screen.getByText("1304")).toBeDefined();
   });
 
   it("highlights queue tile in red when failed > 0", () => {

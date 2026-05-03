@@ -10,10 +10,10 @@ export function HealthDot() {
 
   const isOk = status === "ok" && alertsCount === 0;
   const dotColor = isOk
-    ? "bg-emerald-500"
+    ? "bg-success"
     : status === "degraded" || alertsCount > 0
       ? "bg-amber-500"
-      : "bg-rose-500";
+      : "bg-destructive";
   const label = isOk
     ? t("overview.health_dot.ok")
     : alertsCount > 0
@@ -23,11 +23,20 @@ export function HealthDot() {
   return (
     <Link
       to="/health"
-      className="flex items-center gap-2 text-xs hover:underline"
+      className="group flex items-center gap-2 rounded-full border border-border/60 bg-card/50 px-2.5 py-1 transition-colors hover:border-accent/60"
     >
-      <span className={`inline-block h-2 w-2 rounded-full ${dotColor}`} />
-      <span>{label}</span>
-      <span className="text-muted-foreground">
+      <span className="relative flex h-2 w-2">
+        <span
+          className={`absolute inline-flex h-full w-full rounded-full opacity-60 ${dotColor} ${
+            isOk ? "animate-ping" : ""
+          }`}
+        />
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+      </span>
+      <span className="font-mono text-[10px] uppercase tracking-wider">
+        {label}
+      </span>
+      <span className="font-mono text-[10px] text-muted-foreground transition-colors group-hover:text-accent">
         {t("overview.health_dot.details_link")}
       </span>
     </Link>

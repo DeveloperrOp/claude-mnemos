@@ -41,3 +41,4 @@ claude_mnemos/daemon/static/*
 
 # Brainstorming visual companion sessions
 .superpowers/
+.mnemos-dev/

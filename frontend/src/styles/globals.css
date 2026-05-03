@@ -106,7 +106,7 @@
     font-feature-settings: "ss01", "cv11"; /* Geist: ss01 = stylistic set 1, cv11 = single-story 'l' */
   }
 
-  /* Signature motion keyframes */
+  /* ─── Signature motion ──────────────────────────────────────────── */
   @keyframes blink { 50% { opacity: 0 } }
   .cursor-blink { animation: blink 1.06s steps(2, start) infinite; }
 
@@ -115,6 +115,89 @@
     50%      { opacity: 1.0 }
   }
   .pulse-accent { animation: pulse-accent 2s var(--ease-in-out-snap) infinite; }
+
+  /* Heartbeat for hot status dots — subtle but alive */
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 var(--accent); }
+    50%      { transform: scale(1.25); box-shadow: 0 0 0 4px transparent; }
+  }
+  .heartbeat { animation: heartbeat 1.6s var(--ease-in-out-snap) infinite; }
+
+  /* Stagger reveal: rows fade-up sequentially. Use --i CSS var on each child. */
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0);    }
+  }
+  .stagger > * {
+    opacity: 0;
+    animation: reveal-up 0.5s var(--ease-out-snap) forwards;
+    animation-delay: calc(var(--i, 0) * 28ms);
+  }
+
+  /* ─── Operational utilities ─────────────────────────────────────── */
+  /* Tabular numerals: KPI digits don't shift width when value changes */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  /* Grid-paper background for dashboard surfaces (operational feel) */
+  .grid-bg {
+    background-image:
+      linear-gradient(to right,  oklch(from var(--border) l c h / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(from var(--border) l c h / 0.4) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+  }
+
+  /* Subtle dot-matrix for hero zones */
+  .dot-bg {
+    background-image: radial-gradient(
+      oklch(from var(--border-strong) l c h / 0.45) 1px,
+      transparent 1px
+    );
+    background-size: 12px 12px;
+  }
+
+  /* Editorial divider: thin lime tick + caps text */
+  .section-rail {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .section-rail::before {
+    content: "";
+    width: 18px;
+    height: 2px;
+    background: var(--accent);
+  }
+  .section-rail::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--border) 0%, transparent 100%);
+  }
+
+  /* Mono uppercase eyebrow label */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  /* Hero numeric — huge mono digit display */
+  .hero-num {
+    font-family: var(--font-mono);
+    font-feature-settings: "ss01", "tnum";
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+  }
 
   /* Markdown / prose blocks (Help, page bodies). Mono code, lime border-left
      on fenced blocks. */

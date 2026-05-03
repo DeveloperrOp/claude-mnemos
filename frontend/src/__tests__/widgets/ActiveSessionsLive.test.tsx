@@ -73,7 +73,9 @@ describe("ActiveSessionsLive", () => {
 
   it("renders countdown for cooling sessions only", () => {
     render(wrap(<ActiveSessionsLive sessions={[HOT, COOLING]} />));
-    expect(screen.getByText(/auto-dump in/)).toBeDefined();
+    // Cooling rows render countdown as "↓ <Xh Ym>" inline. HOT has
+    // auto_dump_at=null, so its row has no countdown — matching arrow only for cooling.
+    expect(screen.getByText(/↓\s*\d/)).toBeDefined();
   });
 
   it("Dump now button is present for assigned sessions", () => {
