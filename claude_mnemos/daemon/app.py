@@ -18,6 +18,7 @@ from claude_mnemos.core.trash import TrashEntryNotFoundError
 from claude_mnemos.core.undo import UndoError
 from claude_mnemos.daemon.routes.activity import router as activity_router
 from claude_mnemos.daemon.routes.alerts import router as alerts_router
+from claude_mnemos.daemon.routes.dashboard import router as dashboard_router
 from claude_mnemos.daemon.routes.dead_letter import router as dead_letter_router
 from claude_mnemos.daemon.routes.fs import router as fs_router
 from claude_mnemos.daemon.routes.health import router as health_router
@@ -59,6 +60,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     app.include_router(alerts_router, prefix="/api")
     app.include_router(lint_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
+    app.include_router(dashboard_router, prefix="/api")
     app.include_router(dead_letter_router, prefix="/api")
     app.include_router(pages_router, prefix="/api")
     app.include_router(trash_router, prefix="/api")
