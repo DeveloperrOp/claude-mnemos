@@ -9,9 +9,10 @@ import { SessionDetail } from "../pages/SessionDetail";
 beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
     sessions: {
+      metadata: "Metadata",
       status: { succeeded: "Succeeded" },
       tokens_in: "in", tokens_out: "out", model: "model", ingested_at: "at",
-      created_pages: "pages", no_pages_created: "no pages",
+      created_pages: "pages", no_pages_created: "no pages", error: "Error",
       transcript: "transcript",
       ingest_button: "Ingest",
       ingested_toast: "Ingest queued",
