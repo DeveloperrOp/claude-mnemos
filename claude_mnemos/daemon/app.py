@@ -22,6 +22,7 @@ from claude_mnemos.daemon.routes.dashboard import router as dashboard_router
 from claude_mnemos.daemon.routes.dead_letter import router as dead_letter_router
 from claude_mnemos.daemon.routes.fs import router as fs_router
 from claude_mnemos.daemon.routes.health import router as health_router
+from claude_mnemos.daemon.routes.health_alerts import router as health_alerts_router
 from claude_mnemos.daemon.routes.hooks import router as hooks_router
 from claude_mnemos.daemon.routes.inject_preview import router as inject_preview_router
 from claude_mnemos.daemon.routes.jobs import router as jobs_router
@@ -54,6 +55,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     # client-side routes like /lost-sessions, /dead-letter etc. via fallback
     # to index.html without route conflicts.
     app.include_router(health_router, prefix="/api")
+    app.include_router(health_alerts_router, prefix="/api")
     app.include_router(vault_router, prefix="/api")
     app.include_router(activity_router, prefix="/api")
     app.include_router(snapshots_router, prefix="/api")

@@ -82,11 +82,15 @@ class MnemosDaemon:
             # Auto-dump safety net (P0+P1 spec). Runs hourly.
             self._register_auto_dump_cron()
 
+            # Health-monitor (Feature B). Runs every 5 min.
+            self._register_health_checks_cron()
+
             self.scheduler.start()
 
             # Catch-up immediately after bootstrap — addresses any stale sessions
             # that accumulated while the daemon was down.
             asyncio.create_task(self._auto_dump_task_fn())
+            asyncio.create_task(self._health_checks_task_fn())
 
             await self._serve_uvicorn()
         finally:
@@ -193,6 +197,39 @@ class MnemosDaemon:
             "cron",
             minute=0,
             id="auto_dump_global",
+            replace_existing=True,
+        )
+
+    def _register_health_checks_cron(self) -> None:
+        """Register the ``health_checks_global`` cron task — every 5 min.
+
+        Runs the 7 semantic detectors in ``core.health_checks.run_all_checks``
+        and persists results to ``~/.claude-mnemos/alerts.json``. Each detector
+        is wrapped in try/except internally; the outer wrapper here additionally
+        catches store-load/save failures so a corrupt JSON file does not break
+        the cron forever.
+        """
+        async def _health_checks_task() -> None:
+            try:
+                from claude_mnemos.core.health_checks import run_all_checks
+                from claude_mnemos.state.alerts_store import AlertsStore
+
+                new_alerts = run_all_checks(
+                    daemon=self, scheduler=self.scheduler, runtimes=self.runtimes
+                )
+                store = AlertsStore.load()
+                for alert in new_alerts:
+                    store.upsert(alert)
+                store.save()
+            except Exception:
+                logger.exception("health_checks_task failed")
+
+        self._health_checks_task_fn = _health_checks_task
+        self.scheduler.add_job(
+            _health_checks_task,
+            "cron",
+            minute="*/5",
+            id="health_checks_global",
             replace_existing=True,
         )
 
