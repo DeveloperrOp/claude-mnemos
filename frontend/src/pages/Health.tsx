@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealth } from "@/hooks/useHealth";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -46,133 +45,137 @@ export function Health() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">{t("health.title")}</h1>
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-center justify-between gap-3">
+          <span className="eyebrow">claude-mnemos · health</span>
+        </div>
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("health.title")}
+        </h1>
+      </header>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card>
-          <CardContent className="py-3">
-            <div
-              className={`text-sm font-semibold ${
-                vh.watchdog_running
-                  ? "text-success"
-                  : "text-warning"
-              }`}
+        <div className="rounded-md border border-border/60 bg-card/40 p-4">
+          <div
+            className={`text-sm font-semibold ${
+              vh.watchdog_running
+                ? "text-success"
+                : "text-warning"
+            }`}
+          >
+            {vh.watchdog_running
+              ? t("health.watchdog_running")
+              : t("health.watchdog_down")}
+          </div>
+        </div>
+        <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-1">
+          <div className="hero-num">{vh.jobs_queued}</div>
+          <div className="eyebrow text-muted-foreground">
+            {t("health.jobs_queued")}
+          </div>
+        </div>
+        <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-1">
+          <div className="hero-num">{vh.jobs_running}</div>
+          <div className="eyebrow text-muted-foreground">
+            {t("health.jobs_running")}
+          </div>
+        </div>
+        <div className="rounded-md border border-border/60 bg-card/40 p-4 space-y-2">
+          <div className="hero-num">{vh.jobs_dead_letter}</div>
+          <div className="eyebrow text-muted-foreground">
+            {t("health.jobs_dead_letter")}
+          </div>
+          {vh.jobs_dead_letter > 0 && (
+            <Link
+              to={`/dead-letter?project=${encodeURIComponent(project)}`}
+              className="text-xs text-primary underline inline-block"
             >
-              {vh.watchdog_running
-                ? t("health.watchdog_running")
-                : t("health.watchdog_down")}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 py-3">
-            <div className="text-2xl font-semibold">{vh.jobs_queued}</div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              {t("health.jobs_queued")}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 py-3">
-            <div className="text-2xl font-semibold">{vh.jobs_running}</div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              {t("health.jobs_running")}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 py-3">
-            <div className="text-2xl font-semibold">{vh.jobs_dead_letter}</div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              {t("health.jobs_dead_letter")}
-            </div>
-            {vh.jobs_dead_letter > 0 && (
-              <Link
-                to={`/dead-letter?project=${encodeURIComponent(project)}`}
-                className="text-xs text-primary underline"
-              >
-                {t("health.view_failed_jobs")}
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+              {t("health.view_failed_jobs")}
+            </Link>
+          )}
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("health.scheduler_jobs")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {projectSchedulerJobs.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              {t("health.no_scheduler_jobs")}
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="py-1 font-medium">id</th>
-                  <th className="py-1 font-medium">next_run_time</th>
-                  <th className="py-1 font-medium">trigger</th>
+      <div className="rounded-md border border-border/60 bg-card/40 p-4">
+        <div className="section-rail mb-4">
+          <span>{t("health.scheduler_jobs")}</span>
+          <span className="ml-auto font-mono tabular-nums text-foreground/70">{projectSchedulerJobs.length}</span>
+        </div>
+        {projectSchedulerJobs.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+            <span className="uppercase tracking-wider">empty</span>
+            <span className="ml-auto opacity-60">{t("health.no_scheduler_jobs")}</span>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">id</th>
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">next_run_time</th>
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectSchedulerJobs.map((j) => (
+                <tr key={j.id} className="border-b last:border-0">
+                  <td className="py-2 font-mono text-xs">{j.id}</td>
+                  <td className="py-2 text-xs">{j.next_run_time ?? "—"}</td>
+                  <td className="py-2 text-xs">{j.trigger}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {projectSchedulerJobs.map((j) => (
-                  <tr key={j.id} className="border-b last:border-0">
-                    <td className="py-1 font-mono text-xs">{j.id}</td>
-                    <td className="py-1 text-xs">{j.next_run_time ?? "—"}</td>
-                    <td className="py-1 text-xs">{j.trigger}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between text-left"
-            onClick={() => setAlertsExpanded((x) => !x)}
-            aria-expanded={alertsExpanded}
-          >
-            <CardTitle className="flex items-center gap-2 text-base">
+      <div className="rounded-md border border-border/60 bg-card/40 p-4">
+        <button
+          type="button"
+          className="w-full text-left"
+          onClick={() => setAlertsExpanded((x) => !x)}
+          aria-expanded={alertsExpanded}
+        >
+          <div className="section-rail mb-0">
+            <div className="flex items-center gap-2">
               {alertsExpanded ? (
                 <ChevronDown className="h-4 w-4" />
               ) : (
                 <ChevronRight className="h-4 w-4" />
               )}
-              {t("health.alerts_count")}: {alertsCount}
-            </CardTitle>
-            {alertsExpanded && alerts.length > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setClearAllOpen(true);
-                }}
-                disabled={dismissAll.isPending}
-              >
-                {t("health.alerts.clear_all")}
-              </Button>
-            )}
-          </button>
-        </CardHeader>
+              <span>{t("health.alerts_count")}</span>
+            </div>
+            <span className="ml-auto font-mono tabular-nums text-foreground/70">{alertsCount}</span>
+          </div>
+        </button>
         {alertsExpanded && (
-          <CardContent>
+          <div className="mt-4">
+            {alerts.length > 0 && (
+              <div className="mb-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setClearAllOpen(true)}
+                  disabled={dismissAll.isPending}
+                >
+                  {t("health.alerts.clear_all")}
+                </Button>
+              </div>
+            )}
             {alerts.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                {t("health.alerts.empty")}
+              <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                <span className="uppercase tracking-wider">empty</span>
+                <span className="ml-auto opacity-60">{t("health.alerts.empty")}</span>
               </div>
             ) : (
-              <div className="space-y-2">
-                {alerts.map((a) => (
+              <div className="stagger divide-y divide-border/50 rounded-md bg-card/40 ring-1 ring-border/60">
+                {alerts.map((a, i) => (
                   <div
                     key={a.id}
-                    className="flex items-start gap-3 rounded-md border bg-background px-3 py-2 text-sm"
+                    style={{ ["--i" as string]: i }}
+                    className="border-l-2 border-l-transparent px-3 py-2 hover:border-l-accent hover:bg-card/60 flex items-start gap-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -183,7 +186,7 @@ export function Health() {
                           {formatDateTime(a.detected_at, i18n.language)}
                         </span>
                       </div>
-                      <div className="mt-1 break-words">{a.message}</div>
+                      <div className="mt-1 break-words text-sm">{a.message}</div>
                       {a.path && (
                         <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
                           {a.path}
@@ -204,9 +207,9 @@ export function Health() {
                 ))}
               </div>
             )}
-          </CardContent>
+          </div>
         )}
-      </Card>
+      </div>
 
       <ConfirmDialog
         open={clearAllOpen}
