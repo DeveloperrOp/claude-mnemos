@@ -6,8 +6,10 @@ import os
 import signal
 import sys
 import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -28,6 +30,22 @@ if TYPE_CHECKING:
     from claude_mnemos.daemon.vault_runtime import VaultRuntime
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CronTask:
+    """Declarative description of a cron-scheduled async task.
+
+    ``id``: APScheduler job-id (must remain stable — live tests poll these
+    via /scheduler/jobs).
+    ``schedule_kwargs``: keyword args forwarded to ``scheduler.add_job(...,
+    "cron", **schedule_kwargs)`` (e.g. ``{"minute": 0}`` for hourly).
+    ``fn``: zero-argument coroutine factory invoked at every cron tick.
+    """
+
+    id: str
+    schedule_kwargs: dict[str, Any]
+    fn: Callable[[], Awaitable[None]]
 
 
 class MnemosDaemon:
@@ -84,11 +102,7 @@ class MnemosDaemon:
         try:
             await self._bootstrap_runtimes()
 
-            # Auto-dump safety net (P0+P1 spec). Runs hourly.
-            self._register_auto_dump_cron()
-
-            # Health-monitor (Feature B). Runs every 5 min.
-            self._register_health_checks_cron()
+            self._register_cron_tasks(self._build_cron_tasks())
 
             self.scheduler.start()
 
@@ -183,12 +197,16 @@ class MnemosDaemon:
                 continue
             self.runtimes[entry.name] = runtime
 
-    def _register_auto_dump_cron(self) -> None:
-        """Register the auto_dump_global hourly cron task.
+    def _build_cron_tasks(self) -> list[CronTask]:
+        """Declarative list of cron tasks owned by the daemon.
 
-        Called from run() after bootstrap, before scheduler.start().
-        The closure is stored in self._auto_dump_task_fn for the catch-up
-        create_task() call.
+        - ``auto_dump_global`` (hourly, minute=0): P0+P1 safety net that
+          calls ``auto_dump_stale`` on every runtime.
+        - ``health_checks_global`` (every 5 min): runs the 7 semantic
+          detectors and persists results to ``alerts.json``.
+
+        Each closure is also stashed on ``self`` so ``run()`` can fire a
+        catch-up invocation after scheduler.start().
         """
         async def _auto_dump_task() -> None:
             try:
@@ -196,24 +214,6 @@ class MnemosDaemon:
             except Exception:
                 logger.exception("auto_dump_task failed")
 
-        self._auto_dump_task_fn = _auto_dump_task
-        self.scheduler.add_job(
-            _auto_dump_task,
-            "cron",
-            minute=0,
-            id="auto_dump_global",
-            replace_existing=True,
-        )
-
-    def _register_health_checks_cron(self) -> None:
-        """Register the ``health_checks_global`` cron task — every 5 min.
-
-        Runs the 7 semantic detectors in ``core.health_checks.run_all_checks``
-        and persists results to ``~/.claude-mnemos/alerts.json``. Each detector
-        is wrapped in try/except internally; the outer wrapper here additionally
-        catches store-load/save failures so a corrupt JSON file does not break
-        the cron forever.
-        """
         async def _health_checks_task() -> None:
             try:
                 from claude_mnemos.core.health_checks import run_all_checks
@@ -227,14 +227,37 @@ class MnemosDaemon:
             except Exception:
                 logger.exception("health_checks_task failed")
 
+        self._auto_dump_task_fn = _auto_dump_task
         self._health_checks_task_fn = _health_checks_task
-        self.scheduler.add_job(
-            _health_checks_task,
-            "cron",
-            minute="*/5",
-            id="health_checks_global",
-            replace_existing=True,
-        )
+
+        return [
+            CronTask(
+                id="auto_dump_global",
+                schedule_kwargs={"minute": 0},
+                fn=_auto_dump_task,
+            ),
+            CronTask(
+                id="health_checks_global",
+                schedule_kwargs={"minute": "*/5"},
+                fn=_health_checks_task,
+            ),
+        ]
+
+    def _register_cron_tasks(self, tasks: list[CronTask]) -> None:
+        """Register every ``CronTask`` against ``self.scheduler``.
+
+        Job ids must remain stable — they're observed by /scheduler/jobs and
+        by the auto_dump_overdue health detector. ``replace_existing=True``
+        keeps re-mounting safe in tests.
+        """
+        for task in tasks:
+            self.scheduler.add_job(
+                task.fn,
+                "cron",
+                **task.schedule_kwargs,
+                id=task.id,
+                replace_existing=True,
+            )
 
     # ─── Dynamic vault management (Task 14) ───────────────────────
 
