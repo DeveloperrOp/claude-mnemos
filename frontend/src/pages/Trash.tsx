@@ -29,11 +29,22 @@ export function Trash() {
   const entries = trashQuery.data?.entries ?? [];
   if (entries.length === 0) {
     return (
-      <EmptyState
-        icon="🗑️"
-        title={t("trash.empty.title")}
-        body={t("trash.empty.body")}
-      />
+      <div className="space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-baseline gap-3">
+            <span className="eyebrow">claude-mnemos · trash</span>
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("trash.title")}
+          </h1>
+        </header>
+        <EmptyState
+          icon="🗑️"
+          title={t("trash.empty.title")}
+          body={t("trash.empty.body")}
+        />
+      </div>
     );
   }
 
@@ -41,26 +52,39 @@ export function Trash() {
   const blockedIds = blockedEntries.map((e) => e.trash_id);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">
-          {t("trash.showing_n", { count: entries.length })}
+    <div className="space-y-6">
+      <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative flex items-baseline gap-3">
+          <span className="eyebrow">claude-mnemos · trash</span>
         </div>
-        {blockedEntries.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setBulkOpen(true)}
-            disabled={bulkDismiss.isPending}
-          >
-            <Trash2 className="mr-1 h-3 w-3" />
-            {t("trash.bulk.cleanup_blocked_button", { n: blockedEntries.length })}
-          </Button>
-        )}
+        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          {t("trash.title")}
+        </h1>
+      </header>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            {t("trash.showing_n", { count: entries.length })}
+          </div>
+          {blockedEntries.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkOpen(true)}
+              disabled={bulkDismiss.isPending}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              {t("trash.bulk.cleanup_blocked_button", { n: blockedEntries.length })}
+            </Button>
+          )}
+        </div>
+        <div className="space-y-2">
+          {entries.map((e) => (
+            <TrashRow key={e.trash_id} entry={e} />
+          ))}
+        </div>
       </div>
-      {entries.map((e) => (
-        <TrashRow key={e.trash_id} entry={e} />
-      ))}
 
       <ConfirmDialog
         open={bulkOpen}
