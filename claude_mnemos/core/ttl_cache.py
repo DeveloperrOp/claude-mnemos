@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Awaitable, Callable, Generic, TypeVar
+from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 T = TypeVar("T")
+_MISSING: Any = object()
 
 
 class TTLCache(Generic[T]):
@@ -25,7 +26,7 @@ class TTLCache(Generic[T]):
                    successful compute, the cache is considered stale.
         """
         self.ttl_s = ttl_s
-        self._value: T | None = None
+        self._value: Any = _MISSING
         self._expires_at: float | None = None
         self._lock = asyncio.Lock()
         self._inflight: asyncio.Future[T] | None = None
@@ -49,7 +50,7 @@ class TTLCache(Generic[T]):
 
         async with self._lock:
             # Check if we have a valid cached value
-            if self._value is not None and self._expires_at is not None:
+            if self._value is not _MISSING and self._expires_at is not None:
                 if time.monotonic() < self._expires_at:
                     return self._value
 
@@ -72,10 +73,10 @@ class TTLCache(Generic[T]):
                     self._expires_at = time.monotonic() + self.ttl_s
                     self._inflight = None
                 return result
-            except Exception as e:
-                inflight.set_exception(e)
+            except BaseException as e:
                 async with self._lock:
                     self._inflight = None
+                inflight.set_exception(e)
                 raise
         else:
             # We're not computing; await the inflight future
@@ -83,5 +84,5 @@ class TTLCache(Generic[T]):
 
     def invalidate(self) -> None:
         """Invalidate cached value, forcing recompute on next call."""
-        self._value = None
+        self._value = _MISSING
         self._expires_at = None

@@ -83,3 +83,31 @@ async def test_concurrent_callers_share_inflight_future() -> None:
     results = await asyncio.gather(task1, task2, task3)
     assert results == [7, 7, 7]
     assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_exception_propagates_and_cache_self_heals() -> None:
+    """Exception propagates to all waiters, cache self-heals on next call."""
+    cache: TTLCache[int] = TTLCache(ttl_s=60.0)
+    call_count = 0
+
+    async def fn_that_raises() -> int:
+        nonlocal call_count
+        call_count += 1
+        raise ValueError("test error")
+
+    async def fn_that_succeeds() -> int:
+        nonlocal call_count
+        call_count += 1
+        return 42
+
+    # First call: fn_that_raises should raise
+    with pytest.raises(ValueError, match="test error"):
+        await cache.get_or_compute(fn_that_raises)
+
+    assert call_count == 1
+
+    # Second call: fn_that_succeeds should be called (not cached exception)
+    result = await cache.get_or_compute(fn_that_succeeds)
+    assert result == 42
+    assert call_count == 2
