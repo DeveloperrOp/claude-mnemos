@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from claude_mnemos.core.lost_sessions import (
+from claude_mnemos.core.transcript_helpers import (
     _extract_cwd_and_preview,
     _resolve_transcripts_root,
     _sha256_file,
@@ -41,9 +41,9 @@ def _scan_sync(transcripts_root: Path | None) -> list[TranscriptEntry]:
         try:
             stat = path.stat()
             sha = _sha256_file(path)
+            cwd, preview = _extract_cwd_and_preview(path)
         except OSError:
             continue
-        cwd, preview = _extract_cwd_and_preview(path)
         out.append(
             TranscriptEntry(
                 session_id=path.stem,
