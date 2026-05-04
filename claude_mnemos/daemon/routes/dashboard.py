@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core.active_sessions import scan_active_sessions
+from claude_mnemos.state.manifest import Manifest
 from claude_mnemos.core.transcript_scanner import (
     invalidate_transcripts_cache,
     scan_transcripts as _scan_transcripts_async,
@@ -138,11 +139,25 @@ async def dashboard_snapshot(request: Request) -> dict[str, Any]:
         log.warning("running_jobs aggregator failed: %s", exc)
         errors.append(f"running_jobs: {exc}")
 
+    per_project_counts: dict[str, int] = {}
+    try:
+        for rt in runtimes:
+            try:
+                m = Manifest.load(rt.vault_root)
+                per_project_counts[rt.name] = len(m.ingested)
+            except Exception as exc:
+                log.debug("per_project_session_counts manifest read failed for %s: %s", rt.name, exc)
+                per_project_counts[rt.name] = 0
+    except Exception as exc:
+        log.warning("per_project_session_counts aggregator failed: %s", exc)
+        errors.append(f"per_project_session_counts: {exc}")
+
     return {
         "kpi": kpi,
         "active_sessions": active_sessions,
         "running_jobs": running_jobs,
         "errors": errors,
+        "per_project_session_counts": per_project_counts,
     }
 
 

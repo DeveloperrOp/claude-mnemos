@@ -51,5 +51,6 @@ export const DashboardSnapshotSchema = z.object({
   active_sessions: z.array(ActiveSessionSchema),
   running_jobs: z.array(RunningJobSchema),
   errors: z.array(z.string()),
+  per_project_session_counts: z.record(z.string(), z.number().int()).optional(),
 });
 export type DashboardSnapshot = z.infer<typeof DashboardSnapshotSchema>;

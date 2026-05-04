@@ -3,6 +3,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useHealth } from "@/hooks/useHealth";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
 import { useDashboardSnapshot } from "@/hooks/dashboard/useDashboardSnapshot";
+import { useFirstSessionCelebration } from "@/hooks/useFirstSessionCelebration";
 import { ProjectCard } from "@/components/widgets/ProjectCard";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HookStatusBanner } from "@/components/widgets/HookStatusBanner";
@@ -21,6 +22,7 @@ export function Overview() {
   const healthQuery = useHealth();
   const usageQuery = useUsageByProject("30d");
   const snapshotQuery = useDashboardSnapshot();
+  useFirstSessionCelebration(snapshotQuery.data);
 
   if (projectsQuery.isLoading) {
     return (

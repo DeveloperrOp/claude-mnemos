@@ -173,3 +173,12 @@ async def test_scan_active_endpoint(client, transcripts: Path) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["scanned"] >= 1
+
+
+async def test_snapshot_includes_per_project_session_counts(client, transcripts: Path) -> None:
+    """The Overview's first-session-celebration hook depends on this field."""
+    r = await client.get("/api/dashboard/snapshot")
+    assert r.status_code == 200
+    body = r.json()
+    assert "per_project_session_counts" in body
+    assert isinstance(body["per_project_session_counts"], dict)
