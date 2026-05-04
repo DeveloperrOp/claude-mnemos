@@ -534,6 +534,9 @@ def build_parser() -> argparse.ArgumentParser:
     from claude_mnemos.cli_hooks import add_hooks_subparser
     add_hooks_subparser(sub)
 
+    from claude_mnemos.cli_init import add_init_subparser
+    add_init_subparser(sub)
+
     return parser
 
 
@@ -575,6 +578,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "hooks":
         from claude_mnemos.cli_hooks import handle as hooks_handle
         return hooks_handle(args)
+    if args.command == "init":
+        return args.func(args)
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)
