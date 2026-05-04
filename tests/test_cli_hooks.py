@@ -110,3 +110,21 @@ def test_status_when_not_installed(tmp_claude_settings, capsys):
     cli_hooks, settings_path = tmp_claude_settings
     rc = cli_hooks._cmd_status(mock.Mock())
     assert rc == 1  # neither event installed → exit 1
+
+
+def test_install_writes_precompact_block(tmp_claude_settings):
+    """install() must register a PreCompact hook alongside SessionStart/SessionEnd."""
+    cli_hooks, settings_path = tmp_claude_settings
+
+    result = cli_hooks.install()
+
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    events = set(data["hooks"].keys())
+    assert "PreCompact" in events
+    assert "SessionStart" in events
+    assert "SessionEnd" in events
+
+    pc_blocks = data["hooks"]["PreCompact"]
+    pc_cmds = [h["command"] for block in pc_blocks for h in block["hooks"]]
+    assert any("pre_compact.py" in c for c in pc_cmds)
+    assert result["pre_compact_script"].endswith('pre_compact.py"')

@@ -36,12 +36,10 @@ def _detect_python() -> str:
     return f'"{sys.executable}"'
 
 
-def _detect_hook_scripts() -> tuple[str, str]:
-    """Locate session_start.py and session_end.py.
+def _detect_hook_scripts() -> tuple[str, str, str]:
+    """Locate session_start.py, session_end.py, pre_compact.py.
 
-    They live one level above the claude_mnemos package directory in a
-    source-tree install (../hooks/), or under the package itself in some
-    pipx setups. Try a couple of candidates and return absolute, quoted paths.
+    Returns three quoted absolute paths.
     """
     here = Path(__file__).resolve()
     candidates = [
@@ -51,8 +49,9 @@ def _detect_hook_scripts() -> tuple[str, str]:
     for d in candidates:
         ss = d / "session_start.py"
         se = d / "session_end.py"
-        if ss.exists() and se.exists():
-            return f'"{ss}"', f'"{se}"'
+        pc = d / "pre_compact.py"
+        if ss.exists() and se.exists() and pc.exists():
+            return f'"{ss}"', f'"{se}"', f'"{pc}"'
     raise FileNotFoundError(
         f"Could not locate mnemos hook scripts. Tried: {[str(c) for c in candidates]}"
     )
@@ -105,6 +104,7 @@ def install(*, dry_run: bool = False) -> dict:
           "python": "<exec>",
           "session_start_script": "<path>",
           "session_end_script": "<path>",
+          "pre_compact_script": "<path>",
           "backup_path": "<path or None>",
         }
 
@@ -112,7 +112,7 @@ def install(*, dry_run: bool = False) -> dict:
     (settings file unwritable). Caller catches.
     """
     py = _detect_python()
-    ss_script, se_script = _detect_hook_scripts()  # may raise FileNotFoundError
+    ss_script, se_script, pc_script = _detect_hook_scripts()  # may raise FileNotFoundError
 
     if dry_run:
         return {
@@ -120,6 +120,7 @@ def install(*, dry_run: bool = False) -> dict:
             "python": py,
             "session_start_script": ss_script,
             "session_end_script": se_script,
+            "pre_compact_script": pc_script,
             "backup_path": None,
             "dry_run": True,
         }
@@ -131,9 +132,14 @@ def install(*, dry_run: bool = False) -> dict:
 
     ss_block = _build_hook_block(f"{py} {ss_script}")
     se_block = _build_hook_block(f"{py} {se_script}")
+    pc_block = _build_hook_block(f"{py} {pc_script}")
 
     # Strategy: replace any existing mnemos-flagged blocks; preserve foreign blocks.
-    for event, new_block in (("SessionStart", ss_block), ("SessionEnd", se_block)):
+    for event, new_block in (
+        ("SessionStart", ss_block),
+        ("SessionEnd", se_block),
+        ("PreCompact", pc_block),
+    ):
         existing = hooks.get(event, [])
         filtered = [
             block for block in existing
@@ -148,6 +154,7 @@ def install(*, dry_run: bool = False) -> dict:
         "python": py,
         "session_start_script": ss_script,
         "session_end_script": se_script,
+        "pre_compact_script": pc_script,
         "backup_path": str(backup) if backup else None,
     }
 
@@ -165,6 +172,7 @@ def _cmd_install(_args: argparse.Namespace) -> int:
     print("[OK] mnemos hooks installed")
     print(f"  SessionStart: {result['python']} {result['session_start_script']}")
     print(f"  SessionEnd:   {result['python']} {result['session_end_script']}")
+    print(f"  PreCompact:   {result['python']} {result['pre_compact_script']}")
     print()
     print("Existing non-mnemos hooks for these events were preserved.")
     return 0
@@ -178,7 +186,7 @@ def _cmd_uninstall(_args: argparse.Namespace) -> int:
     settings = _load_settings()
     hooks = settings.get("hooks", {})
     removed = 0
-    for event in ("SessionStart", "SessionEnd"):
+    for event in ("SessionStart", "SessionEnd", "PreCompact"):
         existing = hooks.get(event, [])
         before = len(existing)
         filtered = [
@@ -220,6 +228,7 @@ def _cmd_status(_args: argparse.Namespace) -> int:
 
     ss_installed, ss_cmds = _summarize("SessionStart")
     se_installed, se_cmds = _summarize("SessionEnd")
+    pc_installed, pc_cmds = _summarize("PreCompact")
 
     print(f"settings file: {CLAUDE_SETTINGS}")
     print()
@@ -232,8 +241,13 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     for c in se_cmds:
         marker = "  [mnemos]" if _is_mnemos_command(c) else "  [other]"
         print(f"{marker} {c}")
+    print()
+    print(f"PreCompact:   {'[OK] mnemos installed' if pc_installed else '[X]  no mnemos hook'}")
+    for c in pc_cmds:
+        marker = "  [mnemos]" if _is_mnemos_command(c) else "  [other]"
+        print(f"{marker} {c}")
 
-    return 0 if (ss_installed and se_installed) else 1
+    return 0 if (ss_installed and se_installed and pc_installed) else 1
 
 
 def add_hooks_subparser(parent: argparse._SubParsersAction) -> None:
