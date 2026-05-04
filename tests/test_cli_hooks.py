@@ -147,3 +147,34 @@ def test_status_returns_nonzero_when_pre_compact_missing(tmp_claude_settings):
 
     rc = cli_hooks._cmd_status(mock.Mock())
     assert rc == 1
+
+
+def test_install_uses_exe_subcommand_in_frozen_mode(tmp_path, monkeypatch):
+    """In frozen mode, hook commands must point at <exe> hook <event>, not python <script.py>."""
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr("claude_mnemos.cli_hooks.CLAUDE_SETTINGS", settings)
+    fake_exe = tmp_path / "claude-mnemos.exe"
+    fake_exe.write_bytes(b"")
+
+    monkeypatch.setattr("claude_mnemos.cli_hooks.runtime.is_frozen", lambda: True)
+    monkeypatch.setattr(
+        "claude_mnemos.cli_hooks.runtime.executable_path",
+        lambda: fake_exe,
+    )
+
+    from claude_mnemos import cli_hooks
+    result = cli_hooks.install()
+
+    import json
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    cmds: list[str] = []
+    for event in ("SessionStart", "SessionEnd", "PreCompact"):
+        for block in data["hooks"][event]:
+            for h in block["hooks"]:
+                cmds.append(h["command"])
+
+    assert any("hook session-start" in c for c in cmds)
+    assert any("hook session-end" in c for c in cmds)
+    assert any("hook pre-compact" in c for c in cmds)
+    assert not any(".py" in c for c in cmds)
+    assert "session_start_script" in result

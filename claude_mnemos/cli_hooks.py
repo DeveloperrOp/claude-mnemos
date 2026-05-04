@@ -21,6 +21,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from claude_mnemos import runtime
+
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 MNEMOS_TOKEN = "claude_mnemos"  # part of import path; matches in pipx-venv command line
 MNEMOS_DASHED = "claude-mnemos"  # part of source-tree path
@@ -37,21 +39,34 @@ def _detect_python() -> str:
 
 
 def _detect_hook_scripts() -> tuple[str, str, str]:
-    """Locate session_start.py, session_end.py, pre_compact.py.
+    """Locate hook command lines for the three events.
 
-    Returns three quoted absolute paths.
+    Returns three command strings ready to drop into settings.json.
+
+    In frozen mode the hook target is the bundled exe invoked as
+    ``"<exe>" hook <event>``. In source mode it's
+    ``"<python>" "<script.py>"`` for each of session_start.py / session_end.py
+    / pre_compact.py.
     """
+    if runtime.is_frozen():
+        exe = runtime.executable_path()
+        ss = f'"{exe}" hook session-start'
+        se = f'"{exe}" hook session-end'
+        pc = f'"{exe}" hook pre-compact'
+        return ss, se, pc
+
+    py = _detect_python()
     here = Path(__file__).resolve()
     candidates = [
-        here.parent.parent / "hooks",            # source tree: <repo>/hooks/
-        here.parent / "hooks",                   # alt layout
+        here.parent.parent / "hooks",
+        here.parent / "hooks",
     ]
     for d in candidates:
         ss = d / "session_start.py"
         se = d / "session_end.py"
         pc = d / "pre_compact.py"
         if ss.exists() and se.exists() and pc.exists():
-            return f'"{ss}"', f'"{se}"', f'"{pc}"'
+            return f'{py} "{ss}"', f'{py} "{se}"', f'{py} "{pc}"'
     raise FileNotFoundError(
         f"Could not locate mnemos hook scripts. Tried: {[str(c) for c in candidates]}"
     )
@@ -101,26 +116,23 @@ def install(*, dry_run: bool = False) -> dict:
 
         {
           "ok": True,
-          "python": "<exec>",
-          "session_start_script": "<path>",
-          "session_end_script": "<path>",
-          "pre_compact_script": "<path>",
+          "session_start_script": "<full command>",
+          "session_end_script": "<full command>",
+          "pre_compact_script": "<full command>",
           "backup_path": "<path or None>",
         }
 
     On error raises FileNotFoundError (hook scripts missing) or OSError
     (settings file unwritable). Caller catches.
     """
-    py = _detect_python()
-    ss_script, se_script, pc_script = _detect_hook_scripts()  # may raise FileNotFoundError
+    ss_cmd, se_cmd, pc_cmd = _detect_hook_scripts()  # full command lines
 
     if dry_run:
         return {
             "ok": True,
-            "python": py,
-            "session_start_script": ss_script,
-            "session_end_script": se_script,
-            "pre_compact_script": pc_script,
+            "session_start_script": ss_cmd,
+            "session_end_script": se_cmd,
+            "pre_compact_script": pc_cmd,
             "backup_path": None,
             "dry_run": True,
         }
@@ -130,9 +142,9 @@ def install(*, dry_run: bool = False) -> dict:
     settings.setdefault("hooks", {})
     hooks = settings["hooks"]
 
-    ss_block = _build_hook_block(f"{py} {ss_script}")
-    se_block = _build_hook_block(f"{py} {se_script}")
-    pc_block = _build_hook_block(f"{py} {pc_script}")
+    ss_block = _build_hook_block(ss_cmd)
+    se_block = _build_hook_block(se_cmd)
+    pc_block = _build_hook_block(pc_cmd)
 
     # Strategy: replace any existing mnemos-flagged blocks; preserve foreign blocks.
     for event, new_block in (
@@ -151,10 +163,9 @@ def install(*, dry_run: bool = False) -> dict:
     _save_settings(settings)
     return {
         "ok": True,
-        "python": py,
-        "session_start_script": ss_script,
-        "session_end_script": se_script,
-        "pre_compact_script": pc_script,
+        "session_start_script": ss_cmd,
+        "session_end_script": se_cmd,
+        "pre_compact_script": pc_cmd,
         "backup_path": str(backup) if backup else None,
     }
 
@@ -170,9 +181,9 @@ def _cmd_install(_args: argparse.Namespace) -> int:
     if result.get("backup_path"):
         print(f"backup → {result['backup_path']}")
     print("[OK] mnemos hooks installed")
-    print(f"  SessionStart: {result['python']} {result['session_start_script']}")
-    print(f"  SessionEnd:   {result['python']} {result['session_end_script']}")
-    print(f"  PreCompact:   {result['python']} {result['pre_compact_script']}")
+    print(f"  SessionStart: {result['session_start_script']}")
+    print(f"  SessionEnd:   {result['session_end_script']}")
+    print(f"  PreCompact:   {result['pre_compact_script']}")
     print()
     print("Existing non-mnemos hooks for these events were preserved.")
     return 0
