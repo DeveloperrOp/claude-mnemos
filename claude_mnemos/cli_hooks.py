@@ -261,7 +261,7 @@ def add_hooks_subparser(parent: argparse._SubParsersAction) -> None:
     uninstall_p = sub.add_parser("uninstall", help="Remove mnemos hooks from ~/.claude/settings.json")
     uninstall_p.set_defaults(func=_cmd_uninstall)
 
-    status_p = sub.add_parser("status", help="Show current SessionStart/SessionEnd hook configuration")
+    status_p = sub.add_parser("status", help="Show current SessionStart/SessionEnd/PreCompact hook configuration")
     status_p.set_defaults(func=_cmd_status)
 
 

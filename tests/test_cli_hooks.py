@@ -128,3 +128,22 @@ def test_install_writes_precompact_block(tmp_claude_settings):
     pc_cmds = [h["command"] for block in pc_blocks for h in block["hooks"]]
     assert any("pre_compact.py" in c for c in pc_cmds)
     assert result["pre_compact_script"].endswith('pre_compact.py"')
+
+
+def test_status_returns_nonzero_when_pre_compact_missing(tmp_claude_settings):
+    """If SessionStart+SessionEnd are installed but PreCompact is not, _cmd_status must exit 1."""
+    cli_hooks, settings_path = tmp_claude_settings
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    # Write SS+SE mnemos hooks but no PreCompact entry.
+    settings_path.write_text(
+        json.dumps({
+            "hooks": {
+                "SessionStart": [{"hooks": [{"type": "command", "command": "py path/claude_mnemos/hooks/session_start.py"}]}],
+                "SessionEnd":   [{"hooks": [{"type": "command", "command": "py path/claude_mnemos/hooks/session_end.py"}]}],
+            }
+        }),
+        encoding="utf-8",
+    )
+
+    rc = cli_hooks._cmd_status(mock.Mock())
+    assert rc == 1
