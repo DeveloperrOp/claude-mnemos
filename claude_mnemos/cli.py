@@ -540,6 +540,9 @@ def build_parser() -> argparse.ArgumentParser:
     from claude_mnemos.cli_doctor import add_doctor_subparser
     add_doctor_subparser(sub)
 
+    from claude_mnemos.cli_hook import add_hook_subparser
+    add_hook_subparser(sub)
+
     return parser
 
 
@@ -584,6 +587,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "init":
         return args.func(args)
     if args.command == "doctor":
+        return args.func(args)
+    if args.command == "hook":
         return args.func(args)
 
     if not args.jsonl.exists():
