@@ -7,6 +7,7 @@ import { ProjectCard } from "@/components/widgets/ProjectCard";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HookStatusBanner } from "@/components/widgets/HookStatusBanner";
 import { HealthAlertsBar } from "@/components/widgets/dashboard/HealthAlertsBar";
+import { SetupChecklist } from "@/components/widgets/dashboard/SetupChecklist";
 import { NoProjectsCallout } from "@/components/widgets/NoProjectsCallout";
 import { KpiBar } from "@/components/widgets/dashboard/KpiBar";
 import { RunningJobsLive } from "@/components/widgets/dashboard/RunningJobsLive";
@@ -84,6 +85,8 @@ export function Overview() {
       <HookStatusBanner />
 
       <HealthAlertsBar />
+
+      <SetupChecklist />
 
       {showRateLimitBanner && (
         <div
