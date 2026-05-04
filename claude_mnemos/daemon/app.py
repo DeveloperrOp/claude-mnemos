@@ -25,6 +25,7 @@ from claude_mnemos.daemon.routes.health import router as health_router
 from claude_mnemos.daemon.routes.health_alerts import router as health_alerts_router
 from claude_mnemos.daemon.routes.hooks import router as hooks_router
 from claude_mnemos.daemon.routes.inject_preview import router as inject_preview_router
+from claude_mnemos.daemon.routes.onboarding import router as onboarding_router
 from claude_mnemos.daemon.routes.jobs import router as jobs_router
 from claude_mnemos.daemon.routes.lint import router as lint_router
 from claude_mnemos.daemon.routes.lost_sessions import router as lost_sessions_router
@@ -76,6 +77,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     app.include_router(fs_router, prefix="/api")
     app.include_router(hooks_router, prefix="/api")
     app.include_router(inject_preview_router, prefix="/api")
+    app.include_router(onboarding_router, prefix="/api")
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:
