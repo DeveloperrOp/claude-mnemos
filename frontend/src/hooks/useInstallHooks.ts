@@ -24,6 +24,10 @@ export function useInstallHooks() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["hooks", "status"] });
+      // SetupChecklist + Diagnostics rely on /api/onboarding/setup-status,
+      // which surfaces the same hook-presence detector. Refresh so the row
+      // flips to OK as soon as the install succeeds.
+      void qc.invalidateQueries({ queryKey: ["setup-status"] });
     },
   });
 }

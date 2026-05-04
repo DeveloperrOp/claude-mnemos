@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSetupStatus, type SetupStatusRow } from "@/api/diagnostics.api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HooksFixButton } from "@/components/widgets/dashboard/HooksFixButton";
 
 const STATUS_STYLES: Record<SetupStatusRow["status"], string> = {
   ok: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
@@ -47,6 +48,9 @@ export function Diagnostics() {
             <span className="font-mono uppercase text-[11px]">{row.status}</span>
             <span className="font-medium">{ROW_LABELS[key] ?? key}</span>
             <span className="ml-auto text-xs">{row.message}</span>
+            {key === "hooks" && row.status !== "ok" && (
+              <HooksFixButton size="sm" variant="outline" label="Re-install hooks" />
+            )}
           </div>
         ))}
       </div>

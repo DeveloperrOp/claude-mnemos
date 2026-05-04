@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useSetupStatus } from "@/hooks/onboarding/useSetupStatus";
 import type { SetupStatusRow } from "@/api/diagnostics.api";
+import { HooksFixButton } from "@/components/widgets/dashboard/HooksFixButton";
 
 const ICON: Record<SetupStatusRow["status"], string> = {
   ok: "✓",
@@ -66,7 +67,10 @@ export function SetupChecklist() {
           >
             <span className="font-mono w-4">{ICON[row.status]}</span>
             <span className="font-medium w-44">{ROW_LABELS[key] ?? key}</span>
-            <span className="text-xs">{row.message}</span>
+            <span className="text-xs flex-1">{row.message}</span>
+            {key === "hooks" && row.status !== "ok" && (
+              <HooksFixButton size="sm" variant="outline" label="Fix" />
+            )}
           </li>
         ))}
       </ul>
