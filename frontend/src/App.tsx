@@ -20,7 +20,8 @@ import { Health } from "./pages/Health";
 import { LostSessions } from "./pages/LostSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
-import { Onboarding } from "./pages/Onboarding";
+import { OnboardingWelcome } from "./pages/OnboardingWelcome";
+import { OnboardingAdvanced } from "./pages/OnboardingAdvanced";
 import { ProjectSettings } from "./pages/ProjectSettings";
 import { GlobalSettings } from "./pages/GlobalSettings";
 import { Diagnostics } from "./pages/Diagnostics";
@@ -42,7 +43,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Overview /> },
-      { path: "onboarding", element: <Onboarding /> },
+      { path: "onboarding", element: <OnboardingWelcome /> },
+      { path: "onboarding/advanced", element: <OnboardingAdvanced /> },
       {
         path: "project/:name",
         children: [

@@ -17,7 +17,7 @@ import { CwdBuilder } from "@/components/onboarding/CwdBuilder";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-export function Onboarding() {
+export function OnboardingAdvanced() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const create = useProjectCreate();

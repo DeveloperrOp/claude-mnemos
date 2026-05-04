@@ -7,7 +7,7 @@ import MockAdapter from "axios-mock-adapter";
 import { Toaster } from "../components/ui/sonner";
 import i18n from "../i18n";
 import { apiClient } from "../api/client";
-import { Onboarding } from "../pages/Onboarding";
+import { OnboardingAdvanced } from "../pages/OnboardingAdvanced";
 
 beforeAll(() => {
   i18n.addResourceBundle("en", "translation", {
@@ -97,10 +97,10 @@ function wrap(ui: React.ReactNode) {
   );
 }
 
-describe("Onboarding", () => {
+describe("OnboardingAdvanced", () => {
   it("disables submit when display name is empty", async () => {
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     const submit = screen.getByRole("button", { name: /create project/i });
     expect(submit).toBeDisabled();
 
@@ -114,7 +114,7 @@ describe("Onboarding", () => {
       data: { name: "alpha", display_name: "alpha", vault_root: "/tmp/alpha", cwd_patterns: [] },
     });
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "alpha");
     await user.type(screen.getByLabelText(/vault path/i), "/tmp/alpha");
 
@@ -130,7 +130,7 @@ describe("Onboarding", () => {
     err.response = { status: 500, data: { error: "mount_failed", detail: "Permission denied: /var/foo" } };
     vi.spyOn(apiClient, "post").mockRejectedValueOnce(err);
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "alpha");
     await user.type(screen.getByLabelText(/vault path/i), "/var/foo");
     await user.click(screen.getByRole("button", { name: /create project/i }));
@@ -144,7 +144,7 @@ describe("Onboarding", () => {
     err.response = { status: 409, data: { error: "name_conflict", detail: "Name already exists" } };
     vi.spyOn(apiClient, "post").mockRejectedValueOnce(err);
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "alpha");
     await user.type(screen.getByLabelText(/vault path/i), "/tmp/alpha");
     await user.click(screen.getByRole("button", { name: /create project/i }));
@@ -156,7 +156,7 @@ describe("Onboarding", () => {
       platform: "windows",
       autostart_enabled: false,
     });
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
 
     expect(await screen.findByLabelText(/auto.?start/i)).toBeInTheDocument();
   });
@@ -166,7 +166,7 @@ describe("Onboarding", () => {
       platform: "unsupported",
       autostart_enabled: false,
     });
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     // Wait a tick so the fetch resolves and any conditional render settles.
     await waitFor(() => expect(trayMock.history.get.length).toBeGreaterThan(0));
     expect(screen.queryByLabelText(/auto.?start/i)).not.toBeInTheDocument();
@@ -183,7 +183,7 @@ describe("Onboarding", () => {
     });
 
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "p1");
     await user.type(screen.getByLabelText(/vault path/i), "/x");
     // Checkbox is checked by default; the explicit click would toggle off.
@@ -203,7 +203,7 @@ describe("Onboarding", () => {
       authenticated: true,
       binary_path: "/x/claude",
     });
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     expect(await screen.findByText(/Claude CLI installed and authenticated/i))
       .toBeInTheDocument();
   });
@@ -213,7 +213,7 @@ describe("Onboarding", () => {
       installed: false,
       authenticated: false,
     });
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     expect(await screen.findByText(/Claude Code from https:/i))
       .toBeInTheDocument();
   });
@@ -223,14 +223,14 @@ describe("Onboarding", () => {
       installed: true,
       authenticated: false,
     });
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     expect(await screen.findByText(/run `claude login`/i))
       .toBeInTheDocument();
   });
 
   it("auto-derives slug from display_name input", async () => {
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     const displayInput = screen.getByLabelText(/display name/i);
     await user.type(displayInput, "Конструктор сайтов");
     const slugInput = screen.getByLabelText(/slug/i) as HTMLInputElement;
@@ -239,7 +239,7 @@ describe("Onboarding", () => {
 
   it("locks slug auto-derive when user clicks Edit slug", async () => {
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     const displayInput = screen.getByLabelText(/display name/i);
     await user.type(displayInput, "Test");
     const slugInput = screen.getByLabelText(/slug/i) as HTMLInputElement;
@@ -266,7 +266,7 @@ describe("Onboarding", () => {
       },
     });
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "My Project");
     await user.type(screen.getByLabelText(/vault path/i), "/tmp/x");
     await user.click(screen.getByRole("button", { name: /create project/i }));
@@ -288,7 +288,7 @@ describe("Onboarding", () => {
       truncated: false,
     });
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.click(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i }));
     expect(await screen.findByText(/📁\s*code$/)).toBeInTheDocument();  // picker open
   });
@@ -302,7 +302,7 @@ describe("Onboarding", () => {
       truncated: false,
     });
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.click(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i }));
     await screen.findByText(/📁\s*code$/);
     await user.click(screen.getByRole("button", { name: /Select|Выбрать|Вибрати/i }));
@@ -324,7 +324,7 @@ describe("Onboarding", () => {
     });
 
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
     await user.type(screen.getByLabelText(/display name/i), "Test");
     await user.type(screen.getByLabelText(/vault path/i), "/home");
 
@@ -368,7 +368,7 @@ describe("Onboarding", () => {
     });
 
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
 
     await user.type(screen.getByLabelText(/display name/i), "p1");
     await user.type(screen.getByLabelText(/vault path/i), "/x");
@@ -404,7 +404,7 @@ describe("Onboarding", () => {
     });
 
     const user = userEvent.setup();
-    render(wrap(<Onboarding />));
+    render(wrap(<OnboardingAdvanced />));
 
     await user.type(screen.getByLabelText(/display name/i), "p2");
     await user.type(screen.getByLabelText(/vault path/i), "/x");
