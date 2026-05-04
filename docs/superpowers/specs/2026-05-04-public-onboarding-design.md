@@ -1,18 +1,24 @@
 # Public-grade Onboarding — Design Spec
 
 **Date:** 2026-05-04
-**Status:** Draft, awaiting Yarik approval
+**Status:** Approved by Yarik 2026-05-04 (decisions fixed: skip telemetry, skip marketing/site, friendly modal for missing Claude Code)
 **Scope:** Multi-day plan. Full redesign of install + first-run + first-session journey so a non-technical user installs claude-mnemos and reaches a working dashboard with **zero command-line knowledge**.
 
 ---
 
 ## TL;DR
 
-Public-grade product means installation must look like Slack, not like a Python package. We split the work into 5 phases, smallest-impact first, native installer at peak.
+Public-grade product means installation must look like Slack, not like a Python package. We ship 3 phases, smallest-impact first, native installer at peak.
 
 The end state: user double-clicks `claude-mnemos-setup.exe` (or `.dmg`), it installs, opens browser to a Welcome screen that already shows their detected Claude Code projects with one-click "Track this folder" buttons, hooks install themselves, daemon autostarts with the OS, and the first session that comes through triggers a celebration toast. Anywhere something can break, there's a Setup-Checklist widget with a Fix button. Behind the scenes, `mnemos doctor` exposes the same diagnostics for power users.
 
-The estimated scope is **~10–14 days** of work split across 5 independently-shippable phases.
+The estimated scope is **~10–14 working days** split across 3 independently-shippable phases.
+
+### Resolved decisions (2026-05-04)
+
+- **Telemetry:** SKIP. No remote analytics. Local logs only via existing daemon log + `mnemos doctor`. If signal is needed later, revisit as a separate spec.
+- **Bundled Claude Code install in Phase 2:** SKIP. If Claude Code is missing, show a friendly modal with a download link. User installs Claude Code separately and re-runs setup-hooks from Settings.
+- **Public marketing site / videos / domain:** SKIP. Out of this design entirely. Any public-launch comms is a future, separate decision.
 
 ---
 
@@ -27,10 +33,10 @@ The estimated scope is **~10–14 days** of work split across 5 independently-sh
 
 - Web-hosted SaaS variant — out of scope, mnemos remains local-only.
 - Mobile app — out of scope.
-- Auto-update mechanism for native installers — deferred to a future phase (Phase 6+, not in this design).
-- Public marketing site / video tutorials — referenced but production lies outside this design.
+- Auto-update mechanism for native installers — deferred to a future phase, not in this design.
+- Public marketing site / video tutorials / launch comms — explicitly skipped; not in this design.
 - Localizing onboarding to >2 languages — UA/RU/EN parity remains; new languages out of scope.
-- Telemetry/analytics — explicitly Phase 4 below, opt-in only, gated behind a separate spec sub-review when we get there.
+- Telemetry/analytics — explicitly skipped; local daemon log + `mnemos doctor` cover diagnostics.
 
 ## Success Criteria
 
@@ -118,12 +124,6 @@ The redesign is **additive layers on top of existing code**, not a rewrite. The 
 
 ```
                     ┌─────────────────────────────────┐
-   Phase 5         │ Public docs / website / videos  │   ← reference, not built here
-                    └─────────────────────────────────┘
-                    ┌─────────────────────────────────┐
-   Phase 4         │ Opt-in telemetry / error report │
-                    └─────────────────────────────────┘
-                    ┌─────────────────────────────────┐
    Phase 3         │ Welcome screen + simplified UI  │
                     │ (replaces current Onboarding)   │
                     └─────────────────────────────────┘
@@ -141,7 +141,7 @@ The redesign is **additive layers on top of existing code**, not a rewrite. The 
                     └─────────────────────────────────┘
 ```
 
-Phases 1 + 3 ship value to existing pipx users. Phase 2 unlocks the public-grade story. Phase 4 is data-collection. Phase 5 is comms.
+Phases 1 + 3 ship value to existing pipx users. Phase 2 unlocks the public-grade story for non-technical users.
 
 ---
 
@@ -364,45 +364,6 @@ Manual project creation feels like adding a folder to Dropbox, not configuring a
 
 ---
 
-## Phase 4 — Opt-in telemetry / error reporting (~2–3 days)
-
-Goal: When a public user has a problem, we have signal to improve onboarding.
-
-### 4.1. What we collect (opt-in only)
-
-Anonymous, no PII:
-
-- mnemos version, OS, Python version
-- Onboarding step completion timestamps (`welcome_shown`, `cwd_detected`, `project_created`, `first_session`, `hooks_installed_at_step`)
-- Error events (detector name, no message contents — message contents may contain paths)
-
-What we do NOT collect:
-
-- Cwd paths, project names, vault contents
-- Claude conversation contents
-- IPs (server-side aggregation strips them)
-
-### 4.2. Implementation
-
-- New `state/telemetry_consent.py` storing user's choice. Default `null` (not asked).
-- On first run, Welcome screen shows a one-paragraph opt-in card with "Allow / No thanks" buttons. Choice is sticky.
-- Local event buffer (`~/.claude-mnemos/telemetry-pending.jsonl`). Flushed on daemon shutdown + every 24h to a stub HTTPS endpoint we'll set up (placeholder URL — actual endpoint setup is out of scope, this design just sets up the local pipeline).
-- "Diagnostics" tab has an "Opt out / Opt in" toggle and a "Show what we'd send" button revealing the pending buffer in raw JSON.
-
-### 4.3. Sub-design gate
-
-When Phase 4 implementation starts, this sub-section gets a separate design review (we may decide to skip telemetry entirely if posthog/sentry feel too heavy for the user count). Implementation plan deferred until that review.
-
----
-
-## Phase 5 — Public docs / videos (out-of-scope here, referenced for completeness)
-
-Goal: Marketing site, install videos, FAQ. Not built here. Logged so we don't lose track.
-
-Items: landing page (`mnemos.dev` or similar), 60-second install video, "What is mnemos" 2-min explainer, FAQ page, Discord / GitHub Discussions launch.
-
----
-
 ## Cross-cutting concerns
 
 ### Backwards compatibility
@@ -413,7 +374,7 @@ Items: landing page (`mnemos.dev` or similar), 60-second install video, "What is
 
 ### State storage
 
-- New `state/install_state.py`: tiny JSON file at `~/.claude-mnemos/install-state.json` storing `{first_run_ts, autostart_decision, first_session_celebrated, telemetry_consent}`. Lock-protected, version-stamped.
+- New `state/install_state.py`: tiny JSON file at `~/.claude-mnemos/install-state.json` storing `{first_run_ts, autostart_decision, first_session_celebrated}`. Lock-protected, version-stamped.
 
 ### Internationalization
 
@@ -429,8 +390,8 @@ Every step in the Welcome flow has explicit success/failure UX:
 
 ### Tests
 
-- Backend pytest target after all 5 phases: ~+80 tests.
-- Frontend Vitest target: ~+40 tests.
+- Backend pytest target after all 3 phases: ~+60 tests.
+- Frontend Vitest target: ~+35 tests.
 - E2E tests: install fresh on Win/Mac/Linux VM, complete onboarding, verify first session — at least one E2E per phase deliverable.
 
 ### Risks summary
@@ -442,7 +403,6 @@ Every step in the Welcome flow has explicit success/failure UX:
 | `~/.claude/projects/` cwd detection sees stale data on disk | Filter by `mtime > now - 30d` |
 | Welcome screen feels patronizing to power users | "Show advanced" reveals current wizard inline (no hide-and-seek) |
 | Translation backlog blocks Phase 1 ship | Ship en-only first, UA/RU follow within 24h |
-| Telemetry phase scares users | Default OFF, double-confirm "Allow", easy revoke |
 
 ---
 
@@ -451,43 +411,34 @@ Every step in the Welcome flow has explicit success/failure UX:
 1. **Phase 1 first** (3-4 days). Independent value for current users, validates UX direction without big build investment. Smallest sub-tasks 1.1 → 1.9 ship-able as separate commits.
 2. **Phase 3 second** (2-3 days). Wizard simplification benefits both pipx and installer users. Cheap, high-impact.
 3. **Phase 2 third** (5-7 days). Largest investment; only justified once we know the UX is right (Phases 1+3 done).
-4. **Phase 4 last in this design** (2-3 days). Skip if user-count remains < 50.
-5. **Phase 5** (separate spec, separate plan).
 
-Total: ~12–17 working days for Phases 1-4. Phase 1 alone ships in 3-4 days and is the highest-leverage delivery.
+Total: **~10–14 working days** for the full plan. Phase 1 alone ships in 3-4 days and is the highest-leverage first delivery.
 
 ---
 
-## Out-of-scope decisions
+## Out-of-scope decisions (resolved)
 
 These are documented so they don't drift into scope:
 
-- **Web/SaaS variant:** mnemos remains local-only.
-- **Cloud sync between devices:** out of scope; rsync the vault if needed.
-- **Multi-user / team features:** out of scope.
-- **Auto-update mechanism:** Phase 6+.
-- **Code signing certificates:** budget item, separate decision.
-- **Cwd detection from sources other than `~/.claude/projects/`:** out of scope.
-- **Welcome screen tutorial video embed:** Phase 5 (marketing).
-- **Mobile app companion:** out of scope.
-- **Existing `Onboarding.tsx` rewrite from scratch:** out of scope — we wrap and rename, not rewrite.
-
----
-
-## Open questions for Yarik
-
-1. **Telemetry — go or skip?** Default position: build the local pipeline (Phase 4.1, 4.2) but don't set up the server endpoint yet. Decide on actual server when we have ≥50 users. (Costless to defer.)
-2. **Bundled Claude Code install?** Phase 2 currently shows a friendly modal if Claude Code is missing. Alternative: bundle Claude Code installation step into mnemos installer (chains Claude Code installer if not detected). Heavier but smoother. **Default: friendly modal only.**
-3. **Branding/website domain** — out of scope here, but Phase 5 needs a domain decision before public launch.
+- **Telemetry / analytics** — skipped per Yarik's call. Local daemon log + `mnemos doctor` cover diagnostics.
+- **Public marketing site / videos / domain** — skipped. No launch-comms work in this design.
+- **Bundled Claude Code installer in Phase 2** — we use a friendly modal-with-link. Not bundled.
+- **Web/SaaS variant** — mnemos remains local-only.
+- **Cloud sync between devices** — out of scope; rsync the vault if needed.
+- **Multi-user / team features** — out of scope.
+- **Auto-update mechanism** — deferred to a future phase, not in this design.
+- **Code signing certificates** — budget item, separate decision when we ship Phase 2.
+- **Cwd detection from sources other than `~/.claude/projects/`** — out of scope.
+- **Mobile app companion** — out of scope.
+- **Existing `Onboarding.tsx` rewrite from scratch** — out of scope; we wrap and rename, not rewrite.
 
 ---
 
 ## Self-review notes
 
 - All sections have concrete file targets and LoC estimates — no "TBD".
-- Phases are explicitly independent; reordering Phase 2 ↔ Phase 3 is documented as fine.
+- 3 phases are explicitly independent; reordering Phase 2 ↔ Phase 3 is documented as fine.
 - Goals tested against success criteria in `Success Criteria` section: each goal has a measurable failure mode.
-- Out-of-scope list explicitly catches scope creep targets (mobile, SaaS, multi-user).
-- Phase 4 (telemetry) gated behind sub-design review — not auto-shipping.
+- Out-of-scope list explicitly catches scope creep targets (mobile, SaaS, multi-user) and Yarik's resolved-to-skip items (telemetry, marketing site, bundled CC install).
 - Existing tests baseline carried forward; no test deletion proposed.
 - Error UX is explicitly designed for every Welcome flow step — no silent failures.
