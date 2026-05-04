@@ -23,6 +23,7 @@ from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo
 from claude_mnemos.state.alerts_store import AlertsStore
+from claude_mnemos.state.install_state import load_install_state
 from claude_mnemos.state.projects import ProjectMapEntry, ProjectStore
 from claude_mnemos.state.settings import GlobalSettings, ProjectSettings, SettingsStore
 
@@ -30,6 +31,30 @@ if TYPE_CHECKING:
     from claude_mnemos.daemon.vault_runtime import VaultRuntime
 
 logger = logging.getLogger(__name__)
+
+
+def _attempt_autostart_install() -> bool:
+    """Best-effort tray autostart registration. Returns True on success."""
+    try:
+        from claude_mnemos.tray.__main__ import _cmd_install as tray_install
+        rc = tray_install()
+        return rc == 0
+    except Exception:  # noqa: BLE001
+        logger.exception("autostart-default-on attempt failed")
+        return False
+
+
+def maybe_install_autostart_default() -> None:
+    """If user has not made a decision yet, register tray autostart and remember.
+
+    Idempotent. Designed to be called on daemon startup from MnemosDaemon.run().
+    """
+    state = load_install_state()
+    if state.autostart_decision is not None:
+        return
+    if _attempt_autostart_install():
+        state.autostart_decision = "accepted"
+        state.save()
 
 
 @dataclass(frozen=True)
@@ -110,6 +135,11 @@ class MnemosDaemon:
             # that accumulated while the daemon was down.
             asyncio.create_task(self._auto_dump_task_fn())
             asyncio.create_task(self._health_checks_task_fn())
+
+            # Best-effort: register tray autostart on first run if user hasn't
+            # explicitly opted out. Idempotent — runs at most once across
+            # daemon lifetimes (decision is persisted in install-state.json).
+            asyncio.create_task(asyncio.to_thread(maybe_install_autostart_default))
 
             await self._serve_uvicorn()
         finally:

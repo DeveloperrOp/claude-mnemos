@@ -74,6 +74,14 @@ def run(*, open_browser: bool = True) -> int:
     # 2. Tray autostart (non-fatal)
     if _install_tray_autostart_safe():
         _print("OK", "tray autostart registered")
+        try:
+            from claude_mnemos.state.install_state import load_install_state
+            s = load_install_state()
+            if s.autostart_decision is None:
+                s.autostart_decision = "accepted"
+                s.save()
+        except Exception:
+            pass
     else:
         _print("WARN", "tray autostart skipped (unsupported platform or already running)")
 

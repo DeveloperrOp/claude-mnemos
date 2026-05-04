@@ -149,6 +149,14 @@ def _cmd_uninstall() -> int:
     mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     mgr.uninstall()
     print(f"Auto-start removed ({platform_label()}).")
+    # Record user decision so daemon's autostart-default-on doesn't re-fire.
+    try:
+        from claude_mnemos.state.install_state import load_install_state
+        state = load_install_state()
+        state.autostart_decision = "declined"
+        state.save()
+    except Exception:
+        pass
     return 0
 
 
