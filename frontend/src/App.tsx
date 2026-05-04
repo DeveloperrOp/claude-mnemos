@@ -23,6 +23,7 @@ import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { Onboarding } from "./pages/Onboarding";
 import { ProjectSettings } from "./pages/ProjectSettings";
 import { GlobalSettings } from "./pages/GlobalSettings";
+import { Diagnostics } from "./pages/Diagnostics";
 
 const Help = lazy(() => import("./pages/Help"));
 const Metrics = lazy(() => import("./pages/Metrics"));
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
       { path: "help", element: <Suspense fallback={<Skeleton className="h-64" />}><Help /></Suspense> },
       { path: "metrics", element: <Suspense fallback={<Skeleton className="h-64" />}><Metrics /></Suspense> },
       { path: "settings/global", element: <GlobalSettings /> },
+      { path: "diagnostics", element: <Diagnostics /> },
     ],
   },
 ]);
