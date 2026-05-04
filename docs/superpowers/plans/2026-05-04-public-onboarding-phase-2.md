@@ -14,7 +14,7 @@
 
 - **Platform availability for local testing:** the implementer is expected to develop on Windows. Mac and Linux variants can be **smoke-tested only on CI runners** (`macos-latest`, `ubuntu-latest`). All tasks targeting Mac/Linux must be CI-verifiable; do not require local Mac/Linux to land them.
 - **Code signing is deferred** (initial release ships unsigned). Document SmartScreen / Gatekeeper bypass in README.
-- **Auto-update is out of scope.** User updates by re-downloading.
+- **Auto-update is in scope (minimal):** banner-only — daemon polls GitHub Releases, surfaces `Update available — Download` chip on Overview, click opens the release page. We do NOT auto-replace binaries (Sparkle/Squirrel deferred until code-signing). See Task 10.
 - **Bundle size budget:** ~80–120 MB per platform. Acceptable for a developer tool.
 - **Cold-start cost:** the bundled `claude-mnemos.exe` imports the full FastAPI/uvicorn stack on launch (~1–2s cold). Hooks must NOT use this entry — they get a fast `mnemos hook <event>` subcommand that lazy-imports only what's needed.
 - **Stable install paths** — hook commands written into `~/.claude/settings.json` must point to a location that survives upgrades. We use the platform-canonical install path (`%ProgramFiles%\claude-mnemos\` on Win, `/Applications/claude-mnemos.app/Contents/MacOS/` on Mac, `~/.local/bin/claude-mnemos` for AppImage symlink).
@@ -1481,9 +1481,617 @@ with the .desktop entry. Verified on ubuntu-latest CI runners."
 
 ---
 
-### Task 10: GitHub Actions release workflow
+### Task 10: Auto-update notifier — banner + manual download
 
-On tag push (`v*`), build all three installers in parallel and upload to a GitHub Release.
+> **Scope addition (2026-05-04, Yarik's call):** the spec marked auto-update as out-of-scope. We're putting it back in *minimally*: poll GitHub Releases, show a banner when a newer version exists, click → opens the download in the browser. We don't auto-replace binaries (Sparkle / Squirrel are deferred — they require code-signing to be safe). This must ship in `v0.0.1` so future releases can be discovered by `v0.0.1` users.
+
+**Files:**
+- Create: `claude_mnemos/core/update_check.py` — pure helper that fetches `https://api.github.com/repos/DeveloperrOp/claude-mnemos/releases/latest`, compares versions, returns `{current, latest, download_url, has_update}`. Cached on disk (`~/.claude-mnemos/update-check.json`) for 24h.
+- Create: `claude_mnemos/daemon/routes/update.py` — `GET /api/update-status`, `POST /api/update-status/dismiss` (snoozes the banner for 7 days).
+- Modify: `claude_mnemos/daemon/process.py` — register `update_check_global` cron (every 24h).
+- Modify: `claude_mnemos/daemon/app.py` — include the new router.
+- Create: `frontend/src/api/update.api.ts`
+- Create: `frontend/src/hooks/useUpdateStatus.ts`
+- Create: `frontend/src/components/widgets/dashboard/UpdateBanner.tsx`
+- Modify: `frontend/src/pages/Overview.tsx` — mount banner under `<HealthAlertsBar />`.
+- Test: `tests/core/test_update_check.py`, `tests/daemon/test_app_update.py`, `frontend/src/__tests__/UpdateBanner.test.tsx`
+
+- [ ] **Step 1: Backend test (RED)**
+
+```python
+# tests/core/test_update_check.py
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def cache_path(tmp_path: Path, monkeypatch) -> Path:
+    p = tmp_path / "update-check.json"
+    monkeypatch.setattr("claude_mnemos.core.update_check._CACHE_PATH", p)
+    return p
+
+
+def test_check_returns_has_update_when_newer_remote(monkeypatch, cache_path: Path) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {"tag_name": "v0.0.5", "html_url": "https://github.com/x/y/releases/tag/v0.0.5"},
+    )
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+
+    from claude_mnemos.core.update_check import check_for_update
+
+    result = check_for_update(force=True)
+    assert result.has_update is True
+    assert result.current == "0.0.1"
+    assert result.latest == "0.0.5"
+    assert result.download_url.endswith("/v0.0.5")
+
+
+def test_check_returns_no_update_when_same_version(monkeypatch, cache_path: Path) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {"tag_name": "v0.0.1", "html_url": "x"},
+    )
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+
+    from claude_mnemos.core.update_check import check_for_update
+    result = check_for_update(force=True)
+    assert result.has_update is False
+
+
+def test_check_uses_cache_when_recent(monkeypatch, cache_path: Path) -> None:
+    """If the cache is younger than _CACHE_TTL, do NOT hit the network."""
+    cache_path.write_text(
+        json.dumps({
+            "checked_at": datetime.now(tz=UTC).isoformat(),
+            "current": "0.0.1",
+            "latest": "0.0.7",
+            "download_url": "https://example.com/v0.0.7",
+            "dismissed_until": None,
+        }),
+        encoding="utf-8",
+    )
+
+    fetched = {"calls": 0}
+    def fake_fetch():
+        fetched["calls"] += 1
+        return {"tag_name": "v0.0.99", "html_url": "x"}
+    monkeypatch.setattr("claude_mnemos.core.update_check._fetch_latest_release", fake_fetch)
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+
+    from claude_mnemos.core.update_check import check_for_update
+    result = check_for_update(force=False)
+    assert fetched["calls"] == 0  # cache hit
+    assert result.latest == "0.0.7"
+
+
+def test_dismiss_records_until_timestamp(monkeypatch, cache_path: Path) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {"tag_name": "v0.0.5", "html_url": "x"},
+    )
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+
+    from claude_mnemos.core.update_check import check_for_update, dismiss_for_days
+
+    check_for_update(force=True)
+    dismiss_for_days(7)
+
+    # While snoozed, has_update reads the cache but the banner-suppress logic happens in the route layer.
+    data = json.loads(cache_path.read_text(encoding="utf-8"))
+    assert data["dismissed_until"] is not None
+
+
+def test_check_returns_no_update_on_network_error(monkeypatch, cache_path: Path) -> None:
+    def fake_fetch():
+        raise OSError("offline")
+    monkeypatch.setattr("claude_mnemos.core.update_check._fetch_latest_release", fake_fetch)
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+
+    from claude_mnemos.core.update_check import check_for_update
+    result = check_for_update(force=True)
+    assert result.has_update is False
+    assert result.error is not None
+```
+
+- [ ] **Step 2: Run, RED**
+
+```
+~/pipx/venvs/claude-mnemos/Scripts/python.exe -m pytest tests/core/test_update_check.py -v
+```
+
+- [ ] **Step 3: Implement `core/update_check.py`**
+
+```python
+# claude_mnemos/core/update_check.py
+"""Auto-update check against GitHub Releases.
+
+We do NOT auto-download or auto-replace binaries (that needs Sparkle /
+Squirrel + code-signing). We just compare versions and surface a
+"Update available — click to download" banner. Click opens the latest
+release page in the user's browser; they download + run the new
+installer manually.
+
+Cache: ``~/.claude-mnemos/update-check.json``. Background cron refreshes
+every 24h. Dismissal records ``dismissed_until`` and the route hides
+the banner until that time elapses.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import urllib.error
+import urllib.request
+
+from claude_mnemos import __version__
+
+_GITHUB_LATEST_RELEASE = "https://api.github.com/repos/DeveloperrOp/claude-mnemos/releases/latest"
+_CACHE_PATH: Path = Path.home() / ".claude-mnemos" / "update-check.json"
+_CACHE_TTL = timedelta(hours=24)
+
+
+@dataclass
+class UpdateStatus:
+    current: str
+    latest: str | None
+    download_url: str | None
+    has_update: bool
+    checked_at: datetime
+    dismissed_until: datetime | None = None
+    error: str | None = None
+
+
+def _current_version() -> str:
+    return __version__
+
+
+def _fetch_latest_release() -> dict:
+    """Hit GitHub. Raises OSError on network failure, ValueError on bad JSON."""
+    req = urllib.request.Request(
+        _GITHUB_LATEST_RELEASE,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "claude-mnemos"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _parse_version(v: str) -> tuple[int, ...]:
+    """'v0.0.5' or '0.0.5' → (0, 0, 5). Non-numeric chunks become 0."""
+    raw = v.lstrip("v")
+    parts: list[int] = []
+    for chunk in raw.split("."):
+        try:
+            parts.append(int(chunk.split("-")[0]))  # strip pre-release suffix
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def _load_cache() -> dict | None:
+    if not _CACHE_PATH.exists():
+        return None
+    try:
+        return json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _save_cache(data: dict) -> None:
+    _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CACHE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def check_for_update(*, force: bool = False) -> UpdateStatus:
+    """Return the current update status. Hits network at most once per TTL.
+
+    ``force=True`` bypasses the cache (used by the cron task).
+    """
+    now = datetime.now(tz=UTC)
+    cached = _load_cache()
+
+    if not force and cached:
+        try:
+            checked_at = datetime.fromisoformat(cached["checked_at"])
+            if now - checked_at < _CACHE_TTL:
+                return UpdateStatus(
+                    current=cached["current"],
+                    latest=cached.get("latest"),
+                    download_url=cached.get("download_url"),
+                    has_update=bool(cached.get("latest") and _parse_version(cached["latest"]) > _parse_version(cached["current"])),
+                    checked_at=checked_at,
+                    dismissed_until=datetime.fromisoformat(cached["dismissed_until"]) if cached.get("dismissed_until") else None,
+                )
+        except (KeyError, ValueError):
+            pass
+
+    current = _current_version()
+    try:
+        release = _fetch_latest_release()
+        latest = release.get("tag_name", "").lstrip("v")
+        download_url = release.get("html_url")
+        has_update = bool(latest) and _parse_version(latest) > _parse_version(current)
+        status = UpdateStatus(
+            current=current,
+            latest=latest or None,
+            download_url=download_url,
+            has_update=has_update,
+            checked_at=now,
+        )
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        status = UpdateStatus(
+            current=current,
+            latest=None,
+            download_url=None,
+            has_update=False,
+            checked_at=now,
+            error=str(exc),
+        )
+
+    # Preserve dismissed_until across refreshes.
+    if cached and cached.get("dismissed_until"):
+        try:
+            status.dismissed_until = datetime.fromisoformat(cached["dismissed_until"])
+        except ValueError:
+            pass
+
+    _save_cache({
+        "checked_at": status.checked_at.isoformat(),
+        "current": status.current,
+        "latest": status.latest,
+        "download_url": status.download_url,
+        "dismissed_until": status.dismissed_until.isoformat() if status.dismissed_until else None,
+    })
+    return status
+
+
+def dismiss_for_days(days: int) -> None:
+    """Snooze the update banner for ``days`` days from now."""
+    cached = _load_cache() or {}
+    cached["dismissed_until"] = (datetime.now(tz=UTC) + timedelta(days=days)).isoformat()
+    if "checked_at" not in cached:
+        cached["checked_at"] = datetime.now(tz=UTC).isoformat()
+    if "current" not in cached:
+        cached["current"] = _current_version()
+    _save_cache(cached)
+```
+
+- [ ] **Step 4: REST routes**
+
+```python
+# claude_mnemos/daemon/routes/update.py
+"""Auto-update REST endpoints — banner + dismiss."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import APIRouter, Body
+
+from claude_mnemos.core.update_check import check_for_update, dismiss_for_days
+
+router = APIRouter()
+
+
+@router.get("/update-status")
+def update_status_route() -> dict[str, Any]:
+    s = check_for_update(force=False)
+    suppress = (
+        s.dismissed_until is not None
+        and s.dismissed_until > datetime.now(tz=UTC)
+    )
+    return {
+        "current": s.current,
+        "latest": s.latest,
+        "download_url": s.download_url,
+        "has_update": s.has_update and not suppress,
+        "checked_at": s.checked_at.isoformat(),
+        "dismissed_until": s.dismissed_until.isoformat() if s.dismissed_until else None,
+        "error": s.error,
+    }
+
+
+@router.post("/update-status/dismiss")
+def dismiss_route(payload: dict = Body(default={})) -> dict[str, Any]:
+    days = int(payload.get("days", 7))
+    days = max(1, min(days, 30))  # cap 1-30 days
+    dismiss_for_days(days)
+    return {"ok": True, "dismissed_for_days": days}
+```
+
+Wire into `daemon/app.py`:
+```python
+from claude_mnemos.daemon.routes.update import router as update_router
+# ...
+app.include_router(update_router, prefix="/api")
+```
+
+- [ ] **Step 5: Cron task in `daemon/process.py`**
+
+Find `_build_cron_tasks` (added in cleanup A4). Add:
+```python
+CronTask(
+    id="update_check_global",
+    schedule_kwargs={"hour": 3, "minute": 17},  # 3:17 AM daily
+    fn=lambda: asyncio.to_thread(_run_update_check),
+),
+```
+
+And the helper:
+```python
+def _run_update_check() -> None:
+    try:
+        from claude_mnemos.core.update_check import check_for_update
+        check_for_update(force=True)
+    except Exception:
+        logger.exception("update-check cron failed")
+```
+
+- [ ] **Step 6: REST integration test**
+
+```python
+# tests/daemon/test_app_update.py
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def app(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._CACHE_PATH",
+        tmp_path / "update-check.json",
+    )
+    from claude_mnemos.daemon.app import create_app
+    return create_app(daemon=None)
+
+
+@pytest.fixture
+def client(app):
+    return TestClient(app)
+
+
+def test_update_status_returns_has_update(client, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {"tag_name": "v0.9.0", "html_url": "https://example.com/v0.9.0"},
+    )
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+    r = client.get("/api/update-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["has_update"] is True
+    assert body["latest"] == "0.9.0"
+
+
+def test_dismiss_silences_banner(client, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {"tag_name": "v0.9.0", "html_url": "https://example.com/v0.9.0"},
+    )
+    monkeypatch.setattr("claude_mnemos.core.update_check._current_version", lambda: "0.0.1")
+    # First call populates cache.
+    assert client.get("/api/update-status").json()["has_update"] is True
+    # Dismiss for 7 days.
+    r = client.post("/api/update-status/dismiss", json={"days": 7})
+    assert r.status_code == 200
+    # Subsequent has_update is False.
+    assert client.get("/api/update-status").json()["has_update"] is False
+```
+
+- [ ] **Step 7: Frontend API + hook**
+
+```typescript
+// frontend/src/api/update.api.ts
+import axios from "axios";
+
+export interface UpdateStatus {
+  current: string;
+  latest: string | null;
+  download_url: string | null;
+  has_update: boolean;
+  checked_at: string;
+  dismissed_until: string | null;
+  error: string | null;
+}
+
+export async function getUpdateStatus(): Promise<UpdateStatus> {
+  const r = await axios.get<UpdateStatus>("/api/update-status");
+  return r.data;
+}
+
+export async function dismissUpdate(days: number = 7): Promise<void> {
+  await axios.post("/api/update-status/dismiss", { days });
+}
+```
+
+```typescript
+// frontend/src/hooks/useUpdateStatus.ts
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getUpdateStatus, dismissUpdate } from "@/api/update.api";
+
+export function useUpdateStatus() {
+  return useQuery({
+    queryKey: ["update-status"],
+    queryFn: getUpdateStatus,
+    refetchInterval: 6 * 60 * 60 * 1000,  // 6h client-side poll (cron refreshes server-side daily)
+  });
+}
+
+export function useDismissUpdate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: dismissUpdate,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["update-status"] }),
+  });
+}
+```
+
+- [ ] **Step 8: Banner component + test**
+
+```typescript
+// frontend/src/__tests__/UpdateBanner.test.tsx
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { UpdateBanner } from "@/components/widgets/dashboard/UpdateBanner";
+import * as api from "@/api/update.api";
+
+vi.mock("@/api/update.api");
+
+function renderBanner() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <UpdateBanner />
+    </QueryClientProvider>,
+  );
+}
+
+describe("UpdateBanner", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders nothing when no update available", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      current: "0.0.1",
+      latest: "0.0.1",
+      download_url: null,
+      has_update: false,
+      checked_at: new Date().toISOString(),
+      dismissed_until: null,
+      error: null,
+    });
+    const { container } = renderBanner();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(container.querySelector("[data-testid='update-banner']")).toBeNull();
+  });
+
+  it("renders banner with version + download link when has_update", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      current: "0.0.1",
+      latest: "0.1.0",
+      download_url: "https://example.com/v0.1.0",
+      has_update: true,
+      checked_at: new Date().toISOString(),
+      dismissed_until: null,
+      error: null,
+    });
+    renderBanner();
+    expect(await screen.findByText(/0\.1\.0/i)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /download/i });
+    expect(link).toHaveAttribute("href", "https://example.com/v0.1.0");
+  });
+
+  it("calls dismiss when 'Later' clicked", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      current: "0.0.1",
+      latest: "0.1.0",
+      download_url: "https://example.com/v0.1.0",
+      has_update: true,
+      checked_at: new Date().toISOString(),
+      dismissed_until: null,
+      error: null,
+    });
+    vi.mocked(api.dismissUpdate).mockResolvedValue();
+    renderBanner();
+    await userEvent.click(await screen.findByRole("button", { name: /later/i }));
+    await waitFor(() => expect(api.dismissUpdate).toHaveBeenCalled());
+  });
+});
+```
+
+```tsx
+// frontend/src/components/widgets/dashboard/UpdateBanner.tsx
+import { useUpdateStatus, useDismissUpdate } from "@/hooks/useUpdateStatus";
+
+export function UpdateBanner() {
+  const q = useUpdateStatus();
+  const dismiss = useDismissUpdate();
+
+  if (q.isLoading || !q.data || !q.data.has_update || !q.data.download_url) return null;
+  const { current, latest, download_url } = q.data;
+
+  return (
+    <div
+      data-testid="update-banner"
+      className="rounded-md border border-blue-500/40 bg-blue-500/10 px-4 py-3 flex items-center gap-3"
+    >
+      <span className="font-mono text-xs uppercase text-blue-400">UPDATE</span>
+      <div className="flex-1 text-sm">
+        <span className="font-medium">claude-mnemos {latest}</span> is available
+        <span className="text-muted-foreground"> (you have {current})</span>
+      </div>
+      <a
+        href={download_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
+      >
+        Download
+      </a>
+      <button
+        type="button"
+        onClick={() => dismiss.mutate(7)}
+        disabled={dismiss.isPending}
+        className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted/50"
+      >
+        Later
+      </button>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 9: Mount in Overview**
+
+```tsx
+// frontend/src/pages/Overview.tsx
+import { UpdateBanner } from "@/components/widgets/dashboard/UpdateBanner";
+
+// inside JSX, before <HookStatusBanner />:
+<UpdateBanner />
+```
+
+- [ ] **Step 10: Run all tests**
+
+```
+~/pipx/venvs/claude-mnemos/Scripts/python.exe -m pytest tests/core/test_update_check.py tests/daemon/test_app_update.py -v
+~/pipx/venvs/claude-mnemos/Scripts/python.exe -m pytest tests/ --deselect tests/daemon/test_e2e_subprocess.py::test_daemon_subprocess_lifecycle -q | tail -3
+cd frontend && npm test -- --run UpdateBanner
+cd frontend && npm run typecheck
+```
+Expected: 5 backend + 2 backend route + 3 frontend tests pass; full suite ≥1717.
+
+- [ ] **Step 11: Commit**
+
+```
+git add claude_mnemos/core/update_check.py claude_mnemos/daemon/routes/update.py claude_mnemos/daemon/app.py claude_mnemos/daemon/process.py tests/core/test_update_check.py tests/daemon/test_app_update.py
+git add frontend/src/api/update.api.ts frontend/src/hooks/useUpdateStatus.ts frontend/src/components/widgets/dashboard/UpdateBanner.tsx frontend/src/pages/Overview.tsx frontend/src/__tests__/UpdateBanner.test.tsx
+git commit -m "feat(update): auto-update notifier — banner + click-to-download
+
+Polls GitHub Releases daily (cron at 03:17), 24h cache. UpdateBanner
+on Overview surfaces a 'v X.Y.Z available — Download' chip when the
+remote tag is newer than the current __version__. Click opens release
+page in a new tab; user runs the new installer manually. 'Later'
+snoozes the banner for 7 days.
+
+Auto-replace via Sparkle/Squirrel deferred (needs code-signing).
+Manual install is fine for the unsigned-binary phase."
+```
+
+---
+
+### Task 11: GitHub Actions release workflow
 
 **Files:**
 - Create: `.github/workflows/release.yml`
@@ -1618,7 +2226,7 @@ release job collects all three and publishes a GitHub Release."
 
 ---
 
-### Task 11: README — install-from-release section
+### Task 12: README — install-from-release section
 
 User-facing documentation: download, install, bypass SmartScreen / Gatekeeper, uninstall.
 
@@ -1679,20 +2287,20 @@ Documents the unsigned-binary expectation for the initial release."
 
 ### Final verification — Phase 2
 
-After all 11 tasks:
+After all 12 tasks:
 
 - [ ] **Step 1: Backend full suite**
 
 ```
 ~/pipx/venvs/claude-mnemos/Scripts/python.exe -m pytest tests/ --deselect tests/daemon/test_e2e_subprocess.py::test_daemon_subprocess_lifecycle -q | tail -3
 ```
-Expected: ≥1709 passed (1691 + ~18 new across tasks 1, 3, 4, 6).
+Expected: ≥1717 passed (1691 + ~26 new across tasks 1, 3, 4, 6, 10).
 
 - [ ] **Step 2: Frontend Vitest**
 ```
 cd frontend && npm test -- --run | tail -5
 ```
-Expected: 357 passed (no change — Phase 2 is backend/install only).
+Expected: ≥360 passed (was 357 + 3 new from UpdateBanner test in task 10).
 
 - [ ] **Step 3: PyInstaller bundle works locally on Windows**
 
