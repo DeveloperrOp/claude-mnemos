@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 
-_PROMPTS_DIR = Path(__file__).parent
+from claude_mnemos.runtime import prompts_dir as _runtime_prompts_dir
+
+_PROMPTS_DIR = _runtime_prompts_dir()
 
 
 @lru_cache(maxsize=1)

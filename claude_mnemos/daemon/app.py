@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from claude_mnemos import __version__
+from claude_mnemos.runtime import static_dir as _runtime_static_dir
 from claude_mnemos.core.locks import LockTimeoutError
 from claude_mnemos.core.ontology_apply import OntologyError
 from claude_mnemos.core.page_apply import PageRestoreCollisionError
@@ -206,7 +207,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     # path falls back to index.html so React Router can take over.
     # Mounted last so REST routers take precedence on overlapping paths.
     if static_dir is None:
-        static_dir = Path(__file__).parent / "static"
+        static_dir = _runtime_static_dir()
     if (static_dir / "index.html").is_file():
         app.mount(
             "/",

@@ -18,7 +18,9 @@ from claude_mnemos.tray.supervisor import Supervisor, SupervisorState
 
 logger = logging.getLogger(__name__)
 
-ASSETS = Path(__file__).parent / "assets"
+from claude_mnemos.runtime import tray_assets_dir as _runtime_tray_assets_dir
+
+ASSETS = _runtime_tray_assets_dir()
 
 SUPERVISOR_LOG = Path.home() / ".claude-mnemos" / "supervisor.log"
 RECENT_EVENTS_LIMIT = 8
