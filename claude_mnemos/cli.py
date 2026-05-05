@@ -547,6 +547,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from claude_mnemos.postinstall import maybe_run_first_time_init
+    maybe_run_first_time_init()
     parser = build_parser()
     args = parser.parse_args(argv)
 
