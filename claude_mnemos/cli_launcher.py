@@ -37,7 +37,15 @@ def _tray_running() -> bool:
 
 
 def _spawn_tray() -> bool:
-    cmd = [sys.executable, "-m", "claude_mnemos.tray", "run"]
+    from claude_mnemos import runtime
+    # In frozen mode sys.executable IS the bundled claude-mnemos.exe — argparse
+    # parses its own argv directly, so `-m claude_mnemos.tray` is invalid as a
+    # subcommand and would crash silently. In source mode sys.executable is
+    # python.exe and we need the explicit module path.
+    if runtime.is_frozen():
+        cmd = [sys.executable, "tray", "run"]
+    else:
+        cmd = [sys.executable, "-m", "claude_mnemos.cli", "tray", "run"]
     creationflags = 0
     if sys.platform == "win32":
         creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP

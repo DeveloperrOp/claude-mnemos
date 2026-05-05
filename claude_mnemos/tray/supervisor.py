@@ -163,7 +163,13 @@ class Supervisor:
 
     # ── subprocess lifecycle ────────────────────────────────────
     def _spawn_daemon(self) -> subprocess.Popen:
-        cmd = [sys.executable, "-m", "claude_mnemos.daemon", "foreground", "--all"]
+        from claude_mnemos import runtime
+        # Frozen bundle has its own argparse — `-m` not a valid subcommand.
+        # Source mode needs the explicit module path.
+        if runtime.is_frozen():
+            cmd = [sys.executable, "daemon", "foreground", "--all"]
+        else:
+            cmd = [sys.executable, "-m", "claude_mnemos.daemon", "foreground", "--all"]
         creationflags = 0
         if sys.platform == "win32":
             # CREATE_NEW_PROCESS_GROUP so we can send CTRL_BREAK_EVENT later;
@@ -338,7 +344,11 @@ class Supervisor:
                 logger.exception("[supervisor] open_launcher ipc_send failed")
             return
 
-        cmd = [sys.executable, "-m", "claude_mnemos.cli", "launcher", "--no-spawn-tray"]
+        from claude_mnemos import runtime
+        if runtime.is_frozen():
+            cmd = [sys.executable, "launcher", "--no-spawn-tray"]
+        else:
+            cmd = [sys.executable, "-m", "claude_mnemos.cli", "launcher", "--no-spawn-tray"]
         creationflags = 0
         if sys.platform == "win32":
             creationflags = (
