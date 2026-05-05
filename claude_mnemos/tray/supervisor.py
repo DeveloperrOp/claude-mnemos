@@ -336,10 +336,11 @@ class Supervisor:
         """Open launcher window: spawn subprocess if not alive, send IPC 'show' if alive."""
         if self.launcher_proc is not None and self.launcher_proc.poll() is None:
             try:
-                # Lazy import IPC_ADDRESS to avoid circular import
-                # (tray/__main__ imports supervisor at module level).
-                from claude_mnemos.tray.__main__ import IPC_ADDRESS
-                ipc_send(IPC_ADDRESS, "show")
+                # Send 'show' to LAUNCHER's IPC channel (separate from tray's),
+                # which causes window.show() in the launcher process. Lazy
+                # import to avoid loading webview at module level.
+                from claude_mnemos.launcher import LAUNCHER_IPC_ADDRESS
+                ipc_send(LAUNCHER_IPC_ADDRESS, "show")
             except Exception:
                 logger.exception("[supervisor] open_launcher ipc_send failed")
             return

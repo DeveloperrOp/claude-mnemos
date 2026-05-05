@@ -18,12 +18,23 @@ import sys
 import threading
 import time
 import urllib.request
+from pathlib import Path
 from typing import Callable
 
 DAEMON_URL = "http://127.0.0.1:5757"
 HEALTH_URL = f"{DAEMON_URL}/api/health"
 HEALTH_POLL_INTERVAL_S = 0.5
 HEALTH_TIMEOUT_S = 30.0
+
+# Separate IPC channel from tray's. Tray IPC receives "show" from `mnemos
+# launcher` invocations (CLI / desktop shortcut clicks). Tray then forwards
+# "show" to the LIVE launcher process via THIS launcher channel — which
+# triggers window.show() on the existing hidden window instead of spawning
+# a duplicate. Different name → no message-loopback.
+if sys.platform == "win32":
+    LAUNCHER_IPC_ADDRESS = r"\\.\pipe\claude-mnemos-launcher"
+else:
+    LAUNCHER_IPC_ADDRESS = str(Path.home() / ".claude-mnemos" / "launcher.sock")
 
 SPLASH_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>claude-mnemos</title>
@@ -91,9 +102,32 @@ def _make_on_closing(window) -> Callable[[], bool]:
     return _handler
 
 
+def _make_show_handler(window) -> Callable[[str], None]:
+    """IPC callback: 'show' messages → unhide + restore + focus the window.
+
+    Tray supervisor sends 'show' to LAUNCHER_IPC_ADDRESS when the user
+    re-clicks the desktop shortcut while the launcher process is still alive
+    with a hidden window. Without this, the click would be a no-op.
+    """
+    def _on_msg(msg: str) -> None:
+        if msg != "show":
+            return
+        try:
+            window.show()
+        except Exception:
+            pass
+        try:
+            window.restore()
+        except Exception:
+            pass
+
+    return _on_msg
+
+
 def _open_window() -> int:
     """Open a pywebview window. Blocks until the user closes it."""
     import webview
+    from claude_mnemos.tray.ipc import IpcServer
 
     window = webview.create_window(
         title="claude-mnemos",
@@ -111,6 +145,15 @@ def _open_window() -> int:
     except Exception:
         pass
 
+    # IPC server for "show" messages from supervisor (re-click shortcut while
+    # window is hidden).
+    ipc_srv: IpcServer | None = None
+    try:
+        ipc_srv = IpcServer(LAUNCHER_IPC_ADDRESS, on_message=_make_show_handler(window))
+        ipc_srv.start()
+    except Exception:
+        ipc_srv = None  # not fatal — re-click just won't focus existing window
+
     def _navigate_when_ready() -> None:
         if _wait_daemon_ready():
             try:
@@ -122,7 +165,14 @@ def _open_window() -> int:
     t = threading.Thread(target=_navigate_when_ready, daemon=True)
     t.start()
 
-    webview.start()
+    try:
+        webview.start()
+    finally:
+        if ipc_srv is not None:
+            try:
+                ipc_srv.stop()
+            except Exception:
+                pass
     return 0
 
 
