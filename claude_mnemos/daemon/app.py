@@ -39,6 +39,7 @@ from claude_mnemos.daemon.routes.settings import router as settings_router
 from claude_mnemos.daemon.routes.snapshots import router as snapshots_router
 from claude_mnemos.daemon.routes.trash import router as trash_router
 from claude_mnemos.daemon.routes.tray import router as tray_router
+from claude_mnemos.daemon.routes.update import router as update_router
 from claude_mnemos.daemon.routes.vault import router as vault_router
 from claude_mnemos.lint.exceptions import LintCorruptError, LintError
 from claude_mnemos.state.activity import ActivityCorruptError
@@ -79,6 +80,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     app.include_router(hooks_router, prefix="/api")
     app.include_router(inject_preview_router, prefix="/api")
     app.include_router(onboarding_router, prefix="/api")
+    app.include_router(update_router, prefix="/api")
 
     @app.exception_handler(ActivityCorruptError)
     async def _activity_corrupt(_request: Request, exc: ActivityCorruptError) -> JSONResponse:

@@ -257,6 +257,16 @@ class MnemosDaemon:
             except Exception:
                 logger.exception("health_checks_task failed")
 
+        async def _update_check_task() -> None:
+            # Runs once daily — hits GitHub Releases API on the worker thread
+            # so the network/file IO doesn't block the scheduler loop.
+            try:
+                from claude_mnemos.core.update_check import check_for_update
+
+                await asyncio.to_thread(check_for_update, force=True)
+            except Exception:
+                logger.exception("update_check_task failed")
+
         self._auto_dump_task_fn = _auto_dump_task
         self._health_checks_task_fn = _health_checks_task
 
@@ -270,6 +280,11 @@ class MnemosDaemon:
                 id="health_checks_global",
                 schedule_kwargs={"minute": "*/5"},
                 fn=_health_checks_task,
+            ),
+            CronTask(
+                id="update_check_global",
+                schedule_kwargs={"hour": 3, "minute": 17},
+                fn=_update_check_task,
             ),
         ]
 
