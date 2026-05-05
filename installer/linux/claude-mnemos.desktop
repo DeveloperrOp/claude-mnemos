@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=claude-mnemos
+GenericName=Claude Code Memory Daemon
+Comment=Capture and recall Claude Code session context
+Icon=claude-mnemos
+Exec=claude-mnemos tray run
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=false
