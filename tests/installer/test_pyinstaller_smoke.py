@@ -19,11 +19,17 @@ if os.name != "nt":
 @pytest.mark.skipif(not BUNDLE.exists(), reason="PyInstaller bundle not built")
 def test_bundle_doctor_runs() -> None:
     """The bundled exe must run `doctor` and exit (0 or 1) within 10s."""
+    # Belt-and-suspenders: as of cli.py main() postinstall is gated to `tray
+    # run` only, so `doctor` would not trigger init anyway — but we set the
+    # env var explicitly to make this test bulletproof against a regression.
+    env = os.environ.copy()
+    env["MNEMOS_SKIP_POSTINSTALL"] = "1"
     proc = subprocess.run(
         [str(BUNDLE), "doctor"],
         capture_output=True,
         text=True,
         timeout=10,
+        env=env,
     )
     assert proc.returncode in (0, 1), f"unexpected rc={proc.returncode}; stderr={proc.stderr}"
     assert "claude_cli" in proc.stdout

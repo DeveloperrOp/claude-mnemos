@@ -547,8 +547,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from claude_mnemos.postinstall import maybe_run_first_time_init
-    maybe_run_first_time_init()
+    # First-run-after-install fires the full mnemos init flow (hooks install +
+    # tray autostart + browser open). It's expensive (~30s waiting for daemon
+    # health) and spawns a detached tray subprocess, so it must NOT run for
+    # diagnostic subcommands (`doctor`, `hook <event>`, `hooks status`, etc) —
+    # otherwise smoke tests / hook invocations / arbitrary CLI calls all spawn
+    # rogue trays before they can save first_run_ts. Trigger only on the
+    # primary application entry: `tray run`. Also support an env-var escape
+    # hatch for tests.
+    import os
+    _argv = sys.argv if argv is None else [sys.argv[0], *argv]
+    is_tray_run = (
+        len(_argv) >= 3 and _argv[1] == "tray" and _argv[2] == "run"
+    )
+    if is_tray_run and os.environ.get("MNEMOS_SKIP_POSTINSTALL") != "1":
+        from claude_mnemos.postinstall import maybe_run_first_time_init
+        maybe_run_first_time_init()
     parser = build_parser()
     args = parser.parse_args(argv)
 

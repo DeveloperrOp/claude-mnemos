@@ -58,3 +58,60 @@ def test_skipped_in_source_mode(state_path: Path, monkeypatch) -> None:
     from claude_mnemos.postinstall import maybe_run_first_time_init
     maybe_run_first_time_init()
     assert calls["init"] == 0
+
+
+def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
+    """cli.main() must NOT call maybe_run_first_time_init for diagnostic
+    subcommands (doctor, hook, hooks status, ingest, etc) — only for the
+    primary `tray run` entry. Otherwise smoke tests / hook invocations
+    spawn rogue tray processes before they can save first_run_ts.
+
+    Regression: the bundled exe being invoked with `doctor` (e.g. by the
+    PyInstaller smoke test) used to trigger the full init flow which
+    spawned a detached tray subprocess that never got cleaned up,
+    leaving ghost tray icons in the Windows notification area.
+    """
+    calls = {"postinstall": 0}
+
+    def fake_postinstall():
+        calls["postinstall"] += 1
+
+    monkeypatch.setattr(
+        "claude_mnemos.postinstall.maybe_run_first_time_init",
+        fake_postinstall,
+    )
+
+    from claude_mnemos.cli import main
+
+    # Diagnostic / non-app commands MUST NOT trigger postinstall.
+    for argv in (["doctor"], ["hook", "session-start"], ["hooks", "status"]):
+        try:
+            main(argv)
+        except SystemExit:
+            pass
+        except Exception:
+            pass
+    assert calls["postinstall"] == 0
+
+
+def test_main_skips_postinstall_when_env_var_set(monkeypatch) -> None:
+    """MNEMOS_SKIP_POSTINSTALL=1 disables the call even on `tray run`."""
+    calls = {"postinstall": 0}
+
+    def fake_postinstall():
+        calls["postinstall"] += 1
+
+    monkeypatch.setattr(
+        "claude_mnemos.postinstall.maybe_run_first_time_init",
+        fake_postinstall,
+    )
+    monkeypatch.setenv("MNEMOS_SKIP_POSTINSTALL", "1")
+
+    from claude_mnemos.cli import main
+    try:
+        main(["tray", "run"])
+    except SystemExit:
+        pass
+    except Exception:
+        pass
+    assert calls["postinstall"] == 0
