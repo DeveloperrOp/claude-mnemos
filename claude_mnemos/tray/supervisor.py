@@ -20,6 +20,7 @@ import httpx
 import psutil
 
 from claude_mnemos.daemon.lockfile import is_daemon_running
+from claude_mnemos.tray.ipc import ipc_send
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,9 @@ class Supervisor:
         self.last_health: HealthSnapshot | None = None
         self.health_url = _default_health_url()
         self._http: httpx.Client | None = None
+        # Subprocess of the launcher window (if we spawned one). The tray
+        # may also live without it; ``open_launcher`` lazily fills this in.
+        self.launcher_proc: subprocess.Popen | None = None
 
     # ── liveness helper, mockable ───────────────────────────────
     def _is_existing_daemon_running(self) -> int | None:
@@ -320,3 +324,67 @@ class Supervisor:
             with contextlib.suppress(Exception):
                 self._log_fh.close()
             self._log_fh = None
+
+    # ── verbs driven by tray menu / IPC ─────────────────────────
+    def open_launcher(self) -> None:
+        """Open launcher window: spawn subprocess if not alive, send IPC 'show' if alive."""
+        if self.launcher_proc is not None and self.launcher_proc.poll() is None:
+            try:
+                # Lazy import IPC_ADDRESS to avoid circular import
+                # (tray/__main__ imports supervisor at module level).
+                from claude_mnemos.tray.__main__ import IPC_ADDRESS
+                ipc_send(IPC_ADDRESS, "show")
+            except Exception:
+                logger.exception("[supervisor] open_launcher ipc_send failed")
+            return
+
+        cmd = [sys.executable, "-m", "claude_mnemos.cli", "launcher", "--no-spawn-tray"]
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = (
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        try:
+            self.launcher_proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=creationflags,
+                close_fds=True,
+                start_new_session=(sys.platform != "win32"),
+            )
+        except Exception:
+            logger.exception("[supervisor] open_launcher Popen failed")
+
+    def _post_to_daemon(self, path: str) -> None:
+        if self._http is None:
+            return
+        try:
+            url = self.health_url.replace("/api/health", path)
+            self._http.post(url)
+        except Exception:
+            logger.exception("[supervisor] POST %s failed", path)
+
+    def pause_daemon(self) -> None:
+        self._post_to_daemon("/api/daemon/pause")
+
+    def resume_daemon(self) -> None:
+        self._post_to_daemon("/api/daemon/resume")
+
+    def shutdown(self) -> None:
+        """Graceful full-quit: stop launcher subprocess (if any), then daemon."""
+        if (
+            self.launcher_proc is not None
+            and self.launcher_proc.poll() is None
+        ):
+            try:
+                self.launcher_proc.terminate()
+                self.launcher_proc.wait(timeout=5.0)
+            except Exception:
+                logger.exception("[supervisor] launcher terminate failed")
+            self.launcher_proc = None
+        try:
+            self.stop(grace_seconds=5.0)
+        except Exception:
+            logger.exception("[supervisor] stop failed during shutdown")

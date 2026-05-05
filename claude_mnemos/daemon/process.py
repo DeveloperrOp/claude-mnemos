@@ -101,6 +101,10 @@ class MnemosDaemon:
         self.app: FastAPI = create_app(daemon=self)
         self.started_at_monotonic: float = 0.0
         self._server: uvicorn.Server | None = None
+        # Pause-flag flipped by /api/daemon/{pause,resume}. Read by callers
+        # who choose to honour it (scheduler/watchdog integration is out of
+        # scope for the route; the flag is the single source of truth).
+        self.paused: bool = False
 
     # ─── Scheduler info (used by /scheduler/jobs) ─────────────────
 
