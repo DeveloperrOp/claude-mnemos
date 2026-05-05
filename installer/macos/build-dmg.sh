@@ -4,18 +4,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-# Resolve the Python to use. On CI, $pythonLocation is set by
-# actions/setup-python@v5 and points at the toolcache install where we
-# installed setuptools + py2app. Without this, `python` may resolve to
-# /Library/Frameworks/Python.framework (system Python) which doesn't
-# have setuptools or py2app — setup.py would crash with
-# 'ModuleNotFoundError: No module named pkg_resources'.
-PYTHON_BIN="${pythonLocation:+$pythonLocation/bin/python3}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-echo "[build-dmg] Using Python: $PYTHON_BIN"
-"$PYTHON_BIN" -c "import sys; print('[build-dmg] sys.executable:', sys.executable)"
+# Resolve the actual Python that setup.py will run under.
+#
+# Caveat: actions/setup-python@v5 on macOS installs python3 as a wrapper
+# whose sys.executable re-exec's into /Library/Frameworks/Python.framework
+# (the "real" install target). So just doing `python3 -m pip install`
+# installs into the toolcache, but `python3 setup.py py2app` runs against
+# the system Framework Python — a different site-packages.
+#
+# Resolve sys.executable explicitly and install into THAT Python.
+WRAPPER_PYTHON="${pythonLocation:+$pythonLocation/bin/python3}"
+WRAPPER_PYTHON="${WRAPPER_PYTHON:-python3}"
+PYTHON_BIN=$("$WRAPPER_PYTHON" -c "import sys; print(sys.executable)")
+echo "[build-dmg] Wrapper python: $WRAPPER_PYTHON"
+echo "[build-dmg] Real sys.executable (will be used): $PYTHON_BIN"
 
-# Belt-and-suspenders: ensure setuptools/py2app are present in the chosen Python.
+# Install setuptools + py2app into the SAME Python that runs setup.py.
 "$PYTHON_BIN" -m pip install --quiet setuptools py2app==0.28.6
 
 # 1) Build the .app bundle
