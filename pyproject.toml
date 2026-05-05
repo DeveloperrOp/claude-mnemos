@@ -40,6 +40,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
 ]
+installer = ["pyinstaller>=6.11"]
 
 [project.scripts]
 mnemos = "claude_mnemos.cli:main"
