@@ -14,7 +14,12 @@ import urllib.request
 import webbrowser
 
 from claude_mnemos.cli_hooks import install as _hooks_install_impl
-from claude_mnemos.tray.__main__ import _cmd_install as _tray_install_impl
+
+# NOTE: do NOT import tray.__main__ at module level — its transitive import of
+# pystray top-level requires an X DISPLAY on Linux (pystray._xorg connects to
+# the display at module import). CI runners without DISPLAY would crash on
+# `from claude_mnemos.cli_init import ...` even when the test never calls
+# tray. Import lazily inside _install_tray_autostart_safe instead.
 
 DEFAULT_DAEMON_URL = "http://127.0.0.1:5757/api/health"
 HEALTH_TIMEOUT_S = 30.0
@@ -35,6 +40,9 @@ def _install_hooks_safe() -> dict | None:
 def _install_tray_autostart_safe() -> bool:
     """Returns True on success, False on any failure (Linux unsupported, etc)."""
     try:
+        # Lazy import — pystray (transitive dep) connects to X DISPLAY at top-level
+        # on Linux. Importing here lets headless CI test paths skip the cost.
+        from claude_mnemos.tray.__main__ import _cmd_install as _tray_install_impl
         rc = _tray_install_impl()
         return rc == 0
     except Exception:  # noqa: BLE001
