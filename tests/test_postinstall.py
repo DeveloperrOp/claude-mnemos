@@ -80,6 +80,12 @@ def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
         "claude_mnemos.postinstall.maybe_run_first_time_init",
         fake_postinstall,
     )
+    # Mock all command implementations so the test verifies ONLY the postinstall
+    # gate, not actual command execution. Without this, `doctor` makes a live
+    # HTTP request to the daemon and `tray run` would spawn real subprocesses.
+    monkeypatch.setattr("claude_mnemos.cli_doctor._cmd_doctor", lambda args: 0)
+    monkeypatch.setattr("claude_mnemos.cli_hook._cmd_hook", lambda args: 0)
+    monkeypatch.setattr("claude_mnemos.cli_hooks._cmd_status", lambda args: 0)
 
     from claude_mnemos.cli import main
 
@@ -95,7 +101,12 @@ def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
 
 
 def test_main_skips_postinstall_when_env_var_set(monkeypatch) -> None:
-    """MNEMOS_SKIP_POSTINSTALL=1 disables the call even on `tray run`."""
+    """MNEMOS_SKIP_POSTINSTALL=1 disables the call even on `tray run`.
+
+    CRITICAL: this test must NOT actually run the tray supervisor — it would
+    spawn detached daemon + tray subprocesses that survive pytest exit and
+    accumulate every time the suite runs. Mock cli_tray.run to a no-op.
+    """
     calls = {"postinstall": 0}
 
     def fake_postinstall():
@@ -105,6 +116,7 @@ def test_main_skips_postinstall_when_env_var_set(monkeypatch) -> None:
         "claude_mnemos.postinstall.maybe_run_first_time_init",
         fake_postinstall,
     )
+    monkeypatch.setattr("claude_mnemos.cli_tray.run", lambda argv: 0)
     monkeypatch.setenv("MNEMOS_SKIP_POSTINSTALL", "1")
 
     from claude_mnemos.cli import main
