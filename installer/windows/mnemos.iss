@@ -61,10 +61,16 @@ Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"
 Filename: "{app}\{#MyAppExeName}"; Parameters: "launcher"; Description: "Start claude-mnemos now"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
-; Stop the tray + daemon before file removal.
+; Order matters: cleanup actions FIRST (while exe is still launchable),
+; THEN force-kill any surviving claude-mnemos.exe processes so file removal
+; isn't blocked by locked .exe / .pyd handles. CloseApplications=force in
+; [Setup] handles install-time but not uninstall-time, hence the explicit
+; taskkill here.
 Filename: "{app}\{#MyAppExeName}"; Parameters: "tray uninstall"; Flags: runhidden; RunOnceId: "RemoveAutostart"
 Filename: "{app}\{#MyAppExeName}"; Parameters: "daemon stop";    Flags: runhidden; RunOnceId: "StopDaemon"
 Filename: "{app}\{#MyAppExeName}"; Parameters: "hooks uninstall"; Flags: runhidden; RunOnceId: "RemoveHooks"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM claude-mnemos.exe /T"; Flags: runhidden; RunOnceId: "KillMnemos"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM claude-mnemos-cli.exe /T"; Flags: runhidden; RunOnceId: "KillMnemosCli"
 
 [Code]
 function WebView2RuntimeInstalled: Boolean;

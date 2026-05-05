@@ -61,11 +61,18 @@ class WindowsAutostart(AutostartManager):
             f"$Shortcut.WindowStyle = 7; "  # 7 = minimized; tray app has no main window
             f"$Shortcut.Save()"
         )
+        # CREATE_NO_WINDOW: powershell.exe is a console subsystem program;
+        # without this flag, calling it from a windowed parent (the bundled
+        # claude-mnemos.exe is console=False) flashes a black console window
+        # for ~50ms while powershell starts. The WScript.Shell COM call
+        # finishes in milliseconds, so the flash is brief but visible —
+        # users see it during postinstall autostart registration.
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-Command", ps],
             capture_output=True,
             text=True,
             check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         if result.returncode != 0:
             raise RuntimeError(

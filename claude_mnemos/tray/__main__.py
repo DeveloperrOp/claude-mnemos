@@ -147,11 +147,20 @@ def _cmd_install() -> int:
         if tray_pid > 0 and psutil.pid_exists(tray_pid):
             tray_alive = True
     if not tray_alive:
+        from claude_mnemos import runtime
+        # Frozen bundle has its own argparse — `-m` is invalid as a subcommand.
+        # In source mode sys.executable is python.exe and we need the explicit
+        # module path. Same pattern as cli_launcher._spawn_tray and
+        # supervisor._spawn_daemon.
+        if runtime.is_frozen():
+            cmd = [sys.executable, "tray", "run"]
+        else:
+            cmd = [sys.executable, "-m", "claude_mnemos.tray", "run"]
         creationflags = 0
         if sys.platform == "win32":
             creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
         subprocess.Popen(
-            [sys.executable, "-m", "claude_mnemos.tray", "run"],
+            cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
