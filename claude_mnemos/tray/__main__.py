@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -25,7 +24,9 @@ import psutil
 
 from claude_mnemos.daemon.lockfile import is_daemon_running
 from claude_mnemos.tray.icon import TrayApp
+from claude_mnemos.tray.ipc import IpcServer, ipc_send
 from claude_mnemos.tray.platform import get_autostart_manager, platform_label
+from claude_mnemos.tray.single_instance import get_single_instance
 from claude_mnemos.tray.supervisor import Supervisor
 
 LOG_DIR = Path.home() / ".claude-mnemos"
@@ -33,6 +34,12 @@ TRAY_PID_FILE = LOG_DIR / "tray.pid"
 DAEMON_PID_FILE = LOG_DIR / "daemon.pid"
 DAEMON_LOG = LOG_DIR / "daemon.log"
 SUPERVISOR_LOG = LOG_DIR / "supervisor.log"
+
+TRAY_INSTANCE_NAME = "com.yarik.claude-mnemos.tray"
+if sys.platform == "win32":
+    IPC_ADDRESS = r"\\.\pipe\claude-mnemos-tray"
+else:
+    IPC_ADDRESS = str(Path.home() / ".claude-mnemos" / "tray.sock")
 
 
 def _setup_logging() -> None:
@@ -42,25 +49,6 @@ def _setup_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
-
-
-def _acquire_tray_lock() -> bool:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    if TRAY_PID_FILE.is_file():
-        try:
-            old = int(TRAY_PID_FILE.read_text(encoding="utf-8").strip())
-        except ValueError:
-            old = -1
-        if old > 0 and psutil.pid_exists(old):
-            print(f"another tray running, PID {old}", file=sys.stderr)
-            return False
-        TRAY_PID_FILE.unlink(missing_ok=True)
-    TRAY_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
-    return True
-
-
-def _release_tray_lock() -> None:
-    TRAY_PID_FILE.unlink(missing_ok=True)
 
 
 def _resolve_target() -> tuple[str, list[str]]:
@@ -88,11 +76,33 @@ def _resolve_target() -> tuple[str, list[str]]:
 
 
 def _cmd_run() -> int:
-    if not _acquire_tray_lock():
-        return 1
+    si = get_single_instance(TRAY_INSTANCE_NAME)
+    if not si.acquire():
+        # Already running — tell that one to show its launcher window, exit clean.
+        ok = ipc_send(IPC_ADDRESS, "show")
+        if ok:
+            print("[tray] another instance running; sent 'show'.")
+        else:
+            print("[tray] another instance running but IPC unreachable.", file=sys.stderr)
+        return 0
+
     sv = Supervisor(daemon_pid_file=DAEMON_PID_FILE, log_path=DAEMON_LOG)
     sv.start()
     app = TrayApp(supervisor=sv)
+
+    def _on_ipc(msg: str) -> None:
+        if msg == "show":
+            try:
+                getattr(sv, "open_launcher", lambda: None)()
+            except Exception:
+                logging.exception("[tray] open_launcher failed")
+
+    ipc_srv: IpcServer | None = IpcServer(IPC_ADDRESS, on_message=_on_ipc)
+    try:
+        ipc_srv.start()
+    except Exception:
+        logging.exception("[tray] IPC server failed to start; continuing without it")
+        ipc_srv = None
 
     def _ticker() -> None:
         while True:
@@ -109,7 +119,16 @@ def _cmd_run() -> int:
     try:
         app.run()  # blocks until Quit
     finally:
-        _release_tray_lock()
+        if ipc_srv:
+            try:
+                ipc_srv.stop()
+            except Exception:
+                logging.exception("[tray] IPC stop failed")
+        try:
+            sv.stop()
+        except Exception:
+            logging.exception("[tray] supervisor stop failed")
+        si.release()
     return 0
 
 
