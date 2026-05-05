@@ -36,7 +36,12 @@ OPTIONS = {
     },
     "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview"],
     "includes": ["uvicorn.logging", "uvicorn.lifespan.on", "uvicorn.protocols.http.auto"],
-    "excludes": ["tkinter"],
+    # PyInstaller is installed via the [installer] pip extra so that the same
+    # workflow can build the PyInstaller bundle for non-mac platforms — but on
+    # macOS we use py2app, not PyInstaller, and py2app's modulegraph chokes on
+    # PyInstaller's hook-*.py files (they aren't real importable modules).
+    # Exclude it from the bundle scan.
+    "excludes": ["tkinter", "PyInstaller"],
 }
 
 setup(
