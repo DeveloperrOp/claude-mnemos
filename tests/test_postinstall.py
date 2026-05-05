@@ -127,3 +127,28 @@ def test_main_skips_postinstall_when_env_var_set(monkeypatch) -> None:
     except Exception:
         pass
     assert calls["postinstall"] == 0
+
+
+def test_main_runs_postinstall_for_launcher_command(monkeypatch) -> None:
+    """`mnemos launcher` should also trigger postinstall (it's the new primary entry)."""
+    calls = {"postinstall": 0}
+
+    def fake_postinstall():
+        calls["postinstall"] += 1
+
+    monkeypatch.setattr(
+        "claude_mnemos.postinstall.maybe_run_first_time_init",
+        fake_postinstall,
+    )
+    monkeypatch.setattr("claude_mnemos.cli_launcher.run", lambda argv: 0)
+    # NOT setting MNEMOS_SKIP_POSTINSTALL — we want the gate to fire.
+    monkeypatch.delenv("MNEMOS_SKIP_POSTINSTALL", raising=False)
+
+    from claude_mnemos.cli import main
+    try:
+        main(["launcher"])
+    except SystemExit:
+        pass
+    except Exception:
+        pass
+    assert calls["postinstall"] == 1

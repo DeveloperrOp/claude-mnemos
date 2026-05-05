@@ -543,6 +543,9 @@ def build_parser() -> argparse.ArgumentParser:
     from claude_mnemos.cli_hook import add_hook_subparser
     add_hook_subparser(sub)
 
+    from claude_mnemos.cli_launcher import add_launcher_subparser
+    add_launcher_subparser(sub)
+
     return parser
 
 
@@ -557,10 +560,12 @@ def main(argv: list[str] | None = None) -> int:
     # hatch for tests.
     import os
     _argv = sys.argv if argv is None else [sys.argv[0], *argv]
-    is_tray_run = (
+    is_app_entry = (
         len(_argv) >= 3 and _argv[1] == "tray" and _argv[2] == "run"
+    ) or (
+        len(_argv) >= 2 and _argv[1] == "launcher"
     )
-    if is_tray_run and os.environ.get("MNEMOS_SKIP_POSTINSTALL") != "1":
+    if is_app_entry and os.environ.get("MNEMOS_SKIP_POSTINSTALL") != "1":
         from claude_mnemos.postinstall import maybe_run_first_time_init
         maybe_run_first_time_init()
     parser = build_parser()
@@ -605,6 +610,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         return args.func(args)
     if args.command == "hook":
+        return args.func(args)
+    if args.command == "launcher":
         return args.func(args)
 
     if not args.jsonl.exists():
