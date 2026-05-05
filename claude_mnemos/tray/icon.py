@@ -2,6 +2,13 @@
 
 Not unit-tested in CI (pystray requires a display). Manual smoke checklist
 lives in docs/plans/2026-04-29-tray-autostart-design.md §12.
+
+NOTE: ``import pystray`` is wrapped in try/except because on Linux pystray's
+``_xorg`` backend connects to the X DISPLAY at module-import time. CI runners
+have no DISPLAY → import would crash any module that transitively imports
+this one (e.g. daemon/app.py via daemon/routes/tray.py). When pystray fails
+to import, ``TrayApp`` raises a clear error at instantiation but module
+import succeeds — REST routes can still serve.
 """
 
 from __future__ import annotations
@@ -11,8 +18,18 @@ import re
 import webbrowser
 from pathlib import Path
 
-import pystray
-from PIL import Image
+try:
+    import pystray  # type: ignore[import-not-found]
+except Exception as _pystray_err:  # noqa: BLE001
+    pystray = None  # type: ignore[assignment]
+    _PYSTRAY_IMPORT_ERROR: Exception | None = _pystray_err
+else:
+    _PYSTRAY_IMPORT_ERROR = None
+
+try:
+    from PIL import Image  # type: ignore[import-not-found]
+except Exception:  # noqa: BLE001
+    Image = None  # type: ignore[assignment]
 
 from claude_mnemos.tray.supervisor import Supervisor, SupervisorState
 
@@ -87,6 +104,11 @@ class TrayApp:
         supervisor: Supervisor | None,
         dashboard_url: str = "http://localhost:5757/",
     ) -> None:
+        if pystray is None:
+            raise RuntimeError(
+                f"pystray is not available in this environment: {_PYSTRAY_IMPORT_ERROR}. "
+                "Run a desktop session with X DISPLAY (Linux) or use a Windows/Mac runtime."
+            )
         self.supervisor = supervisor
         self.dashboard_url = dashboard_url
         self.icon = pystray.Icon(
