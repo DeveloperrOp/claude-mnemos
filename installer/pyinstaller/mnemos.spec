@@ -84,7 +84,21 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
+# Two EXE entry points sharing the same bundle — a Windows convention to
+# combine GUI app + console-CLI without forcing terminal users into pipes.
+#
+# claude-mnemos.exe       — console=False (windowed). No console pop-up
+#                           when launched via desktop shortcut, Start Menu,
+#                           autostart, or Inno [Run] postinstall step.
+#                           This is what Yarik's launcher.lnk targets.
+# claude-mnemos-cli.exe   — console=True. For terminal users running
+#                           `claude-mnemos-cli doctor`, `... hooks status`
+#                           etc — gets stdout output.
+#
+# Both share `_internal/` dir; only the entry .exe differs.
+_icon = str(PKG / "tray" / "assets" / "icon.ico") if (PKG / "tray" / "assets" / "icon.ico").exists() else None
+
+exe_gui = EXE(
     pyz,
     a.scripts,
     [],
@@ -94,17 +108,37 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,  # console for daemon foreground; tray launches detached
+    console=False,  # windowed — no console pop-up on launch
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(PKG / "tray" / "assets" / "icon.ico") if (PKG / "tray" / "assets" / "icon.ico").exists() else None,
+    icon=_icon,
+)
+
+exe_cli = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="claude-mnemos-cli",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,  # console — for terminal CLI usage with stdout
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=_icon,
 )
 
 coll = COLLECT(
-    exe,
+    exe_gui,
+    exe_cli,
     a.binaries,
     a.zipfiles,
     a.datas,

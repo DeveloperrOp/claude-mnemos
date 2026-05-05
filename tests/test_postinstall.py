@@ -1,4 +1,3 @@
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,8 +17,8 @@ def test_first_launch_triggers_init(state_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("claude_mnemos.postinstall.runtime.is_frozen", lambda: True)
     calls = {"init": 0}
     monkeypatch.setattr(
-        "claude_mnemos.postinstall.cli_init_run",
-        lambda *, open_browser: calls.update({"init": calls["init"] + 1}) or 0,
+        "claude_mnemos.postinstall._silent_init",
+        lambda: calls.update({"init": calls["init"] + 1}),
     )
 
     from claude_mnemos.postinstall import maybe_run_first_time_init
@@ -29,18 +28,15 @@ def test_first_launch_triggers_init(state_path: Path, monkeypatch) -> None:
 
 def test_subsequent_launches_skip_init(state_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("claude_mnemos.postinstall.runtime.is_frozen", lambda: True)
-    monkeypatch.setattr(
-        "claude_mnemos.postinstall.cli_init_run",
-        lambda *, open_browser: 0,
-    )
+    monkeypatch.setattr("claude_mnemos.postinstall._silent_init", lambda: None)
 
     from claude_mnemos.postinstall import maybe_run_first_time_init
     maybe_run_first_time_init()  # records first_run_ts
 
     calls = {"init": 0}
     monkeypatch.setattr(
-        "claude_mnemos.postinstall.cli_init_run",
-        lambda *, open_browser: calls.update({"init": calls["init"] + 1}) or 0,
+        "claude_mnemos.postinstall._silent_init",
+        lambda: calls.update({"init": calls["init"] + 1}),
     )
     maybe_run_first_time_init()
     assert calls["init"] == 0
@@ -50,8 +46,8 @@ def test_skipped_in_source_mode(state_path: Path, monkeypatch) -> None:
     """Source-mode (development via pipx) must NEVER auto-run init."""
     calls = {"init": 0}
     monkeypatch.setattr(
-        "claude_mnemos.postinstall.cli_init_run",
-        lambda *, open_browser: calls.update({"init": calls["init"] + 1}) or 0,
+        "claude_mnemos.postinstall._silent_init",
+        lambda: calls.update({"init": calls["init"] + 1}),
     )
     monkeypatch.setattr("claude_mnemos.postinstall.runtime.is_frozen", lambda: False)
 
@@ -60,16 +56,41 @@ def test_skipped_in_source_mode(state_path: Path, monkeypatch) -> None:
     assert calls["init"] == 0
 
 
+def test_silent_init_does_not_open_browser_or_wait_for_daemon(state_path: Path, monkeypatch) -> None:
+    """Regression: the old impl called cli_init_run which spent up to 30s
+    waiting for daemon health and then opened a browser. _silent_init must
+    NOT do either — launcher's splash window handles both.
+    """
+    # Stub the two installs to no-ops — we only care whether the forbidden
+    # side-effects fire.
+    hook_calls = {"n": 0}
+
+    def _hook_install():
+        hook_calls["n"] += 1
+        return {"installed": []}
+
+    monkeypatch.setattr("claude_mnemos.cli_hooks.install", _hook_install)
+
+    # These must NOT be reached.
+    def _boom_browser(*a, **kw):
+        raise AssertionError("postinstall must not open a browser")
+
+    def _boom_wait(*a, **kw):
+        raise AssertionError("postinstall must not block on daemon health")
+
+    monkeypatch.setattr("webbrowser.open", _boom_browser)
+    monkeypatch.setattr("claude_mnemos.cli_init._wait_daemon_health", _boom_wait)
+
+    from claude_mnemos.postinstall import _silent_init
+    _silent_init()
+    assert hook_calls["n"] == 1
+
+
 def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
     """cli.main() must NOT call maybe_run_first_time_init for diagnostic
     subcommands (doctor, hook, hooks status, ingest, etc) — only for the
-    primary `tray run` entry. Otherwise smoke tests / hook invocations
-    spawn rogue tray processes before they can save first_run_ts.
-
-    Regression: the bundled exe being invoked with `doctor` (e.g. by the
-    PyInstaller smoke test) used to trigger the full init flow which
-    spawned a detached tray subprocess that never got cleaned up,
-    leaving ghost tray icons in the Windows notification area.
+    primary `tray run` / `launcher` entries. Otherwise smoke tests / hook
+    invocations spawn rogue tray processes before they can save first_run_ts.
     """
     calls = {"postinstall": 0}
 
@@ -80,16 +101,12 @@ def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
         "claude_mnemos.postinstall.maybe_run_first_time_init",
         fake_postinstall,
     )
-    # Mock all command implementations so the test verifies ONLY the postinstall
-    # gate, not actual command execution. Without this, `doctor` makes a live
-    # HTTP request to the daemon and `tray run` would spawn real subprocesses.
     monkeypatch.setattr("claude_mnemos.cli_doctor._cmd_doctor", lambda args: 0)
     monkeypatch.setattr("claude_mnemos.cli_hook._cmd_hook", lambda args: 0)
     monkeypatch.setattr("claude_mnemos.cli_hooks._cmd_status", lambda args: 0)
 
     from claude_mnemos.cli import main
 
-    # Diagnostic / non-app commands MUST NOT trigger postinstall.
     for argv in (["doctor"], ["hook", "session-start"], ["hooks", "status"]):
         try:
             main(argv)
@@ -141,7 +158,6 @@ def test_main_runs_postinstall_for_launcher_command(monkeypatch) -> None:
         fake_postinstall,
     )
     monkeypatch.setattr("claude_mnemos.cli_launcher.run", lambda argv: 0)
-    # NOT setting MNEMOS_SKIP_POSTINSTALL — we want the gate to fire.
     monkeypatch.delenv("MNEMOS_SKIP_POSTINSTALL", raising=False)
 
     from claude_mnemos.cli import main
