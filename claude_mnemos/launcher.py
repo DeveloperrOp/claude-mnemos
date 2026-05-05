@@ -67,35 +67,21 @@ def _make_on_closing(window) -> Callable[[], bool]:
     - True  → allow window to close (quit launcher process).
     - False → cancel the close (we hide window instead).
 
-    First time the user clicks X, ask via JS confirm() and persist the answer.
+    Default behavior: hide window (Discord/Slack convention). User can opt-out
+    in Settings → System → "Close window quits the app" toggle.
+
+    Earlier versions tried to ask via window.evaluate_js("confirm(...)") on
+    first close. That deadlocked the GUI thread because evaluate_js blocks
+    the Python main thread until JS returns, and JS confirm() can't be
+    interacted with while the host process appears 'Not Responding'.
     """
     from claude_mnemos.state.install_state import load_install_state
 
     def _handler() -> bool:
         state = load_install_state()
-        if state.window_close_action == "hide":
-            try:
-                window.hide()
-            except Exception:
-                pass
-            return False
         if state.window_close_action == "quit":
             return True
-        # First time — ask via JS confirm. OK = minimise, Cancel = quit.
-        try:
-            answer = window.evaluate_js(
-                "confirm('Свернуть в трей? OK = в трей, Cancel = выйти полностью.')"
-            )
-        except Exception:
-            # If JS eval fails (window already gone, etc), default to quit.
-            return True
-        state.window_close_action = "hide" if answer else "quit"
-        try:
-            state.save()
-        except Exception:
-            pass
-        if not answer:
-            return True
+        # Default and "hide" both → hide window, keep tray + daemon alive.
         try:
             window.hide()
         except Exception:

@@ -93,7 +93,13 @@ def test_make_on_closing_uses_saved_action_quit(tmp_path, monkeypatch):
     assert handler() is True
 
 
-def test_make_on_closing_first_time_asks_and_persists_hide(tmp_path, monkeypatch):
+def test_make_on_closing_default_hides_silently(tmp_path, monkeypatch):
+    """First close (no saved preference) hides window without asking — Discord/Slack convention.
+
+    Replaces the earlier 'ask via JS confirm()' flow which deadlocked the GUI
+    thread (evaluate_js blocks until JS returns, but JS confirm() needs the
+    GUI thread to handle clicks → unrecoverable hang).
+    """
     monkeypatch.setattr(
         "claude_mnemos.state.install_state._STATE_PATH",
         tmp_path / "install-state.json",
@@ -102,31 +108,10 @@ def test_make_on_closing_first_time_asks_and_persists_hide(tmp_path, monkeypatch
     class FakeWindow:
         def __init__(self): self.hidden = False
         def hide(self): self.hidden = True
-        def evaluate_js(self, code): return True  # OK = minimise
+        def evaluate_js(self, code): raise AssertionError("must NOT call evaluate_js")
 
     from claude_mnemos.launcher import _make_on_closing
     win = FakeWindow()
     handler = _make_on_closing(win)
     assert handler() is False
     assert win.hidden is True
-
-    from claude_mnemos.state.install_state import load_install_state
-    assert load_install_state().window_close_action == "hide"
-
-
-def test_make_on_closing_first_time_asks_and_persists_quit(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "claude_mnemos.state.install_state._STATE_PATH",
-        tmp_path / "install-state.json",
-    )
-
-    class FakeWindow:
-        def hide(self): raise AssertionError("should not be called")
-        def evaluate_js(self, code): return False  # Cancel = quit
-
-    from claude_mnemos.launcher import _make_on_closing
-    handler = _make_on_closing(FakeWindow())
-    assert handler() is True
-
-    from claude_mnemos.state.install_state import load_install_state
-    assert load_install_state().window_close_action == "quit"
