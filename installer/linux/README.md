@@ -26,3 +26,14 @@ with the desktop environment:
 ```
 
 (linuxdeploy adds a `.desktop` entry to `~/.local/share/applications/`.)
+
+## Runtime requirements
+
+The AppImage requires `webkit2gtk-4.0` to render the launcher window. On
+Ubuntu/Debian:
+
+    sudo apt install libwebkit2gtk-4.0-37
+
+On Fedora:
+
+    sudo dnf install webkit2gtk4.0

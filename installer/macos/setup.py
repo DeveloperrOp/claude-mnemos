@@ -34,7 +34,7 @@ OPTIONS = {
         "LSMinimumSystemVersion": "11.0",
         "NSHighResolutionCapable": True,
     },
-    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler"],
+    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview"],
     "includes": ["uvicorn.logging", "uvicorn.lifespan.on", "uvicorn.protocols.http.auto"],
     "excludes": ["tkinter"],
 }

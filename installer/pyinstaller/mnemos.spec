@@ -57,6 +57,13 @@ hiddenimports = [
     "requests",
     "urllib3",
     "charset_normalizer",
+    # pywebview launcher (platform-specific submodules tolerated to be missing)
+    "webview",
+    "webview.platforms.winforms",
+    "webview.platforms.cocoa",
+    "webview.platforms.gtk",
+    "clr_loader",
+    "pythonnet",
 ]
 
 a = Analysis(
