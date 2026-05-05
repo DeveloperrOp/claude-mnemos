@@ -20,7 +20,10 @@ echo "[build-dmg] Wrapper python: $WRAPPER_PYTHON"
 echo "[build-dmg] Real sys.executable (will be used): $PYTHON_BIN"
 
 # Install setuptools + py2app into the SAME Python that runs setup.py.
-"$PYTHON_BIN" -m pip install --quiet setuptools py2app==0.28.6
+# Pin setuptools<81 because 81+ removed pkg_resources from the package
+# (split into a separate distribution); py2app still imports pkg_resources
+# at module load (py2app/__init__.py:30) and crashes otherwise.
+"$PYTHON_BIN" -m pip install --quiet "setuptools<81" py2app==0.28.6
 
 # 1) Build the .app bundle
 cd installer/macos
