@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 import urllib.request
+from typing import Callable
 
 DAEMON_URL = "http://127.0.0.1:5757"
 HEALTH_URL = f"{DAEMON_URL}/api/health"
@@ -59,6 +60,51 @@ def _wait_daemon_ready(*, timeout_s: float = HEALTH_TIMEOUT_S, url: str = HEALTH
     return False
 
 
+def _make_on_closing(window) -> Callable[[], bool]:
+    """Build a window-closing handler that respects install_state.window_close_action.
+
+    Return value semantics (matches pywebview window.events.closing):
+    - True  → allow window to close (quit launcher process).
+    - False → cancel the close (we hide window instead).
+
+    First time the user clicks X, ask via JS confirm() and persist the answer.
+    """
+    from claude_mnemos.state.install_state import load_install_state
+
+    def _handler() -> bool:
+        state = load_install_state()
+        if state.window_close_action == "hide":
+            try:
+                window.hide()
+            except Exception:
+                pass
+            return False
+        if state.window_close_action == "quit":
+            return True
+        # First time — ask via JS confirm. OK = minimise, Cancel = quit.
+        try:
+            answer = window.evaluate_js(
+                "confirm('Свернуть в трей? OK = в трей, Cancel = выйти полностью.')"
+            )
+        except Exception:
+            # If JS eval fails (window already gone, etc), default to quit.
+            return True
+        state.window_close_action = "hide" if answer else "quit"
+        try:
+            state.save()
+        except Exception:
+            pass
+        if not answer:
+            return True
+        try:
+            window.hide()
+        except Exception:
+            pass
+        return False
+
+    return _handler
+
+
 def _open_window() -> int:
     """Open a pywebview window. Blocks until the user closes it."""
     import webview
@@ -70,6 +116,14 @@ def _open_window() -> int:
         height=800,
         min_size=(900, 600),
     )
+
+    # Wire window-close handler
+    handler = _make_on_closing(window)
+    try:
+        # pywebview ≥4 has `window.events.closing` Event
+        window.events.closing += handler
+    except Exception:
+        pass
 
     def _navigate_when_ready() -> None:
         if _wait_daemon_ready():

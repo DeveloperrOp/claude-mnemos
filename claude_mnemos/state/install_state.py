@@ -27,6 +27,7 @@ class InstallState(BaseModel):
     first_run_ts: datetime | None = None
     autostart_decision: Literal["accepted", "declined"] | None = None
     first_session_celebrated_for: list[str] = Field(default_factory=list)
+    window_close_action: Literal["hide", "quit"] | None = None
 
     def mark_celebrated(self, project_name: str) -> None:
         if project_name not in self.first_session_celebrated_for:

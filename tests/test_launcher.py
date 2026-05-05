@@ -50,3 +50,83 @@ def test_launcher_no_spawn_tray_flag_does_not_open_window(monkeypatch):
     from claude_mnemos.launcher import run
     rc = run(["--no-window", "--no-spawn-tray"])
     assert rc == 0
+
+
+# ── _make_on_closing ────────────────────────────────────────────────
+
+
+def test_make_on_closing_uses_saved_action_hide(tmp_path, monkeypatch):
+    """If saved action is 'hide', handler hides window and returns False."""
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
+    from claude_mnemos.state.install_state import InstallState
+    InstallState(window_close_action="hide").save()
+
+    class FakeWindow:
+        def __init__(self): self.hidden = False
+        def hide(self): self.hidden = True
+        def evaluate_js(self, code): raise AssertionError("should not be called")
+
+    from claude_mnemos.launcher import _make_on_closing
+    win = FakeWindow()
+    handler = _make_on_closing(win)
+    assert handler() is False
+    assert win.hidden is True
+
+
+def test_make_on_closing_uses_saved_action_quit(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
+    from claude_mnemos.state.install_state import InstallState
+    InstallState(window_close_action="quit").save()
+
+    class FakeWindow:
+        def hide(self): raise AssertionError("should not be called")
+        def evaluate_js(self, code): raise AssertionError("should not be called")
+
+    from claude_mnemos.launcher import _make_on_closing
+    handler = _make_on_closing(FakeWindow())
+    assert handler() is True
+
+
+def test_make_on_closing_first_time_asks_and_persists_hide(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
+
+    class FakeWindow:
+        def __init__(self): self.hidden = False
+        def hide(self): self.hidden = True
+        def evaluate_js(self, code): return True  # OK = minimise
+
+    from claude_mnemos.launcher import _make_on_closing
+    win = FakeWindow()
+    handler = _make_on_closing(win)
+    assert handler() is False
+    assert win.hidden is True
+
+    from claude_mnemos.state.install_state import load_install_state
+    assert load_install_state().window_close_action == "hide"
+
+
+def test_make_on_closing_first_time_asks_and_persists_quit(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
+
+    class FakeWindow:
+        def hide(self): raise AssertionError("should not be called")
+        def evaluate_js(self, code): return False  # Cancel = quit
+
+    from claude_mnemos.launcher import _make_on_closing
+    handler = _make_on_closing(FakeWindow())
+    assert handler() is True
+
+    from claude_mnemos.state.install_state import load_install_state
+    assert load_install_state().window_close_action == "quit"

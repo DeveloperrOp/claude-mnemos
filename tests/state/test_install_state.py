@@ -42,3 +42,15 @@ def test_mark_celebrated_is_idempotent(state_path: Path) -> None:
     s.mark_celebrated("proj-x")
     s.mark_celebrated("proj-x")  # second call must not duplicate
     assert s.first_session_celebrated_for == ["proj-x"]
+
+
+def test_install_state_window_close_action_default_none(state_path):
+    s = load_install_state()
+    assert s.window_close_action is None
+
+
+def test_install_state_window_close_action_persists(state_path):
+    s = InstallState(window_close_action="hide")
+    s.save()
+    loaded = load_install_state()
+    assert loaded.window_close_action == "hide"
