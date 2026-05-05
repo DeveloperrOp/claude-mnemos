@@ -374,7 +374,7 @@ The implementation plan (next step, written via writing-plans) will decompose in
 7. Tray-menu rewrite (Open / Status / Pause / Settings / Quit)
 8. Backend `/api/settings/autostart` + frontend toggle
 9. PyInstaller spec — pywebview hidden imports
-10. Inno Setup WebView2 bootstrapper detection + Run-launcher swap
+10. Inno Setup WebView2 bootstrapper detection + Run-launcher swap + desktop-icon `checkedonce`
 11. Mac DMG + Linux AppImage entry-point swap
 12. Live walk + tests + documentation
 
@@ -394,6 +394,7 @@ The implementation plan (next step, written via writing-plans) will decompose in
 - **Launcher tech**: pywebview (E1), not full Tauri/Electron rewrite.
 - **Release timing**: hold `v0.0.1` public release until E1 is shipped (option Y).
 - **Interim daemon**: started manually now (option a) until E1 lands.
+- **Desktop shortcut on Windows**: mandatory at install time. Inno Setup `[Tasks]` entry `desktopicon` switches from `unchecked` to `checkedonce` (default ON, opt-out checkbox available for power users). Shortcut launches `claude-mnemos.exe launcher`. Mac/Linux do not get desktop shortcuts (Mac uses Launchpad/Dock; Linux uses `.desktop` entry in `~/.local/share/applications/` via AppImage `--integrate`, no separate desktop file needed).
 
 ## Self-review notes
 
