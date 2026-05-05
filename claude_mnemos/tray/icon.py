@@ -98,32 +98,34 @@ class TrayApp:
 
     # ── menu actions ────────────────────────────────────────────
     def _open_dashboard(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
-        webbrowser.open(self.dashboard_url)
-
-    def _restart_daemon(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         if self.supervisor is None:
+            # Fallback: no supervisor → just open browser
+            webbrowser.open(self.dashboard_url)
             return
         try:
-            self.supervisor.restart()
-        except RuntimeError as exc:
-            logger.warning("restart failed: %s", exc)
+            self.supervisor.open_launcher()
+        except Exception:
+            logger.exception("[tray] open_launcher failed; falling back to browser")
+            webbrowser.open(self.dashboard_url)
 
-    def _show_logs(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
-        log = Path.home() / ".claude-mnemos" / "daemon.log"
-        if not log.is_file():
+    def _toggle_pause(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+        if self.supervisor is None:
             return
-        import os
-        import subprocess
-        import sys
+        if getattr(self.supervisor, "daemon_paused", False):
+            self.supervisor.resume_daemon()
+        else:
+            self.supervisor.pause_daemon()
 
-        if sys.platform == "win32":
-            os.startfile(str(log))  # noqa: SIM115
-        elif sys.platform == "darwin":
-            subprocess.run(["open", str(log)], check=False)
+    def _open_settings(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+        """Open the launcher and let the React SPA route to /settings/global itself."""
+        self._open_dashboard(_icon, _item)
 
     def _quit(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         if self.supervisor is not None:
-            self.supervisor.stop()
+            try:
+                self.supervisor.shutdown()
+            except Exception:
+                logger.exception("[tray] supervisor.shutdown failed")
         self.icon.stop()
 
     # ── menu / state predicates ─────────────────────────────────
@@ -136,29 +138,27 @@ class TrayApp:
         return self.supervisor is not None and self.supervisor._spawned
 
     def _build_menu(self) -> pystray.Menu:
-        # «Recent events» submenu — built lazily each time menu opens so it
-        # reflects current supervisor.log state. pystray.Menu accepts a
-        # callable that returns an iterable of MenuItems.
-        def recent_events_factory() -> tuple[pystray.MenuItem, ...]:
-            events = read_recent_events()
-            if not events:
-                return (
-                    pystray.MenuItem("(no events yet)", None, enabled=False),
-                )
-            return tuple(
-                # Each entry rendered as a disabled item — display only.
-                pystray.MenuItem(line, None, enabled=False)
-                for line in events
-            )
+        def _daemon_status_label(_item) -> str:
+            sv = self.supervisor
+            if sv is None:
+                return "Daemon: no supervisor"
+            if getattr(sv, "daemon_paused", False):
+                return "Daemon: Paused"
+            if self._is_running():
+                return "Daemon: Running"
+            return "Daemon: Stopped"
+
+        def _toggle_label(_item) -> str:
+            if self.supervisor is not None and getattr(self.supervisor, "daemon_paused", False):
+                return "Resume Daemon"
+            return "Pause Daemon"
 
         return pystray.Menu(
-            pystray.MenuItem("Open dashboard", self._open_dashboard, default=True,
-                             enabled=lambda _: self._is_running()),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Restart daemon", self._restart_daemon,
-                             enabled=lambda _: self._is_spawned()),
-            pystray.MenuItem("Recent events", pystray.Menu(recent_events_factory)),
-            pystray.MenuItem("Show full log", self._show_logs),
+            pystray.MenuItem("Open Dashboard", self._open_dashboard, default=True),
+            pystray.MenuItem(_daemon_status_label, None, enabled=False),
+            pystray.MenuItem(_toggle_label, self._toggle_pause,
+                             enabled=lambda _: self.supervisor is not None),
+            pystray.MenuItem("Settings...", self._open_settings),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._quit),
         )
