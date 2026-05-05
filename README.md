@@ -8,6 +8,42 @@ Claude Code holds context only within one session. **claude-mnemos** stores ever
 
 `0.0.1` — early development. Single-user, runs locally, no server-side anything. Not on PyPI yet — install from source.
 
+## Installing from a release (no terminal required)
+
+Download the latest installer for your OS from
+[github.com/DeveloperrOp/claude-mnemos/releases](https://github.com/DeveloperrOp/claude-mnemos/releases):
+
+| OS | File |
+|---|---|
+| Windows 10/11 (x64) | `claude-mnemos-setup-x64.exe` |
+| macOS 11+ (Apple Silicon and Intel) | `claude-mnemos.dmg` |
+| Linux x86_64 | `claude-mnemos-x86_64.AppImage` |
+
+### Windows
+
+1. Double-click the `.exe`.
+2. SmartScreen may say *"Windows protected your PC"* — click **More info → Run anyway**. We have not yet purchased a code-signing certificate; the warning is expected.
+3. Accept the autostart checkbox (default on) — claude-mnemos will start with Windows.
+4. Click **Install**. The dashboard opens automatically when setup finishes.
+
+### macOS
+
+1. Open the `.dmg` and drag claude-mnemos to **Applications**.
+2. The first launch will fail with *"unidentified developer"* — open **System Settings → Privacy & Security → Open Anyway**, or right-click the app and choose **Open** to bypass once.
+3. The app lives in the menu bar (top-right). Click the icon to open the dashboard.
+
+### Linux
+
+1. Make the AppImage executable: `chmod +x claude-mnemos-x86_64.AppImage`.
+2. Run it: `./claude-mnemos-x86_64.AppImage`.
+3. Optional — integrate with your DE: `./claude-mnemos-x86_64.AppImage --integrate` (linuxdeploy adds a desktop entry).
+
+### Uninstalling
+
+- **Windows:** Settings → Apps → claude-mnemos → Uninstall. Removes the daemon, autostart entry, and Claude Code hooks.
+- **macOS:** drag the app to Trash. To remove the LaunchAgent, run `mnemos tray uninstall` from terminal first (or just delete `~/Library/LaunchAgents/com.yarik.claude-mnemos.plist`).
+- **Linux:** delete the `.AppImage`. To remove the autostart entry, delete `~/.config/autostart/claude-mnemos.desktop`.
+
 ## Install
 
 Recommended path uses **pipx** (industry-standard isolated installer for Python CLI tools). System-Python `pip install -e .` is documented as a fallback but **not recommended** — it produces dependency conflicts and orphan files over time.
