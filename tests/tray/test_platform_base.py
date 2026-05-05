@@ -22,6 +22,8 @@ def test_autostart_manager_is_runtime_checkable_protocol() -> None:
         def uninstall(self) -> None: ...
         def status(self) -> AutostartStatus:
             return AutostartStatus(installed=False)
+        def is_installed(self) -> bool:
+            return False
 
     assert isinstance(Stub(), AutostartManager)
 

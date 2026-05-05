@@ -115,3 +115,6 @@ class MacOSAutostart(AutostartManager):
             installed=self.plist_path.is_file(),
             path=str(self.plist_path),
         )
+
+    def is_installed(self) -> bool:
+        return self.plist_path.is_file()

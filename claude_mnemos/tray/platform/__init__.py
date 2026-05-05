@@ -35,6 +35,9 @@ class UnsupportedAutostart:
     def status(self) -> AutostartStatus:
         return AutostartStatus(installed=False, path=None)
 
+    def is_installed(self) -> bool:
+        return False
+
 
 def get_autostart_manager(
     target_exe: str,

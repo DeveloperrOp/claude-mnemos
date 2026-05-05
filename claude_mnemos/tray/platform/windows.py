@@ -80,3 +80,6 @@ class WindowsAutostart(AutostartManager):
             installed=self.shortcut_path.is_file(),
             path=str(self.shortcut_path),
         )
+
+    def is_installed(self) -> bool:
+        return self.shortcut_path.is_file()

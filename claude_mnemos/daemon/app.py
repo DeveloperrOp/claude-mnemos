@@ -38,6 +38,7 @@ from claude_mnemos.daemon.routes.projects import router as projects_router
 from claude_mnemos.daemon.routes.sessions import router as sessions_router
 from claude_mnemos.daemon.routes.settings import router as settings_router
 from claude_mnemos.daemon.routes.snapshots import router as snapshots_router
+from claude_mnemos.daemon.routes.system import router as system_router
 from claude_mnemos.daemon.routes.trash import router as trash_router
 from claude_mnemos.daemon.routes.tray import router as tray_router
 from claude_mnemos.daemon.routes.update import router as update_router
@@ -77,6 +78,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
     app.include_router(metrics_router, prefix="/api")
     app.include_router(projects_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
+    app.include_router(system_router, prefix="/api")
     app.include_router(tray_router, prefix="/api")
     app.include_router(fs_router, prefix="/api")
     app.include_router(hooks_router, prefix="/api")
