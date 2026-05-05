@@ -901,6 +901,11 @@
         "default_max_input_tokens": "Default max input tokens",
         "default_retention_days": "Default retention (days)"
       }
+    },
+    "system": {
+      "heading": "System",
+      "autostart_label": "Start with Windows",
+      "autostart_hint": "Daemon starts automatically at login. Claude Code sessions are always captured."
     }
   }
 }

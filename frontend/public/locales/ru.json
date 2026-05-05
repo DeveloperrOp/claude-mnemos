@@ -843,6 +843,11 @@
         "default_max_input_tokens": "Max input tokens по умолчанию",
         "default_retention_days": "Срок хранения (дни) по умолчанию"
       }
+    },
+    "system": {
+      "heading": "Система",
+      "autostart_label": "Запускать с Windows",
+      "autostart_hint": "Daemon стартует автоматически при логине. Сессии Claude Code собираются всегда."
     }
   }
 }

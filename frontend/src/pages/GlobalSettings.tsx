@@ -1,6 +1,40 @@
 import { useTranslation } from "react-i18next";
 import { GlobalGeneralSection } from "@/components/settings/globals/GlobalGeneralSection";
 import { GlobalDefaultsSection } from "@/components/settings/globals/GlobalDefaultsSection";
+import { useAutostartStatus, useSetAutostart } from "@/hooks/useAutostart";
+
+function AutostartToggleSection() {
+  const { t } = useTranslation();
+  const q = useAutostartStatus();
+  const m = useSetAutostart();
+
+  if (q.isLoading || !q.data) return null;
+  return (
+    <section className="rounded-md border border-border/60 bg-card/40 p-4">
+      <div className="eyebrow mb-2">{t("settings.system.heading", "System")}</div>
+      <label className="flex items-start gap-3 py-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={q.data.enabled}
+          onChange={(e) => m.mutate(e.target.checked)}
+          disabled={m.isPending}
+          className="mt-1"
+        />
+        <div>
+          <div className="text-sm font-medium">
+            {t("settings.system.autostart_label", "Start with Windows")}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {t(
+              "settings.system.autostart_hint",
+              "Daemon starts automatically at login. Claude Code sessions are always captured.",
+            )}
+          </div>
+        </div>
+      </label>
+    </section>
+  );
+}
 
 export function GlobalSettings() {
   const { t } = useTranslation();
@@ -17,6 +51,7 @@ export function GlobalSettings() {
       </header>
       <GlobalGeneralSection />
       <GlobalDefaultsSection />
+      <AutostartToggleSection />
     </div>
   );
 }
