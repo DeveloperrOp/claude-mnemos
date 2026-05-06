@@ -49,7 +49,11 @@ def _detect_hook_scripts() -> tuple[str, str, str]:
     / pre_compact.py.
     """
     if runtime.is_frozen():
-        exe = runtime.executable_path()
+        # Hooks must use the console-subsystem exe (claude-mnemos-cli.exe) so
+        # they have a real stderr handle. The windowed claude-mnemos.exe sets
+        # sys.stderr to None/invalid, causing OSError 22 on the first error
+        # message a hook tries to emit. See runtime.cli_executable_path.
+        exe = runtime.cli_executable_path()
         ss = f'"{exe}" hook session-start'
         se = f'"{exe}" hook session-end'
         pc = f'"{exe}" hook pre-compact'

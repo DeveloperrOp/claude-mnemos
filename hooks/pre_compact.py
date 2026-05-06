@@ -48,7 +48,14 @@ DAEMON_POST_TIMEOUT_S = 2.0
 
 
 def _eprint(msg: str) -> None:
-    print(f"mnemos: {msg}", file=sys.stderr)
+    # See hooks/session_end.py:_eprint — guard against None/invalid stderr in
+    # windowed PyInstaller bundles.
+    if sys.stderr is None:
+        return
+    try:
+        print(f"mnemos: {msg}", file=sys.stderr)
+    except OSError:
+        pass
 
 
 def _daemon_port() -> int:

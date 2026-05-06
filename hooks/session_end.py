@@ -47,7 +47,17 @@ DAEMON_POST_TIMEOUT_S = 2.0
 
 
 def _eprint(msg: str) -> None:
-    print(f"mnemos: {msg}", file=sys.stderr)
+    # Guard against windowed PyInstaller bundles where sys.stderr is None or
+    # an invalid handle. The bundled claude-mnemos.exe (console=False) used
+    # to be the registered hook target on v0.0.4-v0.0.6, so existing installs
+    # crash here with OSError [Errno 22] until they re-run hooks install
+    # against the cli-flavoured exe.
+    if sys.stderr is None:
+        return
+    try:
+        print(f"mnemos: {msg}", file=sys.stderr)
+    except OSError:
+        pass
 
 
 def _daemon_port() -> int:

@@ -38,10 +38,35 @@ def executable_path() -> Path:
 
     In frozen mode: ``sys.executable`` is the bundled exe -- a stable path
     after install. In source mode: ``sys.executable`` is the Python
-    interpreter (pipx-venv on the dev box). Hook installation uses this
-    to write a stable command line into ``~/.claude/settings.json``.
+    interpreter (pipx-venv on the dev box).
     """
     return Path(sys.executable).resolve()
+
+
+def cli_executable_path() -> Path:
+    """Return path to the CLI-flavoured (console=True) executable.
+
+    The bundle ships TWO entry exes that share one ``_internal/`` dir:
+    ``claude-mnemos.exe`` (windowed, console=False) for desktop launches and
+    ``claude-mnemos-cli.exe`` (console=True) for things that need stdout/stderr
+    -- including Claude Code hooks, since Claude Code reads stderr from hooks
+    for error reporting. Calling the windowed exe for a hook causes
+    ``OSError [Errno 22] Invalid argument`` the first time the hook tries to
+    write to ``sys.stderr`` (windowed PyInstaller bundles set stderr to a
+    null/invalid handle).
+
+    In source mode there's only one executable (the Python interpreter), so
+    this returns the same as ``executable_path()``.
+    """
+    if not is_frozen() or sys.platform != "win32":
+        return executable_path()
+    main_exe = Path(sys.executable).resolve()
+    cli_exe = main_exe.with_name("claude-mnemos-cli.exe")
+    if cli_exe.is_file():
+        return cli_exe
+    # Older bundles (≤ v0.0.4) ship only the single windowed exe — fall back
+    # to it so installation doesn't fail outright.
+    return main_exe
 
 
 def static_dir() -> Path:
