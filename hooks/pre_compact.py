@@ -39,7 +39,10 @@ from claude_mnemos.mapping.resolver import (  # noqa: E402
     ProjectResolver,
     ResolverAmbiguityError,
 )
-from claude_mnemos.state.settings import SettingsStore  # noqa: E402
+from claude_mnemos.state.settings import (  # noqa: E402
+    SettingsStore,
+    resolve_ingest_flags,
+)
 
 RECURSION_ENV = "MNEMOS_INGEST_RUNNING"
 DAEMON_URL_ENV = "MNEMOS_DAEMON_URL"
@@ -93,6 +96,9 @@ def _try_post_to_daemon(
 
 
 def _spawn_ingest(transcript_path: str, project_name: str) -> None:
+    """Daemon-offline fallback. Always uses ``--no-llm``: pre-compact is a
+    raw-snapshot mechanism, never an LLM-extraction trigger. v0.0.10 makes
+    this explicit (was implicitly relying on default that could change)."""
     cmd = [
         sys.executable,
         "-m",
@@ -101,6 +107,7 @@ def _spawn_ingest(transcript_path: str, project_name: str) -> None:
         transcript_path,
         "--project",
         project_name,
+        "--no-llm",
     ]
     env = {**os.environ, RECURSION_ENV: "1"}
     if sys.platform == "win32":
@@ -162,6 +169,22 @@ def main() -> int:
             f"cwd {cwd} not registered in project-map; "
             "transcript остаётся в lost-sessions"
         )
+        return 0
+
+    # v0.0.10: respect ``dump_on_session_end`` setting. PreCompact is a raw
+    # snapshot (extract=False is hardcoded in _try_post_to_daemon below), so
+    # there's no LLM cost — but it still WRITES into the project's vault,
+    # which is a side-effect a user in manual mode hasn't consented to.
+    # Same toggle as session_end keeps the policy coherent.
+    try:
+        store = SettingsStore()
+        glob = store.get_global()
+        project_settings = store.get_project(entry.name)
+    except Exception as exc:  # noqa: BLE001
+        _eprint(f"settings load failed ({exc}); skipping POST")
+        return 0
+    dump_on_exit, _, _ = resolve_ingest_flags(project_settings, glob)
+    if not dump_on_exit:
         return 0
 
     port = _daemon_port()

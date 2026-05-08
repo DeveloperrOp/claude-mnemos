@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from claude_mnemos.state.settings import (
+    AutoIngestDefaults,
     AutoIngestSettings,
     GlobalSettings,
     IngestOverrides,
@@ -23,6 +24,7 @@ from claude_mnemos.state.settings import (
     deep_merge,
     get_by_dot_path,
     patch_dict_for_dot_path,
+    resolve_ingest_flags,
 )
 
 
@@ -30,8 +32,12 @@ def test_project_settings_defaults():
     s = ProjectSettings()
     assert s.version == 1
     assert s.locale is None
-    assert s.auto_ingest.enabled is True
-    assert s.auto_ingest.mode == "auto"
+    # v0.0.10: auto_ingest fields default to None (= "inherit from
+    # GlobalSettings.auto_ingest_defaults"), not True/auto. The legacy
+    # ``enabled``/``mode`` fields are dead-coded and now Optional.
+    assert s.auto_ingest.dump_on_session_end is None
+    assert s.auto_ingest.dump_stale_after_24h is None
+    assert s.auto_ingest.extract_after_dump is None
     assert s.lint.enabled_rules is None
     assert s.snapshots.daily_enabled is True
     assert s.snapshots.retention_days == 180
@@ -63,18 +69,37 @@ def test_global_settings_defaults():
 def test_extra_fields_rejected():
     with pytest.raises(ValidationError):
         ProjectSettings.model_validate({"foo": "bar"})
-    with pytest.raises(ValidationError):
-        AutoIngestSettings(enabled=True, mode="auto", extra="x")
+    # AutoIngestSettings deliberately uses extra="ignore" to silently
+    # absorb legacy fields (``enabled``/``mode``) that may be present in
+    # on-disk JSON files written by v0.0.9 or older. Tested below.
+
+
+def test_auto_ingest_settings_ignores_unknown_fields():
+    """v0.0.10: AutoIngestSettings uses extra="ignore" so on-disk JSON
+    written by v0.0.9- (with the old ``enabled``/``mode`` fields, plus
+    any future migration crumbs) loads cleanly without forcing every
+    user to nuke their settings dir."""
+    # Legacy v0.0.9 field shape — must load as if it were a fresh v0.0.10 object.
+    legacy = AutoIngestSettings.model_validate({
+        "enabled": True, "mode": "auto", "garbage_field": "value",
+    })
+    assert legacy.enabled is True
+    assert legacy.mode == "auto"
+    # New fields default to None in absence.
+    assert legacy.dump_on_session_end is None
 
 
 def test_round_trip_json():
     s = ProjectSettings(
         locale="ru",
-        auto_ingest=AutoIngestSettings(enabled=False, mode="manual"),
+        auto_ingest=AutoIngestSettings(
+            dump_on_session_end=True, extract_after_dump=False,
+        ),
     )
     js = s.model_dump_json()
     loaded = ProjectSettings.model_validate_json(js)
-    assert loaded.auto_ingest.enabled is False
+    assert loaded.auto_ingest.dump_on_session_end is True
+    assert loaded.auto_ingest.extract_after_dump is False
     assert loaded.locale == "ru"
 
 
@@ -82,7 +107,9 @@ def test_get_by_dot_path():
     s = ProjectSettings()
     assert get_by_dot_path(s, "lint.enabled_rules") is None
     assert get_by_dot_path(s, "snapshots.retention_days") == 180
-    assert get_by_dot_path(s, "auto_ingest.mode") == "auto"
+    # v0.0.10: auto_ingest.mode defaults to None now (legacy field).
+    assert get_by_dot_path(s, "auto_ingest.mode") is None
+    assert get_by_dot_path(s, "auto_ingest.dump_on_session_end") is None
     assert get_by_dot_path(s, "lint") == s.lint
 
 
@@ -120,6 +147,65 @@ def test_deep_merge_replaces_lists():
     a = {"x": [1, 2]}
     b = {"x": [3]}
     assert deep_merge(a, b) == {"x": [3]}
+
+
+# ---------------------------------------------------------------------------
+# v0.0.10: resolve_ingest_flags — single source of truth for hooks /
+# auto_dump / worker. Per-project field wins over GlobalSettings default;
+# None on a project field means "inherit".
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_ingest_flags_uses_global_when_project_is_none():
+    """No project context (e.g. unassigned cwd in a hook) → globals only."""
+    g = GlobalSettings(auto_ingest_defaults=AutoIngestDefaults(
+        dump_on_session_end=True,
+        dump_stale_after_24h=False,
+        extract_after_dump=True,
+    ))
+    assert resolve_ingest_flags(None, g) == (True, False, True)
+
+
+def test_resolve_ingest_flags_default_globals_are_all_false():
+    """Fresh install → no auto-ingest of any kind. v0.0.10 manual-default policy."""
+    assert resolve_ingest_flags(None, GlobalSettings()) == (False, False, False)
+
+
+def test_resolve_ingest_flags_per_project_overrides_global_per_field():
+    """Project override is per-field: a project setting True wins even if global is False."""
+    g = GlobalSettings(auto_ingest_defaults=AutoIngestDefaults(
+        dump_on_session_end=False,
+        dump_stale_after_24h=False,
+        extract_after_dump=False,
+    ))
+    p = ProjectSettings(auto_ingest=AutoIngestSettings(
+        dump_on_session_end=True,  # only this overridden
+    ))
+    assert resolve_ingest_flags(p, g) == (True, False, False)
+
+
+def test_resolve_ingest_flags_project_none_field_inherits_global():
+    """A None field on the project means "inherit" — not "force False"."""
+    g = GlobalSettings(auto_ingest_defaults=AutoIngestDefaults(
+        dump_on_session_end=True,
+        dump_stale_after_24h=True,
+        extract_after_dump=True,
+    ))
+    p = ProjectSettings(auto_ingest=AutoIngestSettings(
+        dump_on_session_end=False,  # project override: False wins
+        # other two None → inherit True
+    ))
+    assert resolve_ingest_flags(p, g) == (False, True, True)
+
+
+def test_resolve_ingest_flags_project_false_overrides_global_true():
+    """Distinguishes ``None`` (inherit) from ``False`` (explicit opt-out)."""
+    g = GlobalSettings(auto_ingest_defaults=AutoIngestDefaults(
+        extract_after_dump=True,
+    ))
+    p = ProjectSettings(auto_ingest=AutoIngestSettings(extract_after_dump=False))
+    _, _, extract = resolve_ingest_flags(p, g)
+    assert extract is False
 
 
 def test_settings_store_get_project_returns_defaults_if_missing(tmp_path: Path):

@@ -108,8 +108,16 @@ async def ingest_session_route(
             status_code=503,
             detail={"error": "vault_unavailable", "project": project},
         )
+    # v0.0.10: ``extract`` is now an explicit body field with a False default.
+    # Pre-v0.0.10 omitting it meant ``payload.get("extract", True)`` in the
+    # worker — silently spending LLM tokens. Callers (UI buttons, scripts)
+    # must opt in by passing ``extract: true`` if they want extraction.
+    extract = bool(body.get("extract", False))
     store: JobStore = runtime.job_store
-    job = store.create(kind="ingest", payload={"transcript_path": transcript_path})
+    job = store.create(
+        kind="ingest",
+        payload={"transcript_path": transcript_path, "extract": extract},
+    )
     if runtime.job_worker is not None:
         runtime.job_worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")

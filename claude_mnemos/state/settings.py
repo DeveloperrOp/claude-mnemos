@@ -39,9 +39,39 @@ class SettingsCorruptError(SettingsError):
 
 
 class AutoIngestSettings(BaseModel):
+    """Per-project ingest automation toggles.
+
+    Three independent yes/no decisions, all default OFF (manual). Override the
+    same-named fields on ``GlobalSettings.auto_ingest_defaults`` per-project,
+    or leave them as ``None`` to inherit the global default.
+
+    Why three booleans, not one mode enum:
+      - dump_on_session_end (cheap, 0 tokens) and extract_after_dump
+        ($$$ tokens via ``claude -p``) are different cost classes and users
+        sensibly want them controlled independently.
+      - dump_stale_after_24h is a safety net that fires on a different
+        timer (cron) and should be opt-in separately from the per-/exit hook.
+    """
+    model_config = ConfigDict(extra="ignore")
+    # Legacy fields kept for forward-compat with v0.0.9- on-disk JSON.
+    # They were never read by hooks/worker (dead code path), but
+    # ``foo.json`` test fixtures and any user files would otherwise fail
+    # ``extra="forbid"`` validation. Drop after a migration release.
+    enabled: bool | None = None
+    mode: Literal["auto", "hybrid", "manual"] | None = None
+    # v0.0.10 fields — None means "inherit from GlobalSettings.auto_ingest_defaults".
+    dump_on_session_end: bool | None = None
+    dump_stale_after_24h: bool | None = None
+    extract_after_dump: bool | None = None
+
+
+class AutoIngestDefaults(BaseModel):
+    """Global defaults for ``AutoIngestSettings`` — applied to any project
+    that doesn't override a given field."""
     model_config = ConfigDict(extra="forbid")
-    enabled: bool = True
-    mode: Literal["auto", "hybrid", "manual"] = "auto"
+    dump_on_session_end: bool = False
+    dump_stale_after_24h: bool = False
+    extract_after_dump: bool = False
 
 
 class LintSettings(BaseModel):
@@ -120,6 +150,44 @@ class GlobalSettings(BaseModel):
     default_max_input_tokens: int = Field(default=150_000, ge=1024)
     default_retention_days: int = Field(default=180, ge=1)
     # primary_project removed in β2.
+    # v0.0.10: defaults for ProjectSettings.auto_ingest. All three are
+    # opt-in (default OFF) so a fresh install never copies transcripts into
+    # a vault or burns LLM tokens without an explicit user toggle.
+    auto_ingest_defaults: AutoIngestDefaults = Field(default_factory=AutoIngestDefaults)
+
+
+def resolve_ingest_flags(
+    project: ProjectSettings | None,
+    glob: GlobalSettings,
+) -> tuple[bool, bool, bool]:
+    """Resolve the effective (dump_on_session_end, dump_stale_after_24h,
+    extract_after_dump) tuple for a project.
+
+    Per-field override precedence: project-level non-None wins; else fall
+    back to ``glob.auto_ingest_defaults``. ``project=None`` (e.g. a hook
+    with no project context) reads the globals only.
+
+    Used by hooks/session_end, core/auto_dump, and the ingest job worker
+    so a single source of truth controls when things actually run.
+    """
+    pi = project.auto_ingest if project is not None else None
+    defaults = glob.auto_ingest_defaults
+    dump_exit = (
+        pi.dump_on_session_end
+        if pi is not None and pi.dump_on_session_end is not None
+        else defaults.dump_on_session_end
+    )
+    dump_stale = (
+        pi.dump_stale_after_24h
+        if pi is not None and pi.dump_stale_after_24h is not None
+        else defaults.dump_stale_after_24h
+    )
+    extract = (
+        pi.extract_after_dump
+        if pi is not None and pi.extract_after_dump is not None
+        else defaults.extract_after_dump
+    )
+    return dump_exit, dump_stale, extract
 
 
 def get_by_dot_path(obj: BaseModel, key: str) -> Any:

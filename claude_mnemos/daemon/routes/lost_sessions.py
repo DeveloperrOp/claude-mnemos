@@ -32,6 +32,13 @@ router = APIRouter()
 
 UNASSIGNED_PROJECT = "__unassigned__"
 
+# v0.0.10: server-side ceiling on /import-bulk to prevent a single client
+# request from queueing thousands of LLM-extraction jobs by accident or
+# malice. Default limit is intentionally low (200) — large historical
+# imports should be paginated.
+BULK_IMPORT_HARD_CAP = 1000
+BULK_IMPORT_DEFAULT_LIMIT = 200
+
 
 def _validate_transcript_path(transcript_path: str) -> Path:
     """Reject paths outside the canonical transcripts root.
@@ -178,7 +185,7 @@ async def import_bulk_route(
 ) -> dict[str, Any]:
     """Enqueue ingest jobs for every lost session attributed to ``project_name``.
 
-    Body: ``{"project_name": str, "extract": bool? = True, "limit": int? = unbounded}``.
+    Body: ``{"project_name": str, "extract": bool? = False, "limit": int? = 200}``.
 
     Returns: ``{"queued": int, "skipped": int, "session_ids": [str]}``.
 
@@ -187,6 +194,14 @@ async def import_bulk_route(
 
     404 when ``project_name`` is not registered, 422 when missing,
     503 when the target vault has no job_store mounted.
+
+    v0.0.10:
+      * ``extract`` defaults to **False** (raw dump only). Pre-v0.0.10 the
+        default was True so a single ``POST /import-bulk`` could silently
+        spend hundreds of dollars on LLM tokens.
+      * ``limit`` defaults to **200** (was: unbounded). 422 if caller passes
+        a value above ``BULK_IMPORT_HARD_CAP`` so client mistakes can't
+        queue an entire vault's history in one request.
     """
     project_name = body.get("project_name")
     if not isinstance(project_name, str) or not project_name:
@@ -202,8 +217,20 @@ async def import_bulk_route(
         )
 
     raw_limit = body.get("limit")
-    limit = raw_limit if isinstance(raw_limit, int) and raw_limit > 0 else None
-    extract = bool(body.get("extract", True))
+    if isinstance(raw_limit, int) and raw_limit > 0:
+        if raw_limit > BULK_IMPORT_HARD_CAP:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "limit_too_large",
+                    "detail": f"limit may not exceed {BULK_IMPORT_HARD_CAP}",
+                    "hard_cap": BULK_IMPORT_HARD_CAP,
+                },
+            )
+        limit = raw_limit
+    else:
+        limit = BULK_IMPORT_DEFAULT_LIMIT
+    extract = bool(body.get("extract", False))
 
     cache = runtime.lost_sessions_cache
     items = (
@@ -278,7 +305,8 @@ async def import_selection_route(
             detail={"error": "vault_unavailable", "project_name": project_name},
         )
 
-    extract = bool(body.get("extract", True))
+    # v0.0.10: extract defaults to False (raw dump only). UI must opt-in.
+    extract = bool(body.get("extract", False))
 
     cache = runtime.lost_sessions_cache
     items = (
@@ -433,8 +461,13 @@ async def import_route(
             status_code=503,
             detail={"error": "vault_unavailable", "project_name": project_name},
         )
+    # v0.0.10: extract defaults to False. Caller opts in by passing extract=True.
+    extract = bool(body.get("extract", False))
     store: JobStore = runtime.job_store
-    job = store.create(kind="ingest", payload={"transcript_path": transcript_path})
+    job = store.create(
+        kind="ingest",
+        payload={"transcript_path": transcript_path, "extract": extract},
+    )
     if runtime.job_worker is not None:
         runtime.job_worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")

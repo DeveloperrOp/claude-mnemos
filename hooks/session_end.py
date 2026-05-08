@@ -38,7 +38,10 @@ from claude_mnemos.mapping.resolver import (  # noqa: E402
     ProjectResolver,
     ResolverAmbiguityError,
 )
-from claude_mnemos.state.settings import SettingsStore  # noqa: E402
+from claude_mnemos.state.settings import (  # noqa: E402
+    SettingsStore,
+    resolve_ingest_flags,
+)
 
 RECURSION_ENV = "MNEMOS_INGEST_RUNNING"
 DAEMON_URL_ENV = "MNEMOS_DAEMON_URL"
@@ -68,9 +71,18 @@ def _daemon_port() -> int:
 
 
 def _try_post_to_daemon(
-    daemon_url: str, transcript_path: str, project_name: str
+    daemon_url: str,
+    transcript_path: str,
+    project_name: str,
+    *,
+    extract: bool,
 ) -> bool:
-    """POST the ingest job to the daemon. Return True iff queued (2xx)."""
+    """POST the ingest job to the daemon. Return True iff queued (2xx).
+
+    ``extract`` is forwarded into payload so the worker uses it instead of
+    falling back to its old ``True`` default (which silently spent LLM
+    tokens for any auto-triggered hook). Default False at the call site.
+    """
     try:
         import httpx
     except ImportError:
@@ -83,6 +95,7 @@ def _try_post_to_daemon(
                 "payload": {
                     "transcript_path": transcript_path,
                     "project_name": project_name,
+                    "extract": extract,
                 },
             },
             timeout=DAEMON_POST_TIMEOUT_S,
@@ -93,6 +106,15 @@ def _try_post_to_daemon(
 
 
 def _spawn_ingest(transcript_path: str, project_name: str) -> None:
+    """Daemon-offline fallback: spawn ``mnemos ingest --no-llm`` detached.
+
+    v0.0.10: ALWAYS uses ``--no-llm`` (raw dump only). The fallback path
+    must never silently spend LLM tokens just because the daemon is offline
+    — the user opted out of auto-extract by leaving the daemon down OR by
+    not toggling ``extract_after_dump=True``. Either way the safe behaviour
+    is dump-only; if extraction is wanted, the user can trigger it from the
+    page UI later, when the daemon is back up.
+    """
     cmd = [
         sys.executable,
         "-m",
@@ -101,6 +123,7 @@ def _spawn_ingest(transcript_path: str, project_name: str) -> None:
         transcript_path,
         "--project",
         project_name,
+        "--no-llm",
     ]
     env = {**os.environ, RECURSION_ENV: "1"}
     if sys.platform == "win32":
@@ -159,11 +182,31 @@ def main() -> int:
         )
         return 0
 
+    # v0.0.10: respect the per-project / global ingest flags. With manual
+    # defaults (the v0.0.10 baseline), ``dump_on_session_end`` is False ⇒
+    # we silently exit and the transcript naturally surfaces in Lost
+    # Sessions for review later. Only when the user has explicitly opted
+    # in (project- or global-level) do we POST to the daemon.
+    try:
+        store = SettingsStore()
+        glob = store.get_global()
+        project_settings = store.get_project(entry.name)
+    except Exception as exc:  # noqa: BLE001
+        _eprint(f"settings load failed ({exc}); skipping POST to daemon")
+        return 0
+
+    dump_on_exit, _, extract = resolve_ingest_flags(project_settings, glob)
+    if not dump_on_exit:
+        # Manual mode for this project — silent skip. The transcript file
+        # remains on disk and the dashboard's Lost Sessions view will pick
+        # it up after 24h (or immediately if the user opens that page).
+        return 0
+
     port = _daemon_port()
     daemon_url = os.environ.get(
         DAEMON_URL_ENV, f"http://127.0.0.1:{port}"
     )
-    if _try_post_to_daemon(daemon_url, transcript, entry.name):
+    if _try_post_to_daemon(daemon_url, transcript, entry.name, extract=extract):
         return 0
 
     try:
