@@ -120,13 +120,12 @@ async def test_auto_dump_stale_enqueues_when_opted_in(
 
 
 @pytest.mark.asyncio
-async def test_auto_dump_default_opt_out_skips_everything(
+async def test_auto_dump_default_opted_in_dumps_with_no_extract(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, projects_with_alpha: tuple[Path, str]
 ) -> None:
-    """Fresh GlobalSettings (default OFF) → never enqueues, even for assigned stale sessions.
-
-    Regression for the v0.0.9 bug where the cron auto-ingested without consent.
-    """
+    """Fresh GlobalSettings: dump_stale_after_24h defaults to True (free
+    safety net), extract_after_dump defaults to False (no LLM). So a stale
+    session in a registered project IS enqueued, but as a raw dump."""
     vault, cwd = projects_with_alpha
     transcripts = tmp_path / "transcripts"
     transcripts.mkdir()
@@ -134,6 +133,33 @@ async def test_auto_dump_default_opt_out_skips_everything(
     _stale_jsonl(transcripts, "sess-stale", cwd, hours_ago=48)
 
     runtime = _FakeRuntime("alpha", vault)
+    queued = await auto_dump_stale(
+        {"alpha": runtime},
+        settings_store=_settings_store_with_global(GlobalSettings()),
+    )
+
+    assert queued == 1
+    rows = runtime.job_store.list_by_status("queued")
+    assert rows[0].payload["extract"] is False
+    runtime.job_store.close()
+
+
+@pytest.mark.asyncio
+async def test_auto_dump_explicit_opt_out_skips_everything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, projects_with_alpha: tuple[Path, str]
+) -> None:
+    """Per-project ``dump_stale_after_24h=False`` overrides the True global
+    default. Power user can fully silence the cron for that project."""
+    vault, cwd = projects_with_alpha
+    transcripts = tmp_path / "transcripts"
+    transcripts.mkdir()
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(transcripts))
+    _stale_jsonl(transcripts, "sess-stale", cwd, hours_ago=48)
+
+    project_settings = ProjectSettings(
+        auto_ingest=AutoIngestSettings(dump_stale_after_24h=False),
+    )
+    runtime = _FakeRuntime("alpha", vault, settings=project_settings)
     queued = await auto_dump_stale(
         {"alpha": runtime},
         settings_store=_settings_store_with_global(GlobalSettings()),

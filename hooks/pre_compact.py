@@ -39,10 +39,7 @@ from claude_mnemos.mapping.resolver import (  # noqa: E402
     ProjectResolver,
     ResolverAmbiguityError,
 )
-from claude_mnemos.state.settings import (  # noqa: E402
-    SettingsStore,
-    resolve_ingest_flags,
-)
+from claude_mnemos.state.settings import SettingsStore  # noqa: E402
 
 RECURSION_ENV = "MNEMOS_INGEST_RUNNING"
 DAEMON_URL_ENV = "MNEMOS_DAEMON_URL"
@@ -171,22 +168,11 @@ def main() -> int:
         )
         return 0
 
-    # v0.0.10: respect ``dump_on_session_end`` setting. PreCompact is a raw
-    # snapshot (extract=False is hardcoded in _try_post_to_daemon below), so
-    # there's no LLM cost — but it still WRITES into the project's vault,
-    # which is a side-effect a user in manual mode hasn't consented to.
-    # Same toggle as session_end keeps the policy coherent.
-    try:
-        store = SettingsStore()
-        glob = store.get_global()
-        project_settings = store.get_project(entry.name)
-    except Exception as exc:  # noqa: BLE001
-        _eprint(f"settings load failed ({exc}); skipping POST")
-        return 0
-    dump_on_exit, _, _ = resolve_ingest_flags(project_settings, glob)
-    if not dump_on_exit:
-        return 0
-
+    # PreCompact is a raw snapshot of a session that's about to lose history
+    # to compaction. It runs UNCONDITIONALLY for registered projects — no
+    # toggle gate. Compaction destroys context that no other backup catches,
+    # so this safety net must work out of the box. (Cost-wise it's free:
+    # extract=False is hardcoded in _try_post_to_daemon, no LLM.)
     port = _daemon_port()
     daemon_url = os.environ.get(
         DAEMON_URL_ENV, f"http://127.0.0.1:{port}"

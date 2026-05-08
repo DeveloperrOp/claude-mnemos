@@ -166,9 +166,10 @@ def test_resolve_ingest_flags_uses_global_when_project_is_none():
     assert resolve_ingest_flags(None, g) == (True, False, True)
 
 
-def test_resolve_ingest_flags_default_globals_are_all_false():
-    """Fresh install → no auto-ingest of any kind. v0.0.10 manual-default policy."""
-    assert resolve_ingest_flags(None, GlobalSettings()) == (False, False, False)
+def test_resolve_ingest_flags_default_globals():
+    """Fresh install: dump on /exit AND stale-safety-net both ON (free,
+    just file IO), extract OFF (the only LLM-spending toggle is opt-in)."""
+    assert resolve_ingest_flags(None, GlobalSettings()) == (True, True, False)
 
 
 def test_resolve_ingest_flags_per_project_overrides_global_per_field():

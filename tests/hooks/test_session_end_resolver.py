@@ -110,17 +110,19 @@ def test_hook_resolves_match_and_fallback_subprocess(isolated_home):
     assert b"not registered" not in r.stderr
 
 
-def test_hook_default_manual_mode_skips_daemon_post(isolated_home, monkeypatch):
-    """v0.0.10: by default ``dump_on_session_end`` is False (manual mode), so
-    the hook resolves the project but does NOT POST to the daemon and does
-    NOT spawn the fallback ingest subprocess. The transcript stays on disk
-    for the user to import via Lost Sessions later.
+def test_hook_explicit_opt_out_silent_skip(isolated_home):
+    """User can fully opt out of auto-dump by setting
+    ``dump_on_session_end=False`` either per-project or in
+    GlobalSettings.auto_ingest_defaults. In that case the hook resolves the
+    project but does NOT POST and does NOT spawn the fallback subprocess.
+    Transcript stays on disk for manual import via Lost Sessions.
 
-    Regression for the v0.0.9 "auto-ingest without consent" behaviour.
+    Regression for the v0.0.9 "auto-ingest without consent" behaviour: even
+    though the v0.0.11 default flipped to "dump on /exit = on" (it's free,
+    no LLM), the explicit-False path must still kill the side-effect.
     """
     home, env = isolated_home
-    # Tag the env so the hook can't accidentally hit a real daemon.
-    env["MNEMOS_DAEMON_URL"] = "http://127.0.0.1:1"  # already unreachable
+    env["MNEMOS_DAEMON_URL"] = "http://127.0.0.1:1"
 
     map_dir = home / ".claude-mnemos"
     map_dir.mkdir()
@@ -133,21 +135,31 @@ def test_hook_default_manual_mode_skips_daemon_post(isolated_home, monkeypatch):
             "cwd_patterns": [str(cwd)],
         }],
     }))
-    # NO global-settings.json on disk → defaults all False.
+    # Explicit global opt-out.
+    (map_dir / "global-settings.json").write_text(json.dumps({
+        "version": 1,
+        "auto_ingest_defaults": {
+            "dump_on_session_end": False,
+            "dump_stale_after_24h": False,
+            "extract_after_dump": False,
+        },
+    }))
     transcript = home / "t.jsonl"
     transcript.write_text("{}")
     payload = {"transcript_path": str(transcript), "cwd": str(cwd)}
     r = _run_hook(payload, env)
     assert r.returncode == 0
     assert b"not registered" not in r.stderr
-    # No "failed to spawn ingest worker" — fallback path never reached.
     assert b"failed to spawn" not in r.stderr
 
 
-def test_hook_opt_in_dump_on_session_end_attempts_post(isolated_home):
-    """When the global setting ``dump_on_session_end`` is True, the hook
-    DOES try to POST. Daemon is unreachable in this fixture so the spawn
-    fallback fires — that's how we detect the POST path was taken."""
+def test_hook_default_dumps_on_session_end(isolated_home):
+    """v0.0.11 default: when no global-settings.json exists, AutoIngestDefaults
+    has ``dump_on_session_end=True`` so the hook DOES try to POST for any
+    registered project. Daemon is unreachable here → POST fails → spawn
+    fallback fires (silent Popen). We observe the path was taken by the
+    absence of an early "lost-sessions" return.
+    """
     home, env = isolated_home
 
     map_dir = home / ".claude-mnemos"
@@ -161,25 +173,12 @@ def test_hook_opt_in_dump_on_session_end_attempts_post(isolated_home):
             "cwd_patterns": [str(cwd)],
         }],
     }))
-    # Global settings opt-in.
-    (map_dir / "global-settings.json").write_text(json.dumps({
-        "version": 1,
-        "auto_ingest_defaults": {
-            "dump_on_session_end": True,
-            "dump_stale_after_24h": False,
-            "extract_after_dump": False,
-        },
-    }))
+    # NO global-settings.json — exercise the built-in defaults.
     transcript = home / "t.jsonl"
     transcript.write_text("{}")
     payload = {"transcript_path": str(transcript), "cwd": str(cwd)}
     r = _run_hook(payload, env)
     assert r.returncode == 0
-    # Daemon at 127.0.0.1:1 is unreachable → POST fails → spawn fallback
-    # fires. The fallback uses Popen detached, so it doesn't print to stderr,
-    # but it also doesn't return anything we can observe directly. The
-    # important thing: the hook didn't return early on dump_on_session_end
-    # check (no "lost-sessions" message in stderr).
     assert b"not registered" not in r.stderr
 
 

@@ -67,10 +67,19 @@ class AutoIngestSettings(BaseModel):
 
 class AutoIngestDefaults(BaseModel):
     """Global defaults for ``AutoIngestSettings`` — applied to any project
-    that doesn't override a given field."""
+    that doesn't override a given field.
+
+    Defaults rationale (per user policy):
+      * ``dump_*`` = True: copying the .jsonl into the project vault is free
+        (no LLM, just file IO) and saves the user from manual import for
+        every session. The user can still flip it off per-project if they
+        truly want zero auto-writes.
+      * ``extract_after_dump`` = False: LLM extraction is the only step that
+        consumes subscription tokens / hits rate limits — must be opt-in.
+    """
     model_config = ConfigDict(extra="forbid")
-    dump_on_session_end: bool = False
-    dump_stale_after_24h: bool = False
+    dump_on_session_end: bool = True
+    dump_stale_after_24h: bool = True
     extract_after_dump: bool = False
 
 
