@@ -26,9 +26,22 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
+
+# Sub-agent transcripts are produced by Claude Code's Task tool — every spawn
+# of a child agent creates its own jsonl with a filename prefixed ``agent-``
+# (or ``agent-acompact-`` for the compaction sub-agent). They are pieces of a
+# parent session, NOT standalone sessions, so we don't surface them as
+# "lost" — the parent's jsonl already references them via tool_use entries.
+SUBAGENT_FILENAME_PREFIX = "agent-"
+
+# How long after a transcript stops being touched before we consider it
+# "lost". Within this window the session may still be active or queued for
+# auto-dump; surfacing it as lost would tempt users to import a half-written
+# transcript. Matches ``active_sessions.COOLING_THRESHOLD_HOURS``.
+LOST_SESSION_MIN_AGE_HOURS = 24
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -120,10 +133,27 @@ def scan_lost_sessions(
     vault: Path,
     *,
     transcripts_root: Path | None = None,
+    min_age_hours: float | None = None,
+    now: datetime | None = None,
 ) -> list[LostSession]:
-    """Return all transcripts under ``transcripts_root`` that are neither
-    ingested (per manifest) nor explicitly ignored.
+    """Return transcripts that look like genuinely abandoned sessions.
 
+    A transcript is "lost" only when ALL of:
+
+    * its SHA is not in the manifest (not ingested),
+    * its SHA is not on the ignore list,
+    * its filename is NOT a Claude Code sub-agent transcript (``agent-*``) —
+      sub-agents are pieces of a parent session, not standalone work,
+    * its ``mtime`` is at least ``min_age_hours`` ago — anything more recent
+      may still be an active session whose SessionEnd hook hasn't fired,
+      and importing it mid-write would dump a partial transcript.
+
+    The dashboard's Active Sessions widget covers the < ``min_age_hours``
+    window (Plan #14 / 2026-05-03 operational dashboard); Lost Sessions is
+    deliberately the long-tail view of stale uningested work, so the user
+    sees one whole session per row instead of fragments of an ongoing run.
+
+    ``now`` is injectable for tests; it defaults to the current UTC time.
     Internal: delegates disk IO (rglob + stat + sha) to transcript_scanner._scan_sync.
     """
     from claude_mnemos.core.transcript_scanner import _scan_sync
@@ -133,10 +163,18 @@ def scan_lost_sessions(
     ignored_shas: set[str] = LostSessionsIgnore.load(vault).ignored_shas
 
     entries = _scan_sync(transcripts_root)
+    # Resolve None at call-time (NOT in the default arg) so monkey-patching
+    # ``LOST_SESSION_MIN_AGE_HOURS`` from a conftest actually changes behaviour.
+    effective_min_age = LOST_SESSION_MIN_AGE_HOURS if min_age_hours is None else min_age_hours
+    cutoff = (now or datetime.now(tz=UTC)) - timedelta(hours=effective_min_age)
 
     results: list[LostSession] = []
     for e in entries:
         if e.sha in known_shas or e.sha in ignored_shas:
+            continue
+        if Path(e.transcript_path).name.startswith(SUBAGENT_FILENAME_PREFIX):
+            continue
+        if e.mtime > cutoff:
             continue
         results.append(
             LostSession(
@@ -177,11 +215,16 @@ class LostSessionsCache:
         vault: Path,
         *,
         transcripts_root: Path | None = None,
+        min_age_hours: float | None = None,
     ) -> list[LostSession]:
         now = time.monotonic()
         if self._items is not None and now < self._expires_at:
             return self._items
-        scanned = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+        scanned = scan_lost_sessions(
+            vault,
+            transcripts_root=transcripts_root,
+            min_age_hours=min_age_hours,
+        )
         self._items = scanned
         self._expires_at = now + self._ttl_s
         return scanned

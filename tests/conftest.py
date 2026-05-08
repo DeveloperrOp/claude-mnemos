@@ -25,6 +25,24 @@ def isolate_cli_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def disable_lost_session_age_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reset the v0.0.8 24h "still-active" filter so legacy fixtures that
+    create just-now jsonl files keep working without backdating each one.
+
+    Use ``-1`` (i.e. cutoff = now + 1h, in the future) instead of ``0`` so any
+    past mtime survives the filter. ``0`` exposes a Windows NTFS rounding race
+    where a freshly-written file's mtime is occasionally a few hundred
+    nanoseconds AFTER python's later ``datetime.now()`` — flaky in batch runs.
+
+    Tests that specifically exercise the age filter (e.g.
+    ``test_scan_hides_recent_sessions``) pass an explicit ``min_age_hours=24``
+    which overrides this default — so the filter is still covered."""
+    monkeypatch.setattr(
+        "claude_mnemos.core.lost_sessions.LOST_SESSION_MIN_AGE_HOURS", -1
+    )
+
+
 @pytest.fixture
 def register_project(tmp_path, monkeypatch):
     """Register a project pointing at a tmp vault, isolating ~/.claude-mnemos/.

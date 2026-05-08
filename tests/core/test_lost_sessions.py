@@ -50,7 +50,7 @@ def test_scan_empty_transcripts_root_returns_empty(tmp_path: Path) -> None:
     transcripts_root = tmp_path / "transcripts"
     transcripts_root.mkdir()
 
-    assert scan_lost_sessions(vault, transcripts_root=transcripts_root) == []
+    assert scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1) == []
 
 
 def test_scan_nonexistent_transcripts_root_returns_empty(tmp_path: Path) -> None:
@@ -58,7 +58,7 @@ def test_scan_nonexistent_transcripts_root_returns_empty(tmp_path: Path) -> None
     vault.mkdir()
     missing_root = tmp_path / "does-not-exist"
 
-    assert scan_lost_sessions(vault, transcripts_root=missing_root) == []
+    assert scan_lost_sessions(vault, transcripts_root=missing_root, min_age_hours=-1) == []
 
 
 def test_scan_all_in_manifest_returns_empty(tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ def test_scan_all_in_manifest_returns_empty(tmp_path: Path) -> None:
         manifest.add(sha, _ingest_record(f"sess-{i}"))
     manifest.save(vault)
 
-    assert scan_lost_sessions(vault, transcripts_root=transcripts_root) == []
+    assert scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1) == []
 
 
 def test_scan_one_lost_returns_single_entry(tmp_path: Path) -> None:
@@ -97,7 +97,7 @@ def test_scan_one_lost_returns_single_entry(tmp_path: Path) -> None:
     manifest.add(sha_b, _ingest_record("sess-b"))
     manifest.save(vault)
 
-    result = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+    result = scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(result) == 1
     entry = result[0]
     assert isinstance(entry, LostSession)
@@ -132,7 +132,7 @@ def test_scan_respects_ignore_list(tmp_path: Path) -> None:
     ignore = LostSessionsIgnore(ignored_shas={sha_ignored})
     ignore.save(vault)
 
-    result = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+    result = scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(result) == 1
     assert result[0].session_id == "sess-lost"
 
@@ -206,25 +206,27 @@ def test_lost_sessions_cache_ttl_behavior(
     monkeypatch.setattr("claude_mnemos.core.lost_sessions.time.monotonic", _monotonic)
 
     cache = LostSessionsCache(ttl_s=60.0)
-    first = cache.get_or_scan(vault, transcripts_root=transcripts_root)
+    first = cache.get_or_scan(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(first) == 1
 
     # Add a second lost session — without TTL expiry the cache should hide it.
     _write_jsonl(transcripts_root / "proj-lost-2", "sess-lost-2", b"lost-2\n")
     fake_now["t"] = 1030.0  # within TTL
-    cached = cache.get_or_scan(vault, transcripts_root=transcripts_root)
+    cached = cache.get_or_scan(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(cached) == 1, "cache should not rescan within TTL window"
 
     # Advance past TTL → fresh scan.
     fake_now["t"] = 1100.0
-    fresh = cache.get_or_scan(vault, transcripts_root=transcripts_root)
+    fresh = cache.get_or_scan(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(fresh) == 2
 
     # invalidate() forces a rescan even within the TTL window.
     fake_now["t"] = 1110.0
     _write_jsonl(transcripts_root / "proj-lost-3", "sess-lost-3", b"lost-3\n")
     cache.invalidate()
-    after_invalidate = cache.get_or_scan(vault, transcripts_root=transcripts_root)
+    after_invalidate = cache.get_or_scan(
+        vault, transcripts_root=transcripts_root, min_age_hours=-1
+    )
     assert len(after_invalidate) == 3
 
 
@@ -242,7 +244,7 @@ def test_scan_resolves_transcripts_root_from_env(
 
     monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(transcripts_root))
 
-    result = scan_lost_sessions(vault)
+    result = scan_lost_sessions(vault, min_age_hours=-1)
     assert len(result) == 1
     assert result[0].session_id == "via-env"
 
@@ -260,12 +262,76 @@ def test_scan_sorted_by_mtime_desc(tmp_path: Path) -> None:
     path_old, _ = _write_jsonl(transcripts_root / "p-old", "old-sid", b"old\n")
     path_new, _ = _write_jsonl(transcripts_root / "p-new", "new-sid", b"new\n")
 
+    # Both timestamps must be unambiguously in the past so the new
+    # ``min_age_hours`` filter doesn't drop the "new" file as still-active.
+    # 1_700_000_000 = 2023-11; 1_750_000_000 = 2025-06.
     os.utime(path_old, (1_700_000_000, 1_700_000_000))
-    os.utime(path_new, (1_800_000_000, 1_800_000_000))
+    os.utime(path_new, (1_750_000_000, 1_750_000_000))
 
-    result = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+    result = scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     ids = [item.session_id for item in result]
     assert ids == ["new-sid", "old-sid"]
+
+
+# ---------------------------------------------------------------------------
+# v0.0.8 filters: hide sub-agent transcripts (Claude Code Task tool spawns)
+# and hide sessions younger than min_age_hours so users don't see fragments
+# of an in-progress run.
+# ---------------------------------------------------------------------------
+
+
+def test_scan_hides_subagent_transcripts(tmp_path: Path) -> None:
+    """``agent-*.jsonl`` files are pieces of a parent session — never lost."""
+    import os
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    transcripts_root = tmp_path / "transcripts"
+    proj = transcripts_root / "p"
+    proj.mkdir(parents=True)
+
+    # Backdate both so the age filter doesn't matter for this test.
+    main_path, _ = _write_jsonl(proj, "5cab2b52-94c0-4abc-8def-0011223344ff", b"main\n")
+    sub_path, _ = _write_jsonl(proj, "agent-af5b8f1234567890ab", b"sub\n")
+    os.utime(main_path, (1_700_000_000, 1_700_000_000))
+    os.utime(sub_path, (1_700_000_000, 1_700_000_000))
+
+    Manifest().save(vault)
+
+    result = scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1)
+    ids = [item.session_id for item in result]
+    assert ids == ["5cab2b52-94c0-4abc-8def-0011223344ff"]
+
+
+def test_scan_hides_recent_sessions(tmp_path: Path) -> None:
+    """Sessions touched more recently than ``min_age_hours`` ago are still
+    active (or queued for auto-dump) — surfacing them as lost would tempt
+    users to import a half-written transcript."""
+    import os
+    import time as _time
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    transcripts_root = tmp_path / "transcripts"
+    proj = transcripts_root / "p"
+    proj.mkdir(parents=True)
+
+    recent_path, _ = _write_jsonl(proj, "recent-sid", b"recent\n")
+    old_path, _ = _write_jsonl(proj, "old-sid", b"old\n")
+
+    now = _time.time()
+    os.utime(recent_path, (now - 60, now - 60))           # 1 min ago
+    os.utime(old_path, (now - 25 * 3600, now - 25 * 3600))  # 25h ago
+
+    Manifest().save(vault)
+
+    # Pass explicit min_age_hours=24 to override the test-default of 0
+    # (autouse ``disable_lost_session_age_filter`` in tests/conftest.py).
+    result = scan_lost_sessions(
+        vault, transcripts_root=transcripts_root, min_age_hours=24
+    )
+    ids = [item.session_id for item in result]
+    assert ids == ["old-sid"]
 
 
 def test_extract_cwd_and_preview_finds_both(tmp_path: Path) -> None:
@@ -427,9 +493,14 @@ def test_scan_lost_sessions_populates_cwd_and_preview(tmp_path: Path) -> None:
         + json.dumps({"type": "user", "content": "ingest me"})
         + "\n"
     )
-    (proj / "abc123.jsonl").write_text(payload, encoding="utf-8")
+    jsonl = proj / "abc123.jsonl"
+    jsonl.write_text(payload, encoding="utf-8")
+    # Backdate so the new ``min_age_hours`` filter doesn't treat this just-
+    # written file as a still-active session and drop it.
+    import os
+    os.utime(jsonl, (1_700_000_000, 1_700_000_000))
 
-    results = scan_lost_sessions(vault, transcripts_root=transcripts_root)
+    results = scan_lost_sessions(vault, transcripts_root=transcripts_root, min_age_hours=-1)
     assert len(results) == 1
     entry = results[0]
     assert entry.session_id == "abc123"
