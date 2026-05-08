@@ -85,3 +85,85 @@ begin
       'Software\Microsoft\EdgeUpdate\ClientState\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
       'pv', V) and (V <> '');
 end;
+
+// ---------------------------------------------------------------------------
+// Detect-and-uninstall previous version (v0.0.9+ feature).
+//
+// Inno's default behaviour is "in-place upgrade": same AppId + DefaultDirName
+// → it overwrites files in the existing dir without explicit uninstall. That
+// works when nothing is locked, but the bundled tray + daemon + launcher
+// processes hold .exe / .pyd handles that block file replacement, leaving the
+// install in a half-overwritten state.
+//
+// Cleaner: detect the old install via its uninstall registry entry and run
+// its unins000.exe /SILENT first — that path INCLUDES our [UninstallRun]
+// taskkill steps (since v0.0.6) so processes are guaranteed dead before the
+// new bundle lands.
+// ---------------------------------------------------------------------------
+
+function GetUninstallString: String;
+var
+  RegKey, S: String;
+begin
+  // Inno appends "_is1" to AppId for its uninstall registry entry.
+  RegKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+            '{{4F2A8C90-7D5C-4B1A-9D3E-8E9F1A2B3C4D}_is1';
+  S := '';
+  if not RegQueryStringValue(HKLM, RegKey, 'UninstallString', S) then
+    RegQueryStringValue(HKCU, RegKey, 'UninstallString', S);
+  Result := S;
+end;
+
+function IsUpgrade: Boolean;
+begin
+  Result := (GetUninstallString() <> '');
+end;
+
+function UnInstallOldVersion: Boolean;
+var
+  S: String;
+  ResultCode: Integer;
+begin
+  Result := False;
+  S := GetUninstallString();
+  if S = '' then
+    Exit;
+  S := RemoveQuotes(S);
+  // /SILENT runs the uninstaller without UI; /SUPPRESSMSGBOXES kills any
+  // confirmation prompts; /NORESTART blocks the uninstaller from rebooting
+  // (we never need a reboot for our payload). ewWaitUntilTerminated blocks
+  // the installer thread until uninstall is fully done — critical so file
+  // removal completes BEFORE we start writing the new bundle.
+  Result := Exec(S, '/SILENT /SUPPRESSMSGBOXES /NORESTART', '',
+                 SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+function InitializeSetup(): Boolean;
+var
+  Response: Integer;
+begin
+  Result := True;
+  if not IsUpgrade() then
+    Exit;
+  Response := MsgBox(
+    'A previous version of claude-mnemos is already installed.' + #13#10#13#10 +
+    'Uninstall it before installing this update?' + #13#10 +
+    '(recommended — guarantees a clean install)' + #13#10#13#10 +
+    'Yes  — uninstall the old version, then install this one' + #13#10 +
+    'No   — install in place over the existing files' + #13#10 +
+    'Cancel — abort this installer',
+    mbConfirmation, MB_YESNOCANCEL);
+  if Response = IDCANCEL then begin
+    Result := False;  // user aborted whole install
+    Exit;
+  end;
+  if Response = IDYES then begin
+    if not UnInstallOldVersion() then begin
+      MsgBox('Could not uninstall the previous version automatically. ' +
+             'Please uninstall it manually from Settings → Apps, then re-run this installer.',
+             mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+  // IDNO → fall through; Inno will do its default in-place upgrade.
+end;
