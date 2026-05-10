@@ -36,7 +36,14 @@
     "alerts": "Сповіщення",
     "settings": "Налаштування",
     "help": "Допомога",
-    "locale": "Мова"
+    "locale": "Мова",
+    "global_links": {
+      "lost_sessions": "Втрачені сесії",
+      "failed_jobs": "Провалені задачі",
+      "metrics": "Метрики",
+      "help": "Допомога",
+      "global_settings": "Глобальні налаштування"
+    }
   },
   "overview": {
     "no_projects_title": "Мозок проєкту з'явиться тут",

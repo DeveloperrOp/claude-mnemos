@@ -37,7 +37,8 @@ describe("Layout", () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole("banner")).toBeInTheDocument(); // TopBar = <header>
-    expect(screen.getByRole("navigation")).toBeInTheDocument(); // Sidebar = <nav>
+    // Sidebar = <nav aria-label="primary">; TopBar also has <nav aria-label="global">
+    expect(screen.getAllByRole("navigation").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("page-body")).toBeInTheDocument();
   });
 });

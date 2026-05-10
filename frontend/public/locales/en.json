@@ -36,7 +36,14 @@
     "alerts": "Alerts",
     "settings": "Settings",
     "help": "Help",
-    "locale": "Language"
+    "locale": "Language",
+    "global_links": {
+      "lost_sessions": "Lost Sessions",
+      "failed_jobs": "Failed Jobs",
+      "metrics": "Metrics",
+      "help": "Help",
+      "global_settings": "Global Settings"
+    }
   },
   "overview": {
     "no_projects_title": "Project brains appear here",

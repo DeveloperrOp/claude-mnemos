@@ -36,7 +36,14 @@
     "alerts": "Уведомления",
     "settings": "Настройки",
     "help": "Помощь",
-    "locale": "Язык"
+    "locale": "Язык",
+    "global_links": {
+      "lost_sessions": "Потерянные сессии",
+      "failed_jobs": "Провалившиеся задачи",
+      "metrics": "Метрики",
+      "help": "Помощь",
+      "global_settings": "Глобальные настройки"
+    }
   },
   "overview": {
     "no_projects_title": "Мозг проекта появится здесь",

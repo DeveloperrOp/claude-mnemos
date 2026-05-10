@@ -15,8 +15,16 @@ function nextLocale(l: Locale): Locale {
   return LOCALE_CYCLE[(i + 1) % LOCALE_CYCLE.length]!;
 }
 
+const GLOBAL_LINKS = [
+  { to: "/lost-sessions", labelKey: "topbar.global_links.lost_sessions" },
+  { to: "/dead-letter", labelKey: "topbar.global_links.failed_jobs" },
+  { to: "/metrics", labelKey: "topbar.global_links.metrics" },
+  { to: "/help", labelKey: "topbar.global_links.help" },
+  { to: "/settings/global", labelKey: "topbar.global_links.global_settings" },
+] as const;
+
 export function TopBar() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const locale = useUIStore((s) => s.locale);
   const setLocale = useUIStore((s) => s.setLocale);
 
@@ -45,6 +53,19 @@ export function TopBar() {
         <span className="h-4 w-px bg-border" />
         <ProjectSwitcher />
       </div>
+
+      <nav className="flex items-center gap-1" aria-label="global">
+        {GLOBAL_LINKS.map((link) => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground"
+          >
+            {t(link.labelKey)}
+          </Link>
+        ))}
+      </nav>
+
       <div className="flex items-center gap-3">
         <UsageWidget />
         <span className="h-4 w-px bg-border" />
