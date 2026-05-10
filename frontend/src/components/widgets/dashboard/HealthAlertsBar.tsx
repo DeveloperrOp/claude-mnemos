@@ -49,7 +49,11 @@ function HealthAlertRow({ alert }: { alert: HealthAlert }) {
           {t(`overview.health_alerts.severity.${alert.severity}`)} ·{" "}
           {alert.detector}
         </div>
-        <div className="font-mono text-sm break-words">{alert.message}</div>
+        <div className="font-mono text-sm break-words">
+          {alert.i18n_key
+            ? t(alert.i18n_key, alert.i18n_params ?? {})
+            : alert.message}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <DropdownMenu>

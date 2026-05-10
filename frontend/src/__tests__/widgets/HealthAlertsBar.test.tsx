@@ -21,6 +21,10 @@ beforeAll(() => {
           dismiss: "Dismiss",
           show_more: "Show {{count}} more",
           show_less: "Show less",
+          detectors: {
+            hook_silence:
+              "{{count}} recent Claude Code session(s) detected, but no ingest job has succeeded in the last 6h. Check that hooks are installed.",
+          },
         },
       },
     },
@@ -121,5 +125,25 @@ describe("HealthAlertsBar", () => {
     };
     render(wrap(<HealthAlertsBar />));
     expect(screen.getByText("Dismiss")).toBeDefined();
+  });
+
+  it("renders alert text via i18n_key when present", () => {
+    mockData = {
+      alerts: [
+        makeAlert("a1", {
+          detector: "hook_silence",
+          severity: "warning",
+          message: "FALLBACK ENGLISH",
+          i18n_key: "overview.health_alerts.detectors.hook_silence",
+          i18n_params: { count: 4 },
+        }),
+      ],
+      silenced: [],
+    };
+    render(wrap(<HealthAlertsBar />));
+    expect(screen.queryByText(/FALLBACK ENGLISH/)).toBeNull();
+    expect(
+      screen.getByText(/4 recent Claude Code session\(s\) detected/),
+    ).toBeDefined();
   });
 });
