@@ -107,7 +107,17 @@
       "snooze_forever": "Forever",
       "dismiss": "Dismiss",
       "show_more": "Show {{count}} more",
-      "show_less": "Show less"
+      "show_less": "Show less",
+      "detectors": {
+        "auto_dump_overdue_missing": "Auto-dump cron job is not registered with the scheduler.",
+        "auto_dump_overdue": "Auto-dump is overdue by {{minutes}} min.",
+        "ingest_failure_streak": "Last {{count}} ingest jobs all failed within 24h.",
+        "runaway_job": "Job {{job_id}} has been running for {{minutes}}+ min.",
+        "hook_silence": "{{count}} recent Claude Code session(s) detected, but no ingest job has succeeded in the last 6h. Check that hooks are installed.",
+        "disk_low": "Vault \"{{vault}}\" disk has only {{percent_free}}% free.",
+        "project_map_broken": "Project map is corrupted: {{detail}}.",
+        "daemon_uptime_warning": "Daemon was recently restarted."
+      }
     },
     "dump_now": {
       "toast_success": "Queued for dump"

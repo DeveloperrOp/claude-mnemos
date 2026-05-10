@@ -63,6 +63,18 @@
       "body": "Скрипты хуков падали за последние 24ч. Сессии в эти моменты могли пропуститься.",
       "more": "+ ещё {{n}}",
       "log_path": "Полный лог: {{path}}"
+    },
+    "health_alerts": {
+      "detectors": {
+        "auto_dump_overdue_missing": "Cron-задача автодампа не зарегистрирована в шедулере.",
+        "auto_dump_overdue": "Автодамп просрочен на {{minutes}} мин.",
+        "ingest_failure_streak": "Последние {{count}} ingest-задач провалились за 24 часа.",
+        "runaway_job": "Задача {{job_id}} выполняется уже более {{minutes}} мин.",
+        "hook_silence": "Обнаружено {{count}} недавних сессий Claude Code, но за последние 6 часов ни одна ingest-задача не завершилась успешно. Проверь что хуки установлены.",
+        "disk_low": "Vault «{{vault}}» — свободно только {{percent_free}}% диска.",
+        "project_map_broken": "Project-map повреждён: {{detail}}.",
+        "daemon_uptime_warning": "Daemon недавно перезапустился."
+      }
     }
   },
   "project_view": {
