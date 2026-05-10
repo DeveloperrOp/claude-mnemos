@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from claude_mnemos.core.atomic import atomic_write
 
@@ -26,12 +26,7 @@ _LOCK = threading.RLock()
 class InstallState(BaseModel):
     first_run_ts: datetime | None = None
     autostart_decision: Literal["accepted", "declined"] | None = None
-    first_session_celebrated_for: list[str] = Field(default_factory=list)
     window_close_action: Literal["hide", "quit"] | None = None
-
-    def mark_celebrated(self, project_name: str) -> None:
-        if project_name not in self.first_session_celebrated_for:
-            self.first_session_celebrated_for.append(project_name)
 
     def save(self) -> None:
         with _LOCK:

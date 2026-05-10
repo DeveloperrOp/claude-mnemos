@@ -12,7 +12,6 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5757
 DEFAULT_LOG_LEVEL: LogLevel = "info"
 
-LEGACY_HOME_DIRNAME = ".mnemos"
 HOME_DIRNAME = ".claude-mnemos"
 
 
@@ -22,27 +21,6 @@ def default_pid_file() -> Path:
 
 def default_runtime_config_file() -> Path:
     return Path.home() / HOME_DIRNAME / "daemon.config.json"
-
-
-def migrate_legacy_dotmnemos() -> bool:
-    """One-shot move from ~/.mnemos to ~/.claude-mnemos. Unchanged from α."""
-    legacy_dir = Path.home() / LEGACY_HOME_DIRNAME
-    if not legacy_dir.is_dir():
-        return False
-    new_dir = Path.home() / HOME_DIRNAME
-    new_dir.mkdir(parents=True, exist_ok=True)
-    moved = False
-    for name in ("daemon.pid", "daemon.config.json"):
-        src = legacy_dir / name
-        dst = new_dir / name
-        if src.is_file() and not dst.exists():
-            try:
-                dst.write_bytes(src.read_bytes())
-                src.unlink()
-                moved = True
-            except OSError:
-                continue
-    return moved
 
 
 class BootFilter(BaseModel):
