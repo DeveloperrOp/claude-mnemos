@@ -182,3 +182,32 @@ async def test_snapshot_includes_per_project_session_counts(client, transcripts:
     body = r.json()
     assert "per_project_session_counts" in body
     assert isinstance(body["per_project_session_counts"], dict)
+
+
+@pytest.fixture
+def client_with_lost_sessions(client, transcripts: Path):
+    """Two stale jsonls (lost) + one agent-* jsonl (filtered out).
+
+    Both stale files (mtime ≥ 24h ago) should appear in /api/lost-sessions.
+    The agent-* file is filtered out by ``scan_lost_sessions`` because
+    sub-agent transcripts are fragments of a parent session, not standalone.
+    Pre-fix the dashboard KPI counted the agent-* file too (raw on-disk
+    count), giving a different number than the page.
+    """
+    _stale_jsonl(transcripts, "lost-1", cwd=None, hours_ago=48)
+    _stale_jsonl(transcripts, "lost-2", cwd=None, hours_ago=72)
+    _stale_jsonl(transcripts, "agent-fragment", cwd=None, hours_ago=48)
+    return client, transcripts.parent / "vault", transcripts
+
+
+async def test_dashboard_lost_total_matches_lost_sessions_endpoint(
+    client_with_lost_sessions,
+):
+    """KPI lost_total must equal the count returned by GET /lost-sessions
+    so the Overview KPI and the Lost Sessions page never disagree."""
+    client, _vault, _transcripts_root = client_with_lost_sessions
+
+    snapshot = (await client.get("/api/dashboard/snapshot")).json()
+    lost_page = (await client.get("/api/lost-sessions")).json()
+
+    assert snapshot["kpi"]["lost_total"] == lost_page["total"]

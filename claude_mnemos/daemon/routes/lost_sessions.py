@@ -63,8 +63,11 @@ def _validate_transcript_path(transcript_path: str) -> Path:
     return candidate
 
 
-def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
-    """Cross-vault scan with cwd-based project attribution.
+def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
+    """Pure helper: cross-vault scan with cwd-based attribution + dedupe.
+
+    Same filtering as scan_lost_sessions (mtime ≥ 24h ago, no agent-* files,
+    not in any vault's manifest). Reusable from dashboard.snapshot.
 
     Loss-session attribution is determined by ``cwd`` (resolved against the
     project-map) — NOT by the vault that surfaced the session in its scan.
@@ -72,19 +75,9 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
     ingested in ANY mounted vault. ``project_name`` is the name of the
     project whose ``cwd_patterns`` match the session's cwd, or
     ``"__unassigned__"`` if cwd matches no registered project (or is null).
-
-    This fixes a long-standing leakage where every vault would surface
-    every other vault's sessions as "lost" simply because they were
-    missing from its own manifest.
     """
-    runtimes = list(all_runtimes(request))
-
-    # Union of ingested shas across every mounted vault — the true
-    # "globally ingested" set. A session present in ANY manifest is not lost.
     global_ingested = global_ingested_shas(runtimes)
-
     resolver = ProjectResolver()
-
     seen_shas: set[str] = set()
     out: list[dict[str, Any]] = []
     for runtime in runtimes:
@@ -100,7 +93,6 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
             if item.sha in global_ingested:
                 continue
             seen_shas.add(item.sha)
-
             assigned = UNASSIGNED_PROJECT
             if item.cwd:
                 try:
@@ -109,11 +101,20 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
                         assigned = entry.name
                 except (ResolverAmbiguityError, OSError):
                     pass
-
             d = item.model_dump(mode="json")
             d["project_name"] = assigned
             out.append(d)
     return out
+
+
+def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
+    """Cross-vault scan with cwd-based project attribution.
+
+    Thin shim over :func:`collect_lost_sessions` — fixes a long-standing
+    leakage where every vault would surface every other vault's sessions
+    as "lost" simply because they were missing from its own manifest.
+    """
+    return collect_lost_sessions(list(all_runtimes(request)))
 
 
 @router.get("/lost-sessions")

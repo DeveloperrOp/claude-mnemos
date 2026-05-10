@@ -15,11 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core.active_sessions import scan_active_sessions
 from claude_mnemos.state.manifest import Manifest
-from claude_mnemos.core.transcript_scanner import (
-    invalidate_transcripts_cache,
-    scan_transcripts as _scan_transcripts_async,
-)
-from claude_mnemos.core.uningested_sessions import global_ingested_shas
+from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 
 router = APIRouter()
@@ -68,15 +64,19 @@ def _kpi_for(runtimes: list[Any]) -> dict[str, Any]:
 
 
 async def _compute_lost_total(runtimes: list[Any]) -> int:
-    """Count of transcripts not ingested in any vault.
+    """Count of transcripts surfaced by GET /lost-sessions.
 
-    Same union-manifest approach as scan_active_sessions, no mtime filter.
+    Calls the same helper the lost-sessions route uses so the KPI and the
+    user-facing page never disagree. Filtering rules (24h age, agent-*
+    exclusion, dedupe, manifest cross-check) live in the helper.
+
+    The collect call walks JSONL files on disk; offload to a worker
+    thread so the event loop stays responsive even with 500+ files
+    (mirror of list_lost_route).
     """
-    entries = await _scan_transcripts_async()
-    if not entries:
-        return 0
-    ingested = global_ingested_shas(runtimes)
-    return sum(1 for e in entries if e.sha not in ingested)
+    import asyncio
+    from claude_mnemos.daemon.routes.lost_sessions import collect_lost_sessions
+    return len(await asyncio.to_thread(collect_lost_sessions, runtimes))
 
 
 def _running_jobs_for(runtimes: list[Any]) -> list[dict[str, Any]]:
