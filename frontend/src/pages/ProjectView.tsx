@@ -1,10 +1,10 @@
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ExternalLink } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
 import { useHealth } from "@/hooks/useHealth";
 import { useUsageByProject } from "@/hooks/useUsageByProject";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
@@ -12,17 +12,6 @@ import { HealthBadge } from "@/components/widgets/HealthBadge";
 import { InjectPreview } from "@/components/widgets/InjectPreview";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
-
-const TILES: Array<{ key: string; emoji: string; path: string; descKey: string }> = [
-  { key: "navigation.pages",       emoji: "📚", path: "pages",       descKey: "project_view.tile_desc.pages" },
-  { key: "navigation.sessions",    emoji: "💬", path: "sessions",    descKey: "project_view.tile_desc.sessions" },
-  { key: "navigation.activity",    emoji: "📜", path: "activity",    descKey: "project_view.tile_desc.activity" },
-  { key: "navigation.suggestions", emoji: "💡", path: "suggestions", descKey: "project_view.tile_desc.suggestions" },
-  { key: "navigation.trash",       emoji: "🗑️", path: "trash",       descKey: "project_view.tile_desc.trash" },
-  { key: "navigation.snapshots",   emoji: "💾", path: "snapshots",   descKey: "project_view.tile_desc.snapshots" },
-  { key: "navigation.health",      emoji: "🩺", path: "health",      descKey: "project_view.tile_desc.health" },
-  { key: "navigation.settings",    emoji: "⚙",  path: "settings",    descKey: "project_view.tile_desc.settings" },
-];
 
 export function ProjectView() {
   const { name } = useParams<{ name: string }>();
@@ -88,25 +77,6 @@ export function ProjectView() {
       </div>
 
       <InjectPreview project={name!} />
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {TILES.map((tile) => (
-          <Card key={tile.path} className="relative overflow-hidden border-border/60 bg-card/40 transition-colors hover:border-accent/40 hover:bg-card/60">
-            <Link to={`/project/${name}/${tile.path}`} className="block">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">
-                  {tile.emoji} {t(tile.key)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="font-mono text-[11px] text-muted-foreground leading-relaxed">
-                  {t(tile.descKey)}
-                </div>
-              </CardContent>
-            </Link>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }

@@ -92,7 +92,7 @@ const FAKE_HEALTH_RESP = {
 };
 
 describe("ProjectView", () => {
-  it("renders header + stats + tiles for known project", async () => {
+  it("renders header + stats for known project (no tile grid in v0.0.13)", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
       if (url === "/projects") return FAKE_PROJECTS_RESP;
       if (url === "/health") return FAKE_HEALTH_RESP;
@@ -104,12 +104,29 @@ describe("ProjectView", () => {
     );
     // Vault path visible
     expect(screen.getByText(/D:\/v\/alpha/)).toBeInTheDocument();
-    // 8 navigation tiles
+    // Open in Obsidian button (rendered as anchor via Button asChild)
     expect(
-      screen.getAllByRole("link").filter((l) =>
-        l.getAttribute("href")?.startsWith("/project/alpha/"),
-      ),
-    ).toHaveLength(8);
+      screen.getByRole("link", { name: /open in obsidian/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render the navigation tile grid (moved to sidebar in v0.0.13)", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/projects") return FAKE_PROJECTS_RESP;
+      if (url === "/health") return FAKE_HEALTH_RESP;
+      return { data: { projects: [] } };
+    });
+    render(wrap(<ProjectView />, "/project/alpha"));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "alpha" })).toBeInTheDocument(),
+    );
+    // Tile-grid links wrapped in-page subroute hrefs (/project/alpha/pages, etc).
+    // The sidebar lives in Layout — not rendered in this test wrapper — so any
+    // /project/alpha/* link present must be from the (now-removed) tile grid.
+    const subrouteLinks = screen
+      .queryAllByRole("link")
+      .filter((l) => l.getAttribute("href")?.startsWith("/project/alpha/"));
+    expect(subrouteLinks).toHaveLength(0);
   });
 
   it("renders UnknownProject when name is not in /projects", async () => {
