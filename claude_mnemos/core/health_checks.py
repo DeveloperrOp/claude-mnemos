@@ -42,6 +42,8 @@ def _make(
     detector: str,
     severity: str,
     message: str,
+    i18n_key: str,
+    i18n_params: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> StoredAlert:
@@ -51,6 +53,8 @@ def _make(
         detector=detector,
         severity=severity,  # type: ignore[arg-type]
         message=message,
+        i18n_key=i18n_key,
+        i18n_params=i18n_params or {},
         context=context or {},
         first_seen=n,
         last_seen=n,
@@ -79,6 +83,7 @@ def check_auto_dump_overdue(
             detector="auto_dump_overdue",
             severity="warning",
             message="Auto-dump cron job is not registered with the scheduler.",
+            i18n_key="overview.health_alerts.detectors.auto_dump_overdue_missing",
             context={"job_id": "auto_dump_global"},
             now=n,
         )
@@ -96,6 +101,8 @@ def check_auto_dump_overdue(
                 f"Auto-dump is overdue by {int(delta / 60)} min "
                 f"(next_run_time={nrt.isoformat()})."
             ),
+            i18n_key="overview.health_alerts.detectors.auto_dump_overdue",
+            i18n_params={"minutes": int(delta / 60)},
             context={"overdue_seconds": int(delta), "next_run_time": nrt.isoformat()},
             now=n,
         )
@@ -147,6 +154,8 @@ def check_ingest_failure_streak(
             detector="ingest_failure_streak",
             severity="critical",
             message="Last 3 ingest jobs in the past 24h all failed.",
+            i18n_key="overview.health_alerts.detectors.ingest_failure_streak",
+            i18n_params={"count": len(last_three)},
             context={
                 "projects": [p for _, _, p in last_three],
                 "statuses": [s for _, s, _ in last_three],
@@ -192,6 +201,7 @@ def check_runaway_jobs(
                 )
     if not runaways:
         return None
+    longest = max(runaways, key=lambda r: r["running_for_seconds"])
     return _make(
         id_="runaway_job",
         detector="runaway_job",
@@ -200,6 +210,11 @@ def check_runaway_jobs(
             f"{len(runaways)} ingest job(s) running for more than 30 min "
             f"(longest: {max(r['running_for_seconds'] for r in runaways) // 60} min)."
         ),
+        i18n_key="overview.health_alerts.detectors.runaway_job",
+        i18n_params={
+            "job_id": str(longest["id"]),
+            "minutes": int(longest["running_for_seconds"] // 60),
+        },
         context={"jobs": runaways},
         now=n,
     )
@@ -290,6 +305,8 @@ def check_hook_silence(
             f"{len(recent_jsonls)} recent Claude Code session(s) detected, but no "
             f"ingest job has succeeded in the last 6h. Check that hooks are installed."
         ),
+        i18n_key="overview.health_alerts.detectors.hook_silence",
+        i18n_params={"count": len(recent_jsonls)},
         context={"recent_jsonl_count": len(recent_jsonls)},
         now=n,
     )
@@ -335,6 +352,7 @@ async def check_disk_low(
             )
     if not low:
         return None
+    worst = min(low, key=lambda v: v["free_ratio"])
     return _make(
         id_="disk_low",
         detector="disk_low",
@@ -342,6 +360,11 @@ async def check_disk_low(
         message=(
             f"{len(low)} vault filesystem(s) below {int(threshold * 100)}% free space."
         ),
+        i18n_key="overview.health_alerts.detectors.disk_low",
+        i18n_params={
+            "vault": str(worst["project"]),
+            "percent_free": int(worst["free_ratio"] * 100),
+        },
         context={"vaults": low, "threshold": threshold},
         now=n,
     )
@@ -363,6 +386,8 @@ def check_project_map_broken(*, now: datetime | None = None) -> StoredAlert | No
             detector="project_map_broken",
             severity="critical",
             message=f"project-map.json failed to load: {type(exc).__name__}: {exc}",
+            i18n_key="overview.health_alerts.detectors.project_map_broken",
+            i18n_params={"detail": f"{type(exc).__name__}: {exc}"},
             context={"exception_type": type(exc).__name__},
             now=n,
         )
@@ -396,6 +421,8 @@ def check_daemon_uptime_warning(
             detector="daemon_uptime_warning",
             severity="info",
             message=f"Daemon recently restarted ({int(uptime)}s ago).",
+            i18n_key="overview.health_alerts.detectors.daemon_uptime_warning",
+            i18n_params={"minutes": int(uptime / 60)},
             context={"uptime_seconds": int(uptime)},
             now=n,
         )

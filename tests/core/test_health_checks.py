@@ -186,6 +186,25 @@ def test_hook_silence_triggers_with_recent_jsonl_no_ingest(tmp_path: Path) -> No
     assert a.severity == "warning"
 
 
+def test_hook_silence_emits_i18n_key_and_params(tmp_path: Path) -> None:
+    """v0.0.12: hook_silence detector populates i18n_key + i18n_params
+    alongside the legacy English message, so the dashboard can localize."""
+    rt = _FakeRuntime("alpha", tmp_path / "vault")
+    rt.vault_root.mkdir(parents=True, exist_ok=True)
+    pd = tmp_path / "claude-projects"
+    sub = pd / "abc"
+    sub.mkdir(parents=True)
+    (sub / "session.jsonl").write_text("{}", encoding="utf-8")
+    alert = check_hook_silence({"alpha": rt}, projects_dir=pd)
+
+    assert alert is not None
+    assert alert.i18n_key == "overview.health_alerts.detectors.hook_silence"
+    assert "count" in alert.i18n_params
+    assert isinstance(alert.i18n_params["count"], int)
+    # Legacy English message is preserved for v0.0.11- consumers:
+    assert "recent" in alert.message.lower()
+
+
 def test_hook_silence_quiet_with_recent_success(tmp_path: Path) -> None:
     rt = _FakeRuntime("alpha", tmp_path / "vault")
     rt.vault_root.mkdir(parents=True, exist_ok=True)
