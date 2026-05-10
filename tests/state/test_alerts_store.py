@@ -1,11 +1,83 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from claude_mnemos.state.alerts_store import AlertsStore, StoredAlert
+
+
+def test_stored_alert_accepts_i18n_fields():
+    """v0.0.12: StoredAlert may carry i18n_key + i18n_params alongside the
+    legacy message field. Both serialize round-trip cleanly."""
+    a = StoredAlert(
+        id="x",
+        detector="hook_silence",
+        severity="warning",
+        message="4 recent Claude Code session(s) detected, but no ingest job has succeeded in the last 6h. Check that hooks are installed.",
+        i18n_key="overview.health_alerts.detectors.hook_silence",
+        i18n_params={"count": 4},
+        first_seen=datetime(2026, 5, 8, tzinfo=UTC),
+        last_seen=datetime(2026, 5, 8, tzinfo=UTC),
+    )
+    dumped = a.model_dump(mode="json")
+    assert dumped["i18n_key"] == "overview.health_alerts.detectors.hook_silence"
+    assert dumped["i18n_params"] == {"count": 4}
+
+    # Round-trip
+    reloaded = StoredAlert.model_validate(dumped)
+    assert reloaded.i18n_key == "overview.health_alerts.detectors.hook_silence"
+    assert reloaded.i18n_params == {"count": 4}
+
+
+def test_stored_alert_omits_i18n_fields_for_legacy_payload():
+    """v0.0.11- alerts on disk have neither i18n_key nor i18n_params.
+    Forward-compat: the model loads them with both fields = None / {}."""
+    a = StoredAlert.model_validate({
+        "id": "x",
+        "detector": "hook_silence",
+        "severity": "warning",
+        "message": "legacy",
+        "first_seen": "2026-05-08T00:00:00+00:00",
+        "last_seen": "2026-05-08T00:00:00+00:00",
+    })
+    assert a.i18n_key is None
+    assert a.i18n_params == {}
+
+
+def test_upsert_refreshes_i18n_fields_on_redetection():
+    """v0.0.12: when a detector re-fires with updated i18n_params (e.g.
+    the count changed), upsert() must overwrite the stored params, not
+    keep the stale first-seen value. Regression for the silent-drop bug
+    found by code-quality review of 69eae38."""
+    from datetime import UTC, datetime
+    from claude_mnemos.state.alerts_store import AlertsStore, StoredAlert
+
+    store = AlertsStore()
+    first = StoredAlert(
+        id="hook_silence",
+        detector="hook_silence",
+        severity="warning",
+        message="4 sessions, no ingest",
+        i18n_key="overview.health_alerts.detectors.hook_silence",
+        i18n_params={"count": 4},
+        first_seen=datetime(2026, 5, 8, 10, tzinfo=UTC),
+        last_seen=datetime(2026, 5, 8, 10, tzinfo=UTC),
+    )
+    store.upsert(first)
+    assert store.alerts[0].i18n_params == {"count": 4}
+
+    # Re-detection with a higher count and a new message
+    second = first.model_copy(update={
+        "message": "7 sessions, no ingest",
+        "i18n_params": {"count": 7},
+        "last_seen": datetime(2026, 5, 8, 12, tzinfo=UTC),
+    })
+    store.upsert(second)
+    assert len(store.alerts) == 1
+    assert store.alerts[0].i18n_params == {"count": 7}
+    assert store.alerts[0].message == "7 sessions, no ingest"
 
 
 def _now() -> datetime:

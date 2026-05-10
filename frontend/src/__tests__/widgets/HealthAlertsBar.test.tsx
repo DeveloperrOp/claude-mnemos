@@ -58,6 +58,7 @@ function makeAlert(id: string, overrides: Partial<HealthAlert> = {}): HealthAler
     detector: id,
     severity: "warning",
     message: `msg-${id}`,
+    i18n_params: {},
     context: {},
     first_seen: "2026-05-03T10:00:00Z",
     last_seen: "2026-05-03T10:00:00Z",

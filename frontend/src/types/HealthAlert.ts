@@ -8,6 +8,10 @@ export const HealthAlertSchema = z.object({
   detector: z.string(),
   severity: HealthAlertSeveritySchema,
   message: z.string(),
+  // v0.0.12: optional client-side i18n payload. When present, the UI
+  // renders `t(i18n_key, i18n_params)`; otherwise it falls back to message.
+  i18n_key: z.string().nullable().optional(),
+  i18n_params: z.record(z.unknown()).default({}),
   context: z.record(z.unknown()).default({}),
   first_seen: z.string(),
   last_seen: z.string(),

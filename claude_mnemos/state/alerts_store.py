@@ -47,7 +47,13 @@ class StoredAlert(BaseModel):
     id: str
     detector: str
     severity: Severity
-    message: str
+    message: str  # English fallback; kept for v0.0.11- on-disk alerts
+    # v0.0.12: structured payload for client-side localization. The
+    # frontend renders `t(i18n_key, i18n_params)` when i18n_key is set,
+    # otherwise falls back to the literal `message`. Detectors may emit
+    # both — the frontend prefers i18n_key.
+    i18n_key: str | None = None
+    i18n_params: dict[str, Any] = Field(default_factory=dict)
     context: dict[str, Any] = Field(default_factory=dict)
     first_seen: datetime
     last_seen: datetime
@@ -127,6 +133,8 @@ class AlertsStore(BaseModel):
                             "message": alert.message,
                             "context": alert.context,
                             "last_seen": alert.last_seen,
+                            "i18n_key": alert.i18n_key,
+                            "i18n_params": alert.i18n_params,
                         }
                     )
                     self.alerts[i] = merged
