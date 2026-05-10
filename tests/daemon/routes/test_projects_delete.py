@@ -65,7 +65,7 @@ def test_delete_project_removes_settings_file(
     vault.mkdir()
     _add_project(client, vault, name="p2")
     # Force a settings PATCH so the file exists.
-    r = client.patch("/api/settings/p2", json={"telemetry": {"opt_in": True}})
+    r = client.patch("/api/settings/p2", json={"snapshots": {"retention_days": 30}})
     assert r.status_code == 200, r.text
     settings_path = daemon.settings_store.settings_dir / "p2.json"
     assert settings_path.exists()

@@ -10,17 +10,11 @@ from claude_mnemos.state.settings import (
     AutoIngestDefaults,
     AutoIngestSettings,
     GlobalSettings,
-    IngestOverrides,
-    LifecycleSettings,
     LintSettings,
-    OntologySettings,
     ProjectSettings,
-    PromptsSettings,
     SettingsCorruptError,
     SettingsStore,
     SnapshotsSettings,
-    TelemetrySettings,
-    WatchdogSettings,
     deep_merge,
     get_by_dot_path,
     patch_dict_for_dot_path,
@@ -41,22 +35,14 @@ def test_project_settings_defaults():
     assert s.lint.enabled_rules is None
     assert s.snapshots.daily_enabled is True
     assert s.snapshots.retention_days == 180
-    assert s.lifecycle.auto_stale_days == 90
-    assert s.telemetry.opt_in is False
 
 
 def test_subgroup_models_construct_with_defaults():
-    # Smoke test that every spec §12.8 subgroup is independently usable.
+    # Smoke test that every retained subgroup is independently usable.
     assert isinstance(s := ProjectSettings(), ProjectSettings)
     assert isinstance(s.auto_ingest, AutoIngestSettings)
     assert isinstance(s.lint, LintSettings)
-    assert isinstance(s.ontology, OntologySettings)
-    assert isinstance(s.watchdog, WatchdogSettings)
     assert isinstance(s.snapshots, SnapshotsSettings)
-    assert isinstance(s.lifecycle, LifecycleSettings)
-    assert isinstance(s.prompts, PromptsSettings)
-    assert isinstance(s.telemetry, TelemetrySettings)
-    assert isinstance(s.ingest, IngestOverrides)
 
 
 def test_global_settings_defaults():
@@ -66,12 +52,40 @@ def test_global_settings_defaults():
     assert g.default_model == "claude-sonnet-4-6"
 
 
-def test_extra_fields_rejected():
+def test_project_settings_ignores_legacy_placebo_groups():
+    """v0.0.11- on-disk JSON files contain watchdog/ontology/lifecycle/
+    prompts/telemetry/ingest groups that v0.0.12 dropped. The model must
+    silently absorb them on load (extra='ignore' at the top level)."""
+    legacy = ProjectSettings.model_validate({
+        "version": 1,
+        "auto_ingest": {},
+        "watchdog": {"mode": "merge"},
+        "ontology": {"auto_mode": False},
+        "lifecycle": {"auto_stale_days": 90},
+        "prompts": {"custom_system_path": None},
+        "telemetry": {"opt_in": False},
+        "ingest": {"model": None},
+    })
+    assert legacy.version == 1
+    assert not hasattr(legacy, "watchdog")
+    assert not hasattr(legacy, "ontology")
+    assert not hasattr(legacy, "lifecycle")
+    assert not hasattr(legacy, "prompts")
+    assert not hasattr(legacy, "telemetry")
+    assert not hasattr(legacy, "ingest")
+
+
+def test_extra_fields_ignored_at_top_level():
+    # v0.0.12: ProjectSettings uses extra="ignore" so v0.0.11- on-disk
+    # files with the dropped placebo subgroups (watchdog/ontology/
+    # lifecycle/prompts/telemetry/ingest) load cleanly. See
+    # ``test_project_settings_ignores_legacy_placebo_groups`` below.
+    s = ProjectSettings.model_validate({"foo": "bar"})
+    assert not hasattr(s, "foo")
+    # Retained subgroups still validate strictly: an unknown field
+    # inside e.g. ``snapshots`` raises (extra="forbid" on subgroups).
     with pytest.raises(ValidationError):
-        ProjectSettings.model_validate({"foo": "bar"})
-    # AutoIngestSettings deliberately uses extra="ignore" to silently
-    # absorb legacy fields (``enabled``/``mode``) that may be present in
-    # on-disk JSON files written by v0.0.9 or older. Tested below.
+        ProjectSettings.model_validate({"snapshots": {"bogus": 1}})
 
 
 def test_auto_ingest_settings_ignores_unknown_fields():

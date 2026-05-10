@@ -90,62 +90,22 @@ class LintSettings(BaseModel):
     autofix_on_save: bool = False
 
 
-class OntologySettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    auto_mode: bool = False
-    confidence_min: float = Field(default=0.7, ge=0.0, le=1.0)
-    confidence_auto_apply: float = Field(default=0.95, ge=0.0, le=1.0)
-
-
-class WatchdogSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    mode: Literal["strict", "merge", "open"] = "merge"
-
-
 class SnapshotsSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     daily_enabled: bool = True
     retention_days: int = Field(default=180, ge=1)
 
 
-class LifecycleSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    auto_stale_days: int = Field(default=90, ge=1)
-    auto_archive: bool = False
-
-
-class PromptsSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    custom_system_path: str | None = None
-    custom_extract_user_path: str | None = None
-
-
-class TelemetrySettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    opt_in: bool = False
-
-
-class IngestOverrides(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    model: str | None = None
-    language_hint: Literal["auto", "uk", "ru", "en"] | None = None
-    max_input_tokens: int | None = None
-    context_limit: int | None = None
-
-
 class ProjectSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # extra="ignore": forward-compat — silently absorbs v0.0.11- files that
+    # had watchdog/ontology/lifecycle/prompts/telemetry/ingest subgroups.
+    # Those were never read by any code path; dropped in v0.0.12.
+    model_config = ConfigDict(extra="ignore")
     version: Literal[1] = 1
     locale: Literal["uk", "ru", "en"] | None = None
     auto_ingest: AutoIngestSettings = Field(default_factory=AutoIngestSettings)
     lint: LintSettings = Field(default_factory=LintSettings)
-    ontology: OntologySettings = Field(default_factory=OntologySettings)
-    watchdog: WatchdogSettings = Field(default_factory=WatchdogSettings)
     snapshots: SnapshotsSettings = Field(default_factory=SnapshotsSettings)
-    lifecycle: LifecycleSettings = Field(default_factory=LifecycleSettings)
-    prompts: PromptsSettings = Field(default_factory=PromptsSettings)
-    telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
-    ingest: IngestOverrides = Field(default_factory=IngestOverrides)
 
 
 class GlobalSettings(BaseModel):

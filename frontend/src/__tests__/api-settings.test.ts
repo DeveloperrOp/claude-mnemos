@@ -12,13 +12,7 @@ const FULL_PROJECT = {
   locale: null,
   auto_ingest: { enabled: true, mode: "auto" },
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  ontology: { auto_mode: false, confidence_min: 0.7, confidence_auto_apply: 0.95 },
-  watchdog: { mode: "merge" },
   snapshots: { daily_enabled: true, retention_days: 180 },
-  lifecycle: { auto_stale_days: 90, auto_archive: false },
-  prompts: { custom_system_path: null, custom_extract_user_path: null },
-  telemetry: { opt_in: false },
-  ingest: { model: null, language_hint: null, max_input_tokens: null, context_limit: null },
 };
 
 const FULL_GLOBAL = {
@@ -51,11 +45,11 @@ describe("settings API", () => {
 
   it("patchProjectSettings sends partial body", async () => {
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
-      data: { ...FULL_PROJECT, telemetry: { opt_in: true } },
+      data: { ...FULL_PROJECT, snapshots: { daily_enabled: true, retention_days: 30 } },
     });
-    const result = await patchProjectSettings("p1", { telemetry: { opt_in: true } });
-    expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", { telemetry: { opt_in: true } });
-    expect(result.telemetry.opt_in).toBe(true);
+    const result = await patchProjectSettings("p1", { snapshots: { retention_days: 30 } });
+    expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", { snapshots: { retention_days: 30 } });
+    expect(result.snapshots.retention_days).toBe(30);
   });
 
   it("getGlobalSettings parses payload", async () => {
