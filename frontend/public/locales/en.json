@@ -14,6 +14,7 @@
   },
   "navigation": {
     "overview": "Overview",
+    "project_overview": "Project Overview",
     "pages": "Pages",
     "sessions": "Sessions",
     "queue": "Queue",

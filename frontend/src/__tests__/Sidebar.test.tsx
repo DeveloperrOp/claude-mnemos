@@ -22,19 +22,16 @@ beforeAll(async () => {
     "translation",
     {
       navigation: {
-        overview: "Overview",
+        project_overview: "Project Overview",
         pages: "Pages",
         sessions: "Sessions",
         queue: "Queue",
         activity: "Activity",
         suggestions: "Suggestions",
-        lost_sessions: "Lost Sessions",
         trash: "Trash",
         snapshots: "Snapshots",
         health: "Health",
         settings: "Settings",
-        metrics: "Metrics",
-        help: "Help",
       },
     },
     true,
@@ -46,48 +43,84 @@ beforeAll(async () => {
   await i18n.changeLanguage("en");
 });
 
-describe("Sidebar", () => {
-  it("highlights Overview on /", () => {
-    render(
-      <TooltipProvider>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes>
-            <Route path="/" element={<Sidebar />} />
-          </Routes>
-        </MemoryRouter>
-      </TooltipProvider>,
-    );
-    const overview = screen.getByRole("link", { name: /overview|огляд|обзор/i });
-    expect(overview).toHaveAttribute("aria-current", "page");
-  });
+describe("Sidebar (project-scoped)", () => {
+  it("renders project nav items when on /project/:name route", async () => {
+    const { default: i18n } = await import("../i18n");
+    i18n.addResourceBundle("en", "translation", {
+      navigation: {
+        project_overview: "Project Overview",
+        pages: "Pages",
+        sessions: "Sessions",
+        queue: "Queue",
+        activity: "Activity",
+        suggestions: "Suggestions",
+        trash: "Trash",
+        snapshots: "Snapshots",
+        health: "Health",
+        settings: "Settings",
+      },
+    }, true, true);
 
-  it("shows project section disabled when no project active", () => {
     render(
       <TooltipProvider>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes>
-            <Route path="/" element={<Sidebar />} />
-          </Routes>
-        </MemoryRouter>
-      </TooltipProvider>,
-    );
-    // Per-project nav links are present but render as disabled (data-disabled).
-    const pages = screen.queryByText(/pages|сторінки|страницы/i);
-    expect(pages).toBeInTheDocument();
-    expect(pages!.closest("[data-disabled]")).toBeInTheDocument();
-  });
-
-  it("activates project links when on /project/:name", () => {
-    render(
-      <TooltipProvider>
-        <MemoryRouter initialEntries={["/project/alpha/pages"]}>
+        <MemoryRouter initialEntries={["/project/foo"]}>
           <Routes>
             <Route path="/project/:name/*" element={<Sidebar />} />
           </Routes>
         </MemoryRouter>
       </TooltipProvider>,
     );
-    const pages = screen.getByRole("link", { name: /pages|сторінки|страницы/i });
-    expect(pages).toHaveAttribute("aria-current", "page");
+
+    expect(screen.getByText("Project Overview")).toBeInTheDocument();
+    expect(screen.getByText("Pages")).toBeInTheDocument();
+    expect(screen.getByText("Sessions")).toBeInTheDocument();
+    expect(screen.getByText("Queue")).toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByText("Suggestions")).toBeInTheDocument();
+    expect(screen.getByText("Trash")).toBeInTheDocument();
+    expect(screen.getByText("Snapshots")).toBeInTheDocument();
+    expect(screen.getByText("Health")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+  });
+
+  it("does not render any disabled-looking items", () => {
+    render(
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/project/foo"]}>
+          <Routes>
+            <Route path="/project/:name/*" element={<Sidebar />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    expect(document.querySelector("[data-disabled]")).toBeNull();
+  });
+
+  it("does not contain Lost Sessions, Metrics, Help, Failed Jobs, or Global Settings (they live in TopBar)", () => {
+    render(
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/project/foo"]}>
+          <Routes>
+            <Route path="/project/:name/*" element={<Sidebar />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    expect(screen.queryByText(/lost sessions/i)).toBeNull();
+    expect(screen.queryByText(/failed jobs/i)).toBeNull();
+    expect(screen.queryByText(/metrics/i)).toBeNull();
+    expect(screen.queryByText(/help/i)).toBeNull();
+    expect(screen.queryByText(/global settings/i)).toBeNull();
+  });
+
+  it("returns null when there is no project context", () => {
+    const { container } = render(
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <Sidebar />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    expect(container.querySelector("nav")).toBeNull();
   });
 });
