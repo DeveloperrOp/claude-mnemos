@@ -79,8 +79,8 @@ export function Overview() {
             <span className="cursor-blink text-accent">_</span>
           </h1>
           <div className="hidden font-mono text-[10px] tabular-nums uppercase tracking-wider text-muted-foreground sm:flex sm:flex-col sm:items-end">
-            <span>local · {nowStr}</span>
-            <span>refresh · 10s</span>
+            <span>{t("overview.header.local_time", { time: nowStr })}</span>
+            <span>{t("overview.header.refresh_rate")}</span>
           </div>
         </div>
       </header>

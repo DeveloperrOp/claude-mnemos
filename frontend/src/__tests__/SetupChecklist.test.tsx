@@ -1,11 +1,46 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
+import i18n from "../i18n";
 import { SetupChecklist } from "@/components/widgets/dashboard/SetupChecklist";
 import * as api from "@/api/diagnostics.api";
 
 vi.mock("@/api/diagnostics.api");
+
+beforeAll(() => {
+  i18n.addResourceBundle(
+    "en",
+    "translation",
+    {
+      overview: {
+        setup: {
+          all_ok: "✓ Setup OK",
+          heading: "SETUP STATUS",
+          diagnostics_link: "Diagnostics →",
+          fix_button: "Fix",
+        },
+        hooks_fix: {
+          label: "Re-install hooks",
+          success_toast: "Hooks installed",
+          error_toast: "Hook install failed: {{error}}",
+          pending: "Installing…",
+        },
+      },
+      diagnostics: {
+        row: {
+          claude_cli: "Claude Code CLI",
+          hooks: "Claude Code hooks",
+          vaults: "Vault writability",
+          projects: "Tracked projects",
+        },
+      },
+    },
+    true,
+    true,
+  );
+  void i18n.changeLanguage("en");
+});
 
 function renderWidget() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

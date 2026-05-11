@@ -108,7 +108,7 @@ export function Health() {
         {projectSchedulerJobs.length === 0 ? (
           <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-            <span className="uppercase tracking-wider">empty</span>
+            <span className="uppercase tracking-wider">{t("health.empty_label")}</span>
             <span className="ml-auto opacity-60">{t("health.no_scheduler_jobs")}</span>
           </div>
         ) : (
@@ -169,7 +169,7 @@ export function Health() {
             {alerts.length === 0 ? (
               <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-                <span className="uppercase tracking-wider">empty</span>
+                <span className="uppercase tracking-wider">{t("health.empty_label")}</span>
                 <span className="ml-auto opacity-60">{t("health.alerts.empty")}</span>
               </div>
             ) : (

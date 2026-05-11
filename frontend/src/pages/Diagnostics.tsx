@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { getSetupStatus, type SetupStatusRow } from "@/api/diagnostics.api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HooksFixButton } from "@/components/widgets/dashboard/HooksFixButton";
@@ -10,22 +11,19 @@ const STATUS_STYLES: Record<SetupStatusRow["status"], string> = {
   critical: "border-rose-500/40 bg-rose-500/10 text-rose-400",
 };
 
-const ROW_LABELS: Record<string, string> = {
-  claude_cli: "Claude Code CLI",
-  hooks: "Claude Code hooks",
-  vaults: "Vault writability",
-  projects: "Tracked projects",
-};
+const ROW_KEYS = ["claude_cli", "hooks", "vaults", "projects"] as const;
+type RowKey = (typeof ROW_KEYS)[number];
 
 export function Diagnostics() {
+  const { t } = useTranslation();
   const q = useQuery({ queryKey: ["setup-status"], queryFn: getSetupStatus });
 
   if (q.isLoading) return <Skeleton className="h-48 w-full" />;
   if (q.isError || !q.data) {
-    return <div className="rounded border border-rose-500/40 bg-rose-500/10 p-4 text-rose-400">Failed to load status.</div>;
+    return <div className="rounded border border-rose-500/40 bg-rose-500/10 p-4 text-rose-400">{t("diagnostics.load_error")}</div>;
   }
   const status = q.data;
-  const rows: { key: keyof typeof ROW_LABELS; row: SetupStatusRow }[] = [
+  const rows: { key: RowKey; row: SetupStatusRow }[] = [
     { key: "claude_cli", row: status.claude_cli },
     { key: "hooks", row: status.hooks },
     { key: "vaults", row: status.vaults },
@@ -36,7 +34,7 @@ export function Diagnostics() {
     <div className="space-y-4 py-6 max-w-3xl">
       <header>
         <span className="eyebrow">claude-mnemos · diagnostics</span>
-        <h1 className="font-mono text-2xl mt-1">System health</h1>
+        <h1 className="font-mono text-2xl mt-1">{t("diagnostics.title")}</h1>
       </header>
       <div className="space-y-2">
         {rows.map(({ key, row }) => (
@@ -46,10 +44,10 @@ export function Diagnostics() {
             className={`flex items-center gap-3 rounded-md border p-3 ${STATUS_STYLES[row.status]}`}
           >
             <span className="font-mono uppercase text-[11px]">{row.status}</span>
-            <span className="font-medium">{ROW_LABELS[key] ?? key}</span>
+            <span className="font-medium">{t(`diagnostics.row.${key}`)}</span>
             <span className="ml-auto text-xs">{row.message}</span>
             {key === "hooks" && row.status !== "ok" && (
-              <HooksFixButton size="sm" variant="outline" label="Re-install hooks" />
+              <HooksFixButton size="sm" variant="outline" label={t("diagnostics.fix_button")} />
             )}
           </div>
         ))}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { useSetupStatus } from "@/hooks/onboarding/useSetupStatus";
 import type { SetupStatusRow } from "@/api/diagnostics.api";
 import { HooksFixButton } from "@/components/widgets/dashboard/HooksFixButton";
@@ -11,14 +12,11 @@ const ICON: Record<SetupStatusRow["status"], string> = {
   critical: "✗",
 };
 
-const ROW_LABELS: Record<string, string> = {
-  claude_cli: "Claude Code CLI",
-  hooks: "Claude Code hooks",
-  vaults: "Vault writability",
-  projects: "Tracked projects",
-};
+const ROW_KEYS = ["claude_cli", "hooks", "vaults", "projects"] as const;
+type RowKey = (typeof ROW_KEYS)[number];
 
 export function SetupChecklist() {
+  const { t } = useTranslation();
   const q = useSetupStatus();
   const [forcedOpen, setForcedOpen] = useState(false);
 
@@ -33,12 +31,12 @@ export function SetupChecklist() {
         onClick={() => setForcedOpen(true)}
         className="inline-flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-mono text-emerald-400"
       >
-        ✓ Setup OK
+        {t("overview.setup.all_ok")}
       </button>
     );
   }
 
-  const rows: { key: keyof typeof ROW_LABELS; row: SetupStatusRow }[] = [
+  const rows: { key: RowKey; row: SetupStatusRow }[] = [
     { key: "claude_cli", row: status.claude_cli },
     { key: "hooks", row: status.hooks },
     { key: "vaults", row: status.vaults },
@@ -48,9 +46,9 @@ export function SetupChecklist() {
   return (
     <section className="rounded-md border border-border/60 bg-card/40 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="eyebrow">SETUP STATUS</span>
+        <span className="eyebrow">{t("overview.setup.heading")}</span>
         <Link to="/diagnostics" className="text-xs underline text-primary">
-          Diagnostics →
+          {t("overview.setup.diagnostics_link")}
         </Link>
       </div>
       <ul className="space-y-1">
@@ -66,10 +64,10 @@ export function SetupChecklist() {
             }`}
           >
             <span className="font-mono w-4">{ICON[row.status]}</span>
-            <span className="font-medium w-44">{ROW_LABELS[key] ?? key}</span>
+            <span className="font-medium w-44">{t(`diagnostics.row.${key}`)}</span>
             <span className="text-xs flex-1">{row.message}</span>
             {key === "hooks" && row.status !== "ok" && (
-              <HooksFixButton size="sm" variant="outline" label="Fix" />
+              <HooksFixButton size="sm" variant="outline" label={t("overview.setup.fix_button")} />
             )}
           </li>
         ))}

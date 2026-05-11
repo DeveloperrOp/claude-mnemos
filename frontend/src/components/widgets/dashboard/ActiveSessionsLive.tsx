@@ -268,19 +268,19 @@ export function ActiveSessionsLive({ sessions }: { sessions: ActiveSession[] }) 
       </div>
 
       <Bucket
-        label="live · < 5 min"
+        label={t("overview.active.bucket_live")}
         count={buckets.live.length}
         tone="live"
         rows={renderRows(buckets.live, 0)}
       />
       <Bucket
-        label="recent · < 30 min"
+        label={t("overview.active.bucket_recent")}
         count={buckets.recent.length}
         tone="recent"
         rows={renderRows(buckets.recent, buckets.live.length)}
       />
       <Bucket
-        label="idle · < 24 h · auto-dump pending"
+        label={t("overview.active.bucket_idle")}
         count={buckets.idle.length}
         tone="idle"
         rows={renderRows(buckets.idle, buckets.live.length + buckets.recent.length)}

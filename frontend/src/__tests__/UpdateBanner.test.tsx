@@ -1,11 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import i18n from "../i18n";
 import { UpdateBanner } from "@/components/widgets/dashboard/UpdateBanner";
 import * as api from "@/api/update.api";
 
 vi.mock("@/api/update.api");
+
+beforeAll(() => {
+  i18n.addResourceBundle(
+    "en",
+    "translation",
+    {
+      overview: {
+        update: {
+          eyebrow: "UPDATE",
+          available: "v{{version}} is available",
+          current_version: "(you have {{current}})",
+          download_button: "Download",
+          later_button: "Later",
+        },
+      },
+    },
+    true,
+    true,
+  );
+  void i18n.changeLanguage("en");
+});
 
 function renderBanner() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

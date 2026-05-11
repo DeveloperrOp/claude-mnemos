@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
+import i18n from "../i18n";
 import { Diagnostics } from "@/pages/Diagnostics";
 import * as api from "@/api/diagnostics.api";
 import * as installHooksMod from "@/hooks/useInstallHooks";
@@ -10,6 +11,37 @@ import * as installHooksMod from "@/hooks/useInstallHooks";
 vi.mock("@/api/diagnostics.api");
 vi.mock("@/hooks/useInstallHooks");
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+beforeAll(() => {
+  i18n.addResourceBundle(
+    "en",
+    "translation",
+    {
+      diagnostics: {
+        title: "System health",
+        load_error: "Failed to load status.",
+        fix_button: "Re-install hooks",
+        row: {
+          claude_cli: "Claude Code CLI",
+          hooks: "Claude Code hooks",
+          vaults: "Vault writability",
+          projects: "Tracked projects",
+        },
+      },
+      overview: {
+        hooks_fix: {
+          label: "Re-install hooks",
+          success_toast: "Hooks installed",
+          error_toast: "Hook install failed: {{error}}",
+          pending: "Installing…",
+        },
+      },
+    },
+    true,
+    true,
+  );
+  void i18n.changeLanguage("en");
+});
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

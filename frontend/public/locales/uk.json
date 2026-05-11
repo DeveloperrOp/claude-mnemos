@@ -83,6 +83,44 @@
         "project_map_broken": "Project-map пошкоджено: {{detail}}.",
         "daemon_uptime_warning": "Daemon нещодавно перезапустився."
       }
+    },
+    "update": {
+      "eyebrow": "ОНОВЛЕННЯ",
+      "available": "v{{version}} доступна",
+      "current_version": "(зараз {{current}})",
+      "download_button": "Завантажити",
+      "later_button": "Пізніше"
+    },
+    "hooks_fix": {
+      "label": "Перевстановити хуки",
+      "success_toast": "Хуки встановлені",
+      "error_toast": "Помилка встановлення хуків: {{error}}",
+      "pending": "Встановлення…"
+    },
+    "setup": {
+      "all_ok": "✓ Налаштування OK",
+      "heading": "СТАН НАЛАШТУВАНЬ",
+      "diagnostics_link": "Діагностика →",
+      "fix_button": "Виправити"
+    },
+    "kpi": {
+      "hot_label": "активні",
+      "cooling_label": "охолоджуються",
+      "queue_secondary": "у черзі · викон · помил",
+      "today_secondary": "{{count}} сторінок",
+      "tokens_secondary": "сьогодні"
+    },
+    "active": {
+      "bucket_live": "наживо · < 5 хв",
+      "bucket_recent": "нещодавно · < 30 хв",
+      "bucket_idle": "пасивні · < 24 год · авто-дамп очікується"
+    },
+    "running": {
+      "idle": "простій"
+    },
+    "header": {
+      "local_time": "час · {{time}}",
+      "refresh_rate": "оновлення · 10с"
     }
   },
   "project_view": {
@@ -136,7 +174,8 @@
       "cleared_all_toast": "Усі сповіщення приховано",
       "empty": "Сповіщень немає",
       "error": "Не вдалося оновити сповіщення"
-    }
+    },
+    "empty_label": "порожньо"
   },
   "usage": {
     "title": "Використання",
@@ -835,6 +874,17 @@
       "heading": "Система",
       "autostart_label": "Запускати з Windows",
       "autostart_hint": "Daemon стартує автоматично при логіні. Сесії Claude Code збираються завжди."
+    }
+  },
+  "diagnostics": {
+    "title": "Здоров'я системи",
+    "load_error": "Не вдалося завантажити стан.",
+    "fix_button": "Перевстановити хуки",
+    "row": {
+      "claude_cli": "Claude Code CLI",
+      "hooks": "Хуки Claude Code",
+      "vaults": "Запис у vault",
+      "projects": "Відстежувані проєкти"
     }
   }
 }

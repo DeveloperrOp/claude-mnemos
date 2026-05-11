@@ -143,15 +143,15 @@ export function KpiBar({ data }: { data: Kpi }) {
           hot={data.active.hot}
           cooling={data.active.cooling}
           totalLabel={t("overview.kpi.active_label")}
-          hotLabel="hot"
-          coolingLabel="cooling"
+          hotLabel={t("overview.kpi.hot_label")}
+          coolingLabel={t("overview.kpi.cooling_label")}
         />
       </div>
 
       <CompactTile
         label={t("overview.kpi.queue_label")}
         primary={`${data.queue.queued}/${data.queue.running}/${data.queue.failed}`}
-        secondary="queued · run · fail"
+        secondary={t("overview.kpi.queue_secondary")}
         accent={queueAccent}
         testId="kpi-queue"
       />
@@ -159,14 +159,14 @@ export function KpiBar({ data }: { data: Kpi }) {
       <CompactTile
         label={t("overview.kpi.today_label")}
         primary={`${data.today.ingest_count}`}
-        secondary={`${data.today.pages_count} pages`}
+        secondary={t("overview.kpi.today_secondary", { count: data.today.pages_count })}
         testId="kpi-today"
       />
 
       <CompactTile
         label={t("overview.kpi.tokens_label")}
         primary={`${(data.tokens_today / 1000).toFixed(1)}K`}
-        secondary="today"
+        secondary={t("overview.kpi.tokens_secondary")}
         testId="kpi-tokens"
       />
 

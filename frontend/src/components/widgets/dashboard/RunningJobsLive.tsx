@@ -15,7 +15,7 @@ export function RunningJobsLive({ jobs }: { jobs: RunningJob[] }) {
         <div className="section-rail mb-2">{t("overview.running.title")}</div>
         <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-          <span className="uppercase tracking-wider">idle</span>
+          <span className="uppercase tracking-wider">{t("overview.running.idle")}</span>
           <span className="ml-auto opacity-60">{t("overview.running.empty")}</span>
         </div>
       </section>

@@ -1,6 +1,8 @@
+import { useTranslation } from "react-i18next";
 import { useUpdateStatus, useDismissUpdate } from "@/hooks/useUpdateStatus";
 
 export function UpdateBanner() {
+  const { t } = useTranslation();
   const q = useUpdateStatus();
   const dismiss = useDismissUpdate();
 
@@ -12,10 +14,17 @@ export function UpdateBanner() {
       data-testid="update-banner"
       className="flex items-center gap-3 rounded-md border border-blue-500/40 bg-blue-500/10 px-4 py-3"
     >
-      <span className="font-mono text-xs uppercase text-blue-400">UPDATE</span>
+      <span className="font-mono text-xs uppercase text-blue-400">
+        {t("overview.update.eyebrow")}
+      </span>
       <div className="flex-1 text-sm">
-        <span className="font-medium">claude-mnemos {latest}</span> is available
-        <span className="text-muted-foreground"> (you have {current})</span>
+        <span className="font-medium">
+          {t("overview.update.available", { version: latest })}
+        </span>
+        <span className="text-muted-foreground">
+          {" "}
+          {t("overview.update.current_version", { current })}
+        </span>
       </div>
       <a
         href={download_url}
@@ -23,7 +32,7 @@ export function UpdateBanner() {
         rel="noopener noreferrer"
         className="rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
       >
-        Download
+        {t("overview.update.download_button")}
       </a>
       <button
         type="button"
@@ -31,7 +40,7 @@ export function UpdateBanner() {
         disabled={dismiss.isPending}
         className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted/50"
       >
-        Later
+        {t("overview.update.later_button")}
       </button>
     </div>
   );

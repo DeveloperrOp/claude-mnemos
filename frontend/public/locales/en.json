@@ -81,12 +81,18 @@
       "today_format": "{{ingest}} ingest · {{pages}} pages",
       "tokens_label": "Tokens",
       "lost_label": "Lost",
-      "lost_link": "→ Sort"
+      "lost_link": "→ Sort",
+      "hot_label": "hot",
+      "cooling_label": "cooling",
+      "queue_secondary": "queued · run · fail",
+      "today_secondary": "{{count}} pages",
+      "tokens_secondary": "today"
     },
     "running": {
       "title": "Running now",
       "elapsed": "{{seconds}}s elapsed",
-      "empty": "😴 Nothing running"
+      "empty": "😴 Nothing running",
+      "idle": "idle"
     },
     "active": {
       "title": "Active sessions",
@@ -94,7 +100,10 @@
       "dump_now_button": "Dump now",
       "read_button": "Read",
       "auto_dump_in": "auto-dump in {{remaining}}",
-      "auto_dump_overdue": "auto-dump pending"
+      "auto_dump_overdue": "auto-dump pending",
+      "bucket_live": "live · < 5 min",
+      "bucket_recent": "recent · < 30 min",
+      "bucket_idle": "idle · < 24 h · auto-dump pending"
     },
     "health_dot": {
       "ok": "Healthy",
@@ -129,6 +138,29 @@
     },
     "dump_now": {
       "toast_success": "Queued for dump"
+    },
+    "update": {
+      "eyebrow": "UPDATE",
+      "available": "v{{version}} is available",
+      "current_version": "(you have {{current}})",
+      "download_button": "Download",
+      "later_button": "Later"
+    },
+    "hooks_fix": {
+      "label": "Re-install hooks",
+      "success_toast": "Hooks installed",
+      "error_toast": "Hook install failed: {{error}}",
+      "pending": "Installing…"
+    },
+    "setup": {
+      "all_ok": "✓ Setup OK",
+      "heading": "SETUP STATUS",
+      "diagnostics_link": "Diagnostics →",
+      "fix_button": "Fix"
+    },
+    "header": {
+      "local_time": "local · {{time}}",
+      "refresh_rate": "refresh · 10s"
     }
   },
   "project_view": {
@@ -182,7 +214,8 @@
       "cleared_all_toast": "All alerts cleared",
       "empty": "No alerts",
       "error": "Failed to update alert"
-    }
+    },
+    "empty_label": "empty"
   },
   "usage": {
     "title": "Usage",
@@ -889,6 +922,17 @@
       "heading": "System",
       "autostart_label": "Start with Windows",
       "autostart_hint": "Daemon starts automatically at login. Claude Code sessions are always captured."
+    }
+  },
+  "diagnostics": {
+    "title": "System health",
+    "load_error": "Failed to load status.",
+    "fix_button": "Re-install hooks",
+    "row": {
+      "claude_cli": "Claude Code CLI",
+      "hooks": "Claude Code hooks",
+      "vaults": "Vault writability",
+      "projects": "Tracked projects"
     }
   }
 }

@@ -83,6 +83,44 @@
         "project_map_broken": "Project-map повреждён: {{detail}}.",
         "daemon_uptime_warning": "Daemon недавно перезапустился."
       }
+    },
+    "update": {
+      "eyebrow": "ОБНОВЛЕНИЕ",
+      "available": "v{{version}} доступна",
+      "current_version": "(сейчас {{current}})",
+      "download_button": "Скачать",
+      "later_button": "Позже"
+    },
+    "hooks_fix": {
+      "label": "Переустановить хуки",
+      "success_toast": "Хуки установлены",
+      "error_toast": "Ошибка установки хуков: {{error}}",
+      "pending": "Установка…"
+    },
+    "setup": {
+      "all_ok": "✓ Настройки OK",
+      "heading": "СТАТУС НАСТРОЕК",
+      "diagnostics_link": "Диагностика →",
+      "fix_button": "Исправить"
+    },
+    "kpi": {
+      "hot_label": "активные",
+      "cooling_label": "остывают",
+      "queue_secondary": "в очереди · выпол · ошиб",
+      "today_secondary": "{{count}} страниц",
+      "tokens_secondary": "сегодня"
+    },
+    "active": {
+      "bucket_live": "вживую · < 5 мин",
+      "bucket_recent": "недавно · < 30 мин",
+      "bucket_idle": "простой · < 24 ч · авто-дамп ожидается"
+    },
+    "running": {
+      "idle": "простой"
+    },
+    "header": {
+      "local_time": "время · {{time}}",
+      "refresh_rate": "обновление · 10с"
     }
   },
   "project_view": {
@@ -136,7 +174,8 @@
       "cleared_all_toast": "Все уведомления скрыты",
       "empty": "Нет уведомлений",
       "error": "Не удалось обновить уведомление"
-    }
+    },
+    "empty_label": "пусто"
   },
   "usage": {
     "title": "Использование",
@@ -833,6 +872,17 @@
       "heading": "Система",
       "autostart_label": "Запускать с Windows",
       "autostart_hint": "Daemon стартует автоматически при логине. Сессии Claude Code собираются всегда."
+    }
+  },
+  "diagnostics": {
+    "title": "Здоровье системы",
+    "load_error": "Не удалось загрузить статус.",
+    "fix_button": "Переустановить хуки",
+    "row": {
+      "claude_cli": "Claude Code CLI",
+      "hooks": "Хуки Claude Code",
+      "vaults": "Запись в vault",
+      "projects": "Отслеживаемые проекты"
     }
   }
 }

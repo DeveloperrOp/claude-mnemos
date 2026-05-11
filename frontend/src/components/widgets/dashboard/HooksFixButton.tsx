@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useInstallHooks } from "@/hooks/useInstallHooks";
 
@@ -11,17 +12,19 @@ interface Props {
 export function HooksFixButton({
   size = "sm",
   variant = "default",
-  label = "Re-install hooks",
+  label,
 }: Props) {
+  const { t } = useTranslation();
   const mut = useInstallHooks();
+  const resolvedLabel = label ?? t("overview.hooks_fix.label");
 
   const onClick = async () => {
     try {
       await mut.mutateAsync();
-      toast.success("Hooks installed");
+      toast.success(t("overview.hooks_fix.success_toast"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown error";
-      toast.error(`Hook install failed: ${msg}`);
+      toast.error(t("overview.hooks_fix.error_toast", { error: msg }));
     }
   };
 
@@ -33,7 +36,7 @@ export function HooksFixButton({
       onClick={onClick}
       disabled={mut.isPending}
     >
-      {mut.isPending ? "Installing…" : label}
+      {mut.isPending ? t("overview.hooks_fix.pending") : resolvedLabel}
     </Button>
   );
 }
