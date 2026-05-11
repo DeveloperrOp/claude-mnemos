@@ -5,7 +5,13 @@ import { Sidebar } from "./Sidebar";
 
 export function Layout() {
   // Sidebar is project-scoped — only render it on /project/:name and any sub-route.
-  const inProject = useMatch("/project/:name/*") ?? useMatch("/project/:name");
+  // The splat in `/project/:name/*` also matches the bare `/project/:name`
+  // (with `*=""`), so one useMatch covers both cases. Chaining two useMatch
+  // calls with `??` was a rules-of-hooks violation — `??` short-circuits, so
+  // the second call ran only when the first returned null. Hook count then
+  // differed between renders, producing React error #300 ("rendered fewer
+  // hooks than expected") on navigation between project / non-project routes.
+  const inProject = useMatch("/project/:name/*");
 
   return (
     <TooltipProvider delayDuration={300}>

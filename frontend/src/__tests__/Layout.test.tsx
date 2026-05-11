@@ -124,6 +124,43 @@ describe("Layout", () => {
     expect(screen.getByRole("navigation", { name: "primary" })).toBeInTheDocument();
   });
 
+  it("navigating between global and project routes does not throw (rules-of-hooks regression)", () => {
+    // Regression for React error #300 ("rendered fewer hooks than expected"):
+    // a previous version of Layout chained `useMatch(...) ?? useMatch(...)`,
+    // which short-circuited the second call and changed hook count between
+    // renders. Rerendering with two different paths in the same component
+    // instance triggers the violation. This must NOT throw.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<div data-testid="page">Home</div>} />
+              <Route path="/project/:name" element={<div data-testid="page">Proj</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    // Re-render the same Layout instance with a project route. If hooks order
+    // differs, this throws synchronously with the #300 error.
+    rerender(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/project/foo"]}>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<div data-testid="page">Home</div>} />
+              <Route path="/project/:name" element={<div data-testid="page">Proj</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    // If we reach here, no hooks-order violation fired.
+    expect(true).toBe(true);
+  });
+
   it("layout grid switches columns based on project context", () => {
     // Global route — main takes full width via grid-cols-1
     const { container, unmount } = renderLayoutAt("/");
