@@ -91,6 +91,27 @@ export function Overview() {
 
       <HealthAlertsBar />
 
+      <section>
+        <div className="section-rail mb-3">
+          <span>{t("overview.projects_heading", "Projects")}</span>
+          <span className="ml-auto font-mono tabular-nums text-foreground/70">
+            {projects.length}
+          </span>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {projects.map((p) => (
+            <ProjectCard
+              key={p.name}
+              project={p}
+              vault_health={healthQuery.data?.vaults?.[p.name]}
+              usage={usageByName.get(p.name) as
+                | { sessions_covered?: number; avg_compression_ratio?: number }
+                | undefined}
+            />
+          ))}
+        </div>
+      </section>
+
       <SetupChecklist />
 
       {showRateLimitBanner && (
@@ -117,27 +138,6 @@ export function Overview() {
           <ActiveSessionsLive sessions={snapshot.active_sessions} />
         </>
       )}
-
-      <section>
-        <div className="section-rail mb-3">
-          <span>{t("overview.projects_heading", "Projects")}</span>
-          <span className="ml-auto font-mono tabular-nums text-foreground/70">
-            {projects.length}
-          </span>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {projects.map((p) => (
-            <ProjectCard
-              key={p.name}
-              project={p}
-              vault_health={healthQuery.data?.vaults?.[p.name]}
-              usage={usageByName.get(p.name) as
-                | { sessions_covered?: number; avg_compression_ratio?: number }
-                | undefined}
-            />
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
