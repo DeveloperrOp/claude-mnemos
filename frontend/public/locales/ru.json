@@ -82,7 +82,20 @@
         "disk_low": "Vault «{{vault}}» — свободно только {{percent_free}}% диска.",
         "project_map_broken": "Project-map повреждён: {{detail}}.",
         "daemon_uptime_warning": "Daemon недавно перезапустился."
-      }
+      },
+      "dismiss": "Закрыть",
+      "severity": {
+        "critical": "критично",
+        "info": "инфо",
+        "warning": "внимание"
+      },
+      "show_less": "Свернуть",
+      "show_more": "Показать ещё {{count}}",
+      "snooze_1h": "1 ч",
+      "snooze_24h": "24 ч",
+      "snooze_forever": "Навсегда",
+      "snooze_label": "Отложить",
+      "title": "Уведомления"
     },
     "update": {
       "eyebrow": "ОБНОВЛЕНИЕ",
@@ -108,19 +121,46 @@
       "cooling_label": "остывают",
       "queue_secondary": "в очереди · выпол · ошиб",
       "today_secondary": "{{count}} страниц",
-      "tokens_secondary": "сегодня"
+      "tokens_secondary": "сегодня",
+      "active_format": "🟢 {{hot}} · 🟡 {{cooling}}",
+      "active_label": "Активные",
+      "lost_label": "Потерянные",
+      "lost_link": "→ Сортировка",
+      "queue_format": "{{queued}} в очереди · {{running}} выпол · {{failed}} ошибок",
+      "queue_label": "Очередь",
+      "today_format": "{{ingest}} ингест · {{pages}} страниц",
+      "today_label": "Сегодня",
+      "tokens_label": "Токены"
     },
     "active": {
       "bucket_live": "вживую · < 5 мин",
       "bucket_recent": "недавно · < 30 мин",
-      "bucket_idle": "простой · < 24 ч · авто-дамп ожидается"
+      "bucket_idle": "простой · < 24 ч · авто-дамп ожидается",
+      "auto_dump_in": "авто-дамп через {{remaining}}",
+      "auto_dump_overdue": "авто-дамп ожидается",
+      "dump_now_button": "Дамп сейчас",
+      "empty": "Нет активных сессий",
+      "read_button": "Читать",
+      "title": "Активные сессии"
     },
     "running": {
-      "idle": "простой"
+      "idle": "простой",
+      "elapsed": "{{seconds}}с",
+      "empty": "😴 Ничего не выполняется",
+      "title": "Выполняется сейчас"
     },
     "header": {
       "local_time": "время · {{time}}",
       "refresh_rate": "обновление · 10с"
+    },
+    "dump_now": {
+      "toast_success": "Поставлено в очередь на дамп"
+    },
+    "health_dot": {
+      "critical": "Критично",
+      "details_link": "→ Детали",
+      "ok": "Здоровая",
+      "warning": "Предупреждения"
     }
   },
   "project_view": {
@@ -884,5 +924,15 @@
       "vaults": "Запись в vault",
       "projects": "Отслеживаемые проекты"
     }
+  },
+  "inject_preview": {
+    "computed_at": "вычислено {{ago}}",
+    "limit_label": "лимит",
+    "pages_count": "Включено страниц ({{count}})",
+    "preview_hide": "Скрыть превью",
+    "preview_show": "Показать превью",
+    "title": "КОНТЕКСТ ИНЪЕКЦИИ",
+    "tokens_label": "токены",
+    "truncated": "ОБРЕЗАНО"
   }
 }

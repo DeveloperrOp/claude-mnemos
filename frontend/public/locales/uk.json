@@ -82,7 +82,20 @@
         "disk_low": "Vault «{{vault}}» — вільно лише {{percent_free}}% диску.",
         "project_map_broken": "Project-map пошкоджено: {{detail}}.",
         "daemon_uptime_warning": "Daemon нещодавно перезапустився."
-      }
+      },
+      "dismiss": "Прибрати",
+      "severity": {
+        "critical": "критично",
+        "info": "інфо",
+        "warning": "увага"
+      },
+      "show_less": "Сховати",
+      "show_more": "Показати ще {{count}}",
+      "snooze_1h": "1 год",
+      "snooze_24h": "24 год",
+      "snooze_forever": "Назавжди",
+      "snooze_label": "Відкласти",
+      "title": "Сповіщення"
     },
     "update": {
       "eyebrow": "ОНОВЛЕННЯ",
@@ -108,19 +121,46 @@
       "cooling_label": "охолоджуються",
       "queue_secondary": "у черзі · викон · помил",
       "today_secondary": "{{count}} сторінок",
-      "tokens_secondary": "сьогодні"
+      "tokens_secondary": "сьогодні",
+      "active_format": "🟢 {{hot}} · 🟡 {{cooling}}",
+      "active_label": "Активні",
+      "lost_label": "Втрачені",
+      "lost_link": "→ Сортування",
+      "queue_format": "{{queued}} в черзі · {{running}} викон · {{failed}} помилок",
+      "queue_label": "Черга",
+      "today_format": "{{ingest}} інжест · {{pages}} сторінок",
+      "today_label": "Сьогодні",
+      "tokens_label": "Токени"
     },
     "active": {
       "bucket_live": "наживо · < 5 хв",
       "bucket_recent": "нещодавно · < 30 хв",
-      "bucket_idle": "пасивні · < 24 год · авто-дамп очікується"
+      "bucket_idle": "пасивні · < 24 год · авто-дамп очікується",
+      "auto_dump_in": "авто-дамп через {{remaining}}",
+      "auto_dump_overdue": "авто-дамп очікується",
+      "dump_now_button": "Дампити зараз",
+      "empty": "Немає активних сесій",
+      "read_button": "Читати",
+      "title": "Активні сесії"
     },
     "running": {
-      "idle": "простій"
+      "idle": "простій",
+      "elapsed": "{{seconds}}с",
+      "empty": "😴 Нічого не виконується",
+      "title": "Виконується зараз"
     },
     "header": {
       "local_time": "час · {{time}}",
       "refresh_rate": "оновлення · 10с"
+    },
+    "dump_now": {
+      "toast_success": "Поставлено в чергу на дамп"
+    },
+    "health_dot": {
+      "critical": "Критично",
+      "details_link": "→ Деталі",
+      "ok": "Здорова",
+      "warning": "Попередження"
     }
   },
   "project_view": {
@@ -886,5 +926,15 @@
       "vaults": "Запис у vault",
       "projects": "Відстежувані проєкти"
     }
+  },
+  "inject_preview": {
+    "computed_at": "обчислено {{ago}}",
+    "limit_label": "ліміт",
+    "pages_count": "Включено сторінок ({{count}})",
+    "preview_hide": "Сховати прев'ю",
+    "preview_show": "Показати прев'ю",
+    "title": "КОНТЕКСТ ІНЖЕКЦІЇ",
+    "tokens_label": "токени",
+    "truncated": "ОБРІЗАНО"
   }
 }
