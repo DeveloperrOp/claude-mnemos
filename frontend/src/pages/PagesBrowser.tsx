@@ -148,6 +148,11 @@ export function PagesBrowser() {
             {t("pages.showing_n_of_m", { shown: filteredSorted.length, total: totalPaths })}
             {stillLoading && <> · {t("pages.loading_frontmatter")}</>}
           </div>
+          {!stillLoading && loaded.length === 0 && totalPaths > 0 && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-[12px] text-amber-700 dark:text-amber-400">
+              {t("pages.raw_only_hint", { count: totalPaths })}
+            </div>
+          )}
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {filteredSorted.map((p) => (
               <PageCard

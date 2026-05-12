@@ -322,7 +322,8 @@
       "discard_modal_desc": "Your edits will be lost.",
       "discard_button": "Discard",
       "loading": "Loading…"
-    }
+    },
+    "raw_only_hint": "{{count}} session(s) ingested but not yet extracted into wiki pages. Open Project Settings → Auto Ingest and enable “extract after dump”, then re-ingest to populate this view."
   },
   "pages_browser": {
     "empty": {
