@@ -948,7 +948,18 @@
       "claude_cli": "Claude Code CLI",
       "hooks": "Хуки Claude Code",
       "vaults": "Запис у vault",
-      "projects": "Відстежувані проєкти"
+      "projects": "Відстежувані проєкти",
+      "claude_cli_ok": "Claude Code CLI встановлено.",
+      "hooks_ok": "Всі хуки Claude Code встановлені.",
+      "vaults_ok": "Усі vault-папки доступні для запису.",
+      "projects_tracked": "Відстежується {{count}} проєкт(ів).",
+      "projects_none": "Поки що немає відстежуваних проєктів."
+    },
+    "alert": {
+      "claude_cli_not_installed": "Claude Code CLI не встановлено. Встанови з docs.anthropic.com перш ніж користуватися mnemos.",
+      "hooks_not_installed": "Хуки Claude Code не встановлені. Запусти `mnemos hooks install` щоб mnemos захопив сесії.",
+      "hooks_partial": "Деякі хуки Claude Code відсутні: {{missing}}. Перезапусти `mnemos hooks install`.",
+      "vault_not_writable": "Ці vault-папки недоступні для запису: {{paths}}. Перевір права доступу."
     }
   },
   "inject_preview": {

@@ -64,12 +64,30 @@ def detected_cwds_route(request: Request) -> dict[str, Any]:
     return {"cwds": [d.model_dump(mode="json") for d in items]}
 
 
-def _row(alert: Any | None, ok_message: str) -> dict[str, Any]:
+def _row(
+    alert: Any | None,
+    ok_message: str,
+    ok_i18n_key: str,
+    ok_i18n_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a setup-status row.
+
+    v0.0.17: each row carries `i18n_key` + `i18n_params` alongside the
+    legacy `message` string. Frontend prefers the i18n payload (rendered
+    via `t(key, params)`) and falls back to `message` for old clients.
+    """
     if alert is None:
-        return {"status": "ok", "message": ok_message}
+        return {
+            "status": "ok",
+            "message": ok_message,
+            "i18n_key": ok_i18n_key,
+            "i18n_params": ok_i18n_params or {},
+        }
     return {
         "status": alert.severity,
         "message": alert.message,
+        "i18n_key": alert.i18n_key,
+        "i18n_params": alert.i18n_params or {},
         "id": alert.id,
     }
 
@@ -82,13 +100,37 @@ def setup_status_route(request: Request) -> dict[str, Any]:
     project_count = _project_count(request)
 
     rows = {
-        "claude_cli": _row(cli_alert, "Claude Code CLI is installed."),
-        "hooks": _row(hooks_alert, "All Claude Code hooks are installed."),
-        "vaults": _row(vaults_alert, "All vault roots are writable."),
+        "claude_cli": _row(
+            cli_alert,
+            "Claude Code CLI is installed.",
+            "diagnostics.row.claude_cli_ok",
+        ),
+        "hooks": _row(
+            hooks_alert,
+            "All Claude Code hooks are installed.",
+            "diagnostics.row.hooks_ok",
+        ),
+        "vaults": _row(
+            vaults_alert,
+            "All vault roots are writable.",
+            "diagnostics.row.vaults_ok",
+        ),
         "projects": (
-            {"status": "ok", "message": f"{project_count} project(s) tracked.", "count": project_count}
+            {
+                "status": "ok",
+                "message": f"{project_count} project(s) tracked.",
+                "i18n_key": "diagnostics.row.projects_tracked",
+                "i18n_params": {"count": project_count},
+                "count": project_count,
+            }
             if project_count > 0
-            else {"status": "warning", "message": "No projects tracked yet.", "count": 0}
+            else {
+                "status": "warning",
+                "message": "No projects tracked yet.",
+                "i18n_key": "diagnostics.row.projects_none",
+                "i18n_params": {},
+                "count": 0,
+            }
         ),
     }
     all_ok = all(r["status"] == "ok" for r in rows.values())

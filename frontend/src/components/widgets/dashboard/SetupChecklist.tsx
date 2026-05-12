@@ -65,7 +65,11 @@ export function SetupChecklist() {
           >
             <span className="font-mono w-4">{ICON[row.status]}</span>
             <span className="font-medium w-44">{t(`diagnostics.row.${key}`)}</span>
-            <span className="text-xs flex-1">{row.message}</span>
+            <span className="text-xs flex-1">
+              {row.i18n_key
+                ? t(row.i18n_key, { ...(row.i18n_params ?? {}), defaultValue: row.message })
+                : row.message}
+            </span>
             {key === "hooks" && row.status !== "ok" && (
               <HooksFixButton size="sm" variant="outline" label={t("overview.setup.fix_button")} />
             )}

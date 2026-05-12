@@ -956,7 +956,18 @@
       "claude_cli": "Claude Code CLI",
       "hooks": "Claude Code hooks",
       "vaults": "Vault writability",
-      "projects": "Tracked projects"
+      "projects": "Tracked projects",
+      "claude_cli_ok": "Claude Code CLI is installed.",
+      "hooks_ok": "All Claude Code hooks are installed.",
+      "vaults_ok": "All vault roots are writable.",
+      "projects_tracked": "{{count}} project(s) tracked.",
+      "projects_none": "No projects tracked yet."
+    },
+    "alert": {
+      "claude_cli_not_installed": "Claude Code CLI is not installed. Install it from docs.anthropic.com before using mnemos.",
+      "hooks_not_installed": "Claude Code hooks are not installed. Run `mnemos hooks install` so mnemos can capture sessions.",
+      "hooks_partial": "Some Claude Code hooks are missing: {{missing}}. Re-run `mnemos hooks install`.",
+      "vault_not_writable": "These vault roots are not writable: {{paths}}. Check permissions."
     }
   },
   "breadcrumb": {

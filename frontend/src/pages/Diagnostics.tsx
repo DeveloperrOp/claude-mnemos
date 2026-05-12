@@ -46,7 +46,11 @@ export function Diagnostics() {
           >
             <span className="font-mono uppercase text-[11px]">{row.status}</span>
             <span className="font-medium">{t(`diagnostics.row.${key}`)}</span>
-            <span className="ml-auto text-xs">{row.message}</span>
+            <span className="ml-auto text-xs">
+              {row.i18n_key
+                ? t(row.i18n_key, { ...(row.i18n_params ?? {}), defaultValue: row.message })
+                : row.message}
+            </span>
             {key === "hooks" && row.status !== "ok" && (
               <HooksFixButton size="sm" variant="outline" label={t("diagnostics.fix_button")} />
             )}

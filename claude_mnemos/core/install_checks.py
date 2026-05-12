@@ -39,6 +39,7 @@ def check_claude_cli_installed() -> StoredAlert | None:
             "https://docs.anthropic.com/en/docs/claude-code/quickstart "
             "before using mnemos."
         ),
+        i18n_key="diagnostics.alert.claude_cli_not_installed",
         context={},
         first_seen=now,
         last_seen=now,
@@ -80,6 +81,7 @@ def check_hooks_present() -> StoredAlert | None:
                 "Claude Code hooks are not installed. Run `mnemos hooks "
                 "install` so mnemos can capture sessions."
             ),
+            i18n_key="diagnostics.alert.hooks_not_installed",
             context={"installed": []},
             first_seen=now,
             last_seen=now,
@@ -96,6 +98,8 @@ def check_hooks_present() -> StoredAlert | None:
                 f"Some Claude Code hooks are missing: {', '.join(missing)}. "
                 f"Re-run `mnemos hooks install`."
             ),
+            i18n_key="diagnostics.alert.hooks_partial",
+            i18n_params={"missing": ", ".join(missing)},
             context={"installed": sorted(installed), "missing": missing},
             first_seen=now,
             last_seen=now,
@@ -128,6 +132,8 @@ def check_vault_writable(vault_roots: Iterable[Path]) -> StoredAlert | None:
             + ", ".join(bad)
             + ". Check permissions."
         ),
+        i18n_key="diagnostics.alert.vault_not_writable",
+        i18n_params={"paths": ", ".join(bad)},
         context={"unwritable": bad},
         first_seen=now,
         last_seen=now,
