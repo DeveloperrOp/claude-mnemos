@@ -116,9 +116,9 @@ export function Health() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">id</th>
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">next_run_time</th>
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">trigger</th>
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.id")}</th>
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.next_run_time")}</th>
+                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.trigger")}</th>
               </tr>
             </thead>
             <tbody>

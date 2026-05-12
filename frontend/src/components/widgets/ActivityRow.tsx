@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useActivityUndo } from "@/hooks/useActivityUndo";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 import type { ActivityEntry } from "@/types/Activity";
 
 interface Props {
@@ -37,7 +38,7 @@ function EntryIcon({ entry }: { entry: ActivityEntry }) {
 }
 
 export function ActivityRow({ project, entry: e }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [undoOpen, setUndoOpen] = useState(false);
   const undo = useActivityUndo();
   const canUndo = e.can_undo && !e.undone;
@@ -52,7 +53,7 @@ export function ActivityRow({ project, entry: e }: Props) {
               {t(`activity.op.${e.operation_type}`, e.operation_type)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {e.timestamp}
+              {formatDateTime(e.timestamp, i18n.language)}
             </span>
           </div>
           {e.affected_pages.length > 0 && (

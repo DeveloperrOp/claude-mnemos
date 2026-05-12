@@ -4,7 +4,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "open": "Open",
-    "retry": "Retry"
+    "retry": "Retry",
+    "back_arrow": "← back"
   },
   "confirm": {
     "cancel": "Cancel",
@@ -215,7 +216,12 @@
       "empty": "No alerts",
       "error": "Failed to update alert"
     },
-    "empty_label": "empty"
+    "empty_label": "empty",
+    "col": {
+      "id": "id",
+      "next_run_time": "next_run_time",
+      "trigger": "trigger"
+    }
   },
   "usage": {
     "title": "Usage",
@@ -257,7 +263,8 @@
     "cancel_success": "Job cancelled",
     "retry_success": "Job re-queued",
     "traceback_show": "Show traceback",
-    "traceback_hide": "Hide traceback"
+    "traceback_hide": "Hide traceback",
+    "total_label": "total"
   },
   "placeholder": {
     "title": "{{section}}",
@@ -369,7 +376,8 @@
       "banner": "Lost sessions for this project: {{n}}",
       "expand": "Expand ▾",
       "collapse": "Collapse ▴"
-    }
+    },
+    "total_label": "total"
   },
   "activity": {
     "title": "Activity",
@@ -415,7 +423,14 @@
     "cannot_undo": "Cannot undo",
     "undone": "Undone",
     "not_found_title": "Activity entry not found",
-    "not_found_hint": "Go back"
+    "not_found_hint": "Go back",
+    "field": {
+      "status": "status",
+      "undo": "undo"
+    },
+    "status": {
+      "success": "success"
+    }
   },
   "wiki": {
     "status": {

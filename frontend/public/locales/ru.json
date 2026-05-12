@@ -4,7 +4,8 @@
     "save": "Сохранить",
     "cancel": "Отменить",
     "open": "Открыть",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "back_arrow": "← назад"
   },
   "confirm": {
     "cancel": "Отмена",
@@ -215,7 +216,12 @@
       "empty": "Нет уведомлений",
       "error": "Не удалось обновить уведомление"
     },
-    "empty_label": "пусто"
+    "empty_label": "пусто",
+    "col": {
+      "id": "идентификатор",
+      "next_run_time": "следующий запуск",
+      "trigger": "триггер"
+    }
   },
   "usage": {
     "title": "Использование",
@@ -247,7 +253,8 @@
     "cancel_success": "Задача отменена",
     "retry_success": "Задача повторно поставлена в очередь",
     "traceback_show": "Показать traceback",
-    "traceback_hide": "Скрыть traceback"
+    "traceback_hide": "Скрыть traceback",
+    "total_label": "всего"
   },
   "placeholder": {
     "title": "{{section}}",
@@ -359,7 +366,8 @@
       "banner": "Потерянные сессии этого проекта: {{n}}",
       "expand": "Развернуть ▾",
       "collapse": "Свернуть ▴"
-    }
+    },
+    "total_label": "всего"
   },
   "activity": {
     "title": "История",
@@ -405,7 +413,14 @@
     "cannot_undo": "Нельзя отменить",
     "undone": "Отменено",
     "not_found_title": "Запись активности не найдена",
-    "not_found_hint": "Вернуться назад"
+    "not_found_hint": "Вернуться назад",
+    "field": {
+      "status": "статус",
+      "undo": "отмена"
+    },
+    "status": {
+      "success": "успешно"
+    }
   },
   "wiki": {
     "status": {
@@ -459,7 +474,7 @@
   "snapshots": {
     "title": "Снимки",
     "kind": {
-      "pre-op": "Pre-op",
+      "pre-op": "Перед операцией",
       "daily": "Ежедневный",
       "manual": "Ручной",
       "all": "Все"

@@ -4,7 +4,8 @@
     "save": "Зберегти",
     "cancel": "Скасувати",
     "open": "Відкрити",
-    "retry": "Повторити"
+    "retry": "Повторити",
+    "back_arrow": "← назад"
   },
   "confirm": {
     "cancel": "Скасувати",
@@ -215,7 +216,12 @@
       "empty": "Сповіщень немає",
       "error": "Не вдалося оновити сповіщення"
     },
-    "empty_label": "порожньо"
+    "empty_label": "порожньо",
+    "col": {
+      "id": "ідентифікатор",
+      "next_run_time": "наступний запуск",
+      "trigger": "тригер"
+    }
   },
   "usage": {
     "title": "Використання",
@@ -247,7 +253,8 @@
     "cancel_success": "Задачу скасовано",
     "retry_success": "Задачу повторно поставлено в чергу",
     "traceback_show": "Показати traceback",
-    "traceback_hide": "Сховати traceback"
+    "traceback_hide": "Сховати traceback",
+    "total_label": "всього"
   },
   "placeholder": {
     "title": "{{section}}",
@@ -359,7 +366,8 @@
       "banner": "Загублені сесії цього проєкту: {{n}}",
       "expand": "Розгорнути ▾",
       "collapse": "Згорнути ▴"
-    }
+    },
+    "total_label": "всього"
   },
   "activity": {
     "title": "Активність",
@@ -405,7 +413,14 @@
     "cannot_undo": "Не можна скасувати",
     "undone": "Скасовано",
     "not_found_title": "Запис активності не знайдено",
-    "not_found_hint": "Повернутись назад"
+    "not_found_hint": "Повернутись назад",
+    "field": {
+      "status": "статус",
+      "undo": "скасування"
+    },
+    "status": {
+      "success": "успішно"
+    }
   },
   "wiki": {
     "status": {
@@ -459,7 +474,7 @@
   "snapshots": {
     "title": "Знімки",
     "kind": {
-      "pre-op": "Pre-op",
+      "pre-op": "Перед операцією",
       "daily": "Щоденний",
       "manual": "Ручний",
       "all": "Усі"

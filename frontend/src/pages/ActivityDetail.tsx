@@ -9,10 +9,11 @@ import { useActivityEntry } from "@/hooks/useActivityEntry";
 import { useActivityUndo } from "@/hooks/useActivityUndo";
 import { pageHref } from "@/lib/pageHref";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
+import { formatDateTime } from "@/lib/datetime";
 
 export function ActivityDetail() {
   const { name: project, opId } = useParams<{ name: string; opId: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const entryQuery = useActivityEntry(project, opId);
   const [undoOpen, setUndoOpen] = useState(false);
   const undo = useActivityUndo();
@@ -47,14 +48,14 @@ export function ActivityDetail() {
               to={`/project/${project}/activity`}
               className="text-xs text-primary underline"
             >
-              ← back
+              {t("common.back_arrow")}
             </Link>
           </div>
           <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t(`activity.op.${e.operation_type}`, e.operation_type)}
           </h1>
           <p className="relative mt-2 text-xs text-muted-foreground">
-            {e.id} · {e.timestamp}
+            {e.id} · {formatDateTime(e.timestamp, i18n.language)}
           </p>
         </header>
 
@@ -73,8 +74,8 @@ export function ActivityDetail() {
 
         <div className="rounded-md border border-border/60 bg-card/40 p-4">
           <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">status</dt>
-            <dd>{e.status}</dd>
+            <dt className="text-muted-foreground">{t("activity.field.status")}</dt>
+            <dd>{t(`activity.status.${e.status}`, e.status)}</dd>
 
             {e.snapshot_path && (
               <>
@@ -87,7 +88,7 @@ export function ActivityDetail() {
               </>
             )}
 
-            <dt className="text-muted-foreground">undo</dt>
+            <dt className="text-muted-foreground">{t("activity.field.undo")}</dt>
             <dd>
               {e.undone
                 ? `${t("activity.undone")} ${e.undone_at ?? ""}`
