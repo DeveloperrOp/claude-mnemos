@@ -2,9 +2,20 @@ import { z } from "zod";
 
 const LocaleSchema = z.enum(["uk", "ru", "en"]);
 
+// v0.0.10+: legacy fields (enabled / mode) became Optional[bool|str] on the
+// backend after the auto_ingest redesign. New toggles dump_on_session_end /
+// dump_stale_after_24h / extract_after_dump landed alongside as tri-state
+// (None = inherit from GlobalSettings.auto_ingest_defaults).
+// Pre-v0.0.17 the Zod schema still required enabled/mode as non-null —
+// validation crashed silently for every project, taking out the LocaleSection,
+// AutoIngestSection, LintSection, and SnapshotsSection together since
+// they all share the same ProjectSettings query.
 export const AutoIngestSettingsSchema = z.object({
-  enabled: z.boolean().default(true),
-  mode: z.enum(["auto", "hybrid", "manual"]).default("auto"),
+  enabled: z.boolean().nullable().default(null),
+  mode: z.enum(["auto", "hybrid", "manual"]).nullable().default(null),
+  dump_on_session_end: z.boolean().nullable().default(null),
+  dump_stale_after_24h: z.boolean().nullable().default(null),
+  extract_after_dump: z.boolean().nullable().default(null),
 });
 export type AutoIngestSettings = z.infer<typeof AutoIngestSettingsSchema>;
 

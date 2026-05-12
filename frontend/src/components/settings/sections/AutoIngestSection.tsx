@@ -23,17 +23,23 @@ export function AutoIngestSection({ slug }: Props) {
 
   useEffect(() => {
     if (server) {
-      // Server-data sync into local form state — intentional initialization pattern.
+      // v0.0.10+: legacy `enabled` / `mode` are Optional on the backend
+      // (defaults moved to GlobalSettings.auto_ingest_defaults). Treat null
+      // as the legacy defaults so the UI keeps rendering until the section
+      // is rewritten to expose the new dump_*/extract_after_dump tri-state
+      // toggles. v0.0.17 fix: Zod schema accepts null; UI compensates here.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setEnabled(server.enabled);
+      setEnabled(server.enabled ?? true);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMode(server.mode);
+      setMode(server.mode ?? "auto");
     }
   }, [server]);
 
   if (!data || !server) return null;
 
-  const dirty = enabled !== server.enabled || mode !== server.mode;
+  const serverEnabled = server.enabled ?? true;
+  const serverMode = server.mode ?? "auto";
+  const dirty = enabled !== serverEnabled || mode !== serverMode;
 
   const onSave = () => {
     mut.mutate({ auto_ingest: { enabled, mode } });

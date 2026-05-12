@@ -68,4 +68,33 @@ describe("settings API", () => {
     expect(apiClient.patch).toHaveBeenCalledWith("/settings/global", { daemon_port: 6000 });
     expect(g.daemon_port).toBe(6000);
   });
+
+  // v0.0.17 regression: backend after v0.0.10 returns auto_ingest with the
+  // legacy `enabled` and `mode` fields as null (their replacements live under
+  // GlobalSettings.auto_ingest_defaults). Pre-v0.0.17 the Zod schema required
+  // non-null bool/enum, so the entire ProjectSettings parse threw and the
+  // ProjectSettings UI showed only General + Danger Zone (every other section
+  // shares the same query and saw `data === undefined`).
+  it("getProjectSettings parses v0.0.10+ auto_ingest with null legacy fields", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        version: 1,
+        locale: null,
+        auto_ingest: {
+          enabled: null,
+          mode: null,
+          dump_on_session_end: null,
+          dump_stale_after_24h: null,
+          extract_after_dump: null,
+        },
+        lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
+        snapshots: { daily_enabled: true, retention_days: 180 },
+      },
+    });
+    const result = await getProjectSettings("p1");
+    expect(result.auto_ingest.enabled).toBeNull();
+    expect(result.auto_ingest.mode).toBeNull();
+    expect(result.auto_ingest.dump_on_session_end).toBeNull();
+    expect(result.auto_ingest.extract_after_dump).toBeNull();
+  });
 });
