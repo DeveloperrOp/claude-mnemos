@@ -667,7 +667,7 @@
       "empty": "Сесій Claude Code поки не знайдено. Відкрий Claude Code у папці проєкту, запусти сесію, потім онови сторінку.",
       "track_selected": "Відстежувати вибрані",
       "show_advanced": "Розширені налаштування",
-      "sessions_count": "{{count}} сесій"
+      "sessions_label": "сесій"
     }
   },
   "metrics": {

@@ -675,7 +675,7 @@
       "empty": "No Claude Code sessions found yet. Open Claude Code in a project folder, run a session, then refresh this page.",
       "track_selected": "Track selected",
       "show_advanced": "Show advanced",
-      "sessions_count": "{{count}} sessions"
+      "sessions_label": "sessions"
     }
   },
   "metrics": {
