@@ -12,8 +12,7 @@ const ICON: Record<SetupStatusRow["status"], string> = {
   critical: "✗",
 };
 
-const ROW_KEYS = ["claude_cli", "hooks", "vaults", "projects"] as const;
-type RowKey = (typeof ROW_KEYS)[number];
+type RowKey = "claude_cli" | "hooks" | "vaults" | "projects";
 
 export function SetupChecklist() {
   const { t } = useTranslation();

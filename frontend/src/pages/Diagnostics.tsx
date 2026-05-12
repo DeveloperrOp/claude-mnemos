@@ -12,8 +12,7 @@ const STATUS_STYLES: Record<SetupStatusRow["status"], string> = {
   critical: "border-rose-500/40 bg-rose-500/10 text-rose-400",
 };
 
-const ROW_KEYS = ["claude_cli", "hooks", "vaults", "projects"] as const;
-type RowKey = (typeof ROW_KEYS)[number];
+type RowKey = "claude_cli" | "hooks" | "vaults" | "projects";
 
 export function Diagnostics() {
   const { t } = useTranslation();

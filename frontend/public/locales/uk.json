@@ -21,7 +21,7 @@
     "queue": "Черга",
     "activity": "Історія",
     "suggestions": "Пропозиції",
-    "lost_sessions": "Втрачені",
+    "lost_sessions": "Загублені",
     "trash": "Кошик",
     "snapshots": "Знімки",
     "health": "Здоров'я",
@@ -40,7 +40,7 @@
     "help": "Допомога",
     "locale": "Мова",
     "global_links": {
-      "lost_sessions": "Втрачені сесії",
+      "lost_sessions": "Загублені сесії",
       "failed_jobs": "Провалені задачі",
       "metrics": "Метрики",
       "help": "Допомога",
@@ -991,7 +991,7 @@
     "metrics": "метрики",
     "help": "допомога",
     "dead_letter": "провалені",
-    "lost_sessions": "втрачені сесії",
+    "lost_sessions": "загублені сесії",
     "welcome": "вітання",
     "onboarding": "встановлення",
     "diagnostics": "діагностика"

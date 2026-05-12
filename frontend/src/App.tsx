@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, RouterProvider, useParams } from "react-router";
+import { createBrowserRouter, Navigate, RouterProvider, useParams } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "./components/layout/Layout";
@@ -37,6 +37,16 @@ function PagesRouteSwitch() {
   return rest?.endsWith("/edit") ? <PageEdit /> : <PageDetail />;
 }
 
+function LostSessionsProjectRedirect() {
+  const { name } = useParams<{ name: string }>();
+  return (
+    <Navigate
+      to={`/lost-sessions${name ? `?project=${encodeURIComponent(name)}` : ""}`}
+      replace
+    />
+  );
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -60,6 +70,7 @@ const router = createBrowserRouter([
           { path: "snapshots", element: <Snapshots /> },
           { path: "health", element: <Health /> },
           { path: "queue", element: <Queue /> },
+          { path: "lost-sessions", element: <LostSessionsProjectRedirect /> },
           { path: "settings", element: <ProjectSettings /> },
         ],
       },

@@ -125,7 +125,9 @@ export function Health() {
               {projectSchedulerJobs.map((j) => (
                 <tr key={j.id} className="border-b last:border-0">
                   <td className="py-2 font-mono text-xs">{j.id}</td>
-                  <td className="py-2 text-xs">{j.next_run_time ?? "—"}</td>
+                  <td className="py-2 text-xs">
+                    {j.next_run_time ? formatDateTime(j.next_run_time, i18n.language) : "—"}
+                  </td>
                   <td className="py-2 text-xs">{j.trigger}</td>
                 </tr>
               ))}
