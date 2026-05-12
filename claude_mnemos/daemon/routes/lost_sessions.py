@@ -143,14 +143,24 @@ async def rescan_route(request: Request) -> dict[str, Any]:
 async def read_transcript_route(
     session_id: str, request: Request, limit: int = 100,
 ) -> dict[str, Any]:
-    """Return parsed messages from a lost session's JSONL.
+    """Return parsed messages from a session's JSONL by session_id.
 
-    Looks up ``transcript_path`` via the per-vault ``LostSessionsCache``.
-    Returns 404 if ``session_id`` is not in any vault's current scan
-    results. ``limit`` is clamped to ``[1, 500]``.
+    Two-tier lookup:
+      1. Per-vault ``LostSessionsCache`` (fast — same set as
+         ``GET /lost-sessions`` lists).
+      2. **Fallback**: raw transcript scan under ``~/.claude/projects/``,
+         no filters. Catches sessions that the user-facing Lost Sessions
+         view hides (active sessions <24h old, ``agent-*`` sub-agent
+         transcripts) but which the user can still click "Read" on from
+         the dashboard's Active Sessions widget.
+
+    Returns 404 only if no jsonl with this ``session_id`` exists anywhere
+    under the transcripts root. ``limit`` is clamped to ``[1, 500]``.
     """
     capped = max(1, min(limit, 500))
-    entry = None
+    transcript_path: str | None = None
+
+    # Tier 1: lost-sessions cache (post-filter set).
     for runtime in all_runtimes(request):
         cache = runtime.lost_sessions_cache
         items = (
@@ -160,19 +170,30 @@ async def read_transcript_route(
         )
         match = next((i for i in items if i.session_id == session_id), None)
         if match is not None:
-            entry = match
+            transcript_path = match.transcript_path
             break
-    if entry is None:
+
+    # Tier 2: raw transcript scan (no filters). Read endpoint serves any
+    # session the user can see in the dashboard, including active and
+    # agent-* sessions that Lost Sessions filters out.
+    if transcript_path is None:
+        from claude_mnemos.core.transcript_scanner import _scan_sync
+        for entry in _scan_sync(None):
+            if entry.session_id == session_id:
+                transcript_path = entry.transcript_path
+                break
+
+    if transcript_path is None:
         raise HTTPException(
             status_code=404,
             detail={"error": "lost_session_not_found", "session_id": session_id},
         )
     messages, total, truncated_overall = core_lost_sessions.read_transcript_messages(
-        Path(entry.transcript_path), limit=capped,
+        Path(transcript_path), limit=capped,
     )
     return {
         "session_id": session_id,
-        "transcript_path": entry.transcript_path,
+        "transcript_path": transcript_path,
         "messages": [m.model_dump() for m in messages],
         "total_messages": total,
         "returned_count": len(messages),

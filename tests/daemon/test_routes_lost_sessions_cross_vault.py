@@ -355,6 +355,49 @@ def test_transcript_endpoint_returns_messages(
     assert body["messages"][0]["content"] == "what's up"
 
 
+def test_transcript_endpoint_falls_back_to_raw_scan_for_active_sessions(
+    daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """v0.0.16 regression: read endpoint must serve a session that the
+    user can see in the dashboard but which is hidden from
+    /lost-sessions by the v0.0.8 filters (mtime <24h or agent-* prefix).
+
+    Pre-fix the user clicked "Read" on an active session in the dashboard
+    and got 404 because read_transcript_route only checked the
+    LostSessionsCache (which omits these sessions by design).
+    """
+    import json as _json
+
+    _daemon, client, _vault_a, _vault_b = daemon_with_two
+
+    # Use `agent-*` prefix: that filter is unconditional in
+    # core.lost_sessions.scan_lost_sessions (no autouse fixture override
+    # touches it), so the session will be absent from the lost-sessions
+    # cache yet must still be served by the read endpoint.
+    root = tmp_path / "transcripts"
+    root.mkdir(exist_ok=True)
+    jsonl = root / "agent-deadbeef.jsonl"
+    jsonl.write_text(
+        _json.dumps({"type": "user", "content": "live message"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
+
+    # The session is NOT in /lost-sessions (agent-* prefix is filtered).
+    r_lost = client.get("/api/lost-sessions")
+    assert r_lost.status_code == 200
+    assert all(s["session_id"] != "agent-deadbeef" for s in r_lost.json()["sessions"])
+
+    # BUT the read endpoint still serves it via raw-scan fallback.
+    r = client.get("/api/lost-sessions/agent-deadbeef/transcript")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["session_id"] == "agent-deadbeef"
+    assert body["returned_count"] == 1
+
+
 def test_ignore_routes_to_specified_project(
     daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
     tmp_path: Path,
