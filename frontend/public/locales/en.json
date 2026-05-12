@@ -667,6 +667,15 @@
     "hook_install": {
       "auto_success": "Mnemos hooks installed automatically. Restart any open Claude Code sessions to take effect.",
       "auto_failed": "Couldn't auto-install hooks ({{error}}). The Overview banner has a manual install button."
+    },
+    "welcome": {
+      "title": "Welcome to claude-mnemos",
+      "subtitle": "Pick a folder where you use Claude Code — mnemos will start remembering what happens there.",
+      "detected_heading": "We found these Claude Code workspaces:",
+      "empty": "No Claude Code sessions found yet. Open Claude Code in a project folder, run a session, then refresh this page.",
+      "track_selected": "Track selected",
+      "show_advanced": "Show advanced",
+      "sessions_count": "{{count}} sessions"
     }
   },
   "metrics": {

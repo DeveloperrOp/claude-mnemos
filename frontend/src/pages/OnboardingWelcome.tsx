@@ -103,7 +103,7 @@ export function OnboardingWelcome() {
                 <div className="flex-1 min-w-0">
                   <div className="font-mono text-sm truncate">{d.cwd}</div>
                   <div className="text-xs text-muted-foreground">
-                    {d.session_count} sessions
+                    {t("onboarding.welcome.sessions_count", { count: d.session_count })}
                   </div>
                 </div>
               </li>
