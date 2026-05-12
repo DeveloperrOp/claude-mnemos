@@ -14,6 +14,7 @@ import {
   defaultSessionFilterState,
   type SessionFilterState,
 } from "@/components/filters/SessionFilters";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Sessions() {
   const { name: project } = useParams<{ name: string }>();
@@ -86,7 +87,7 @@ export function Sessions() {
         <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
           <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
           <div className="relative flex items-center justify-between gap-3">
-            <span className="eyebrow">claude-mnemos · sessions</span>
+            <EyebrowBreadcrumb section="sessions" />
           </div>
           <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t("sessions.title", "Sessions")}
@@ -120,7 +121,7 @@ export function Sessions() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · sessions</span>
+          <EyebrowBreadcrumb section="sessions" />
           <span className="font-mono tabular-nums text-[10px] text-muted-foreground">
             {total} {t("sessions.total_label", "total")}
           </span>

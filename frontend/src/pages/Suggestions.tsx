@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SuggestionCard } from "@/components/widgets/SuggestionCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
 import { SuggestionFilters, type StatusFilter } from "@/components/filters/SuggestionFilters";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Suggestions() {
   const { name: project } = useParams<{ name: string }>();
@@ -23,7 +24,7 @@ export function Suggestions() {
         <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
           <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
           <div className="relative flex items-baseline gap-3">
-            <span className="eyebrow">claude-mnemos · suggestions</span>
+            <EyebrowBreadcrumb section="suggestions" />
           </div>
           <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t("suggestions.title")}
@@ -42,7 +43,7 @@ export function Suggestions() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-baseline gap-3">
-          <span className="eyebrow">claude-mnemos · suggestions</span>
+          <EyebrowBreadcrumb section="suggestions" />
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("suggestions.title")}

@@ -934,5 +934,28 @@
     "title": "КОНТЕКСТ ИНЪЕКЦИИ",
     "tokens_label": "токены",
     "truncated": "ОБРЕЗАНО"
+  },
+  "breadcrumb": {
+    "ops": "панель",
+    "project": "проект",
+    "pages": "страницы",
+    "page": "страница",
+    "editor": "редактор",
+    "sessions": "сессии",
+    "session_detail": "сессия",
+    "queue": "очередь",
+    "activity": "активность",
+    "suggestions": "предложения",
+    "trash": "корзина",
+    "snapshots": "снимки",
+    "health": "здоровье",
+    "settings": "настройки",
+    "metrics": "метрики",
+    "help": "помощь",
+    "dead_letter": "провалившиеся",
+    "lost_sessions": "потерянные сессии",
+    "welcome": "приветствие",
+    "onboarding": "установка",
+    "diagnostics": "диагностика"
   }
 }

@@ -936,5 +936,28 @@
     "title": "КОНТЕКСТ ІНЖЕКЦІЇ",
     "tokens_label": "токени",
     "truncated": "ОБРІЗАНО"
+  },
+  "breadcrumb": {
+    "ops": "панель",
+    "project": "проєкт",
+    "pages": "сторінки",
+    "page": "сторінка",
+    "editor": "редактор",
+    "sessions": "сесії",
+    "session_detail": "сесія",
+    "queue": "черга",
+    "activity": "активність",
+    "suggestions": "пропозиції",
+    "trash": "кошик",
+    "snapshots": "знімки",
+    "health": "здоров'я",
+    "settings": "налаштування",
+    "metrics": "метрики",
+    "help": "допомога",
+    "dead_letter": "провалені",
+    "lost_sessions": "втрачені сесії",
+    "welcome": "вітання",
+    "onboarding": "встановлення",
+    "diagnostics": "діагностика"
   }
 }

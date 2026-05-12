@@ -12,6 +12,7 @@ import { HealthBadge } from "@/components/widgets/HealthBadge";
 import { InjectPreview } from "@/components/widgets/InjectPreview";
 import { UnknownProject } from "@/components/widgets/UnknownProject";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function ProjectView() {
   const { name } = useParams<{ name: string }>();
@@ -34,7 +35,7 @@ export function ProjectView() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · project</span>
+          <EyebrowBreadcrumb section="project" />
           <div className="flex items-center gap-2">
             <HealthBadge vault_health={vh} />
           </div>

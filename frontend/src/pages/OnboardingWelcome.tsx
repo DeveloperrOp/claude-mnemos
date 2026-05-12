@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDetectedCwds } from "@/hooks/onboarding/useDetectedCwds";
 import { useProjectCreate } from "@/hooks/useProjectCreate";
 import { deriveSlug } from "@/lib/slugify";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 function lastSegment(p: string): string {
   return p.replace(/[\\/]+$/, "").split(/[\\/]/).slice(-1)[0] ?? p;
@@ -63,7 +64,7 @@ export function OnboardingWelcome() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-8">
       <header className="rounded-lg border border-border/60 bg-card/40 px-5 py-4">
-        <span className="eyebrow">claude-mnemos · welcome</span>
+        <EyebrowBreadcrumb section="welcome" />
         <h1 className="mt-2 font-mono text-2xl">{t("onboarding.welcome.title", "Welcome to claude-mnemos")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {t(

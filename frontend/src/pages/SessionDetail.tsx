@@ -7,6 +7,7 @@ import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
 import { pageHref } from "@/lib/pageHref";
 import type { SessionStatus } from "@/types/Session";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 const STATUS_COLOR: Record<SessionStatus, string> = {
   succeeded: "bg-success/10 text-success",
@@ -64,7 +65,7 @@ export function SessionDetail() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · session detail</span>
+          <EyebrowBreadcrumb section="session_detail" />
           <span
             className={cn(
               "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",

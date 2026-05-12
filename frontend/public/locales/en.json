@@ -934,5 +934,28 @@
       "vaults": "Vault writability",
       "projects": "Tracked projects"
     }
+  },
+  "breadcrumb": {
+    "ops": "ops",
+    "project": "project",
+    "pages": "pages",
+    "page": "page",
+    "editor": "editor",
+    "sessions": "sessions",
+    "session_detail": "session detail",
+    "queue": "queue",
+    "activity": "activity",
+    "suggestions": "suggestions",
+    "trash": "trash",
+    "snapshots": "snapshots",
+    "health": "health",
+    "settings": "settings",
+    "metrics": "metrics",
+    "help": "help",
+    "dead_letter": "dead-letter",
+    "lost_sessions": "lost sessions",
+    "welcome": "welcome",
+    "onboarding": "onboarding",
+    "diagnostics": "diagnostics"
   }
 }

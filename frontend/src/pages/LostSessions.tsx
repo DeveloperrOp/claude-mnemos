@@ -7,6 +7,7 @@ import { useLostSessions } from "@/hooks/useLostSessions";
 import { useLostSessionsScan } from "@/hooks/useLostSessionsScan";
 import { LostSessionsManager } from "@/components/widgets/LostSessionsManager";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function LostSessions() {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ export function LostSessions() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · lost sessions</span>
+          <EyebrowBreadcrumb section="lost_sessions" />
           <Button
             size="sm"
             variant="outline"

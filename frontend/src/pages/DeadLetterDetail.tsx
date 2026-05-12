@@ -11,6 +11,7 @@ import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
 import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
 import { formatDateTime } from "@/lib/datetime";
 import { JOB_MAX_ATTEMPTS } from "@/types/Job";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function DeadLetterDetail() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -41,7 +42,7 @@ export function DeadLetterDetail() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · dead-letter</span>
+          <EyebrowBreadcrumb section="dead_letter" />
           <Link to="/dead-letter" className="text-xs text-primary underline">
             ← back
           </Link>

@@ -16,6 +16,7 @@ import { RunningJobsLive } from "@/components/widgets/dashboard/RunningJobsLive"
 import { ActiveSessionsLive } from "@/components/widgets/dashboard/ActiveSessionsLive";
 import { HealthDot } from "@/components/widgets/dashboard/HealthDot";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Overview() {
   const { t } = useTranslation();
@@ -69,7 +70,7 @@ export function Overview() {
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-3">
-            <span className="eyebrow">claude-mnemos · ops</span>
+            <EyebrowBreadcrumb section="ops" />
           </div>
           <HealthDot />
         </div>

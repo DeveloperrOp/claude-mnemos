@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { useActivityEntry } from "@/hooks/useActivityEntry";
 import { useActivityUndo } from "@/hooks/useActivityUndo";
 import { pageHref } from "@/lib/pageHref";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function ActivityDetail() {
   const { name: project, opId } = useParams<{ name: string; opId: string }>();
@@ -41,7 +42,7 @@ export function ActivityDetail() {
         <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
           <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
           <div className="relative flex items-center justify-between gap-3">
-            <span className="eyebrow">claude-mnemos · activity</span>
+            <EyebrowBreadcrumb section="activity" />
             <Link
               to={`/project/${project}/activity`}
               className="text-xs text-primary underline"

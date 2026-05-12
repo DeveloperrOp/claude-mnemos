@@ -16,6 +16,7 @@ import { ProvenanceIndicator } from "@/components/widgets/ProvenanceIndicator";
 import { StatusBadge } from "@/components/widgets/StatusBadge";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { pageHref, pagePathSegments } from "@/lib/pageHref";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function PageDetail() {
   const { name: project, "*": pageRefRaw } = useParams<{ name: string; "*": string }>();
@@ -65,7 +66,7 @@ export function PageDetail() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-baseline gap-3">
-          <span className="eyebrow">claude-mnemos · page</span>
+          <EyebrowBreadcrumb section="page" />
         </div>
         <h1 data-testid="page-title" className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {fm ? fm.title : fileStem}

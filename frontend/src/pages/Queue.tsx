@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/widgets/EmptyState";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
 import { JOB_MAX_ATTEMPTS, type Job, type JobStatus } from "@/types/Job";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 const STATUS_COLOR: Record<JobStatus, string> = {
   succeeded: "bg-success/10 text-success",
@@ -176,7 +177,7 @@ export function Queue() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · queue</span>
+          <EyebrowBreadcrumb section="queue" />
           <span className="font-mono tabular-nums text-[10px] text-muted-foreground">
             {filterCount("all")} {t("queue.total_label", "total")}
           </span>

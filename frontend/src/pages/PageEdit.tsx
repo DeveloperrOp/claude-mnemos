@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { usePage } from "@/hooks/usePage";
 import { usePagePatch } from "@/hooks/usePagePatch";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 const PAGE_TYPES = ["entity", "concept", "source"] as const;
 const PAGE_STATUSES = ["draft", "reviewed", "verified", "stale", "archived"] as const;
@@ -108,7 +109,7 @@ export function PageEdit() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-baseline gap-3">
-          <span className="eyebrow">claude-mnemos · editor</span>
+          <EyebrowBreadcrumb section="editor" />
         </div>
         <div className="relative mt-2 flex items-center justify-between gap-3">
           <h1 className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">

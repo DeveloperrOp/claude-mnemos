@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DeadLetterRow } from "@/components/widgets/DeadLetterRow";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function DeadLetter() {
   const { t } = useTranslation();
@@ -36,7 +37,7 @@ export function DeadLetter() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · dead-letter</span>
+          <EyebrowBreadcrumb section="dead_letter" />
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("dead_letter.title")}

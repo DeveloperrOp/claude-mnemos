@@ -12,6 +12,7 @@ import {
 } from "@/hooks/useDismissWatchdogEvent";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { formatDateTime } from "@/lib/datetime";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Health() {
   const { name: project } = useParams<{ name: string }>();
@@ -51,7 +52,7 @@ export function Health() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · health</span>
+          <EyebrowBreadcrumb section="health" />
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("health.title")}

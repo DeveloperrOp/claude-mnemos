@@ -10,6 +10,7 @@ import { UsageTimelineChart } from "@/components/widgets/UsageTimelineChart";
 import { UsageByProjectTable } from "@/components/widgets/UsageByProjectTable";
 import { TopSessionsTable } from "@/components/widgets/TopSessionsTable";
 import { CompressionTimelineChart } from "@/components/widgets/CompressionTimelineChart";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 import { cn } from "@/lib/utils";
 
 const PERIODS = ["7d", "30d", "90d", "1y"] as const;
@@ -28,7 +29,7 @@ function Metrics() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
-          <span className="eyebrow">claude-mnemos · metrics</span>
+          <EyebrowBreadcrumb section="metrics" />
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("metrics.title")}

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getSetupStatus, type SetupStatusRow } from "@/api/diagnostics.api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HooksFixButton } from "@/components/widgets/dashboard/HooksFixButton";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 const STATUS_STYLES: Record<SetupStatusRow["status"], string> = {
   ok: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
@@ -33,7 +34,7 @@ export function Diagnostics() {
   return (
     <div className="space-y-4 py-6 max-w-3xl">
       <header>
-        <span className="eyebrow">claude-mnemos · diagnostics</span>
+        <EyebrowBreadcrumb section="diagnostics" />
         <h1 className="font-mono text-2xl mt-1">{t("diagnostics.title")}</h1>
       </header>
       <div className="space-y-2">

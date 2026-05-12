@@ -15,6 +15,7 @@ import {
 import { PageCard } from "@/components/widgets/PageCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
 import type { PageDetail, WikiPageFrontmatter } from "@/types/WikiPage";
+import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 const MAX_PAGES = 200;
 
@@ -100,7 +101,7 @@ export function PagesBrowser() {
         <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
           <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
           <div className="relative flex items-baseline gap-3">
-            <span className="eyebrow">claude-mnemos · pages</span>
+            <EyebrowBreadcrumb section="pages" />
           </div>
           <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t("navigation.pages")}
@@ -134,7 +135,7 @@ export function PagesBrowser() {
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-baseline gap-3">
-          <span className="eyebrow">claude-mnemos · pages</span>
+          <EyebrowBreadcrumb section="pages" />
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("navigation.pages")}
