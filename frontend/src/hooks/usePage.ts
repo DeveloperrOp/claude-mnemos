@@ -9,6 +9,6 @@ export function usePage(
     queryKey: ["page", project, pageRef],
     queryFn: () => getPage(project!, pageRef!),
     enabled: !!project && !!pageRef,
-    refetchInterval: 7 * 60_000,
+    refetchInterval: 60_000,
   });
 }

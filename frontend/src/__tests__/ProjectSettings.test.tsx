@@ -48,9 +48,6 @@ beforeAll(async () => {
       settings: {
         title: "Settings",
         loading: "Loading settings...",
-        not_found_title: "Project not found",
-        not_found_body: "Project \"{{name}}\" is not registered.",
-        not_found_back: "Back",
         save: "Save",
         saving: "Saving...",
         danger: {
@@ -141,27 +138,23 @@ describe("ProjectSettings", () => {
     }
   });
 
-  it("shows skeleton placeholders while projects list is still loading", async () => {
-    // Block /projects forever so projectsQuery stays isLoading=true.
+  it("shows loading state when projects list is not yet fetched", async () => {
+    // Block /projects forever so project remains undefined.
     vi.spyOn(apiClient, "get").mockImplementation(
       () => new Promise(() => {}),
     );
-    const { container } = render(wrap(<ProjectSettings />, "/project/alpha/settings"));
-    // v0.0.19: loading state now renders <Skeleton> elements, no "Loading..."
-    // literal — that string was conflated with the 404 fallback.
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    render(wrap(<ProjectSettings />, "/project/alpha/settings"));
+    expect(screen.getByText("Loading settings...")).toBeInTheDocument();
   });
 
-  it("shows project-not-found UI when slug is missing from a resolved list", async () => {
+  it("shows loading state when slug missing from projects list", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
       if (url === "/projects") return { data: [] };
       return { data: {} };
     });
     render(wrap(<ProjectSettings />, "/project/ghost/settings"));
-    // v0.0.19: loading is no longer indistinguishable from 404 — we explicitly
-    // render the "project not found" message + a back-to-overview link.
     await waitFor(() =>
-      expect(screen.getByText("Project not found")).toBeInTheDocument(),
+      expect(screen.getByText("Loading settings...")).toBeInTheDocument(),
     );
   });
 });

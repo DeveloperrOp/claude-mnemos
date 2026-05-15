@@ -3,19 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from claude_mnemos.core.graph import (
+    build_page_graph,
     build_page_graph_with_pages,
     pages_within_k_hops,
 )
-
-
-def build_page_graph(vault: Path) -> dict[str, set[str]]:
-    """Test helper: graph-only flavour of build_page_graph_with_pages.
-
-    The production wrapper was removed in v0.0.19 (only tests used it);
-    we keep a tiny test-local shim so the existing assertions stay readable.
-    """
-    graph, _ = build_page_graph_with_pages(vault)
-    return graph
 
 
 def _write_page(vault: Path, slug: str, body: str = "", related: list[str] | None = None) -> None:

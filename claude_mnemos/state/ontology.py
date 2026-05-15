@@ -33,10 +33,7 @@ def generate_suggestion_id(today: datetime | None = None) -> str:
 
 
 class SuggestionFrontmatter(BaseModel):
-    # extra="ignore": forward-compat for legacy on-disk fields like
-    # ``deferred_until`` that were never plumbed through to a real UI
-    # (dropped in v0.0.19). Existing suggestion files keep loading fine.
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=SUGGESTION_ID_RE.pattern)
     created: datetime
@@ -48,6 +45,7 @@ class SuggestionFrontmatter(BaseModel):
     reason: str = ""
     applied_at: datetime | None = None
     applied_op_id: str | None = None
+    deferred_until: datetime | None = None
 
 
 class Suggestion(BaseModel):
@@ -159,6 +157,7 @@ class SuggestionStore:
         *,
         applied_at: datetime | None = None,
         applied_op_id: str | None = None,
+        deferred_until: datetime | None = None,
     ) -> Suggestion:
         existing = self.get(suggestion_id)
         if existing is None:
@@ -168,6 +167,8 @@ class SuggestionStore:
             updates["applied_at"] = applied_at
         if applied_op_id is not None:
             updates["applied_op_id"] = applied_op_id
+        if deferred_until is not None:
+            updates["deferred_until"] = deferred_until
         new_fm = existing.frontmatter.model_copy(update=updates)
         new_suggestion = Suggestion(frontmatter=new_fm, body=existing.body)
 

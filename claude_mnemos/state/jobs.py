@@ -297,20 +297,6 @@ class JobStore:
             )
         return [_row_to_job(r) for r in cur.fetchall()]
 
-    def list_running_kinds(self) -> list[tuple[str, str]]:
-        """Return raw ``(id, kind)`` tuples for every ``status='running'`` row.
-
-        Unlike :meth:`list_by_status`, this does NOT parse rows through the
-        ``Job`` model — so it surfaces jobs whose ``kind`` is unknown to the
-        current build (the very rows the worker's orphan-sweeper needs to
-        see). Encapsulation-safe replacement for the prior ``_conn.execute``
-        peek that bypassed JobStore boundaries.
-        """
-        cur = self._conn.execute(
-            "SELECT id, kind FROM jobs WHERE status='running'"
-        )
-        return [(str(r["id"]), str(r["kind"])) for r in cur.fetchall()]
-
     def count_by_status(self) -> dict[str, int]:
         cur = self._conn.execute(
             "SELECT status, COUNT(*) FROM jobs GROUP BY status"
@@ -429,47 +415,38 @@ class JobStore:
         requeued = 0
         moved = 0
         with self._tx_lock:
-            # Wrap the whole batch in one SQLite transaction so a crash midway
-            # cannot leave half the zombies requeued and half stuck in
-            # ``running`` forever (autocommit mode would do that).
-            self._conn.execute("BEGIN IMMEDIATE")
-            try:
-                rows = self._conn.execute(
-                    "SELECT id, attempt FROM jobs WHERE status='running'"
-                ).fetchall()
-                for row in rows:
-                    new_attempt = int(row["attempt"]) + 1
-                    if new_attempt >= MAX_ATTEMPTS:
-                        self._conn.execute(
-                            """
-                            UPDATE jobs
-                            SET status='dead_letter', attempt=?, finished_at=?,
-                                error=?, error_traceback=NULL
-                            WHERE id=?
-                            """,
-                            (
-                                new_attempt,
-                                _ts(now_dt),
-                                "daemon crashed during execution",
-                                row["id"],
-                            ),
-                        )
-                        moved += 1
-                    else:
-                        self._conn.execute(
-                            """
-                            UPDATE jobs
-                            SET status='queued', attempt=?, next_attempt_at=?,
-                                started_at=NULL
-                            WHERE id=?
-                            """,
-                            (new_attempt, _ts(now_dt), row["id"]),
-                        )
-                        requeued += 1
-                self._conn.execute("COMMIT")
-            except Exception:
-                self._conn.execute("ROLLBACK")
-                raise
+            rows = self._conn.execute(
+                "SELECT id, attempt FROM jobs WHERE status='running'"
+            ).fetchall()
+            for row in rows:
+                new_attempt = int(row["attempt"]) + 1
+                if new_attempt >= MAX_ATTEMPTS:
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='dead_letter', attempt=?, finished_at=?,
+                            error=?, error_traceback=NULL
+                        WHERE id=?
+                        """,
+                        (
+                            new_attempt,
+                            _ts(now_dt),
+                            "daemon crashed during execution",
+                            row["id"],
+                        ),
+                    )
+                    moved += 1
+                else:
+                    self._conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status='queued', attempt=?, next_attempt_at=?,
+                            started_at=NULL
+                        WHERE id=?
+                        """,
+                        (new_attempt, _ts(now_dt), row["id"]),
+                    )
+                    requeued += 1
         return RecoveryResult(requeued=requeued, moved_to_dead_letter=moved)
 
     def cancel_all_queued(self) -> int:

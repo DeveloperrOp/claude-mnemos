@@ -10,7 +10,6 @@ import { UsageTimelineChart } from "@/components/widgets/UsageTimelineChart";
 import { UsageByProjectTable } from "@/components/widgets/UsageByProjectTable";
 import { TopSessionsTable } from "@/components/widgets/TopSessionsTable";
 import { CompressionTimelineChart } from "@/components/widgets/CompressionTimelineChart";
-import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 import { cn } from "@/lib/utils";
 
@@ -24,18 +23,6 @@ function Metrics() {
   const compressionTimeline = useCompressionTimeline(period);
   const byProject = useUsageByProject(period);
   const top = useTopSessions(10);
-
-  // Show daemon-down only when ALL four endpoints fail (network/daemon out).
-  // Partial failures (one chart schema mismatched, others OK) render their
-  // own empty state via `data ?? []` — same as pre-v0.0.19 behaviour.
-  if (
-    timeline.isError &&
-    compressionTimeline.isError &&
-    byProject.isError &&
-    top.isError
-  ) {
-    return <DaemonDownAlert error={timeline.error ?? new Error("metrics unavailable")} />;
-  }
 
   return (
     <div className="space-y-6">

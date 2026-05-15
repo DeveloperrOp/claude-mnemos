@@ -313,3 +313,22 @@ def build_adaptive_context_with_stats(
     return context, stats
 
 
+def build_adaptive_context(
+    vault: Path,
+    *,
+    cwd: Path,
+    max_chars: int = 40_000,
+    recent_sessions: int = DEFAULT_RECENT_SESSIONS,
+    graph_hops: int = DEFAULT_GRAPH_HOPS,
+) -> str:
+    """Backward-compatible wrapper — drops the stats. New code should call
+    :func:`build_adaptive_context_with_stats` directly.
+    """
+    context, _ = build_adaptive_context_with_stats(
+        vault,
+        cwd=cwd,
+        max_chars=max_chars,
+        recent_sessions=recent_sessions,
+        graph_hops=graph_hops,
+    )
+    return context

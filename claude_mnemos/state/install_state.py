@@ -27,9 +27,6 @@ class InstallState(BaseModel):
     first_run_ts: datetime | None = None
     autostart_decision: Literal["accepted", "declined"] | None = None
     window_close_action: Literal["hide", "quit"] | None = None
-    # v0.0.19: surface silent postinstall failures so the user has SOMETHING
-    # to look at when "everything looks fine but nothing ingests".
-    last_install_error: str | None = None
 
     def save(self) -> None:
         with _LOCK:

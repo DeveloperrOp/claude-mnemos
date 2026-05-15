@@ -9,23 +9,11 @@ from claude_mnemos.core.page_io import ParsedPage, slug_from_page_path
 from claude_mnemos.core.session_start import (
     FLAVOR_WEIGHTS,
     InjectStats,
+    build_adaptive_context,
     build_adaptive_context_with_stats,
     page_summary,
     score_page,
 )
-
-
-def build_adaptive_context(
-    vault: Path,
-    *,
-    cwd: Path,
-    max_chars: int = 40_000,
-) -> str:
-    """Test helper: ignores stats so existing assertions stay terse."""
-    context, _ = build_adaptive_context_with_stats(
-        vault, cwd=cwd, max_chars=max_chars
-    )
-    return context
 from claude_mnemos.state.manifest import IngestRecord, Manifest
 
 

@@ -89,22 +89,17 @@ def test_confidence_bounds():
         )
 
 
-def test_extra_field_ignored():
-    """v0.0.19: extra='ignore' (was 'forbid') so legacy files with the now-removed
-    `deferred_until` field still load. Unknown extras are silently dropped."""
-    fm = SuggestionFrontmatter.model_validate(
-        {
-            "id": "ont-2026-04-26-abc123",
-            "created": "2026-04-26T00:00:00Z",
-            "operation": "merge_entities",
-            "affected_pages": ["x.md"],
-            "weird_field": 1,
-            "deferred_until": "2026-05-01T00:00:00Z",
-        }
-    )
-    assert fm.id == "ont-2026-04-26-abc123"
-    assert not hasattr(fm, "weird_field")
-    assert not hasattr(fm, "deferred_until")
+def test_extra_field_rejected():
+    with pytest.raises(ValidationError):
+        SuggestionFrontmatter.model_validate(
+            {
+                "id": "ont-2026-04-26-abc123",
+                "created": "2026-04-26T00:00:00Z",
+                "operation": "merge_entities",
+                "affected_pages": ["x.md"],
+                "weird_field": 1,
+            }
+        )
 
 
 def test_affected_pages_min_length():

@@ -1,8 +1,6 @@
 import { apiClient } from "./client";
 import {
-  RestorePreviewSchema,
   SnapshotListResponseSchema,
-  type RestorePreview,
   type SnapshotInfo,
 } from "@/types/Snapshot";
 
@@ -45,14 +43,4 @@ export async function restoreSnapshot(
     `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}/restore`,
   );
   return r.data as RestoreSnapshotResult;
-}
-
-export async function previewSnapshot(
-  project: string,
-  name: string,
-): Promise<RestorePreview> {
-  const r = await apiClient.get(
-    `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}/preview`,
-  );
-  return RestorePreviewSchema.parse(r.data);
 }

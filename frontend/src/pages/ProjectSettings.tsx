@@ -1,8 +1,6 @@
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useProjects } from "@/hooks/useProjects";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 
 import { GeneralSection } from "@/components/settings/sections/GeneralSection";
 import { LocaleSection } from "@/components/settings/sections/LocaleSection";
@@ -11,41 +9,14 @@ import { LintSection } from "@/components/settings/sections/LintSection";
 import { SnapshotsSection } from "@/components/settings/sections/SnapshotsSection";
 import { DangerZoneSection } from "@/components/settings/sections/DangerZoneSection";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
-import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 
 export function ProjectSettings() {
   const { t } = useTranslation();
   const { name = "" } = useParams<{ name: string }>();
-  const projectsQuery = useProjects();
-  const project = projectsQuery.data?.find((p) => p.name === name);
+  const { data: projects } = useProjects();
+  const project = projects?.find((p) => p.name === name);
 
-  if (projectsQuery.isLoading) {
-    return (
-      <div className="mx-auto max-w-3xl space-y-6 py-6">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-
-  if (projectsQuery.isError) {
-    return <DaemonDownAlert error={projectsQuery.error} />;
-  }
-
-  if (!project) {
-    return (
-      <div className="mx-auto max-w-xl space-y-3 py-12 text-center">
-        <h1 className="text-2xl font-semibold">{t("settings.not_found_title")}</h1>
-        <p className="text-muted-foreground">
-          {t("settings.not_found_body", { name })}
-        </p>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">{t("settings.not_found_back")}</Link>
-        </Button>
-      </div>
-    );
-  }
+  if (!project) return <div>{t("settings.loading")}</div>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">

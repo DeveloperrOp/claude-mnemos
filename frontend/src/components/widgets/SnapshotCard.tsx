@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { KindBadge, type KindTone } from "./KindBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { TypedConfirmDialog } from "./TypedConfirmDialog";
-import { SnapshotRestorePreview } from "./SnapshotRestorePreview";
 import { useSnapshotDelete } from "@/hooks/useSnapshotDelete";
 import { useSnapshotRestore } from "@/hooks/useSnapshotRestore";
 import { formatDateTime } from "@/lib/datetime";
@@ -97,11 +96,6 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
         expectedPhrase={s.name}
         phraseLabel={t("snapshots.restore_typed_label")}
         confirmLabel={t("snapshots.restore_button")}
-        extraContent={
-          project ? (
-            <SnapshotRestorePreview project={project} name={s.name} enabled={restoreOpen} />
-          ) : null
-        }
         onConfirm={() => {
           restore.mutate(s.name, { onSettled: () => setRestoreOpen(false) });
         }}

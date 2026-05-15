@@ -13,7 +13,6 @@ import {
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { formatDateTime } from "@/lib/datetime";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
-import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 
 export function Health() {
   const { name: project } = useParams<{ name: string }>();
@@ -26,9 +25,6 @@ export function Health() {
   const [clearAllOpen, setClearAllOpen] = useState(false);
 
   if (!project) return null;
-  if (healthQuery.isError) {
-    return <DaemonDownAlert error={healthQuery.error} />;
-  }
   if (healthQuery.isLoading) return <Skeleton className="h-64" />;
 
   const health = healthQuery.data;

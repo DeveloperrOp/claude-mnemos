@@ -38,16 +38,10 @@ class JobWorker:
         self._stop = asyncio.Event()
         self._wakeup = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
-        # Captured in start() so signal_wakeup() (called from APScheduler
-        # threads) can hit the right loop. Python 3.12+ deprecated
-        # `asyncio.get_event_loop()` in non-running threads, and 3.14 will
-        # raise instead of warning.
-        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def start(self) -> None:
         if self._task is not None:
             raise RuntimeError("JobWorker already started")
-        self._loop = asyncio.get_running_loop()
         self._task = asyncio.create_task(self._run_loop())
 
     async def stop(self, *, timeout: float = 10.0) -> None:
@@ -68,11 +62,9 @@ class JobWorker:
 
     def signal_wakeup(self) -> None:
         """Schedule wakeup (called by APScheduler trigger or external signal)."""
-        loop = self._loop
-        if loop is None or loop.is_closed():
-            return
+        # Event loop may be closed — nothing to do in that case.
         with contextlib.suppress(RuntimeError):
-            loop.call_soon_threadsafe(self._wakeup.set)
+            asyncio.get_event_loop().call_soon_threadsafe(self._wakeup.set)
 
     def try_dequeue_one(self) -> Job | None:
         """Single dequeue entrypoint — honours JobStore.is_paused().
@@ -107,23 +99,25 @@ class JobWorker:
 
     def _sweep_orphan_unknown_kinds(self) -> None:
         try:
-            rows = self._store.list_running_kinds()
+            rows = self._store._conn.execute(
+                "SELECT id, kind FROM jobs WHERE status='running'"
+            ).fetchall()
         except Exception:
             logger.exception("failed to sweep orphan running rows")
             return
-        for job_id, kind in rows:
-            if kind in self._handlers:
+        for row in rows:
+            if row["kind"] in self._handlers:
                 continue
             try:
                 self._store.mark_failed_with_retry(
-                    job_id,
-                    error=f"no handler for kind={kind!r}",
+                    row["id"],
+                    error=f"no handler for kind={row['kind']!r}",
                     traceback="",
                     finished_at=datetime.now(UTC),
                 )
             except Exception:
                 logger.exception(
-                    "failed to mark orphan job %s as failed", job_id
+                    "failed to mark orphan job %s as failed", row["id"]
                 )
 
     async def _sleep_or_wakeup(self) -> None:

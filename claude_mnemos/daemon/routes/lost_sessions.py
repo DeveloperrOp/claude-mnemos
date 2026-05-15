@@ -427,64 +427,6 @@ async def ignore_selection_route(
     return {"ignored_count": len(ignore.ignored_shas), "added": added}
 
 
-@router.get("/lost-sessions/ignored")
-async def list_ignored_route(request: Request) -> dict[str, Any]:
-    """List ignored sessions across all mounted vaults.
-
-    Each entry carries ``project_name`` (the vault that owns the ignore
-    record). Same SHA can theoretically be ignored in multiple vaults — we
-    surface each ignore record separately so un-ignore can target the
-    specific vault.
-    """
-    out: list[dict[str, Any]] = []
-    for runtime in all_runtimes(request):
-        try:
-            items = core_lost_sessions.list_ignored_session_details(runtime.vault_root)
-        except Exception:  # noqa: BLE001
-            continue
-        for item in items:
-            d = item.model_dump(mode="json")
-            d["project_name"] = runtime.name
-            out.append(d)
-    return {"ignored": out, "total": len(out)}
-
-
-@router.post("/lost-sessions/un-ignore-selection", status_code=200)
-async def un_ignore_selection_route(
-    request: Request, body: dict[str, Any]
-) -> dict[str, Any]:
-    """Remove multiple SHAs from a vault's ignore list.
-
-    Body: ``{"project_name": str, "shas": [str]}``.
-    Returns: ``{"removed": int, "ignored_count": int}``.
-    """
-    project_name = body.get("project_name")
-    if not isinstance(project_name, str) or not project_name:
-        raise HTTPException(
-            status_code=422, detail={"error": "missing_project_name"}
-        )
-    raw_shas = body.get("shas")
-    if (
-        not isinstance(raw_shas, list)
-        or not raw_shas
-        or not all(isinstance(x, str) and x for x in raw_shas)
-    ):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "invalid_shas",
-                "detail": "shas must be a non-empty list of non-empty strings",
-            },
-        )
-
-    runtime = get_runtime(request, project_name)
-    ignore, removed = core_lost_sessions.remove_from_ignore(runtime.vault_root, raw_shas)
-    cache = runtime.lost_sessions_cache
-    if cache is not None:
-        cache.invalidate()
-    return {"removed": removed, "ignored_count": len(ignore.ignored_shas)}
-
-
 @router.post("/lost-sessions/{session_id}/import", status_code=201)
 async def import_route(
     session_id: str,

@@ -11,9 +11,7 @@ import { getProjectDisplayName } from "@/lib/projectDisplayName";
 import { UNASSIGNED_PROJECT, isUnassigned } from "@/lib/lostSessionsConst";
 import type { LostSession } from "@/types/LostSession";
 
-// v0.0.19: always confirm ignore — irreversible until visited /lost-sessions/ignored.
-const BULK_IGNORE_CONFIRM_THRESHOLD = 1;
-const BULK_IMPORT_CONFIRM_THRESHOLD = 10;
+const BULK_CONFIRM_THRESHOLD = 10;
 
 interface Props {
   /** All lost sessions to consider. Caller decides what to pass. */
@@ -123,12 +121,12 @@ export function LostSessionsManager({
   }
 
   function requestImport() {
-    if (selectedSessions.length > BULK_IMPORT_CONFIRM_THRESHOLD) setConfirmImport(true);
+    if (selectedSessions.length > BULK_CONFIRM_THRESHOLD) setConfirmImport(true);
     else runImport();
   }
 
   function requestIgnore() {
-    if (selectedSessions.length >= BULK_IGNORE_CONFIRM_THRESHOLD) setConfirmIgnore(true);
+    if (selectedSessions.length > BULK_CONFIRM_THRESHOLD) setConfirmIgnore(true);
     else runIgnore();
   }
 
