@@ -14,12 +14,38 @@ without showing a window, exits 0.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import threading
 import time
+import traceback
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
+
+
+def _diag_log_path() -> Path:
+    return Path.home() / ".claude-mnemos" / "launcher.log"
+
+
+def _diag(msg: str) -> None:
+    """Append a timestamped breadcrumb to ~/.claude-mnemos/launcher.log.
+
+    Windowed PyInstaller bundles silently swallow stdout/stderr, so when the
+    launcher fails the user is left with "nothing happens". This file is the
+    only signal a desktop user has — keep it best-effort, never raise.
+    """
+    try:
+        p = _diag_log_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"[{ts}] {msg}\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 DAEMON_URL = "http://127.0.0.1:5757"
 HEALTH_URL = f"{DAEMON_URL}/api/health"
@@ -126,7 +152,14 @@ def _make_show_handler(window) -> Callable[[str], None]:
 
 def _open_window() -> int:
     """Open a pywebview window. Blocks until the user closes it."""
-    import webview
+    _diag(f"_open_window: sys.executable={sys.executable!r} platform={sys.platform}")
+    try:
+        import webview
+    except Exception as exc:  # noqa: BLE001
+        _diag(f"_open_window: pywebview import FAILED: {exc!r}")
+        _diag(traceback.format_exc())
+        return 10
+    _diag("_open_window: pywebview imported OK")
     from claude_mnemos.tray.ipc import IpcServer
 
     window = webview.create_window(
@@ -184,15 +217,23 @@ def run(argv: list[str] | None = None) -> int:
                         help="Do NOT auto-spawn the tray supervisor. Used when supervisor is calling us.")
     args = parser.parse_args(argv)
 
+    _diag(f"launcher.run: argv={argv!r} no_window={args.no_window}")
+
     if args.no_window:
         try:
             import webview  # noqa: F401
         except Exception as exc:
             print(f"[launcher] pywebview import failed: {exc}", file=sys.stderr)
+            _diag(f"launcher.run --no-window: pywebview import failed: {exc!r}")
             return 1
         return 0
 
-    return _open_window()
+    try:
+        return _open_window()
+    except Exception as exc:  # noqa: BLE001
+        _diag(f"_open_window raised: {exc!r}")
+        _diag(traceback.format_exc())
+        return 99
 
 
 if __name__ == "__main__":  # pragma: no cover

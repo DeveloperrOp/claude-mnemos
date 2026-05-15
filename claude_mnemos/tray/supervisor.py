@@ -192,7 +192,12 @@ class Supervisor:
         if sys.platform == "win32":
             # CREATE_NEW_PROCESS_GROUP so we can send CTRL_BREAK_EVENT later;
             # don't use DETACHED_PROCESS — we want stdout/stderr handles.
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            # CREATE_NO_WINDOW guarantees no console window pops up even if a
+            # console-flavoured exe somehow ends up here (defensive: should
+            # only be windowed exe under normal circumstances).
+            creationflags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            )
 
         if self.log_path:
             self.log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -370,8 +375,15 @@ class Supervisor:
             cmd = [sys.executable, "-m", "claude_mnemos.cli", "launcher", "--no-spawn-tray"]
         creationflags = 0
         if sys.platform == "win32":
+            # DETACHED_PROCESS detaches from parent's console; CREATE_NO_WINDOW
+            # guarantees no new console window pops up even if a console exe
+            # gets routed here by mistake. Belt-and-braces against the "cmd
+            # window opens instead of the launcher" symptom Yarik reported on
+            # v0.0.19/v0.0.20.
             creationflags = (
-                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                subprocess.DETACHED_PROCESS
+                | subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.CREATE_NO_WINDOW
             )
         try:
             self.launcher_proc = subprocess.Popen(
