@@ -221,19 +221,50 @@ class MnemosDaemon:
         return [e for e in all_entries if e.name in wanted]
 
     async def _bootstrap_runtimes(self) -> None:
-        """Mount every selected project. Failures degrade to alerts."""
+        """Mount every selected project. Failures degrade to alerts.
+
+        v0.0.20: every mount failure now ALSO surfaces as a watchdog alert so
+        the user sees "vault X failed to mount" on the Health page instead of
+        a silent ``vaults: {}`` dashboard state. The same situation used to
+        live only in the daemon stdout log, invisible to a desktop user.
+        """
         from claude_mnemos.daemon.vault_runtime import VaultMountError, VaultRuntime
 
         entries = self._select_boot_entries()
         for entry in entries:
-            settings = self.settings_store.get_project(entry.name)
-            runtime = VaultRuntime(project=entry, settings=settings)
             try:
+                settings = self.settings_store.get_project(entry.name)
+                runtime = VaultRuntime(project=entry, settings=settings)
                 await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
             except VaultMountError as exc:
                 logger.warning("vault %s mount failed: %s", entry.name, exc)
+                self._alert_mount_failure(entry.name, str(exc))
+                continue
+            except Exception as exc:  # noqa: BLE001
+                # Anything outside VaultMountError (corrupt settings JSON, FS
+                # permission, etc) used to silently swallow into the bootstrap
+                # warning log. Surface it as an alert and continue so other
+                # vaults still mount.
+                logger.exception("vault %s bootstrap unexpected error", entry.name)
+                self._alert_mount_failure(entry.name, f"unexpected: {exc!r}")
                 continue
             self.runtimes[entry.name] = runtime
+
+    def _alert_mount_failure(self, project_name: str, message: str) -> None:
+        """Emit a watchdog alert for a mount failure so it is visible on the
+        Health page (and via /api/health/alerts).
+        """
+        from datetime import UTC, datetime
+
+        try:
+            self.alerts.add(
+                kind="handler_error",
+                path="",
+                message=f"Vault {project_name!r} failed to mount: {message}",
+                detected_at=datetime.now(UTC),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to emit mount-failure alert for %s", project_name)
 
     def _build_cron_tasks(self) -> list[CronTask]:
         """Declarative list of cron tasks owned by the daemon.
