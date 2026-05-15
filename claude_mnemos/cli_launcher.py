@@ -48,16 +48,7 @@ def _spawn_tray() -> bool:
         cmd = [sys.executable, "-m", "claude_mnemos.cli", "tray", "run"]
     creationflags = 0
     if sys.platform == "win32":
-        # CREATE_NO_WINDOW added in v0.0.20-hotfix-2: belt-and-braces against the
-        # "cmd window opens instead of the launcher" symptom. DETACHED_PROCESS
-        # alone *should* suppress the console, but some PowerShell/Windows
-        # Terminal interactions still flash one through; CREATE_NO_WINDOW
-        # forces no-console deterministically.
-        creationflags = (
-            subprocess.DETACHED_PROCESS
-            | subprocess.CREATE_NEW_PROCESS_GROUP
-            | subprocess.CREATE_NO_WINDOW
-        )
+        creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
         subprocess.Popen(
             cmd,
