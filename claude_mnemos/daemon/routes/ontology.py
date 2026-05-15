@@ -63,17 +63,6 @@ def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# POST /ontology/{project}/run
-# ---------------------------------------------------------------------------
-
-
-@router.post("/ontology/{project}/run")
-def ontology_run(project: str, request: Request) -> dict[str, Any]:
-    get_runtime(request, project)
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
 # GET /ontology/{project}/suggestions
 # ---------------------------------------------------------------------------
 

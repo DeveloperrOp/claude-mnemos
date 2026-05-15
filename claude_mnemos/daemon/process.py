@@ -167,14 +167,18 @@ class MnemosDaemon:
         await self._server.serve()
 
     async def _shutdown_runtimes(self) -> None:
+        # Hold the lock for the WHOLE shutdown so a concurrent HTTP request
+        # cannot observe an empty `runtimes` dict while vaults are still
+        # draining (was a TOCTOU vs route helpers). Lock release happens only
+        # after every unmount finished (or its 5s timeout elapsed).
         async with self._runtimes_lock:
             tasks = [
                 rt.unmount(timeout=5.0, force=True)
                 for rt in list(self.runtimes.values())
             ]
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
             self.runtimes.clear()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
 
     def _install_signal_handlers(self) -> None:
         try:

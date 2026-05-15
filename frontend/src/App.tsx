@@ -18,6 +18,7 @@ import { Snapshots } from "./pages/Snapshots";
 import { Suggestions } from "./pages/Suggestions";
 import { Health } from "./pages/Health";
 import { LostSessions } from "./pages/LostSessions";
+import { IgnoredSessions } from "./pages/IgnoredSessions";
 import { DeadLetter } from "./pages/DeadLetter";
 import { DeadLetterDetail } from "./pages/DeadLetterDetail";
 import { OnboardingWelcome } from "./pages/OnboardingWelcome";
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: "lost-sessions", element: <LostSessions /> },
+      { path: "lost-sessions/ignored", element: <IgnoredSessions /> },
       { path: "dead-letter", element: <DeadLetter /> },
       { path: "dead-letter/:jobId", element: <DeadLetterDetail /> },
       { path: "help", element: <Suspense fallback={<Skeleton className="h-64" />}><Help /></Suspense> },

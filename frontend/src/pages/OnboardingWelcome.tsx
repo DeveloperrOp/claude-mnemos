@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDetectedCwds } from "@/hooks/onboarding/useDetectedCwds";
@@ -39,25 +40,46 @@ export function OnboardingWelcome() {
 
   const trackSelected = async () => {
     const list = Array.from(selected);
-    let lastSlug = "";
+    const successes: string[] = [];
+    const failures: { cwd: string; error: string }[] = [];
     for (const cwd of list) {
       const display = humanize(lastSegment(cwd));
       const slug = deriveSlug(display);
-      lastSlug = slug;
       const vault = cwd.replace(/[\\/]+$/, "") + "/.mnemos";
       const patterns = [cwd, `${cwd}/*`, `${cwd}/**`];
-      await new Promise<void>((res, rej) => {
-        createMut.mutate(
-          {
-            name: slug,
-            display_name: display,
-            vault_root: vault,
-            cwd_patterns: patterns,
-          },
-          { onSuccess: () => res(), onError: (e) => rej(e) },
-        );
-      });
+      try {
+        await new Promise<void>((res, rej) => {
+          createMut.mutate(
+            {
+              name: slug,
+              display_name: display,
+              vault_root: vault,
+              cwd_patterns: patterns,
+            },
+            { onSuccess: () => res(), onError: (e) => rej(e) },
+          );
+        });
+        successes.push(slug);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        failures.push({ cwd, error: msg });
+      }
     }
+    if (failures.length > 0) {
+      const list = failures
+        .map((f) => `${lastSegment(f.cwd)} — ${f.error}`)
+        .join("; ");
+      toast.error(
+        t("onboarding.welcome.partial_failure", {
+          defaultValue:
+            "{{succeeded}} created, {{failed}} failed: {{list}}",
+          succeeded: successes.length,
+          failed: failures.length,
+          list,
+        }),
+      );
+    }
+    const lastSlug = successes[successes.length - 1] ?? "";
     navigate(lastSlug ? `/project/${encodeURIComponent(lastSlug)}` : "/");
   };
 

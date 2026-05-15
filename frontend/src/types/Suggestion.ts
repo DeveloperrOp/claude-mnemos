@@ -15,6 +15,8 @@ export const SuggestionOperationSchema = z.enum([
 ]);
 export type SuggestionOperation = z.infer<typeof SuggestionOperationSchema>;
 
+// v0.0.19: dropped `deferred_until` — backend stopped serialising it (the
+// defer endpoint never accepted a date), legacy files load via `extra="ignore"`.
 export const SuggestionFrontmatterSchema = z.object({
   id: z.string(),
   created: z.string(),
@@ -26,7 +28,6 @@ export const SuggestionFrontmatterSchema = z.object({
   reason: z.string(),
   applied_at: z.string().nullable(),
   applied_op_id: z.string().nullable(),
-  deferred_until: z.string().nullable().optional(),
 });
 export type SuggestionFrontmatter = z.infer<typeof SuggestionFrontmatterSchema>;
 

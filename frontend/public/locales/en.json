@@ -504,6 +504,18 @@
     "created_toast": "Snapshot created",
     "deleted_toast": "Snapshot deleted",
     "restored_toast": "Vault restored",
+    "preview": {
+      "created": "Created",
+      "files_in_snapshot": "Files in snapshot",
+      "files_in_vault": "Files in vault now",
+      "unchanged": "Unchanged",
+      "will_create": "Will create",
+      "will_overwrite": "Will overwrite",
+      "will_delete": "Will delete",
+      "no_changes": "This snapshot is identical to the current vault — nothing will change.",
+      "truncated": "Showing only first {{limit}} paths per category — more changes exist.",
+      "error": "Failed to load preview."
+    },
     "restore_modal_title": "Restore vault from snapshot?",
     "restore_modal_desc": "This will revert ALL pages to the state at this snapshot. Operations performed since this snapshot will be lost.",
     "restore_typed_label": "Type the snapshot name",
@@ -521,6 +533,7 @@
     "title": "Lost sessions",
     "scan": "Scan",
     "scanning": "Scanning...",
+    "view_ignored": "Ignored",
     "session_id": "session_id",
     "sha": "sha",
     "size": "size",
@@ -877,6 +890,9 @@
   "settings": {
     "title": "Settings",
     "loading": "Loading settings...",
+    "not_found_title": "Project not found",
+    "not_found_body": "Project \"{{name}}\" is not registered. Check the URL or go back to the overview.",
+    "not_found_back": "Back to overview",
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
@@ -990,8 +1006,26 @@
     "help": "help",
     "dead_letter": "dead-letter",
     "lost_sessions": "lost sessions",
+    "ignored_sessions": "ignored",
     "welcome": "welcome",
     "onboarding": "onboarding",
     "diagnostics": "diagnostics"
+  },
+  "ignored_sessions": {
+    "title": "Ignored sessions",
+    "subtitle": "SHAs previously marked as ignored. The JSONL is still on disk — you can move them back to Lost.",
+    "back_to_lost": "← back to lost",
+    "empty_title": "Empty here",
+    "empty_body": "No session has been ignored yet.",
+    "file_missing": "file deleted from disk",
+    "select_all": "Select all ({{n}})",
+    "deselect_all": "Deselect",
+    "select_all_aria": "Select all ignored sessions",
+    "bar_count": "{{n}} selected",
+    "bar_restore": "Move back to Lost",
+    "confirm_title": "Restore {{n}} session(s)?",
+    "confirm_body": "These SHAs will reappear in the Lost Sessions list. You can then import them or ignore them again.",
+    "restored_toast": "Sessions moved back to Lost.",
+    "restore_error": "Failed to restore: {{error}}"
   }
 }

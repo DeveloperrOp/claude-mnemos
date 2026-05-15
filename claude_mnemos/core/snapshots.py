@@ -241,6 +241,132 @@ def list_snapshots(vault: Path) -> list[SnapshotInfo]:
     return items
 
 
+def _iter_snapshot_files(root: Path) -> "list[tuple[str, Path]]":
+    """Walk vault/snapshot, yield (posix-relpath, abs-path) for content files.
+
+    Skips ``.backups/``, ``.staging/``, ``.trash/`` subtrees and meta/lock files.
+    """
+    out: list[tuple[str, Path]] = []
+    if not root.is_dir():
+        return out
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        try:
+            rel = p.relative_to(root)
+        except ValueError:
+            continue
+        parts = rel.parts
+        if parts and parts[0] in _EXCLUDED_DIRS:
+            continue
+        if p.name in _EXCLUDED_FILES or p.name == META_FILENAME:
+            continue
+        out.append((rel.as_posix(), p))
+    return out
+
+
+def _file_sha(path: Path) -> str | None:
+    import hashlib
+
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+class RestorePreview(BaseModel):
+    """Diff between a snapshot and the current vault — what restore would do."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_name: str
+    snapshot_timestamp: datetime
+    snapshot_kind: SnapshotKind
+    snapshot_file_count: int
+    vault_file_count: int
+    will_create: list[str]  # in snapshot, missing from vault — restore writes them
+    will_delete: list[str]  # in vault, missing from snapshot — restore removes them
+    will_overwrite: list[str]  # in both, sha differs — restore overwrites
+    unchanged_count: int
+    sample_limit: int  # cap on each will_* list
+    truncated: bool  # True if any will_* list was truncated
+
+
+def compute_restore_preview(
+    vault: Path,
+    snapshot_name: str,
+    *,
+    sample_limit: int = 20,
+) -> RestorePreview:
+    """Diff snapshot vs current vault to preview a restore.
+
+    Walks both trees, classifies every file by sha. Cheap when most files
+    match by size (sha is only computed when sizes are equal).
+    Lists are sorted alphabetically; truncated at ``sample_limit`` entries
+    each — ``truncated=True`` signals that more changes exist.
+    """
+    parsed = parse_snapshot_name(snapshot_name)
+    if parsed is None:
+        raise ValueError(f"not a snapshot name: {snapshot_name!r}")
+    snap_dir = vault / SNAPSHOTS_DIRNAME / snapshot_name
+    if not snap_dir.is_dir():
+        raise FileNotFoundError(f"snapshot not found: {snapshot_name}")
+
+    snap_files = {rel: p for rel, p in _iter_snapshot_files(snap_dir)}
+    vault_files = {rel: p for rel, p in _iter_snapshot_files(vault)}
+
+    create: list[str] = []
+    delete: list[str] = []
+    overwrite: list[str] = []
+    unchanged = 0
+
+    for rel, snap_p in snap_files.items():
+        v_p = vault_files.get(rel)
+        if v_p is None:
+            create.append(rel)
+            continue
+        try:
+            same_size = snap_p.stat().st_size == v_p.stat().st_size
+        except OSError:
+            same_size = False
+        if same_size and _file_sha(snap_p) == _file_sha(v_p):
+            unchanged += 1
+        else:
+            overwrite.append(rel)
+
+    for rel in vault_files:
+        if rel not in snap_files:
+            delete.append(rel)
+
+    create.sort()
+    delete.sort()
+    overwrite.sort()
+
+    truncated = (
+        len(create) > sample_limit
+        or len(delete) > sample_limit
+        or len(overwrite) > sample_limit
+    )
+
+    return RestorePreview(
+        snapshot_name=snapshot_name,
+        snapshot_timestamp=parsed.timestamp,
+        snapshot_kind=parsed.kind,
+        snapshot_file_count=len(snap_files),
+        vault_file_count=len(vault_files),
+        will_create=create[:sample_limit],
+        will_delete=delete[:sample_limit],
+        will_overwrite=overwrite[:sample_limit],
+        unchanged_count=unchanged,
+        sample_limit=sample_limit,
+        truncated=truncated,
+    )
+
+
 def delete_snapshot(vault: Path, name: str) -> None:
     """Delete a snapshot directory by name. Path-traversal-safe.
 

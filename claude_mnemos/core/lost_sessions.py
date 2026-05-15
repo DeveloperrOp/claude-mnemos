@@ -363,3 +363,75 @@ def add_to_ignore(vault: Path, sha: str) -> LostSessionsIgnore:
     ignore.ignored_shas.add(sha)
     ignore.save(vault)
     return ignore
+
+
+def remove_from_ignore(vault: Path, shas: list[str]) -> tuple[LostSessionsIgnore, int]:
+    """Remove SHAs from the ignore list and persist. Returns (model, removed_count).
+
+    Silently no-ops for SHAs that were not ignored. Persists only when at
+    least one SHA was actually removed.
+    """
+    ignore = LostSessionsIgnore.load(vault)
+    before = len(ignore.ignored_shas)
+    ignore.ignored_shas.difference_update(shas)
+    removed = before - len(ignore.ignored_shas)
+    if removed > 0:
+        ignore.save(vault)
+    return ignore, removed
+
+
+class IgnoredSessionDetails(BaseModel):
+    """Details of an ignored session — what surfaces in the Ignored Sessions page.
+
+    ``transcript_path`` and ``mtime`` are best-effort: the JSONL may have been
+    deleted from disk since it was ignored. When the file is gone, those fields
+    are ``None`` so the UI can still list the SHA and allow restoration.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sha: str
+    transcript_path: str | None = None
+    session_id: str | None = None
+    size_bytes: int | None = None
+    mtime: datetime | None = None
+    preview: str | None = None
+    cwd: str | None = None
+
+
+def list_ignored_session_details(
+    vault: Path,
+    *,
+    transcripts_root: Path | None = None,
+) -> list[IgnoredSessionDetails]:
+    """List ignored SHAs with enrichment from on-disk JSONL when still present.
+
+    Walks the transcript root once and joins with the ignored-SHA set. Files
+    no longer on disk surface as bare ``sha``-only entries so the user can
+    still un-ignore them.
+    """
+    from claude_mnemos.core.transcript_scanner import _scan_sync
+
+    ignored = LostSessionsIgnore.load(vault).ignored_shas
+    if not ignored:
+        return []
+    entries = {e.sha: e for e in _scan_sync(transcripts_root)}
+    out: list[IgnoredSessionDetails] = []
+    for sha in ignored:
+        e = entries.get(sha)
+        if e is None:
+            out.append(IgnoredSessionDetails(sha=sha))
+        else:
+            out.append(
+                IgnoredSessionDetails(
+                    sha=sha,
+                    transcript_path=e.transcript_path,
+                    session_id=e.session_id,
+                    size_bytes=e.size_bytes,
+                    mtime=e.mtime,
+                    preview=e.preview,
+                    cwd=e.cwd,
+                )
+            )
+    out.sort(key=lambda i: (i.mtime is None, -(i.mtime.timestamp() if i.mtime else 0)))
+    return out

@@ -100,22 +100,6 @@ def _suggestion(
 
 
 # ---------------------------------------------------------------------------
-# POST /ontology/{project}/run
-# ---------------------------------------------------------------------------
-
-
-async def test_run_happy(client: Any) -> None:
-    r = await client.post("/api/ontology/alpha/run")
-    assert r.status_code == 200
-    assert r.json()["ok"] is True
-
-
-async def test_run_unknown_project_404(client: Any) -> None:
-    r = await client.post("/api/ontology/unknown/run")
-    assert r.status_code == 404
-
-
-# ---------------------------------------------------------------------------
 # GET /ontology/{project}/suggestions
 # ---------------------------------------------------------------------------
 

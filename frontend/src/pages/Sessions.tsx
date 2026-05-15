@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionCard } from "@/components/widgets/SessionCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { LostSessionsManager } from "@/components/widgets/LostSessionsManager";
 import {
   SessionFilters,
@@ -33,6 +34,9 @@ export function Sessions() {
   const lostCount = lostForProject.length;
 
   if (!project) return null;
+  if (sessionsQuery.isError) {
+    return <DaemonDownAlert error={sessionsQuery.error} />;
+  }
 
   if (sessionsQuery.isLoading) {
     return (

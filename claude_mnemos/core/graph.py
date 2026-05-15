@@ -23,19 +23,6 @@ from claude_mnemos.core.page_io import PageParseError, ParsedPage, read_page, sl
 from claude_mnemos.core.wikilinks import extract_wikilinks
 
 
-def build_page_graph(vault: Path) -> dict[str, set[str]]:
-    """Walk ``vault/wiki/**/*.md`` and return slug → set of neighbor slugs.
-
-    Bidirectional. Bad pages are skipped. Targets not present as their own
-    pages still appear as keys (empty neighbor set).
-
-    Thin wrapper around :func:`build_page_graph_with_pages` — see that
-    function for the variant that also returns parsed page bodies.
-    """
-    graph, _ = build_page_graph_with_pages(vault)
-    return graph
-
-
 def build_page_graph_with_pages(
     vault: Path,
 ) -> tuple[dict[str, set[str]], dict[str, ParsedPage]]:

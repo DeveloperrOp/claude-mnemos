@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActivity } from "@/hooks/useActivity";
 import { ActivityRow } from "@/components/widgets/ActivityRow";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { groupByDay, type DayGroupKey } from "@/lib/groupByDay";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -27,6 +28,9 @@ export function ActivityCenter() {
   );
 
   if (!project) return null;
+  if (activityQuery.isError) {
+    return <DaemonDownAlert error={activityQuery.error} />;
+  }
 
   if (activityQuery.isLoading) {
     return (

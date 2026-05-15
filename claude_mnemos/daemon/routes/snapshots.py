@@ -9,7 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from claude_mnemos.core.locks import pipeline_lock
 from claude_mnemos.core.snapshots import (
+    RestorePreview,
     SnapshotInfo,
+    compute_restore_preview,
     create_manual_snapshot,
     delete_snapshot,
     list_snapshots,
@@ -110,6 +112,26 @@ def delete_snapshot_endpoint(
                 status_code=400, detail={"error": "invalid_name", "detail": str(exc)}
             ) from exc
     return {"deleted": name}
+
+
+@router.get("/snapshots/{project}/{name}/preview", response_model=RestorePreview)
+def preview_snapshot_endpoint(
+    project: str, name: str, request: Request
+) -> RestorePreview:
+    """Diff snapshot vs current vault — what a restore would change."""
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
+    _validate_snapshot_name(name)
+    try:
+        return compute_restore_preview(vault, name)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail={"error": "not_found", "name": name}
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail={"error": "invalid_name", "detail": str(exc)}
+        ) from exc
 
 
 @router.post(

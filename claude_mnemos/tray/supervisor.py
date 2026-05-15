@@ -32,8 +32,26 @@ class HealthSnapshot:
     uptime_seconds: float | None = None
 
 
+DEFAULT_DAEMON_PORT = 5757
+
+
+def _resolve_daemon_port() -> int:
+    """Read configured port from GlobalSettings; fall back to 5757 on any error.
+
+    Tray supervisor runs in a separate process, so it can't share daemon's
+    in-memory state — re-load settings from disk on init. Best-effort: if
+    the settings file is missing/corrupt we use the safe default rather
+    than crashing the tray.
+    """
+    try:
+        from claude_mnemos.state.settings import SettingsStore
+        return SettingsStore().get_global().daemon_port
+    except Exception:  # noqa: BLE001
+        return DEFAULT_DAEMON_PORT
+
+
 def _default_health_url() -> str:
-    return "http://localhost:5757/api/health"
+    return f"http://localhost:{_resolve_daemon_port()}/api/health"
 
 
 class RestartLimiter:

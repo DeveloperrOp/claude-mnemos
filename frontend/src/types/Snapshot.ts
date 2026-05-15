@@ -18,3 +18,18 @@ export type SnapshotInfo = z.infer<typeof SnapshotInfoSchema>;
 export const SnapshotListResponseSchema = z.object({
   snapshots: z.array(SnapshotInfoSchema),
 });
+
+export const RestorePreviewSchema = z.object({
+  snapshot_name: z.string(),
+  snapshot_timestamp: z.string(),
+  snapshot_kind: SnapshotKindSchema,
+  snapshot_file_count: z.number().int().nonnegative(),
+  vault_file_count: z.number().int().nonnegative(),
+  will_create: z.array(z.string()),
+  will_delete: z.array(z.string()),
+  will_overwrite: z.array(z.string()),
+  unchanged_count: z.number().int().nonnegative(),
+  sample_limit: z.number().int().positive(),
+  truncated: z.boolean(),
+});
+export type RestorePreview = z.infer<typeof RestorePreviewSchema>;

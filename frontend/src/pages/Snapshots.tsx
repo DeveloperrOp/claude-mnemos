@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { SnapshotCard } from "@/components/widgets/SnapshotCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { SnapshotFilters, type KindFilter } from "@/components/filters/SnapshotFilters";
 import {
   AlertDialog,
@@ -37,6 +38,9 @@ export function Snapshots() {
   }, [snapshotsQuery.data, kind]);
 
   if (!project) return null;
+  if (snapshotsQuery.isError) {
+    return <DaemonDownAlert error={snapshotsQuery.error} />;
+  }
 
   const headerControls = (
     <div className="flex items-center gap-3">
