@@ -1,5 +1,11 @@
 # claude-mnemos — project instructions
 
+> **NON-NEGOTIABLE: ALWAYS invoke `superpowers` skills for every task in this repo. No exceptions.**
+>
+> Before responding, before writing any code, before any tool call — check if a superpowers skill applies and invoke it. Even on tasks that seem trivial. "It's just a one-liner" / "I already understand" / "this is too small for a skill" are all rationalisations — ignore them and invoke the skill anyway.
+>
+> Skipping skills in this repo has burned the user multiple times. The 21-fix bundle in v0.0.19 broke the desktop launcher because no live-test happened before push. **Skills exist to enforce the discipline you'd otherwise skip when in a hurry.**
+
 ## Skills (superpowers) — ALWAYS USE
 
 For **every** non-trivial task in this repo, default to the `superpowers` skills. They override the default system behaviour where they conflict.
@@ -46,8 +52,12 @@ User feedback already captured in memory (read `~/.claude/projects/.../memory/ME
 
 ## Hard rules
 
-1. Never create projects/vaults/persistent artifacts without explicit user consent — diagnose gaps, ask first.
-2. Never run destructive git ops (force-push, reset --hard, branch -D) without explicit ask.
-3. Never skip hooks (`--no-verify`) or signing.
-4. After audit/review: show findings with severity, **wait** for user's "fix what" before applying.
-5. Match locale-format dates via `formatDateTime(iso, i18n.language)` — never render raw ISO in user-facing UI.
+1. **ALWAYS invoke superpowers skills.** No "this is trivial" exceptions. Re-read the banner at the top of this file.
+2. Never create projects/vaults/persistent artifacts without explicit user consent — diagnose gaps, ask first.
+3. Never run destructive git ops (force-push, reset --hard, branch -D) without explicit ask.
+4. Never skip hooks (`--no-verify`) or signing.
+5. After audit/review: show findings with severity, **wait** for user's "fix what" before applying.
+6. Match locale-format dates via `formatDateTime(iso, i18n.language)` — never render raw ISO in user-facing UI.
+7. **One release = one focused change.** Do NOT bundle 20 unrelated fixes into a single release tag. Each tag should fix or add ONE thing that Yarik can live-test in under 5 minutes. Stacking changes hides which one broke things.
+8. **Critical paths require live-test BEFORE pushing the tag**: anything touching `launcher.py`, `cli_launcher.py`, `tray/supervisor.py`, `postinstall.py`, `installer/windows/mnemos.iss`, `_bootstrap_runtimes`, or hook installation. "Tests passed" is not enough — Yarik must click the shortcut and confirm the dashboard opens. If you can't run that live-test yourself, ask Yarik to test BEFORE the tag, not after.
+9. **Dead-code removal needs runtime proof, not just grep.** Static analysis says "not imported" — Inno install script, PyInstaller spec hidden_imports, frozen-mode subprocess calls, hook scripts loaded via dynamic command lines all bypass grep. Verify the path is actually unused at runtime before deleting.
