@@ -138,34 +138,11 @@ begin
                  SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
-// v0.0.20: ALWAYS taskkill old processes before install starts, regardless of
-// "uninstall first?" answer. Otherwise an in-place upgrade leaves the prior
-// v0.0.18 daemon running on :5757; the new bundle's daemon can't bind, vaults
-// fail to mount, dashboard launches into an empty `vaults: {}` state.
-// CloseApplications=force only detects WINDOWED apps — daemon and tray
-// supervisor are background processes (no window), so Inno doesn't close
-// them on its own. taskkill /T also covers the spawned subprocess tree.
-procedure KillRunningProcesses;
-var
-  ResultCode: Integer;
-begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'),
-       '/F /IM claude-mnemos.exe /T',
-       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec(ExpandConstant('{sys}\taskkill.exe'),
-       '/F /IM claude-mnemos-cli.exe /T',
-       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
-
 function InitializeSetup(): Boolean;
 var
   Response: Integer;
 begin
   Result := True;
-  // Kill stale processes from any previous run BEFORE touching files. Safe
-  // on a clean install too — taskkill is a no-op if no such process exists.
-  KillRunningProcesses;
-
   if not IsUpgrade() then
     Exit;
   Response := MsgBox(
@@ -188,7 +165,5 @@ begin
       Result := False;
     end;
   end;
-  // IDNO → fall through; Inno will do its default in-place upgrade. The
-  // taskkill above already cleared any running daemon/tray/launcher process,
-  // so file replacement won't be blocked by file locks.
+  // IDNO → fall through; Inno will do its default in-place upgrade.
 end;
