@@ -6,7 +6,6 @@ Per-project routes resolve the target VaultRuntime via
 
 URL structure::
 
-    POST   /ontology/{project}/run                         — trigger HITL run (no-op stub)
     GET    /ontology/{project}/suggestions                 — list suggestions
     POST   /ontology/{project}/suggestions                 — create suggestion
     POST   /ontology/{project}/suggestions/{id}/approve    — approve and apply
@@ -60,17 +59,6 @@ class PatchSuggestionRequest(BaseModel):
 def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
     fm = s.frontmatter.model_dump(mode="json")
     return {"frontmatter": fm, "body": s.body}
-
-
-# ---------------------------------------------------------------------------
-# POST /ontology/{project}/run
-# ---------------------------------------------------------------------------
-
-
-@router.post("/ontology/{project}/run")
-def ontology_run(project: str, request: Request) -> dict[str, Any]:
-    get_runtime(request, project)
-    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
