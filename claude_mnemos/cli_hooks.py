@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from claude_mnemos import runtime
+from claude_mnemos.core.atomic import atomic_write
 
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 MNEMOS_TOKEN = "claude_mnemos"  # part of import path; matches in pipx-venv command line
@@ -90,7 +91,7 @@ def _load_settings() -> dict:
 
 def _save_settings(data: dict) -> None:
     CLAUDE_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    CLAUDE_SETTINGS.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    atomic_write(CLAUDE_SETTINGS, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
 def _is_mnemos_command(cmd: str) -> bool:

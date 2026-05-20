@@ -27,6 +27,7 @@ class InstallState(BaseModel):
     first_run_ts: datetime | None = None
     autostart_decision: Literal["accepted", "declined"] | None = None
     window_close_action: Literal["hide", "quit"] | None = None
+    last_install_error: str | None = None
 
     def save(self) -> None:
         with _LOCK:

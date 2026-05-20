@@ -172,9 +172,9 @@ class MnemosDaemon:
                 rt.unmount(timeout=5.0, force=True)
                 for rt in list(self.runtimes.values())
             ]
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
             self.runtimes.clear()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
 
     def _install_signal_handlers(self) -> None:
         try:
