@@ -363,3 +363,61 @@ def add_to_ignore(vault: Path, sha: str) -> LostSessionsIgnore:
     ignore.ignored_shas.add(sha)
     ignore.save(vault)
     return ignore
+
+
+def remove_from_ignore(
+    vault: Path,
+    shas: list[str],
+) -> tuple[LostSessionsIgnore, int]:
+    """Remove ``shas`` from the ignore list. Returns (updated, removed_count).
+
+    Unknown SHAs are silently skipped. Persists only when at least one SHA
+    was actually removed.
+    """
+    ignore = LostSessionsIgnore.load(vault)
+    to_remove = set(shas)
+    before = len(ignore.ignored_shas)
+    ignore.ignored_shas -= to_remove
+    removed = before - len(ignore.ignored_shas)
+    if removed > 0:
+        ignore.save(vault)
+    return ignore, removed
+
+
+class IgnoredSessionDetails(BaseModel):
+    sha: str
+    project_name: str = ""
+    transcript_path: str | None = None
+    session_id: str | None = None
+    size_bytes: int | None = None
+    mtime: str | None = None
+    preview: str | None = None
+    cwd: str | None = None
+
+
+def list_ignored_session_details(
+    vault: Path,
+    *,
+    transcripts_root: Path | None = None,
+) -> list[IgnoredSessionDetails]:
+    """Return one IgnoredSessionDetails per ignored SHA for this vault."""
+    ignore = LostSessionsIgnore.load(vault)
+    if not ignore.ignored_shas:
+        return []
+    results: list[IgnoredSessionDetails] = []
+    for sha in sorted(ignore.ignored_shas):
+        detail = IgnoredSessionDetails(sha=sha)
+        if transcripts_root is not None:
+            for p in transcripts_root.rglob(f"{sha}*.jsonl"):
+                try:
+                    detail.transcript_path = p.as_posix()
+                    stat = p.stat()
+                    detail.size_bytes = stat.st_size
+                    detail.mtime = datetime.fromtimestamp(
+                        stat.st_mtime, tz=UTC
+                    ).isoformat()
+                except OSError:
+                    pass
+                break
+        results.append(detail)
+    return results

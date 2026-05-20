@@ -539,3 +539,45 @@ async def ignore_route(
     if cache is not None:
         cache.invalidate()
     return {"ignored_count": len(ignore.ignored_shas)}
+
+
+@router.get("/lost-sessions/ignored")
+async def list_ignored_route(request: Request) -> dict[str, Any]:
+    """List all ignored session SHAs across every mounted vault."""
+    daemon = request.app.state.daemon
+    all_details: list[dict[str, Any]] = []
+    for project_name, runtime in daemon.runtimes.items():
+        for detail in core_lost_sessions.list_ignored_session_details(
+            runtime.vault_root
+        ):
+            d = detail.model_dump(mode="json")
+            d["project_name"] = project_name
+            all_details.append(d)
+    return {"ignored": all_details, "total": len(all_details)}
+
+
+@router.post("/lost-sessions/un-ignore-selection")
+async def un_ignore_selection_route(
+    request: Request, body: dict[str, Any]
+) -> dict[str, Any]:
+    """Remove SHAs from a project vault's ignore list.
+
+    Body: ``{"project_name": str, "shas": [str]}``.
+    Returns: ``{"removed": int, "ignored_count": int}``.
+    """
+    project_name = body.get("project_name")
+    if not isinstance(project_name, str) or not project_name:
+        raise HTTPException(
+            status_code=422, detail={"error": "missing_project_name"}
+        )
+    raw_shas = body.get("shas")
+    if not isinstance(raw_shas, list) or not all(isinstance(s, str) for s in raw_shas):
+        raise HTTPException(
+            status_code=422, detail={"error": "invalid_shas"}
+        )
+    runtime = get_runtime(request, project_name)
+    updated, removed = core_lost_sessions.remove_from_ignore(runtime.vault_root, raw_shas)
+    cache = runtime.lost_sessions_cache
+    if cache is not None:
+        cache.invalidate()
+    return {"removed": removed, "ignored_count": len(updated.ignored_shas)}
