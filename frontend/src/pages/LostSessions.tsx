@@ -1,6 +1,6 @@
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { RefreshCw } from "lucide-react";
+import { EyeOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLostSessions } from "@/hooks/useLostSessions";
@@ -51,16 +51,24 @@ export function LostSessions() {
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative flex items-center justify-between gap-3">
           <EyebrowBreadcrumb section="lost_sessions" />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => scan.mutate()}
-            disabled={scan.isPending}
-            className="h-8"
-          >
-            <RefreshCw className={`mr-1 h-3 w-3 ${scan.isPending ? "animate-spin" : ""}`} />
-            {scan.isPending ? t("lost_sessions.scanning") : t("lost_sessions.scan")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild className="h-8">
+              <Link to="/lost-sessions/ignored">
+                <EyeOff className="h-4 w-4 mr-1" />
+                {t("lost_sessions.view_ignored")}
+              </Link>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => scan.mutate()}
+              disabled={scan.isPending}
+              className="h-8"
+            >
+              <RefreshCw className={`mr-1 h-3 w-3 ${scan.isPending ? "animate-spin" : ""}`} />
+              {scan.isPending ? t("lost_sessions.scanning") : t("lost_sessions.scan")}
+            </Button>
+          </div>
         </div>
         <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("lost_sessions.title")}

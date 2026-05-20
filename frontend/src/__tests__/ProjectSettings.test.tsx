@@ -48,6 +48,9 @@ beforeAll(async () => {
       settings: {
         title: "Settings",
         loading: "Loading settings...",
+        not_found_title: "Project not found",
+        not_found_body: "The project was not found.",
+        not_found_back: "Go back",
         save: "Save",
         saving: "Saving...",
         danger: {
@@ -138,23 +141,24 @@ describe("ProjectSettings", () => {
     }
   });
 
-  it("shows loading state when projects list is not yet fetched", async () => {
+  it("shows loading skeleton when projects list is not yet fetched", async () => {
     // Block /projects forever so project remains undefined.
     vi.spyOn(apiClient, "get").mockImplementation(
       () => new Promise(() => {}),
     );
     render(wrap(<ProjectSettings />, "/project/alpha/settings"));
-    expect(screen.getByText("Loading settings...")).toBeInTheDocument();
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("shows loading state when slug missing from projects list", async () => {
+  it("shows not-found UI when slug missing from projects list", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
       if (url === "/projects") return { data: [] };
       return { data: {} };
     });
     render(wrap(<ProjectSettings />, "/project/ghost/settings"));
     await waitFor(() =>
-      expect(screen.getByText("Loading settings...")).toBeInTheDocument(),
+      expect(screen.getByText("Project not found")).toBeInTheDocument(),
     );
   });
 });

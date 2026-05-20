@@ -5,6 +5,7 @@ import { Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { usePage } from "@/hooks/usePage";
 import { usePagePatch } from "@/hooks/usePagePatch";
@@ -20,7 +21,6 @@ interface FormState {
   status: string;
   flavor: string[];
   confidence: number;
-  aliases: string;
   body: string;
 }
 
@@ -44,6 +44,7 @@ export function PageEdit() {
   }, [pageQuery.data, project, cleanPath, navigate]);
 
   useEffect(() => {
+    if (dirty) return;
     if (pageQuery.data) {
       const fm = pageQuery.data.frontmatter;
       if (fm === null) return;
@@ -55,14 +56,24 @@ export function PageEdit() {
         status: fm.status,
         flavor: Array.isArray(fm.flavor) ? fm.flavor : [],
         confidence: fm.confidence ?? 0,
-        aliases: "",
         body: pageQuery.data.body ?? "",
       });
       setDirty(false);
     }
-  }, [pageQuery.data]);
+  }, [pageQuery.data, dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   if (pageQuery.isLoading) return <Skeleton className="h-64" />;
+  if (pageQuery.isError) return <DaemonDownAlert error={pageQuery.error} />;
   if (!project || !pagePath) return null;
   if (!form) return <Skeleton className="h-64" />;
 
@@ -88,16 +99,13 @@ export function PageEdit() {
             status: form.status,
             flavor: form.flavor.length > 0 ? form.flavor : undefined,
             confidence: form.confidence,
-            aliases: form.aliases
-              .split(",")
-              .map((a) => a.trim())
-              .filter(Boolean),
           },
           body: form.body,
         },
       },
       {
         onSuccess: () => {
+          setDirty(false);
           navigate(`/project/${encodeURIComponent(project)}/pages/${cleanPath}`);
         },
       },
@@ -203,20 +211,6 @@ export function PageEdit() {
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="eyebrow">
-              {t("pages.editor.aliases")}
-              <span className="ml-2 font-sans text-[10px] text-muted-foreground">
-                {t("pages.editor.aliases_hint")}
-              </span>
-            </label>
-            <input
-              type="text"
-              value={form.aliases}
-              onChange={(e) => update("aliases", e.target.value)}
-              className="mt-2 w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-            />
           </div>
           <div>
             <label htmlFor="page-body" className="eyebrow">

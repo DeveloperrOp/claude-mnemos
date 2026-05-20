@@ -1,5 +1,8 @@
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { useProjects } from "@/hooks/useProjects";
 
 import { GeneralSection } from "@/components/settings/sections/GeneralSection";
@@ -12,11 +15,34 @@ import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function ProjectSettings() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { name = "" } = useParams<{ name: string }>();
-  const { data: projects } = useProjects();
-  const project = projects?.find((p) => p.name === name);
+  const projectsQuery = useProjects();
+  const project = projectsQuery.data?.find((p) => p.name === name);
 
-  if (!project) return <div>{t("settings.loading")}</div>;
+  if (projectsQuery.isLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (projectsQuery.isError) return <DaemonDownAlert error={projectsQuery.error} />;
+
+  if (!project) {
+    return (
+      <div className="p-6 flex flex-col items-center gap-4 text-center">
+        <p className="text-muted-foreground">{t("settings.not_found_title")}</p>
+        <p className="text-sm text-muted-foreground">{t("settings.not_found_body")}</p>
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          {t("settings.not_found_back")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">
