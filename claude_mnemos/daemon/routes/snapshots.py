@@ -9,7 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from claude_mnemos.core.locks import pipeline_lock
 from claude_mnemos.core.snapshots import (
+    RestorePreview,
     SnapshotInfo,
+    compute_restore_preview,
     create_manual_snapshot,
     delete_snapshot,
     list_snapshots,
@@ -158,3 +160,17 @@ def restore_snapshot_endpoint(
         log.save(vault)
 
     return RestoreSnapshotResponse(success=True, snapshot=name, activity_id=new_id)
+
+
+@router.get("/snapshots/{project}/{name}/preview", response_model=RestorePreview)
+def snapshot_preview_endpoint(
+    project: str, name: str, request: Request
+) -> RestorePreview:
+    runtime = get_runtime(request, project)
+    _validate_snapshot_name(name)
+    try:
+        return compute_restore_preview(runtime.vault_root, name)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail={"error": "not_found", "name": name}
+        ) from exc

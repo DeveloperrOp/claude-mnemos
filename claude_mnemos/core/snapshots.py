@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -546,3 +547,112 @@ def restore_from_snapshot(
             shutil.rmtree(old_vault, ignore_errors=True)
 
         return RestoreResult(success=True, vault_intact=False)
+
+
+# ---------------------------------------------------------------------------
+# Restore preview
+# ---------------------------------------------------------------------------
+
+
+class RestorePreview(BaseModel):
+    snapshot_name: str
+    snapshot_timestamp: str
+    snapshot_kind: str
+    snapshot_file_count: int
+    vault_file_count: int
+    will_create: list[str]
+    will_delete: list[str]
+    will_overwrite: list[str]
+    unchanged_count: int
+    sample_limit: int
+    truncated: bool
+
+
+def _file_sha256(path: Path) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _iter_vault_files(vault: Path) -> list[tuple[str, Path]]:
+    """Return (vault-relative-posix, abs_path) for every non-excluded file."""
+    results: list[tuple[str, Path]] = []
+    for p in vault.rglob("*"):
+        if not p.is_file():
+            continue
+        parts = p.relative_to(vault).parts
+        if parts[0] in _EXCLUDED_DIRS or parts[0] in _EXCLUDED_FILES:
+            continue
+        results.append((p.relative_to(vault).as_posix(), p))
+    return results
+
+
+def compute_restore_preview(
+    vault: Path,
+    snapshot_name: str,
+    *,
+    sample_limit: int = 20,
+) -> RestorePreview:
+    snap_path = vault / SNAPSHOTS_DIRNAME / snapshot_name
+    if not snap_path.is_dir():
+        raise FileNotFoundError(f"Snapshot not found: {snapshot_name}")
+
+    # Walk snapshot files (exclude .meta.json)
+    snap_files: dict[str, Path] = {}
+    for p in snap_path.rglob("*"):
+        if not p.is_file():
+            continue
+        if p.name == META_FILENAME:
+            continue
+        snap_files[p.relative_to(snap_path).as_posix()] = p
+
+    # Walk vault files
+    vault_files: dict[str, Path] = dict(_iter_vault_files(vault))
+
+    snap_keys = set(snap_files.keys())
+    vault_keys = set(vault_files.keys())
+
+    will_create_all = sorted(snap_keys - vault_keys)
+    will_delete_all = sorted(vault_keys - snap_keys)
+
+    will_overwrite_all: list[str] = []
+    unchanged_count = 0
+    for key in sorted(snap_keys & vault_keys):
+        snap_sha = _file_sha256(snap_files[key])
+        vault_sha = _file_sha256(vault_files[key])
+        if snap_sha != vault_sha:
+            will_overwrite_all.append(key)
+        else:
+            unchanged_count += 1
+
+    total_changes = len(will_create_all) + len(will_delete_all) + len(will_overwrite_all)
+    truncated = total_changes > sample_limit
+
+    will_create = will_create_all[:sample_limit]
+    remaining = sample_limit - len(will_create)
+    will_overwrite = will_overwrite_all[:max(0, remaining)]
+    remaining -= len(will_overwrite)
+    will_delete = will_delete_all[:max(0, remaining)]
+
+    parsed = parse_snapshot_name(snapshot_name)
+    snap_kind = parsed.kind if parsed is not None else "manual"
+    snap_ts = parsed.timestamp.isoformat() if parsed is not None else snapshot_name
+
+    return RestorePreview(
+        snapshot_name=snapshot_name,
+        snapshot_timestamp=snap_ts,
+        snapshot_kind=snap_kind,
+        snapshot_file_count=len(snap_keys),
+        vault_file_count=len(vault_keys),
+        will_create=will_create,
+        will_delete=will_delete,
+        will_overwrite=will_overwrite,
+        unchanged_count=unchanged_count,
+        sample_limit=sample_limit,
+        truncated=truncated,
+    )
