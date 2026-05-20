@@ -1,6 +1,8 @@
 import { apiClient } from "./client";
 import {
+  IgnoredSessionListResponseSchema,
   LostSessionListResponseSchema,
+  type IgnoredSessionListResponse,
   type LostSession,
 } from "@/types/LostSession";
 import type { Job } from "@/types/Job";
@@ -121,4 +123,26 @@ export async function getLostSessionTranscript(
     { params: { limit } },
   );
   return r.data;
+}
+
+export async function listIgnoredSessions(): Promise<IgnoredSessionListResponse> {
+  const r = await apiClient.get("/lost-sessions/ignored");
+  return IgnoredSessionListResponseSchema.parse(r.data);
+}
+
+export interface UnIgnoreSelectionBody {
+  project_name: string;
+  shas: string[];
+}
+
+export interface UnIgnoreSelectionResponse {
+  removed: number;
+  ignored_count: number;
+}
+
+export async function unIgnoreLostSessionsSelection(
+  body: UnIgnoreSelectionBody,
+): Promise<UnIgnoreSelectionResponse> {
+  const r = await apiClient.post("/lost-sessions/un-ignore-selection", body);
+  return r.data as UnIgnoreSelectionResponse;
 }
