@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionCard } from "@/components/widgets/SessionCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { LostSessionsManager } from "@/components/widgets/LostSessionsManager";
 import {
   SessionFilters,
@@ -42,6 +43,7 @@ export function Sessions() {
       </div>
     );
   }
+  if (sessionsQuery.isError) return <DaemonDownAlert error={sessionsQuery.error} />;
 
   const sessions = sessionsQuery.data?.sessions ?? [];
   const total = sessionsQuery.data?.total ?? 0;

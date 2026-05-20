@@ -10,6 +10,7 @@ import { UsageTimelineChart } from "@/components/widgets/UsageTimelineChart";
 import { UsageByProjectTable } from "@/components/widgets/UsageByProjectTable";
 import { TopSessionsTable } from "@/components/widgets/TopSessionsTable";
 import { CompressionTimelineChart } from "@/components/widgets/CompressionTimelineChart";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,14 @@ function Metrics() {
   const compressionTimeline = useCompressionTimeline(period);
   const byProject = useUsageByProject(period);
   const top = useTopSessions(10);
+
+  const allFailed =
+    timeline.isError &&
+    compressionTimeline.isError &&
+    byProject.isError &&
+    top.isError;
+
+  if (allFailed) return <DaemonDownAlert error={timeline.error} />;
 
   return (
     <div className="space-y-6">

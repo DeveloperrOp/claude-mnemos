@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ interface TypedConfirmDialogProps {
   phraseLabel: string;
   confirmLabel: string;
   cancelLabel?: string;
+  extraContent?: ReactNode;
   onConfirm: () => void;
   isPending?: boolean;
 }
@@ -30,6 +31,7 @@ export function TypedConfirmDialog({
   expectedPhrase,
   phraseLabel,
   confirmLabel, cancelLabel,
+  extraContent,
   onConfirm,
   isPending = false,
 }: TypedConfirmDialogProps) {
@@ -51,6 +53,7 @@ export function TypedConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {extraContent && <div className="my-2">{extraContent}</div>}
         <div className="space-y-2">
           <label className="text-sm font-medium">{phraseLabel}</label>
           <p className="text-xs text-muted-foreground">

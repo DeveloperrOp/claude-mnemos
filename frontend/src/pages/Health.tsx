@@ -11,6 +11,7 @@ import {
   useDismissAllWatchdogEvents,
 } from "@/hooks/useDismissWatchdogEvent";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { formatDateTime } from "@/lib/datetime";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -26,6 +27,7 @@ export function Health() {
 
   if (!project) return null;
   if (healthQuery.isLoading) return <Skeleton className="h-64" />;
+  if (healthQuery.isError) return <DaemonDownAlert error={healthQuery.error} />;
 
   const health = healthQuery.data;
   const vh = health?.vaults?.[project];

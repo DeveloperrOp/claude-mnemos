@@ -5,6 +5,7 @@ import { useSuggestions } from "@/hooks/useSuggestions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SuggestionCard } from "@/components/widgets/SuggestionCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { SuggestionFilters, type StatusFilter } from "@/components/filters/SuggestionFilters";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -36,6 +37,7 @@ export function Suggestions() {
       </div>
     );
   }
+  if (suggestionsQuery.isError) return <DaemonDownAlert error={suggestionsQuery.error} />;
 
   const items = suggestionsQuery.data?.suggestions ?? [];
   return (

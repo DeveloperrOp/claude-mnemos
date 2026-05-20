@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TrashRow } from "@/components/widgets/TrashRow";
 import { EmptyState } from "@/components/widgets/EmptyState";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Trash() {
@@ -26,6 +27,7 @@ export function Trash() {
       </div>
     );
   }
+  if (trashQuery.isError) return <DaemonDownAlert error={trashQuery.error} />;
 
   const entries = trashQuery.data?.entries ?? [];
   if (entries.length === 0) {

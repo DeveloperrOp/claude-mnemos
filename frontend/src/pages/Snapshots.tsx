@@ -19,6 +19,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Snapshots() {
@@ -74,6 +75,7 @@ export function Snapshots() {
       </div>
     );
   }
+  if (snapshotsQuery.isError) return <DaemonDownAlert error={snapshotsQuery.error} />;
 
   const empty = (snapshotsQuery.data ?? []).length === 0;
 

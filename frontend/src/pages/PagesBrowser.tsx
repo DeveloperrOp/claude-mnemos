@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/widgets/EmptyState";
 import type { PageDetail, WikiPageFrontmatter } from "@/types/WikiPage";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
-const MAX_PAGES = 200;
+const MAX_PAGES = 1000;
 
 function compareBy(a: WikiPageFrontmatter, b: WikiPageFrontmatter, mode: SortMode): number {
   switch (mode) {
@@ -163,6 +163,11 @@ export function PagesBrowser() {
               />
             ))}
           </div>
+          {(pagesQuery.data ?? []).length >= MAX_PAGES && (
+            <p className="text-xs text-amber-500 text-center py-2">
+              {t("pages_browser.truncation_hint")}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/widgets/EmptyState";
+import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
 import { JOB_MAX_ATTEMPTS, type Job, type JobStatus } from "@/types/Job";
@@ -158,6 +159,7 @@ export function Queue() {
       </div>
     );
   }
+  if (jobsQuery.isError) return <DaemonDownAlert error={jobsQuery.error} />;
 
   const allJobs = jobsQuery.data?.jobs ?? [];
   const counts = jobsQuery.data?.counts ?? {};

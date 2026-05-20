@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDetectedCwds } from "@/hooks/onboarding/useDetectedCwds";
@@ -39,26 +40,45 @@ export function OnboardingWelcome() {
 
   const trackSelected = async () => {
     const list = Array.from(selected);
-    let lastSlug = "";
+    const successes: string[] = [];
+    const failures: string[] = [];
+
     for (const cwd of list) {
       const display = humanize(lastSegment(cwd));
       const slug = deriveSlug(display);
-      lastSlug = slug;
       const vault = cwd.replace(/[\\/]+$/, "") + "/.mnemos";
       const patterns = [cwd, `${cwd}/*`, `${cwd}/**`];
-      await new Promise<void>((res, rej) => {
-        createMut.mutate(
-          {
-            name: slug,
-            display_name: display,
-            vault_root: vault,
-            cwd_patterns: patterns,
-          },
-          { onSuccess: () => res(), onError: (e) => rej(e) },
-        );
-      });
+      try {
+        await new Promise<void>((res, rej) => {
+          createMut.mutate(
+            {
+              name: slug,
+              display_name: display,
+              vault_root: vault,
+              cwd_patterns: patterns,
+            },
+            { onSuccess: () => res(), onError: (e) => rej(e) },
+          );
+        });
+        successes.push(slug);
+      } catch {
+        failures.push(display);
+      }
     }
-    navigate(lastSlug ? `/project/${encodeURIComponent(lastSlug)}` : "/");
+
+    if (failures.length > 0) {
+      toast.error(
+        t("onboarding.partial_fail_toast", {
+          failed: failures.join(", "),
+          count: failures.length,
+        }),
+      );
+    }
+
+    const lastSlug = successes[successes.length - 1];
+    if (lastSlug) {
+      navigate(`/project/${encodeURIComponent(lastSlug)}`);
+    }
   };
 
   return (
