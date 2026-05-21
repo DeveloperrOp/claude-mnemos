@@ -88,6 +88,26 @@ async def test_scan_recursive(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_scan_skips_subagent_transcripts(tmp_path: Path) -> None:
+    """Subagent JSONLs live in `<session>/subagents/agent-*.jsonl` and must be
+    excluded: their payload is already captured in the parent transcript via
+    tool_use/tool_result, so re-ingesting them would double-count and pollute
+    lost-sessions/active counters with sidechain runs.
+    """
+    root = tmp_path / "transcripts"
+    proj = root / "project-1"
+    proj.mkdir(parents=True)
+    _write_jsonl(proj, "main-session")
+    subagents = proj / "main-session" / "subagents"
+    subagents.mkdir(parents=True)
+    _write_jsonl(subagents, "agent-abc123")
+    _write_jsonl(subagents, "agent-def456")
+
+    out = await scan_transcripts(transcripts_root=root)
+    assert {e.session_id for e in out} == {"main-session"}
+
+
+@pytest.mark.asyncio
 async def test_transcripts_cache_dedupes_concurrent(tmp_path: Path) -> None:
     """Two concurrent calls share one disk scan."""
     from claude_mnemos.core import transcript_scanner as ts

@@ -45,6 +45,13 @@ def _scan_sync(transcripts_root: Path | None) -> list[TranscriptEntry]:
     for path in root.rglob("*.jsonl"):
         if not path.is_file():
             continue
+        # Skip subagent transcripts. Claude Code writes Agent-tool runs into
+        # `<project>/<session>/subagents/agent-*.jsonl`; their payload is
+        # already in the parent transcript via tool_use/tool_result, so
+        # surfacing them as separate sessions inflates active/lost counters
+        # and would double-ingest the same content.
+        if "subagents" in path.parts:
+            continue
         try:
             stat = path.stat()
             sha = _sha256_file(path)
