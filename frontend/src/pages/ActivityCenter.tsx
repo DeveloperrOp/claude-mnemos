@@ -43,11 +43,22 @@ export function ActivityCenter() {
   const total = activityQuery.data?.total ?? 0;
   if (total === 0) {
     return (
-      <EmptyState
-        icon="📜"
-        title={t("activity.empty.title")}
-        body={t("activity.empty.body")}
-      />
+      <div className="space-y-6">
+        <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
+          <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative flex items-center justify-between gap-3">
+            <EyebrowBreadcrumb section="activity" />
+          </div>
+          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            {t("activity.title", "Activity")}
+          </h1>
+        </header>
+        <EmptyState
+          icon="📜"
+          title={t("activity.empty.title")}
+          body={t("activity.empty.body")}
+        />
+      </div>
     );
   }
 

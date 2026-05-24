@@ -11,6 +11,7 @@ beforeAll(() => {
     "en",
     "translation",
     {
+      breadcrumb: { activity: "activity" },
       activity: {
         title: "Activity",
         groups: {
@@ -81,7 +82,7 @@ describe("ActivityCenter", () => {
     expect(screen.getByText("Ingest")).toBeInTheDocument();
   });
 
-  it("shows empty state", async () => {
+  it("shows empty state with page header (P1-5: header in empty state)", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({
       data: { entries: [], total: 0 },
     });
@@ -89,5 +90,8 @@ describe("ActivityCenter", () => {
     await waitFor(() =>
       expect(screen.getByText(/no operations yet/i)).toBeInTheDocument(),
     );
+    // P1-5: header (h1 "Activity") and breadcrumb must render even when empty.
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.getByText(/claude-mnemos/i)).toBeInTheDocument();
   });
 });
