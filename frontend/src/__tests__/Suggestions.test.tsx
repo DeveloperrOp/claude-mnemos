@@ -35,6 +35,9 @@ beforeAll(() => {
       approve_delete_modal_title: "Apply delete-page suggestion?",
       approve_delete_modal_desc: "This will permanently delete the page from the vault. Type the page name to confirm.",
       approve_delete_typed_label: "Type the page name",
+      scan_button: "Scan vault",
+      scan_running: "Scanning",
+      scan_toast: "Scan done {{created}}/{{scanned}}",
     },
   }, true, true);
   void i18n.changeLanguage("en");
@@ -86,5 +89,35 @@ describe("Suggestions", () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { suggestions: [], total: 0 } });
     render(wrap(<Suggestions />));
     await waitFor(() => expect(screen.getByText(/no proposals pending/i)).toBeInTheDocument());
+  });
+
+  it("shows Scan button in toolbar and in empty state CTA", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: { suggestions: [], total: 0 } });
+    render(wrap(<Suggestions />));
+    await waitFor(() => expect(screen.getByText(/no proposals pending/i)).toBeInTheDocument());
+    // Two "Scan vault" buttons: one in the toolbar, one in the empty-state CTA.
+    const scanButtons = screen.getAllByText("Scan vault");
+    expect(scanButtons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("calls /scan endpoint when Scan button is clicked", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: { suggestions: [], total: 0 } });
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({
+      data: {
+        created: ["ont-2026-05-22-abc"],
+        skipped_existing: 0,
+        skipped_distinct: 0,
+        skipped_capped: 0,
+        errors: [],
+        scanned_pages: 5,
+      },
+    });
+    render(wrap(<Suggestions />));
+    await waitFor(() => expect(screen.getAllByText("Scan vault").length).toBeGreaterThan(0));
+    const btn = screen.getAllByText("Scan vault")[0];
+    btn.click();
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledWith("/ontology/alpha/scan");
+    });
   });
 });

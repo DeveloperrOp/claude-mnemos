@@ -63,3 +63,19 @@ export async function deferSuggestion(
   );
   return r.data as RejectResult;
 }
+
+export interface ScanResult {
+  created: string[];
+  skipped_existing: number;
+  skipped_distinct: number;
+  skipped_capped: number;
+  errors: Array<{ pair: string; error: string }>;
+  scanned_pages: number;
+}
+
+export async function scanOntology(project: string): Promise<ScanResult> {
+  const r = await apiClient.post(
+    `/ontology/${encodeURIComponent(project)}/scan`,
+  );
+  return r.data as ScanResult;
+}

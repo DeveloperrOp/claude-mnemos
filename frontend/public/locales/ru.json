@@ -613,7 +613,10 @@
     "approve_modal_desc": "Выполнит операцию {{operation}} над {{count}} страницами.",
     "approve_delete_modal_title": "Применить удаление страницы?",
     "approve_delete_modal_desc": "Страница будет удалена из vault. Введите имя страницы для подтверждения.",
-    "approve_delete_typed_label": "Введите имя страницы"
+    "approve_delete_typed_label": "Введите имя страницы",
+    "scan_button": "Сканировать vault",
+    "scan_running": "Сканирую…",
+    "scan_toast": "Сканирование завершено — {{created}} новых пропозиций ({{scanned}} страниц)"
   },
   "dead_letter": {
     "title": "Сбойные задачи",

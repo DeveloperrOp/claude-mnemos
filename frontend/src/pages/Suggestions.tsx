@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Sparkles } from "lucide-react";
 import { useSuggestions } from "@/hooks/useSuggestions";
+import { useScanOntology } from "@/hooks/useScanOntology";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SuggestionCard } from "@/components/widgets/SuggestionCard";
 import { EmptyState } from "@/components/widgets/EmptyState";
@@ -17,6 +20,7 @@ export function Suggestions() {
     project,
     status === "all" ? {} : { status },
   );
+  const scanMut = useScanOntology(project ?? "");
 
   if (!project) return null;
   if (suggestionsQuery.isLoading) {
@@ -52,16 +56,35 @@ export function Suggestions() {
         </h1>
       </header>
       <div className="space-y-3">
-        <SuggestionFilters value={status} onChange={setStatus} />
+        <div className="flex flex-wrap items-center gap-3">
+          <SuggestionFilters value={status} onChange={setStatus} />
+          <Button
+            size="sm"
+            onClick={() => scanMut.mutate()}
+            disabled={scanMut.isPending}
+          >
+            <Sparkles className="mr-1 h-3 w-3" />
+            {scanMut.isPending
+              ? t("suggestions.scan_running")
+              : t("suggestions.scan_button")}
+          </Button>
+        </div>
         {items.length === 0 ? (
           <EmptyState
             icon="🧭"
             title={t("suggestions.empty.title")}
             body={t("suggestions.empty.body")}
             actions={
-              <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
-                {t("suggestions.empty.cta")}
-              </code>
+              <Button
+                size="sm"
+                onClick={() => scanMut.mutate()}
+                disabled={scanMut.isPending}
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                {scanMut.isPending
+                  ? t("suggestions.scan_running")
+                  : t("suggestions.scan_button")}
+              </Button>
             }
           />
         ) : (

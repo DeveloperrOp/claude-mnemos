@@ -615,7 +615,10 @@
     "approve_modal_desc": "Виконає операцію {{operation}} над {{count}} сторінками.",
     "approve_delete_modal_title": "Застосувати видалення сторінки?",
     "approve_delete_modal_desc": "Сторінка буде видалена з vault. Введіть назву сторінки для підтвердження.",
-    "approve_delete_typed_label": "Введіть назву сторінки"
+    "approve_delete_typed_label": "Введіть назву сторінки",
+    "scan_button": "Сканувати vault",
+    "scan_running": "Скануємо…",
+    "scan_toast": "Сканування завершене — {{created}} нових пропозицій ({{scanned}} сторінок)"
   },
   "dead_letter": {
     "title": "Збійні задачі",

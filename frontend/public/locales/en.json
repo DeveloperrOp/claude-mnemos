@@ -623,7 +623,10 @@
     "approve_modal_desc": "This will execute the {{operation}} operation on {{count}} affected pages.",
     "approve_delete_modal_title": "Apply delete-page suggestion?",
     "approve_delete_modal_desc": "This will permanently delete the page from the vault. Type the page name to confirm.",
-    "approve_delete_typed_label": "Type the page name"
+    "approve_delete_typed_label": "Type the page name",
+    "scan_button": "Scan vault",
+    "scan_running": "Scanning…",
+    "scan_toast": "Scan finished — {{created}} new suggestions ({{scanned}} pages)"
   },
   "dead_letter": {
     "title": "Failed jobs",
