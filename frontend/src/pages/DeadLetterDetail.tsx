@@ -49,7 +49,7 @@ export function DeadLetterDetail() {
         </div>
         <div className="relative mt-2 flex items-center gap-2">
           <ProjectBadge name={j.project_name} />
-          <span className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">{j.id}</span>
+          <span className="text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">{j.id}</span>
         </div>
         <p className="relative mt-2 text-xs text-muted-foreground">
           {t("dead_letter.attempt_n_of_m", { n: j.attempt, max: JOB_MAX_ATTEMPTS })}

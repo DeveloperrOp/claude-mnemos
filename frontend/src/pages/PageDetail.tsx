@@ -68,7 +68,7 @@ export function PageDetail() {
         <div className="relative flex items-baseline gap-3">
           <EyebrowBreadcrumb section="page" />
         </div>
-        <h1 data-testid="page-title" className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 data-testid="page-title" className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {fm ? fm.title : fileStem}
         </h1>
         <div className="relative mt-3 flex flex-wrap items-center gap-3 text-xs">

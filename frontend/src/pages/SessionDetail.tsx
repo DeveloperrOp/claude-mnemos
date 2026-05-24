@@ -75,7 +75,7 @@ export function SessionDetail() {
             {t(`sessions.status.${s.status}`)}
           </span>
         </div>
-        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {s.session_id}
         </h1>
       </header>

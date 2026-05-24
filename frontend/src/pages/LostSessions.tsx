@@ -70,7 +70,7 @@ export function LostSessions() {
             </Button>
           </div>
         </div>
-        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("lost_sessions.title")}
         </h1>
       </header>

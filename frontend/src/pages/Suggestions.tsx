@@ -31,7 +31,7 @@ export function Suggestions() {
           <div className="relative flex items-baseline gap-3">
             <EyebrowBreadcrumb section="suggestions" />
           </div>
-          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t("suggestions.title")}
           </h1>
         </header>
@@ -51,7 +51,7 @@ export function Suggestions() {
         <div className="relative flex items-baseline gap-3">
           <EyebrowBreadcrumb section="suggestions" />
         </div>
-        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("suggestions.title")}
         </h1>
       </header>

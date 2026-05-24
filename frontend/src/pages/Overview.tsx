@@ -75,7 +75,7 @@ export function Overview() {
           <HealthDot />
         </div>
         <div className="relative mt-2 flex items-end justify-between gap-3">
-          <h1 className="font-mono text-[clamp(1.75rem,4vw,2.75rem)] font-medium tracking-tight">
+          <h1 className="text-[clamp(1.75rem,4vw,2.75rem)] font-medium tracking-tight">
             {t("overview.title", "Overview")}
             <span className="cursor-blink text-accent">_</span>
           </h1>

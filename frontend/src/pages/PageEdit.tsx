@@ -120,7 +120,7 @@ export function PageEdit() {
           <EyebrowBreadcrumb section="editor" />
         </div>
         <div className="relative mt-2 flex items-center justify-between gap-3">
-          <h1 className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          <h1 className="text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t("pages.editor.title")}
           </h1>
           <div className="flex items-center gap-2">

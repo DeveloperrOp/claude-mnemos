@@ -184,7 +184,7 @@ export function Queue() {
             {filterCount("all")} {t("queue.total_label", "total")}
           </span>
         </div>
-        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("queue.title")}
         </h1>
       </header>

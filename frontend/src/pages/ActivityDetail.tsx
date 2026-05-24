@@ -51,7 +51,7 @@ export function ActivityDetail() {
               {t("common.back_arrow")}
             </Link>
           </div>
-          <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+          <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
             {t(`activity.op.${e.operation_type}`, e.operation_type)}
           </h1>
           <p className="relative mt-2 text-xs text-muted-foreground">

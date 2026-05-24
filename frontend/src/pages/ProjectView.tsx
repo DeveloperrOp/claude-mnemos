@@ -42,7 +42,7 @@ export function ProjectView() {
         </div>
         <div className="relative mt-3 flex items-end justify-between gap-3">
           <div>
-            <h1 className="font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+            <h1 className="text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
               {getProjectDisplayName(project)}
             </h1>
             <p className="mt-1 font-mono text-[10px] text-muted-foreground">

@@ -150,7 +150,7 @@ export default function Lint() {
       <div className="relative flex items-baseline gap-3">
         <EyebrowBreadcrumb section="lint" />
       </div>
-      <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+      <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
         {t("lint.title")}
       </h1>
     </header>

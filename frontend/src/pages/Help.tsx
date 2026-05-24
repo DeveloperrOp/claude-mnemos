@@ -59,7 +59,7 @@ function Help() {
         <div className="relative flex items-center justify-between gap-3">
           <EyebrowBreadcrumb section="help" />
         </div>
-        <h1 className="relative mt-2 font-mono text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
+        <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("help.title")}
         </h1>
       </header>
