@@ -984,7 +984,9 @@
       "heading": "System",
       "autostart_label": "Start with Windows",
       "autostart_hint": "Daemon starts automatically at login. Claude Code sessions are always captured."
-    }
+    },
+    "saved_toast": "Saved",
+    "save_error_toast": "Save failed: {{message}}"
   },
   "diagnostics": {
     "title": "System health",

@@ -976,7 +976,9 @@
       "heading": "Система",
       "autostart_label": "Запускати з Windows",
       "autostart_hint": "Daemon стартує автоматично при логіні. Сесії Claude Code збираються завжди."
-    }
+    },
+    "saved_toast": "Збережено",
+    "save_error_toast": "Помилка збереження: {{message}}"
   },
   "diagnostics": {
     "title": "Здоров'я системи",
