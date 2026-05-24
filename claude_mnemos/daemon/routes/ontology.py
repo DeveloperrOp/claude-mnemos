@@ -12,22 +12,28 @@ URL structure::
     POST   /ontology/{project}/suggestions/{id}/reject     — reject
     POST   /ontology/{project}/suggestions/{id}/defer      — defer
     PATCH  /ontology/{project}/suggestions/{id}            — update mutable fields
+    POST   /ontology/{project}/scan                        — run scanner, create
+                                                            pending suggestions
 """
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from claude_mnemos.config import Config
 from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.core.ontology_apply import (
     OntologyError,
     apply_suggestion,
 )
+from claude_mnemos.core.ontology_scan import scan_ontology
 from claude_mnemos.daemon.routes._helpers import get_runtime
+from claude_mnemos.ingest.llm import MissingApiKeyError, make_llm_client
 from claude_mnemos.state.ontology import (
     Suggestion,
     SuggestionFrontmatter,
@@ -254,3 +260,46 @@ def patch_suggestion_endpoint(
         target = store._archive_file_for(suggestion_id)  # noqa: SLF001
     atomic_write(target, new_suggestion.serialize())
     return _suggestion_to_dict(new_suggestion)
+
+
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/scan
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ontology/{project}/scan")
+async def scan_endpoint(project: str, request: Request) -> dict[str, Any]:
+    """Run the ontology scanner and return counts.
+
+    Synchronous from the client's perspective: the request blocks until the
+    scan completes. Internally we offload to a worker thread so the event
+    loop stays responsive for parallel calls (status, list, etc).
+
+    Returns 503 if no LLM provider is configured (no API key and no
+    ``claude`` binary on PATH).
+    """
+    runtime = get_runtime(request, project)
+    cfg = Config.from_env()
+    try:
+        llm = make_llm_client(cfg)
+    except MissingApiKeyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "llm_unavailable",
+                "hint": (
+                    "Set ANTHROPIC_API_KEY or install Claude Code CLI "
+                    "to enable ontology scanning."
+                ),
+            },
+        ) from exc
+
+    result = await asyncio.to_thread(scan_ontology, runtime.vault_root, llm=llm)
+    return {
+        "created": result.created,
+        "skipped_existing": result.skipped_existing,
+        "skipped_distinct": result.skipped_distinct,
+        "skipped_capped": result.skipped_capped,
+        "errors": [{"pair": p, "error": e} for p, e in result.errors],
+        "scanned_pages": result.scanned_pages,
+    }

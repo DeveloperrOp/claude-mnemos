@@ -354,3 +354,146 @@ async def test_create_unknown_project_404(client: Any) -> None:
         },
     )
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /ontology/{project}/scan
+# ---------------------------------------------------------------------------
+
+
+def _write_wiki_page(
+    vault: Path, rel: str, *, title: str = "Test", body: str = ""
+) -> Path:
+    today = "2026-05-22"
+    p = vault / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        f"---\ntitle: {title}\ntype: concept\nstatus: draft\nconfidence: 0.7\n"
+        f"flavor: []\nsources: []\nrelated: []\ncreated: {today}\nupdated: {today}\n"
+        f"agent_written: false\n---\n\n{body}",
+        encoding="utf-8",
+    )
+    return p
+
+
+class _FakeLLM:
+    """Stub LLMClient yielding a configurable payload."""
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+        self.calls = 0
+
+    def extract(self, *, system: str, user: str, tool: dict, validate=None):  # type: ignore[no-untyped-def]
+        from claude_mnemos.ingest.llm import ExtractionRaw
+
+        self.calls += 1
+        if validate is not None:
+            validate(self.payload)
+        return ExtractionRaw(payload=self.payload, input_tokens=0, output_tokens=0)
+
+
+async def test_scan_empty_vault(client: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.routes.ontology.make_llm_client",
+        lambda cfg: _FakeLLM({"verdict": "distinct", "reason": "x"}),
+    )
+    r = await client.post("/api/ontology/alpha/scan")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["created"] == []
+    assert body["scanned_pages"] == 0
+
+
+async def test_scan_creates_suggestion(
+    client: Any,
+    alpha_vault: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Two pages with identical body → exact duplicate → LLM says merge with
+    # new target slug → orchestrator creates merge_entities suggestion.
+    _write_wiki_page(alpha_vault, "wiki/concepts/foo.md", title="Foo", body="same body")
+    _write_wiki_page(alpha_vault, "wiki/concepts/bar.md", title="Bar", body="same body")
+
+    fake_llm = _FakeLLM(
+        {
+            "verdict": "merge",
+            "target_slug": "merged-page",
+            "merged_title": "Merged Page",
+            "reason": "Identical content; merge into one.",
+        }
+    )
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.routes.ontology.make_llm_client",
+        lambda cfg: fake_llm,
+    )
+
+    r = await client.post("/api/ontology/alpha/scan")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["created"]) == 1
+    assert body["scanned_pages"] == 2
+    assert fake_llm.calls == 1
+
+    # Verify the suggestion is fetchable via the normal list endpoint.
+    r = await client.get("/api/ontology/alpha/suggestions")
+    assert r.status_code == 200
+    listed = r.json()
+    assert len(listed["suggestions"]) == 1
+    s_fm = listed["suggestions"][0]["frontmatter"]
+    assert s_fm["operation"] == "merge_entities"
+    assert s_fm["proposed_target"] == "wiki/concepts/merged-page.md"
+
+
+async def test_scan_idempotent_second_call_creates_nothing(
+    client: Any,
+    alpha_vault: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_wiki_page(alpha_vault, "wiki/concepts/a.md", title="A", body="dup")
+    _write_wiki_page(alpha_vault, "wiki/concepts/b.md", title="B", body="dup")
+    fake_llm = _FakeLLM(
+        {
+            "verdict": "merge",
+            "target_slug": "combined",
+            "merged_title": "Combined",
+            "reason": "merge",
+        }
+    )
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.routes.ontology.make_llm_client",
+        lambda cfg: fake_llm,
+    )
+    r1 = await client.post("/api/ontology/alpha/scan")
+    r2 = await client.post("/api/ontology/alpha/scan")
+    assert r1.status_code == 200 and r2.status_code == 200
+    assert len(r1.json()["created"]) == 1
+    assert r2.json()["created"] == []
+    assert r2.json()["skipped_existing"] >= 1
+
+
+async def test_scan_unknown_project_404(
+    client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.routes.ontology.make_llm_client",
+        lambda cfg: _FakeLLM({"verdict": "distinct", "reason": "x"}),
+    )
+    r = await client.post("/api/ontology/unknown/scan")
+    assert r.status_code == 404
+
+
+async def test_scan_llm_unavailable_returns_503(
+    client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from claude_mnemos.ingest.llm import MissingApiKeyError
+
+    def _raise_missing(cfg):  # noqa: ANN001
+        raise MissingApiKeyError("no key, no CLI")
+
+    monkeypatch.setattr(
+        "claude_mnemos.daemon.routes.ontology.make_llm_client", _raise_missing
+    )
+    r = await client.post("/api/ontology/alpha/scan")
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert detail["error"] == "llm_unavailable"
