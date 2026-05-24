@@ -25,6 +25,10 @@ from claude_mnemos.ingest.llm.rate_limit import parse_rate_limit_from_stderr
 from claude_mnemos.ingest.llm.tokens import count_tokens_local
 
 DEFAULT_TIMEOUT_SEC = 120
+DEFAULT_MAX_TURNS = 5
+"""Maximum tool-use turns per extract call. Must be ≥2 so the CLI can
+complete a tool_use → result loop. 5 accommodates validation retries
+(the validator can ask the model to fix a bad payload up to 2 times)."""
 
 
 def _build_env() -> dict[str, str]:
@@ -116,7 +120,7 @@ class CliLLMClient:
             "--system-prompt", system,
             "--setting-sources", "",
             "--no-session-persistence",
-            "--max-turns", "1",
+            "--max-turns", str(DEFAULT_MAX_TURNS),
         ]
         try:
             result = subprocess.run(

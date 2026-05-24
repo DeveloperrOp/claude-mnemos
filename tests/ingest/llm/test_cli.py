@@ -78,6 +78,38 @@ def test_extract_invokes_claude_p_with_correct_args(cfg: Config) -> None:
     assert "--json-schema" in cmd
     assert "--system-prompt" in cmd
     assert "--setting-sources" in cmd
+
+
+def test_extract_uses_default_max_turns(cfg: Config) -> None:
+    """--max-turns must be ≥2 so Claude CLI can complete a tool_use → result loop.
+
+    Plan Phase A (2026-05-24): previously hardcoded to 1, which broke any
+    json-schema flow — CLI made the tool call on turn 1 but couldn't return
+    the structured output without a second turn, surfacing as 'claude -p
+    exit 1: ' with empty stderr.
+    """
+    from pathlib import Path
+
+    from claude_mnemos.ingest.llm.cli import DEFAULT_MAX_TURNS
+
+    assert DEFAULT_MAX_TURNS >= 2, (
+        f"DEFAULT_MAX_TURNS={DEFAULT_MAX_TURNS} too low — tool_use needs ≥2 turns"
+    )
+
+    payload = {"pages": [], "summary": "ok"}
+    with (
+        patch("claude_mnemos.ingest.llm.cli.subprocess.run") as run,
+        patch(
+            "claude_mnemos.ingest.llm.cli.find_claude_binary",
+            return_value=Path("/usr/bin/claude"),
+        ),
+    ):
+        run.return_value = _stub_completed(0, stdout=_ok_envelope(payload))
+        CliLLMClient(cfg).extract(system="SYS", user="USR", tool=_TOOL_SCHEMA)
+
+    cmd = run.call_args[0][0]
+    idx = cmd.index("--max-turns")
+    assert cmd[idx + 1] == str(DEFAULT_MAX_TURNS)
     assert "--no-session-persistence" in cmd
     assert "--max-turns" in cmd
 
