@@ -33,6 +33,10 @@ beforeEach(() => {
           confirm: "Delete project",
           deleting: "Deleting...",
           force_delete: "Force delete (cancel jobs)",
+          force_modal_title: "Force-delete «{{name}}»?",
+          force_modal_body: "This will KILL {{running}} running and DROP {{queued}} queued jobs.",
+          force_confirm_label: "Type «{{phrase}}» to confirm",
+          force_apply: "Force-delete",
         },
       },
     },
@@ -114,7 +118,7 @@ describe("DangerZoneSection", () => {
     );
   });
 
-  it("409 jobs-running → error displayed → Force delete link → DELETE ?force=true", async () => {
+  it("409 jobs-running → Force link opens second typed-confirm → DELETE ?force=true (P0-3)", async () => {
     // First call rejects with 409 + dict detail
     vi.mocked(apiClient.delete)
       .mockRejectedValueOnce({
@@ -155,10 +159,33 @@ describe("DangerZoneSection", () => {
       ).toBeInTheDocument(),
     );
 
+    // P0-3: clicking the Force link MUST NOT trigger DELETE directly.
+    // It opens the second modal showing kill-counts and requires typing
+    // FORCE-{slug} before the Apply button is enabled.
     const forceLink = screen.getByRole("button", {
-      name: /Force delete/i,
+      name: /Force delete \(cancel jobs\)/i,
     });
     await userEvent.click(forceLink);
+
+    // Verify second modal opened with kill-counts (running=1, queued=2).
+    expect(screen.getByText(/KILL 1 running/)).toBeInTheDocument();
+    expect(screen.getByText(/DROP 2 queued/)).toBeInTheDocument();
+
+    // DELETE not yet called — only the initial failed attempt.
+    expect(apiClient.delete).toHaveBeenCalledTimes(1);
+
+    // Force-apply button disabled until matching phrase typed.
+    const forceApply = screen.getByRole("button", { name: "Force-delete" });
+    expect(forceApply).toBeDisabled();
+
+    // Type the required phrase.
+    const inputs = screen.getAllByRole("textbox");
+    const forceInput = inputs[inputs.length - 1];
+    await userEvent.type(forceInput, "FORCE-p1");
+    expect(forceApply).toBeEnabled();
+
+    // Now apply → second DELETE with force=true.
+    await userEvent.click(forceApply);
 
     await waitFor(() =>
       expect(apiClient.delete).toHaveBeenLastCalledWith("/projects/p1", {

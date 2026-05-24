@@ -929,7 +929,11 @@
       "cancel": "Cancel",
       "confirm": "Delete project",
       "deleting": "Deleting...",
-      "force_delete": "Force delete (cancel jobs)"
+      "force_delete": "Force delete (cancel jobs)",
+      "force_modal_title": "Force-delete «{{name}}»?",
+      "force_modal_body": "This will KILL {{running}} running job(s) and DROP {{queued}} queued job(s). Their work cannot be recovered. The vault folder remains on disk.",
+      "force_confirm_label": "Type «{{phrase}}» to confirm",
+      "force_apply": "Force-delete"
     },
     "section": {
       "general": {
