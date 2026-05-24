@@ -1,7 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
 import { Link } from "react-router";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUIStore } from "@/stores/ui.store";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
@@ -54,7 +61,8 @@ export function TopBar() {
         <ProjectSwitcher />
       </div>
 
-      <nav className="flex items-center gap-1" aria-label="global">
+      {/* Wide screens: inline link row. */}
+      <nav className="hidden xl:flex items-center gap-1" aria-label="global">
         {GLOBAL_LINKS.map((link) => (
           <Link
             key={link.to}
@@ -65,6 +73,32 @@ export function TopBar() {
           </Link>
         ))}
       </nav>
+
+      {/* Narrow screens: collapse into a Menu dropdown so the 5 ru/uk-long
+          link labels don't wrap to two rows and break the TopBar layout. */}
+      <div className="xl:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              aria-label={t("topbar.global_menu_label", "Global menu")}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {GLOBAL_LINKS.map((link) => (
+              <DropdownMenuItem key={link.to} asChild>
+                <Link to={link.to} className="cursor-pointer font-mono text-xs uppercase tracking-[0.12em]">
+                  {t(link.labelKey)}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <div className="flex items-center gap-3">
         <UsageWidget />

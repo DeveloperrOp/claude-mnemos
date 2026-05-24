@@ -46,7 +46,8 @@
       "metrics": "Метрики",
       "help": "Помощь",
       "global_settings": "Глобальные настройки"
-    }
+    },
+    "global_menu_label": "Глобальное меню"
   },
   "overview": {
     "no_projects_title": "Мозг проекта появится здесь",

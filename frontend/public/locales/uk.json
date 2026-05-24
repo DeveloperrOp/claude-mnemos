@@ -46,7 +46,8 @@
       "metrics": "Метрики",
       "help": "Допомога",
       "global_settings": "Глобальні налаштування"
-    }
+    },
+    "global_menu_label": "Глобальне меню"
   },
   "overview": {
     "no_projects_title": "Мозок проєкту з'явиться тут",

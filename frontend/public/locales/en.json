@@ -46,7 +46,8 @@
       "metrics": "Metrics",
       "help": "Help",
       "global_settings": "Global Settings"
-    }
+    },
+    "global_menu_label": "Global menu"
   },
   "overview": {
     "no_projects_title": "Project brains appear here",

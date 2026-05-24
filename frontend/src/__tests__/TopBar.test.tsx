@@ -81,12 +81,13 @@ describe("TopBar", () => {
     const user = userEvent.setup();
     useUIStore.setState({ locale: "uk", sidebarCollapsed: false, theme: "light" });
     render(wrap(<TopBar />));
-    const btn = screen.getByRole("button", { name: /uk/i });
-    await user.click(btn);
+    // Exact match — aria-label "Global menu" added in Task 14 also matches /en/i
+    // via its 'men' substring, so a regex would resolve to multiple buttons.
+    await user.click(screen.getByRole("button", { name: "UK" }));
     expect(useUIStore.getState().locale).toBe("ru");
-    await user.click(screen.getByRole("button", { name: /ru/i }));
+    await user.click(screen.getByRole("button", { name: "RU" }));
     expect(useUIStore.getState().locale).toBe("en");
-    await user.click(screen.getByRole("button", { name: /en/i }));
+    await user.click(screen.getByRole("button", { name: "EN" }));
     expect(useUIStore.getState().locale).toBe("uk");
   });
 });
