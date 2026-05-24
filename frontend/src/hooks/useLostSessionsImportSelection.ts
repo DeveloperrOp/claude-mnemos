@@ -36,7 +36,10 @@ export function useLostSessionsImportSelection() {
   return useMutation({
     mutationFn: async ({
       selected,
-      extract = true,
+      // Default `false` matches backend v0.0.10 contract — extraction (which
+      // burns LLM tokens) is opt-in. Bulk-import callers that want extraction
+      // must pass `extract: true` explicitly (e.g. via a checkbox).
+      extract = false,
     }: ImportSelectionArgs): Promise<ImportSelectionAggregate> => {
       const groups = groupByProject(selected);
       const results = await Promise.all(
