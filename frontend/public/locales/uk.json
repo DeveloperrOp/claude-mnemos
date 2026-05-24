@@ -31,7 +31,8 @@
     "help": "Допомога",
     "global_settings": "Глобальні налаштування",
     "create_project": "+ Новий проєкт",
-    "disabled_hint": "Спершу відкрий проєкт"
+    "disabled_hint": "Спершу відкрий проєкт",
+    "lint": "Лінт"
   },
   "topbar": {
     "all_projects": "Всі проєкти",
@@ -1027,6 +1028,49 @@
     "lost_sessions": "загублені сесії",
     "welcome": "вітання",
     "onboarding": "встановлення",
-    "diagnostics": "діагностика"
+    "diagnostics": "діагностика",
+    "lint": "лінт"
+  },
+  "lint": {
+    "title": "Лінт",
+    "run_button": "Запустити лінт",
+    "running": "Прогін…",
+    "autofix_button": "Автовиправити ({{count}})",
+    "autofix_running": "Виправляю…",
+    "autofix_submit": "Застосувати автовиправлення",
+    "autofix_confirm_title": "Застосувати автовиправлення?",
+    "autofix_confirm_body": "Буде виправлено {{count}} findings. Спершу створюється знімок — скасувати можна через Історію.",
+    "fixable_badge": "Fix",
+    "last_run": "Останній прогін: {{time}}",
+    "run_toast": "Лінт завершено — {{findings}} findings",
+    "autofix_toast": "Виправлено: {{fixed}}, пропущено: {{skipped}}",
+    "empty": {
+      "title": "Лінт ще не запускався",
+      "body": "Натисни «Запустити лінт», щоб перевірити vault за набором правил. Результати кешуються до наступного прогону."
+    },
+    "clean": {
+      "title": "Vault чистий",
+      "body": "Прогін не знайшов проблем. Можна запустити знов будь-коли."
+    },
+    "summary": {
+      "total": "Всього",
+      "fixable": "Виправно"
+    },
+    "severity": {
+      "error": "Помилка",
+      "warning": "Попередження",
+      "info": "Інфо"
+    },
+    "rules": {
+      "page_parse_failed": "Сторінка не розбирається",
+      "wikilinks_broken": "Биті wikilinks",
+      "orphan_pages": "Сторінки-сироти",
+      "stale_pages": "Застарілі сторінки",
+      "duplicate_titles": "Дублікати заголовків",
+      "provenance_inferred_high": "Високий inferred provenance",
+      "provenance_ambiguous_high": "Високий ambiguous provenance",
+      "trailing_whitespace": "Зайві пробіли в кінці рядків",
+      "missing_required_frontmatter": "Бракує обов'язкового frontmatter"
+    }
   }
 }

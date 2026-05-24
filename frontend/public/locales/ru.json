@@ -31,7 +31,8 @@
     "help": "Помощь",
     "global_settings": "Глобальные настройки",
     "create_project": "+ Новый проект",
-    "disabled_hint": "Сначала откройте проект"
+    "disabled_hint": "Сначала откройте проект",
+    "lint": "Линт"
   },
   "topbar": {
     "all_projects": "Все проекты",
@@ -1025,6 +1026,49 @@
     "lost_sessions": "потерянные сессии",
     "welcome": "приветствие",
     "onboarding": "установка",
-    "diagnostics": "диагностика"
+    "diagnostics": "диагностика",
+    "lint": "линт"
+  },
+  "lint": {
+    "title": "Линт",
+    "run_button": "Запустить линт",
+    "running": "Идёт прогон…",
+    "autofix_button": "Автоисправить ({{count}})",
+    "autofix_running": "Исправляю…",
+    "autofix_submit": "Применить автоисправления",
+    "autofix_confirm_title": "Применить автоисправления?",
+    "autofix_confirm_body": "Будет исправлено {{count}} findings. Сначала создаётся снимок — отменить можно через Историю.",
+    "fixable_badge": "Fix",
+    "last_run": "Последний прогон: {{time}}",
+    "run_toast": "Линт завершён — {{findings}} findings",
+    "autofix_toast": "Исправлено: {{fixed}}, пропущено: {{skipped}}",
+    "empty": {
+      "title": "Линт ещё не запускался",
+      "body": "Нажми «Запустить линт», чтобы проверить vault по набору правил. Результаты кэшируются до следующего прогона."
+    },
+    "clean": {
+      "title": "Vault чист",
+      "body": "Прогон не нашёл проблем. Можно запустить снова в любой момент."
+    },
+    "summary": {
+      "total": "Всего",
+      "fixable": "Исправимо"
+    },
+    "severity": {
+      "error": "Ошибка",
+      "warning": "Предупреждение",
+      "info": "Инфо"
+    },
+    "rules": {
+      "page_parse_failed": "Страница не разбирается",
+      "wikilinks_broken": "Битые wikilinks",
+      "orphan_pages": "Страницы-сироты",
+      "stale_pages": "Устаревшие страницы",
+      "duplicate_titles": "Дубликаты заголовков",
+      "provenance_inferred_high": "Высокий inferred provenance",
+      "provenance_ambiguous_high": "Высокий ambiguous provenance",
+      "trailing_whitespace": "Лишние пробелы в конце строк",
+      "missing_required_frontmatter": "Не хватает обязательного frontmatter"
+    }
   }
 }

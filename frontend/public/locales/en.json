@@ -31,7 +31,8 @@
     "help": "Help",
     "global_settings": "Global settings",
     "create_project": "+ New project",
-    "disabled_hint": "Open any project first"
+    "disabled_hint": "Open any project first",
+    "lint": "Lint"
   },
   "topbar": {
     "all_projects": "All projects",
@@ -1025,6 +1026,49 @@
     "lost_sessions": "lost sessions",
     "welcome": "welcome",
     "onboarding": "onboarding",
-    "diagnostics": "diagnostics"
+    "diagnostics": "diagnostics",
+    "lint": "lint"
+  },
+  "lint": {
+    "title": "Lint",
+    "run_button": "Run lint",
+    "running": "Running…",
+    "autofix_button": "Auto-fix ({{count}})",
+    "autofix_running": "Fixing…",
+    "autofix_submit": "Apply auto-fixes",
+    "autofix_confirm_title": "Apply auto-fixes?",
+    "autofix_confirm_body": "{{count}} fixable findings will be patched. A pre-op snapshot is created first; you can undo via Activity.",
+    "fixable_badge": "Fix",
+    "last_run": "Last run: {{time}}",
+    "run_toast": "Lint finished — {{findings}} findings",
+    "autofix_toast": "Fixed: {{fixed}}, skipped: {{skipped}}",
+    "empty": {
+      "title": "Lint has not run yet",
+      "body": "Click \"Run lint\" to check this vault against the rule set. Findings are cached and reused until the next run."
+    },
+    "clean": {
+      "title": "Vault is clean",
+      "body": "Last lint run produced zero findings. Re-run any time."
+    },
+    "summary": {
+      "total": "Total",
+      "fixable": "Fixable"
+    },
+    "severity": {
+      "error": "Error",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "rules": {
+      "page_parse_failed": "Page parse failed",
+      "wikilinks_broken": "Broken wikilinks",
+      "orphan_pages": "Orphan pages",
+      "stale_pages": "Stale pages",
+      "duplicate_titles": "Duplicate titles",
+      "provenance_inferred_high": "High inferred provenance",
+      "provenance_ambiguous_high": "High ambiguous provenance",
+      "trailing_whitespace": "Trailing whitespace",
+      "missing_required_frontmatter": "Missing required frontmatter"
+    }
   }
 }

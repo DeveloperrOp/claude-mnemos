@@ -29,6 +29,7 @@ import { Diagnostics } from "./pages/Diagnostics";
 
 const Help = lazy(() => import("./pages/Help"));
 const Metrics = lazy(() => import("./pages/Metrics"));
+const Lint = lazy(() => import("./pages/Lint"));
 
 // react-router v7 splats must be path-final, so a literal `pages/*/edit` route
 // cannot exist. Both PageDetail and PageEdit share `pages/*`; this switch
@@ -72,6 +73,14 @@ const router = createBrowserRouter([
           { path: "health", element: <Health /> },
           { path: "queue", element: <Queue /> },
           { path: "lost-sessions", element: <LostSessionsProjectRedirect /> },
+          {
+            path: "lint",
+            element: (
+              <Suspense fallback={<Skeleton className="h-64" />}>
+                <Lint />
+              </Suspense>
+            ),
+          },
           { path: "settings", element: <ProjectSettings /> },
         ],
       },

@@ -18,6 +18,7 @@ const PROJECT_ITEMS: NavItem[] = [
   { to: (p) => `/project/${p}/suggestions`, label: "navigation.suggestions",      icon: "💡" },
   { to: (p) => `/project/${p}/trash`,       label: "navigation.trash",            icon: "🗑️" },
   { to: (p) => `/project/${p}/snapshots`,   label: "navigation.snapshots",        icon: "💾" },
+  { to: (p) => `/project/${p}/lint`,        label: "navigation.lint",             icon: "🔍" },
   { to: (p) => `/project/${p}/health`,      label: "navigation.health",           icon: "🩺" },
   { to: (p) => `/project/${p}/settings`,    label: "navigation.settings",         icon: "⚙" },
 ];
