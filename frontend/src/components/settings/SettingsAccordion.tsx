@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -37,9 +38,12 @@ export function SettingsAccordion({
         aria-expanded={open}
       >
         <span className="text-sm font-medium">{title}</span>
-        <span className="text-xs text-muted-foreground">
-          {open ? "▴" : "▾"}
-        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-150 ${
+            open ? "rotate-0" : "-rotate-90"
+          }`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div className="space-y-3 border-t px-4 py-3 text-sm">

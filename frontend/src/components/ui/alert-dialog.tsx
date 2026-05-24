@@ -52,7 +52,10 @@ function AlertDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
 }
 
 function AlertDialogTitle({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
-  return <AlertDialogPrimitive.Title className={cn("font-mono text-lg font-semibold uppercase tracking-wider", className)} {...props} />;
+  // P1-visual: drop uppercase + tracking-wider — dialog titles are headings,
+  // not eyebrow labels. Eyebrow / section-rail labels keep their uppercase
+  // styling via the dedicated `.eyebrow` CSS class.
+  return <AlertDialogPrimitive.Title className={cn("text-lg font-semibold", className)} {...props} />;
 }
 
 function AlertDialogDescription({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
