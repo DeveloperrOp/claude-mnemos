@@ -1,36 +1,54 @@
+import type { ComponentType, SVGProps } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useParams } from "react-router";
+import {
+  Activity,
+  BookOpen,
+  History,
+  LayoutDashboard,
+  Lightbulb,
+  ListOrdered,
+  MessageSquare,
+  Save,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface NavItem {
   to: (project: string) => string;
   label: string;
-  icon: string;
+  Icon: IconComponent;
 }
 
 // All project-scoped. Global navigation lives in TopBar (Task 1 of v0.0.13).
+// Icons: Lucide monochrome SVG — consistent visual weight, OS-independent
+// rendering, matches the rest of the app's iconography (was: emoji).
 const PROJECT_ITEMS: NavItem[] = [
-  { to: (p) => `/project/${p}`,             label: "navigation.project_overview", icon: "📊" },
-  { to: (p) => `/project/${p}/pages`,       label: "navigation.pages",            icon: "📚" },
-  { to: (p) => `/project/${p}/sessions`,    label: "navigation.sessions",         icon: "💬" },
-  { to: (p) => `/project/${p}/queue`,       label: "navigation.queue",            icon: "🌊" },
-  { to: (p) => `/project/${p}/activity`,    label: "navigation.activity",         icon: "📜" },
-  { to: (p) => `/project/${p}/suggestions`, label: "navigation.suggestions",      icon: "💡" },
-  { to: (p) => `/project/${p}/trash`,       label: "navigation.trash",            icon: "🗑️" },
-  { to: (p) => `/project/${p}/snapshots`,   label: "navigation.snapshots",        icon: "💾" },
-  { to: (p) => `/project/${p}/lint`,        label: "navigation.lint",             icon: "🔍" },
-  { to: (p) => `/project/${p}/health`,      label: "navigation.health",           icon: "🩺" },
-  { to: (p) => `/project/${p}/settings`,    label: "navigation.settings",         icon: "⚙" },
+  { to: (p) => `/project/${p}`,             label: "navigation.project_overview", Icon: LayoutDashboard },
+  { to: (p) => `/project/${p}/pages`,       label: "navigation.pages",            Icon: BookOpen },
+  { to: (p) => `/project/${p}/sessions`,    label: "navigation.sessions",         Icon: MessageSquare },
+  { to: (p) => `/project/${p}/queue`,       label: "navigation.queue",            Icon: ListOrdered },
+  { to: (p) => `/project/${p}/activity`,    label: "navigation.activity",         Icon: History },
+  { to: (p) => `/project/${p}/suggestions`, label: "navigation.suggestions",      Icon: Lightbulb },
+  { to: (p) => `/project/${p}/trash`,       label: "navigation.trash",            Icon: Trash2 },
+  { to: (p) => `/project/${p}/snapshots`,   label: "navigation.snapshots",        Icon: Save },
+  { to: (p) => `/project/${p}/lint`,        label: "navigation.lint",             Icon: Search },
+  { to: (p) => `/project/${p}/health`,      label: "navigation.health",           Icon: Activity },
+  { to: (p) => `/project/${p}/settings`,    label: "navigation.settings",         Icon: Settings },
 ];
 
 interface SidebarLinkProps {
   to: string;
-  icon: string;
+  Icon: IconComponent;
   label: string;
   exact?: boolean;
 }
 
-function SidebarLink({ to, icon, label, exact }: SidebarLinkProps) {
+function SidebarLink({ to, Icon, label, exact }: SidebarLinkProps) {
   return (
     <NavLink
       to={to}
@@ -44,7 +62,7 @@ function SidebarLink({ to, icon, label, exact }: SidebarLinkProps) {
         )
       }
     >
-      <span className="w-4 text-center text-[13px]">{icon}</span>
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span>{label}</span>
     </NavLink>
   );
@@ -64,7 +82,7 @@ export function Sidebar() {
         <SidebarLink
           key={item.label}
           to={item.to(name)}
-          icon={item.icon}
+          Icon={item.Icon}
           label={t(item.label)}
           exact={i === 0}
         />
