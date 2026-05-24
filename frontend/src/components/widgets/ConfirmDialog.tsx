@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
@@ -21,6 +22,10 @@ interface ConfirmDialogProps {
   destructive?: boolean;
   onConfirm: () => void;
   isPending?: boolean;
+  /** Optional preview/extra content rendered between the description and the
+   * footer. Used by Snapshot restore to show a file-diff preview before the
+   * user commits to the destructive action. */
+  extraContent?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -30,6 +35,7 @@ export function ConfirmDialog({
   destructive = false,
   onConfirm,
   isPending = false,
+  extraContent,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   return (
@@ -39,6 +45,7 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {extraContent && <div className="my-2">{extraContent}</div>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>
             {cancelLabel ?? t("confirm.cancel")}

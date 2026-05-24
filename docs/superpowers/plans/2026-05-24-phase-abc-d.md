@@ -575,7 +575,15 @@ Wrap empty branch in the standard rounded-lg header (EyebrowBreadcrumb
 
 ---
 
-### Task 6: P1-1 — Health alerts project-scoped filter
+### Task 6: P1-1 — Health alerts project-scoped filter — DEFERRED
+
+**Reason for deferral (2026-05-24):** `WatchdogAlert` ([daemon/alerts.py:32](../claude_mnemos/daemon/alerts.py#L32)) has no `project_name` field. Adding it requires updating 8+ `alerts.add(...)` call-sites across `watchdog_handler.py`, `vault_runtime.py`, `process.py`. Path-prefix filtering on the client is a workaround but fragile (Windows backslash vs POSIX, vault_root trailing slashes, dotfile-vault edge cases). Proper fix is one task on its own — split off.
+
+Tracked separately as a follow-up: add `project_name: str | None` to WatchdogAlert, plumb through every caller, then make the frontend hook filter by it.
+
+---
+
+### Task 6 (original — for the follow-up): P1-1 — Health alerts project-scoped filter
 
 **Files:**
 - Modify: `frontend/src/hooks/useWatchdogEvents.ts`
@@ -693,7 +701,15 @@ without args → global view preserved."
 
 ---
 
-### Task 7: P1-4 — Settings accordion: collapse by default except General
+### Task 7: P1-4 — Accordion collapse — DEFERRED
+
+**Reason for deferral (2026-05-24):** Flipping `SettingsAccordion`'s `defaultOpen` from `true` to `false` regressed 15 existing tests across 6 test files. They assume `getByLabelText(...)` returns the input inside a section immediately, but with sections collapsed the inputs aren't mounted yet. Fixing them requires `fireEvent.click(header)` before every assertion across ~6 files — larger than the original task budget.
+
+Tracked separately. Proper approach: keep `defaultOpen=true` as the default to preserve test contracts; have ProjectSettings pass `defaultOpen={section.name === "general"}` per section. Each Section component needs to accept a `defaultOpen` prop and forward it (4-5 small edits + test updates).
+
+---
+
+### Task 7 (original — for the follow-up): P1-4 — Settings accordion: collapse by default except General
 
 **Files:**
 - Modify: `frontend/src/components/settings/SettingsAccordion.tsx` (or wherever the open-state lives)

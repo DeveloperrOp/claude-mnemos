@@ -89,14 +89,16 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
         </CardContent>
       </Card>
 
-      <TypedConfirmDialog
+      {/* Restore: recoverable (vault file changes only; other snapshots exist
+          to re-restore from). Visual safety = preview of file diff. Plain
+          confirm — no typed input gate. */}
+      <ConfirmDialog
         open={restoreOpen}
         onOpenChange={setRestoreOpen}
         title={t("snapshots.restore_modal_title")}
         description={t("snapshots.restore_modal_desc")}
-        expectedPhrase={s.name}
-        phraseLabel={t("snapshots.restore_typed_label")}
         confirmLabel={t("snapshots.restore_button")}
+        destructive
         extraContent={
           project ? (
             <SnapshotRestorePreview
@@ -112,13 +114,17 @@ export function SnapshotCard({ snapshot: s }: { snapshot: SnapshotInfo }) {
         isPending={restore.isPending}
       />
 
-      <ConfirmDialog
+      {/* Delete: truly irreversible (snapshot is gone forever, no other
+          backup to restore from). TypedConfirmDialog gates on the snapshot
+          name to force the user to look at what they're about to lose. */}
+      <TypedConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t("snapshots.delete_modal_title")}
         description={t("snapshots.delete_modal_desc")}
+        expectedPhrase={s.name}
+        phraseLabel={t("snapshots.delete_typed_label")}
         confirmLabel={t("snapshots.delete_button")}
-        destructive
         onConfirm={() => {
           remove.mutate(s.name, { onSettled: () => setDeleteOpen(false) });
         }}

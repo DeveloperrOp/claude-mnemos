@@ -530,7 +530,8 @@
       "no_changes": "No changes — vault matches snapshot",
       "truncated": "List truncated to {{count}} items",
       "error": "Could not load preview"
-    }
+    },
+    "delete_typed_label": "Type the snapshot name to confirm"
   },
   "lost_sessions": {
     "title": "Lost sessions",
