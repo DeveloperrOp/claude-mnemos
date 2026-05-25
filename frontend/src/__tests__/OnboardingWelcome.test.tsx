@@ -72,7 +72,7 @@ describe("OnboardingWelcome", () => {
         expect.objectContaining({
           name: expect.stringMatching(/app1/),
           vault_root: expect.stringContaining("D:/code/app1"),
-          cwd_patterns: expect.arrayContaining(["D:/code/app1"]),
+          cwd_patterns: ["D:/code/app1/**"],
         }),
         expect.anything(),
       );

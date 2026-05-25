@@ -47,7 +47,7 @@ export function OnboardingWelcome() {
       const display = humanize(lastSegment(cwd));
       const slug = deriveSlug(display);
       const vault = cwd.replace(/[\\/]+$/, "") + "/.mnemos";
-      const patterns = [cwd, `${cwd}/*`, `${cwd}/**`];
+      const patterns = [`${cwd}/**`];
       try {
         await new Promise<void>((res, rej) => {
           createMut.mutate(

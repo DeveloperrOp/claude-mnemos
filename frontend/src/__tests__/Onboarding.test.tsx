@@ -338,7 +338,7 @@ describe("OnboardingAdvanced", () => {
 
     await waitFor(() => expect(postSpy).toHaveBeenCalled());
     const [, body] = postSpy.mock.calls[0] as [string, Record<string, unknown>];
-    expect(body.cwd_patterns).toContain("/home/*");
+    expect(body.cwd_patterns).toContain("/home/**");
   });
 
   it("auto-installs hooks after project creation when not yet installed", async () => {

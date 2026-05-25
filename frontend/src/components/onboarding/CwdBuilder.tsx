@@ -9,7 +9,11 @@ interface Props {
   disabled?: boolean;
 }
 
-const RECURSIVE_SUFFIX_RE = /[\\/]\*$/;
+// Recognise both legacy single-star (path/*) and the canonical recursive
+// double-star (path/**). Backend resolver treats them identically — the
+// regex must keep accepting `\*` so older project-map entries don't lose
+// their "recursive" checkbox state when displayed.
+const RECURSIVE_SUFFIX_RE = /[\\/]\*\*?$/;
 
 function isRecursive(pattern: string): boolean {
   return RECURSIVE_SUFFIX_RE.test(pattern);
@@ -23,7 +27,7 @@ function withRecursive(path: string, recursive: boolean): string {
   const base = basePath(path);
   if (!recursive) return base;
   const sep = base.includes("\\") ? "\\" : "/";
-  return `${base}${sep}*`;
+  return `${base}${sep}**`;
 }
 
 export function CwdBuilder({ patterns, onChange, disabled }: Props) {

@@ -27,6 +27,52 @@ PROJECT_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
 _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
 
+# Trailing-wildcard suffixes the resolver recognises (see mapping/resolver.py).
+# Order matters: longer suffixes first, otherwise stripping `\*` from `\**`
+# loses information.
+_CWD_SUFFIXES: tuple[str, ...] = ("\\**", "/**", "\\*", "/*")
+
+
+def _cwd_base(pattern: str) -> tuple[str, str | None]:
+    """Split a pattern into (base, suffix). Suffix is one of _CWD_SUFFIXES or None."""
+    for suffix in _CWD_SUFFIXES:
+        if pattern.endswith(suffix):
+            return pattern[: -len(suffix)], suffix
+    return pattern, None
+
+
+def _dedupe_cwd_patterns(patterns: list[str]) -> list[str]:
+    """Collapse the legacy [base, base/*, base/**] triplet produced by the
+    Onboarding wizard into a single recursive entry. When multiple forms of
+    the same base coexist, the recursive form wins (resolver already treats
+    \\*, \\**, and the bare path identically as 'this folder and below').
+
+    A base with only one form is left untouched so we don't override a
+    user's deliberate choice. Exact duplicates are always removed.
+    """
+    by_base: dict[str, set[str]] = {}
+    order: list[str] = []
+    for p in patterns:
+        base, suffix = _cwd_base(p)
+        if base not in by_base:
+            by_base[base] = set()
+            order.append(base)
+        by_base[base].add(suffix or "plain")
+    out: list[str] = []
+    for base in order:
+        forms = by_base[base]
+        # Two-or-more-forms case: artefact of the old Onboarding triplet —
+        # collapse to recursive `\**` (or `/**` for posix bases).
+        if len(forms) > 1 or "\\**" in forms or "/**" in forms:
+            sep = "\\" if "\\" in base else "/"
+            out.append(f"{base}{sep}**")
+        elif "\\*" in forms or "/*" in forms:
+            sep = "\\" if "\\" in base else "/"
+            out.append(f"{base}{sep}*")
+        else:
+            out.append(base)
+    return out
+
 
 def _lock_for(path: Path) -> threading.Lock:
     key = str(Path(path).expanduser().resolve())
@@ -120,13 +166,23 @@ class ProjectStore:
         )
 
     def list_all(self) -> list[ProjectMapEntry]:
-        return list(self._load().projects)
+        return [self._canonicalize(e) for e in self._load().projects]
 
     def get(self, name: str) -> ProjectMapEntry:
         for e in self._load().projects:
             if e.name == name:
-                return e
+                return self._canonicalize(e)
         raise ProjectNotFoundError(f"project {name!r} not found in project-map")
+
+    @staticmethod
+    def _canonicalize(e: ProjectMapEntry) -> ProjectMapEntry:
+        """Collapse legacy cwd_patterns triplets on read. File-on-disk stays
+        as-is; users running PATCH /projects/{name} with new patterns store
+        the new list verbatim."""
+        canon = _dedupe_cwd_patterns(e.cwd_patterns)
+        if canon == e.cwd_patterns:
+            return e
+        return e.model_copy(update={"cwd_patterns": canon})
 
     def add(self, entry: ProjectMapEntry) -> ProjectMapEntry:
         with self._lock:

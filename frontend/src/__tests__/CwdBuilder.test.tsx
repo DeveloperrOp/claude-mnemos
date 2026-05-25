@@ -72,6 +72,21 @@ describe("CwdBuilder", () => {
     expect(onChange).toHaveBeenCalledWith(["/home/code"]);
   });
 
+  it("displays /** pattern with recursive checkbox checked", () => {
+    render(<CwdBuilder patterns={["/home/code/**"]} onChange={() => {}} />);
+    expect(screen.getByText(/📁\s*\/home\/code$/)).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it("turning recursive ON writes the canonical /** suffix", async () => {
+    const onChange = vi.fn();
+    render(<CwdBuilder patterns={["/home/code"]} onChange={onChange} />);
+    const checkbox = screen.getByRole("checkbox");
+    await userEvent.click(checkbox);
+    expect(onChange).toHaveBeenCalledWith(["/home/code/**"]);
+  });
+
   it("opens DirectoryPicker on Add folder click", async () => {
     render(<CwdBuilder patterns={[]} onChange={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: /Add folder/i }));
