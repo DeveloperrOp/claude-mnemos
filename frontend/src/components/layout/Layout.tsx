@@ -2,6 +2,7 @@ import { Outlet, useMatch } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
+import { ProjectLocaleSync } from "./ProjectLocaleSync";
 
 export function Layout() {
   // Sidebar is project-scoped — only render it on /project/:name and any sub-route.
@@ -12,11 +13,13 @@ export function Layout() {
   // differed between renders, producing React error #300 ("rendered fewer
   // hooks than expected") on navigation between project / non-project routes.
   const inProject = useMatch("/project/:name/*");
+  const projectSlug = inProject?.params.name;
 
   return (
     <TooltipProvider delayDuration={300}>
       <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden">
         <TopBar />
+        <ProjectLocaleSync slug={projectSlug ?? null} />
         <div
           className={
             inProject

@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { useEffect } from "react";
 import { Link } from "react-router";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,13 +30,9 @@ const GLOBAL_LINKS = [
 ] as const;
 
 export function TopBar() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const locale = useUIStore((s) => s.locale);
   const setLocale = useUIStore((s) => s.setLocale);
-
-  useEffect(() => {
-    if (i18n.language !== locale) void i18n.changeLanguage(locale);
-  }, [i18n, locale]);
 
   return (
     <header className="relative flex items-center justify-between border-b border-border/60 bg-card/40 px-4 py-2.5">
