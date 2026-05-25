@@ -41,6 +41,13 @@ export const ProjectSettingsSchema = z.object({
 });
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 
+export const AutoIngestDefaultsSchema = z.object({
+  dump_on_session_end: z.boolean().default(true),
+  dump_stale_after_24h: z.boolean().default(true),
+  extract_after_dump: z.boolean().default(false),
+});
+export type AutoIngestDefaults = z.infer<typeof AutoIngestDefaultsSchema>;
+
 export const GlobalSettingsSchema = z.object({
   version: z.literal(1).default(1),
   locale: LocaleSchema.default("uk"),
@@ -49,6 +56,11 @@ export const GlobalSettingsSchema = z.object({
   default_language_hint: z.enum(["auto", "uk", "ru", "en"]).default("auto"),
   default_max_input_tokens: z.number().int().min(1024).default(150000),
   default_retention_days: z.number().int().min(1).default(180),
+  auto_ingest_defaults: AutoIngestDefaultsSchema.default({
+    dump_on_session_end: true,
+    dump_stale_after_24h: true,
+    extract_after_dump: false,
+  }),
 });
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>;
 

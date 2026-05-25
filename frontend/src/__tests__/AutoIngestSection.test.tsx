@@ -10,15 +10,30 @@ import { AutoIngestSection } from "../components/settings/sections/AutoIngestSec
 const FULL = {
   version: 1,
   locale: null,
-  auto_ingest: { enabled: true, mode: "auto" },
+  auto_ingest: {
+    enabled: null,
+    mode: null,
+    dump_on_session_end: null,
+    dump_stale_after_24h: null,
+    extract_after_dump: null,
+  },
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  ontology: { auto_mode: false, confidence_min: 0.7, confidence_auto_apply: 0.95 },
-  watchdog: { mode: "merge" },
   snapshots: { daily_enabled: true, retention_days: 180 },
-  lifecycle: { auto_stale_days: 90, auto_archive: false },
-  prompts: { custom_system_path: null, custom_extract_user_path: null },
-  telemetry: { opt_in: false },
-  ingest: { model: null, language_hint: null, max_input_tokens: null, context_limit: null },
+};
+
+const GLOBAL = {
+  version: 1,
+  locale: "uk",
+  daemon_port: 5757,
+  default_model: "claude-sonnet-4-6",
+  default_language_hint: "auto",
+  default_max_input_tokens: 150000,
+  default_retention_days: 180,
+  auto_ingest_defaults: {
+    dump_on_session_end: true,
+    dump_stale_after_24h: true,
+    extract_after_dump: false,
+  },
 };
 
 beforeEach(() => {
@@ -30,7 +45,21 @@ beforeEach(() => {
         save: "Save",
         saving: "Saving...",
         section: {
-          auto_ingest: { title: "Auto-ingest", enabled: "Enabled", mode: "Mode" },
+          auto_ingest: {
+            title: "Auto-ingest",
+            hint: "What happens automatically",
+            inherit: "Inherit",
+            inherit_on: "Inherit (ON)",
+            inherit_off: "Inherit (OFF)",
+            on: "Force ON",
+            off: "Force OFF",
+            dump_on_session_end_label: "Dump on session end",
+            dump_on_session_end_hint: "hook copies .jsonl",
+            dump_stale_after_24h_label: "Dump stale (24h)",
+            dump_stale_after_24h_hint: "cron picks up old sessions",
+            extract_after_dump_label: "Extract after dump",
+            extract_after_dump_hint: "LLM burns tokens",
+          },
         },
       },
     },
@@ -38,7 +67,11 @@ beforeEach(() => {
     true,
   );
   void i18n.changeLanguage("en");
-  vi.spyOn(apiClient, "get");
+  vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+    if (url === "/settings/global") return { data: GLOBAL };
+    if (url.startsWith("/settings/")) return { data: FULL };
+    throw new Error(`unexpected GET ${url}`);
+  });
   vi.spyOn(apiClient, "patch");
 });
 afterEach(() => {
@@ -53,34 +86,54 @@ function wrap(ui: ReactNode) {
 }
 
 describe("AutoIngestSection", () => {
-  it("renders server values; Save disabled when no diff", async () => {
-    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
+  it("renders all three inherited fields; Save disabled when no diff", async () => {
     wrap(<AutoIngestSection slug="p1" />);
     await waitFor(() =>
       expect(screen.getByText("Auto-ingest")).toBeInTheDocument(),
     );
-    const save = screen.getByRole("button", { name: /Save/i });
+    expect(screen.getByText("Dump on session end")).toBeInTheDocument();
+    expect(screen.getByText("Dump stale (24h)")).toBeInTheDocument();
+    expect(screen.getByText("Extract after dump")).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: /^Save$/i });
     expect(save).toBeDisabled();
   });
 
-  it("change field enables Save and PATCHes", async () => {
-    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
+  it("inherit dropdown reflects global default ON/OFF state", async () => {
+    wrap(<AutoIngestSection slug="p1" />);
+    await waitFor(() =>
+      expect(screen.getByText("Auto-ingest")).toBeInTheDocument(),
+    );
+    // extract_after_dump defaults to false globally → its Inherit option says (OFF)
+    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    const extractSelect = selects[2];
+    expect(extractSelect.options[0].textContent).toBe("Inherit (OFF)");
+  });
+
+  it("force OFF dump_on_session_end → PATCH body contains explicit false", async () => {
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
-      data: { ...FULL, auto_ingest: { enabled: false, mode: "auto" } },
+      data: {
+        ...FULL,
+        auto_ingest: { ...FULL.auto_ingest, dump_on_session_end: false },
+      },
     });
     wrap(<AutoIngestSection slug="p1" />);
     await waitFor(() =>
       expect(screen.getByText("Auto-ingest")).toBeInTheDocument(),
     );
 
-    await userEvent.click(screen.getByRole("checkbox"));
-    const save = screen.getByRole("button", { name: /Save/i });
+    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    await userEvent.selectOptions(selects[0], "off");
+    const save = screen.getByRole("button", { name: /^Save$/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);
 
     await waitFor(() =>
       expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", {
-        auto_ingest: { enabled: false, mode: "auto" },
+        auto_ingest: {
+          dump_on_session_end: false,
+          dump_stale_after_24h: null,
+          extract_after_dump: null,
+        },
       }),
     );
   });

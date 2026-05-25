@@ -952,8 +952,18 @@
       },
       "auto_ingest": {
         "title": "Auto-ingest",
-        "enabled": "Enabled",
-        "mode": "Mode"
+        "hint": "Controls what happens to your Claude Code sessions automatically. Dump = copy .jsonl into the vault (free). Extract = LLM extracts knowledge into Markdown pages (paid, tokens).",
+        "inherit": "Use global default",
+        "inherit_on": "Use global (currently: ON)",
+        "inherit_off": "Use global (currently: OFF)",
+        "on": "Force ON",
+        "off": "Force OFF",
+        "dump_on_session_end_label": "Dump on session end",
+        "dump_on_session_end_hint": "The SessionEnd hook copies the .jsonl into the vault (.ingest-jobs/). Cheap, no LLM. With this off, sessions are only reachable via the Lost-sessions page (manual import).",
+        "dump_stale_after_24h_label": "Dump stale sessions (24h cron)",
+        "dump_stale_after_24h_hint": "A cron job at 03:00 picks up sessions that weren't updated for 24+ hours and were never dumped. Safety net for when the hook didn't fire (Claude crashed, etc.).",
+        "extract_after_dump_label": "Extract after dump",
+        "extract_after_dump_hint": "After each dump the LLM extracts knowledge into Markdown pages. Burns subscription/API tokens on every session — enable only for a fully-automatic pipeline."
       },
       "lint": {
         "title": "Lint",
