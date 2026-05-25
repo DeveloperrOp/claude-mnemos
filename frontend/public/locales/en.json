@@ -957,9 +957,13 @@
       },
       "lint": {
         "title": "Lint",
-        "schedule": "Cron schedule",
-        "enabled_rules": "Enabled rules (comma-separated)",
-        "autofix_on_save": "Autofix on save"
+        "hint": "Scans vault pages for issues: broken wikilinks, duplicate titles, orphaned pages, etc. Runs manually from the Lint page by default.",
+        "schedule": "Auto-run (cron format)",
+        "schedule_hint": "Leave empty — lint never runs on its own. Example: \"0 4 * * *\" = every day at 04:00. Format: minute hour day-of-month month day-of-week.",
+        "enabled_rules": "Active rules",
+        "enabled_rules_hint": "All ticked rules run on each lint pass. Uncheck only if a rule emits false positives in your vault.",
+        "autofix_on_save": "Auto-apply fixable findings",
+        "autofix_on_save_hint": "After you edit a page by hand, findings flagged as \"fixable\" are applied automatically. Other rules stay informational."
       },
       "snapshots": {
         "title": "Snapshots",

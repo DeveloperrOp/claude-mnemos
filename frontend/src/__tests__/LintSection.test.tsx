@@ -81,7 +81,9 @@ describe("LintSection", () => {
       expect(screen.getByText("Lint")).toBeInTheDocument(),
     );
 
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /Autofix on save/i }),
+    );
     const save = screen.getByRole("button", { name: /Save/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);
@@ -95,5 +97,28 @@ describe("LintSection", () => {
         },
       }),
     );
+  });
+
+  it("unticking one rule sends explicit enabled_rules list on save", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
+    vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: FULL });
+    wrap(<LintSection slug="p1" />);
+    await waitFor(() =>
+      expect(screen.getByText("Lint")).toBeInTheDocument(),
+    );
+
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /stale_pages/ }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+    await waitFor(() => {
+      const [url, body] = (apiClient.patch as ReturnType<typeof vi.fn>).mock
+        .calls[0] as [string, { lint: { enabled_rules: string[] | null } }];
+      expect(url).toBe("/settings/p1");
+      expect(body.lint.enabled_rules).toBeInstanceOf(Array);
+      expect(body.lint.enabled_rules).not.toContain("stale_pages");
+      expect(body.lint.enabled_rules).toContain("orphan_pages");
+    });
   });
 });
