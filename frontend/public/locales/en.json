@@ -963,8 +963,13 @@
       },
       "snapshots": {
         "title": "Snapshots",
+        "hint": "Archive of the whole vault into .snapshots/. Daily at 04:00 + before risky operations. Entries older than the retention window are pruned at 05:00.",
         "daily_enabled": "Daily snapshots enabled",
-        "retention_days": "Retention (days)"
+        "retention_days": "Retention (days)",
+        "next_run": "Next scheduled run: {{time}}",
+        "next_run_pending": "Next scheduled run: calculating…",
+        "run_now": "Create snapshot now",
+        "run_now_pending": "Creating…"
       },
       "locale": {
         "title": "Locale",
