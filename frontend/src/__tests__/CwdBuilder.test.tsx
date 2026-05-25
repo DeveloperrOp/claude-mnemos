@@ -52,8 +52,8 @@ describe("CwdBuilder", () => {
 
   it("renders existing patterns with recursive flag", () => {
     render(<CwdBuilder patterns={["/home/code/*", "/tmp"]} onChange={() => {}} />);
-    expect(screen.getByText(/📁\s*\/home\/code$/)).toBeInTheDocument();
-    expect(screen.getByText(/📁\s*\/tmp$/)).toBeInTheDocument();
+    expect(screen.getByText(/\s*\/home\/code$/)).toBeInTheDocument();
+    expect(screen.getByText(/\s*\/tmp$/)).toBeInTheDocument();
   });
 
   it("removes pattern when × clicked", async () => {
@@ -74,7 +74,7 @@ describe("CwdBuilder", () => {
 
   it("displays /** pattern with recursive checkbox checked", () => {
     render(<CwdBuilder patterns={["/home/code/**"]} onChange={() => {}} />);
-    expect(screen.getByText(/📁\s*\/home\/code$/)).toBeInTheDocument();
+    expect(screen.getByText(/\s*\/home\/code$/)).toBeInTheDocument();
     const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
   });
@@ -90,6 +90,6 @@ describe("CwdBuilder", () => {
   it("opens DirectoryPicker on Add folder click", async () => {
     render(<CwdBuilder patterns={[]} onChange={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: /Add folder/i }));
-    expect(await screen.findByText(/📁\s*code$/)).toBeInTheDocument();  // picker rendered
+    expect(await screen.findByText(/\s*code$/)).toBeInTheDocument();  // picker rendered
   });
 });

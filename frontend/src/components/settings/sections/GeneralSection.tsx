@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsAccordion } from "../SettingsAccordion";
+import { Folder, AlertTriangle } from "lucide-react";
 import { CwdBuilder } from "@/components/onboarding/CwdBuilder";
 import { DirectoryPicker } from "@/components/picker/DirectoryPicker";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,8 @@ export function GeneralSection({ project }: Props) {
             size="sm"
             onClick={() => setVaultPickerOpen(true)}
           >
-            📁 {t("settings.section.general.browse")}
+            <Folder className="mr-1 h-3 w-3" />
+            {t("settings.section.general.browse")}
           </Button>
           <button
             type="button"
@@ -135,8 +137,9 @@ export function GeneralSection({ project }: Props) {
           {t("settings.section.general.vault_hint")}
         </p>
         {vaultChanged && (
-          <p className="rounded-md border-2 border-warning bg-warning/10 p-2 text-xs text-warning">
-            ⚠ {t("settings.section.general.vault_warn")}
+          <p className="flex items-start gap-1.5 rounded-md border-2 border-warning bg-warning/10 p-2 text-xs text-warning">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{t("settings.section.general.vault_warn")}</span>
           </p>
         )}
       </div>

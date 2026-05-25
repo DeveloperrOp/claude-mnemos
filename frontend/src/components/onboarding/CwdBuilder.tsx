@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DirectoryPicker } from "@/components/picker/DirectoryPicker";
 
@@ -61,7 +62,10 @@ export function CwdBuilder({ patterns, onChange, disabled }: Props) {
         <ul className="space-y-1">
           {patterns.map((p, idx) => (
             <li key={`${p}-${idx}`} className="flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-sm">
-              <span className="font-mono">📁 {basePath(p)}</span>
+              <span className="flex items-center gap-1.5 font-mono">
+                <Folder className="h-3 w-3 text-muted-foreground" />
+                {basePath(p)}
+              </span>
               <label className="ml-auto inline-flex items-center gap-1 text-xs">
                 <input
                   type="checkbox"
