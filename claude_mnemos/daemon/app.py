@@ -255,7 +255,7 @@ class SpaStaticFiles(StaticFiles):
 
     async def get_response(self, path: str, scope: Any) -> Any:  # type: ignore[override]
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
                 if path == "favicon.ico":
@@ -278,5 +278,17 @@ class SpaStaticFiles(StaticFiles):
                         raise
                 # Everything else is an application route — let the SPA
                 # take over.
-                return await super().get_response("index.html", scope)
-            raise
+                response = await super().get_response("index.html", scope)
+            else:
+                raise
+
+        # Force revalidation for files that aren't content-addressable. Vite
+        # hashes JS/CSS bundle names (e.g. index-C3Uo6L4J.js) so those can
+        # cache forever, but index.html points to the *current* hash and
+        # /locales/*.json change every release. Without this, browsers
+        # heuristic-cache them on the first install and old translations
+        # (sidebar 'NAVIGATION.LINT' literal, etc.) persist past upgrades.
+        normalised = path.replace("\\", "/")
+        if normalised.startswith("locales/") or normalised in ("", "index.html"):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response

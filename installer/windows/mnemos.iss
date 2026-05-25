@@ -138,11 +138,60 @@ begin
                  SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
+// ---------------------------------------------------------------------------
+// Kill anything holding port 5757 + any python process running claude_mnemos
+// before we install. This closes the gap that taskkill /IM claude-mnemos.exe
+// misses — a dev-tree `python -m claude_mnemos.daemon` (PID 30536 in the
+// 2026-05-25 incident) keeps the port bound, the new bundle's daemon fails
+// to bind, and the user sees stale state from the dev daemon's runtime dir.
+// ---------------------------------------------------------------------------
+
+procedure KillStaleProcesses;
+var
+  ResultCode: Integer;
+begin
+  // Best-effort: each command swallows its own errors via runhidden.
+  // /F = force, /T = also kill child processes.
+
+  // 1. Anything matching our installed exe names — same as [UninstallRun]
+  //    but runs PRE-install too, before file replacement.
+  Exec(ExpandConstant('{sys}\taskkill.exe'),
+       '/F /IM claude-mnemos.exe /T',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'),
+       '/F /IM claude-mnemos-cli.exe /T',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // 2. Any python.exe with 'claude_mnemos' in its command line. Catches
+  //    `python -m claude_mnemos.daemon` from a developer install. WMIC is
+  //    deprecated in Win11 but PowerShell Get-CimInstance works everywhere.
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+       '-NoProfile -Command "Get-CimInstance Win32_Process -Filter ''Name=''''python.exe'''''' | Where-Object { $_.CommandLine -like ''*claude_mnemos*'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // 3. Whoever holds the daemon's TCP port. PID is in column 5 of netstat
+  //    -ano output (last field for LISTENING rows). PowerShell parses it
+  //    and force-kills.
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+       '-NoProfile -Command "Get-NetTCPConnection -LocalPort 5757 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // Give Windows a moment to release file handles before file copy starts.
+  Sleep(1500);
+end;
+
 function InitializeSetup(): Boolean;
 var
   Response: Integer;
 begin
   Result := True;
+
+  // Always run the kill sweep before anything else — handles both fresh and
+  // upgrade installs. Fresh installs are no-ops (no processes to kill);
+  // upgrades benefit even on the IDNO path (in-place overwrite needs file
+  // handles released).
+  KillStaleProcesses();
+
   if not IsUpgrade() then
     Exit;
   Response := MsgBox(
