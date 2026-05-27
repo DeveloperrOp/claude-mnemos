@@ -355,10 +355,22 @@
     "created_pages": "Созданные страницы",
     "no_pages_created": "Страниц не создано",
     "showing_n_of_m": "{{shown}} из {{total}}",
-    "ingest_button": "Ингест",
+    "ingest_button": "Ингестить в мозг",
     "ingested_toast": "Ингест в очереди",
     "reingest_button": "Заново ингестить",
     "reingest_toast": "Re-ingest в очереди — открой Очередь",
+    "retry_button": "Попробовать ещё",
+    "ingesting": "Ингестирую…",
+    "job_status_hint": "Технический статус последнего ingest-задания",
+    "brain": {
+      "in_brain_one": "В мозге · {{count}} страница",
+      "in_brain_few": "В мозге · {{count}} страницы",
+      "in_brain_many": "В мозге · {{count}} страниц",
+      "in_brain_other": "В мозге · {{count}} страниц",
+      "in_progress": "В работе",
+      "failed": "Ошибка",
+      "not_in_brain": "Не в мозге"
+    },
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад",
     "bulk_import": {

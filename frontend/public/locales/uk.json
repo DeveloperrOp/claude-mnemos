@@ -355,10 +355,22 @@
     "created_pages": "Створені сторінки",
     "no_pages_created": "Сторінок не створено",
     "showing_n_of_m": "{{shown}} з {{total}}",
-    "ingest_button": "Інжест",
+    "ingest_button": "Інжестити в мозок",
     "ingested_toast": "Інжест у черзі",
     "reingest_button": "Заново інжестити",
     "reingest_toast": "Re-ingest у черзі — дивись Чергу",
+    "retry_button": "Спробувати ще",
+    "ingesting": "Інжестую…",
+    "job_status_hint": "Технічний статус останнього ingest-задачі",
+    "brain": {
+      "in_brain_one": "У мозку · {{count}} сторінка",
+      "in_brain_few": "У мозку · {{count}} сторінки",
+      "in_brain_many": "У мозку · {{count}} сторінок",
+      "in_brain_other": "У мозку · {{count}} сторінок",
+      "in_progress": "У роботі",
+      "failed": "Помилка",
+      "not_in_brain": "Не в мозку"
+    },
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад",
     "bulk_import": {
