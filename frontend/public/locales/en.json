@@ -994,10 +994,6 @@
         "next_run_pending": "Next scheduled run: calculating…",
         "run_now": "Create snapshot now",
         "run_now_pending": "Creating…"
-      },
-      "locale": {
-        "title": "Locale",
-        "inherit": "Inherit from global"
       }
     },
     "global": {
@@ -1013,6 +1009,16 @@
         "default_language_hint": "Default language hint",
         "default_max_input_tokens": "Default max input tokens",
         "default_retention_days": "Default retention (days)"
+      },
+      "auto_ingest": {
+        "title": "Auto-ingest (global defaults)",
+        "hint": "What happens to sessions by default. Individual projects can override these values in their Settings → Auto-ingest.",
+        "dump_on_session_end_label": "Dump on session end",
+        "dump_on_session_end_hint": "The SessionEnd hook copies .jsonl into the project's vault. Cheap, no LLM.",
+        "dump_stale_after_24h_label": "Dump stale sessions (24h cron)",
+        "dump_stale_after_24h_hint": "A cron job at 03:00 picks up sessions that weren't updated for 24+ hours.",
+        "extract_after_dump_label": "Extract after dump",
+        "extract_after_dump_hint": "LLM extracts knowledge into Markdown pages after each dump. Burns tokens — enable only for a fully-automatic pipeline."
       }
     },
     "system": {

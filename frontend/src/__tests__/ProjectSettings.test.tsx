@@ -118,18 +118,15 @@ function mockApi() {
 }
 
 describe("ProjectSettings", () => {
-  it("renders all 6 section titles when project loaded", async () => {
+  it("renders all section titles when project loaded", async () => {
     mockApi();
     render(wrap(<ProjectSettings />, "/project/alpha/settings"));
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument(),
     );
-    // v0.0.12: 5 placebo subgroups (Ontology/Watchdog/Lifecycle/Prompts/
-    // Telemetry/Ingest overrides) were dropped. Remaining: General, Locale,
-    // Auto-ingest, Lint, Snapshots + Danger zone.
+    // v0.0.28: Locale section removed — moved to GlobalSettings only.
     for (const title of [
       "General",
-      "Locale",
       "Auto-ingest",
       "Lint",
       "Snapshots",

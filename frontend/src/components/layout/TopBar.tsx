@@ -8,7 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUIStore } from "@/stores/ui.store";
+import {
+  useGlobalSettings,
+  useGlobalSettingsMutation,
+} from "@/hooks/useGlobalSettings";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
 import { UsageWidget } from "@/components/widgets/UsageWidget";
@@ -31,8 +34,9 @@ const GLOBAL_LINKS = [
 
 export function TopBar() {
   const { t } = useTranslation();
-  const locale = useUIStore((s) => s.locale);
-  const setLocale = useUIStore((s) => s.setLocale);
+  const { data: global } = useGlobalSettings();
+  const mut = useGlobalSettingsMutation();
+  const locale: Locale = global?.locale ?? "uk";
 
   return (
     <header className="relative flex items-center justify-between border-b border-border/60 bg-card/40 px-4 py-2.5">
@@ -102,8 +106,10 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setLocale(nextLocale(locale))}
+          onClick={() => mut.mutate({ locale: nextLocale(locale) })}
+          disabled={mut.isPending}
           className="h-7 px-2 font-mono text-[10px] tracking-[0.14em]"
+          title={t("topbar.locale_cycle_hint", "Cycle UI language (global setting)")}
         >
           {locale.toUpperCase()}
         </Button>

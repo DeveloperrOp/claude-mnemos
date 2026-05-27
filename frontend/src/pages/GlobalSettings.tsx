@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { GlobalGeneralSection } from "@/components/settings/globals/GlobalGeneralSection";
 import { GlobalDefaultsSection } from "@/components/settings/globals/GlobalDefaultsSection";
+import { GlobalAutoIngestSection } from "@/components/settings/globals/GlobalAutoIngestSection";
 import { useAutostartStatus, useSetAutostart } from "@/hooks/useAutostart";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -52,6 +53,7 @@ export function GlobalSettings() {
       </header>
       <GlobalGeneralSection />
       <GlobalDefaultsSection />
+      <GlobalAutoIngestSection />
       <AutostartToggleSection />
     </div>
   );

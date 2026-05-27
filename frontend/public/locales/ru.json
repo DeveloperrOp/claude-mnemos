@@ -986,10 +986,6 @@
         "next_run_pending": "Следующий автозапуск: вычисляется…",
         "run_now": "Сделать снапшот сейчас",
         "run_now_pending": "Создаю…"
-      },
-      "locale": {
-        "title": "Локаль",
-        "inherit": "Наследовать глобальную"
       }
     },
     "global": {
@@ -1005,6 +1001,16 @@
         "default_language_hint": "Подсказка языка по умолчанию",
         "default_max_input_tokens": "Max input tokens по умолчанию",
         "default_retention_days": "Срок хранения (дни) по умолчанию"
+      },
+      "auto_ingest": {
+        "title": "Автоингест (глобальные дефолты)",
+        "hint": "Что происходит с сессиями по умолчанию. Отдельные проекты могут переопределять эти значения в своих Настройках → Автоингест.",
+        "dump_on_session_end_label": "Дамп при завершении сессии",
+        "dump_on_session_end_hint": "Hook SessionEnd копирует .jsonl в vault проекта. Дёшево, без LLM.",
+        "dump_stale_after_24h_label": "Дамп старых сессий (24h cron)",
+        "dump_stale_after_24h_hint": "Cron-задача в 03:00 подбирает сессии, которые не обновлялись 24+ часа.",
+        "extract_after_dump_label": "Экстракт после дампа",
+        "extract_after_dump_hint": "LLM вытягивает знания в Markdown-страницы после каждого дампа. Жжёт токены — включай только для полностью автоматического pipeline."
       }
     },
     "system": {

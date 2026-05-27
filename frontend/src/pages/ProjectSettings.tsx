@@ -6,7 +6,6 @@ import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { useProjects } from "@/hooks/useProjects";
 
 import { GeneralSection } from "@/components/settings/sections/GeneralSection";
-import { LocaleSection } from "@/components/settings/sections/LocaleSection";
 import { AutoIngestSection } from "@/components/settings/sections/AutoIngestSection";
 import { LintSection } from "@/components/settings/sections/LintSection";
 import { SnapshotsSection } from "@/components/settings/sections/SnapshotsSection";
@@ -57,7 +56,6 @@ export function ProjectSettings() {
       </header>
 
       <GeneralSection project={project} />
-      <LocaleSection slug={project.name} />
       <AutoIngestSection slug={project.name} />
       <LintSection slug={project.name} />
       <SnapshotsSection slug={project.name} />

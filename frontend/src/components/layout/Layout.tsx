@@ -13,13 +13,12 @@ export function Layout() {
   // differed between renders, producing React error #300 ("rendered fewer
   // hooks than expected") on navigation between project / non-project routes.
   const inProject = useMatch("/project/:name/*");
-  const projectSlug = inProject?.params.name;
 
   return (
     <TooltipProvider delayDuration={300}>
       <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden">
         <TopBar />
-        <ProjectLocaleSync slug={projectSlug ?? null} />
+        <ProjectLocaleSync />
         <div
           className={
             inProject
