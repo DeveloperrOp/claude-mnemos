@@ -138,6 +138,15 @@ class VaultRuntime:
                     id=f"daily_snapshot:{self.name}",
                     replace_existing=True,
                 )
+                # Catch-up: if the user's machine was off at 04:00 today,
+                # the daily snapshot didn't run. `daily_snapshot_task` is
+                # idempotent (no-op if today's snapshot already exists),
+                # so it's safe to fire-and-forget on mount. Runs in a
+                # thread because tar.gz creation is blocking.
+                import asyncio as _asyncio
+                _asyncio.create_task(
+                    _asyncio.to_thread(daily_snapshot_task, self.vault_root),
+                )
             scheduler.add_job(
                 backups_cleanup_task,
                 "cron",

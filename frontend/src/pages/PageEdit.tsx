@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useBlocker, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,14 @@ export function PageEdit() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+
+  // Block in-app (React Router) navigation while there are unsaved edits.
+  // `beforeunload` above covers tab close / F5 but not <Link> clicks, which
+  // would otherwise drop the user's edits silently.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname,
+  );
 
   if (pageQuery.isLoading) return <Skeleton className="h-64" />;
   if (pageQuery.isError) return <DaemonDownAlert error={pageQuery.error} />;
@@ -243,6 +251,23 @@ export function PageEdit() {
         onConfirm={() => {
           setDiscardOpen(false);
           navigate(`/project/${encodeURIComponent(project)}/pages/${cleanPath}`);
+        }}
+      />
+
+      {/* Reuses the same discard dialog for blocked in-app navigation
+          (sidebar clicks, back button) so user sees a single prompt
+          regardless of how they tried to leave. */}
+      <ConfirmDialog
+        open={blocker.state === "blocked"}
+        onOpenChange={(open) => {
+          if (!open && blocker.state === "blocked") blocker.reset();
+        }}
+        title={t("pages.editor.discard_modal_title")}
+        description={t("pages.editor.discard_modal_desc")}
+        confirmLabel={t("pages.editor.discard_button")}
+        destructive
+        onConfirm={() => {
+          if (blocker.state === "blocked") blocker.proceed();
         }}
       />
     </div>

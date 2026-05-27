@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "../components/ui/sonner";
 import i18n from "../i18n";
@@ -49,15 +49,17 @@ beforeAll(() => {
 
 function wrap(ui: React.ReactNode, path: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // PageEdit uses useBlocker which requires a data router (createMemoryRouter
+  // / createBrowserRouter), not the older MemoryRouter component.
+  const router = createMemoryRouter(
+    [{ path: "/project/:name/pages/*", element: ui }],
+    { initialEntries: [path] },
+  );
   return (
-    <MemoryRouter initialEntries={[path]}>
-      <QueryClientProvider client={qc}>
-        <Routes>
-          <Route path="/project/:name/pages/*" element={ui} />
-        </Routes>
-        <Toaster />
-      </QueryClientProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={qc}>
+      <RouterProvider router={router} />
+      <Toaster />
+    </QueryClientProvider>
   );
 }
 

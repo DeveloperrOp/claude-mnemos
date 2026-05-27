@@ -115,9 +115,13 @@ async def delete_project(
     name: str, request: Request, force: bool = False
 ) -> Response:
     daemon = request.app.state.daemon
-    if daemon is not None and name in daemon.runtimes:
+    if daemon is not None:
         from claude_mnemos.daemon.vault_runtime import VaultBusyError
 
+        # No pre-check on `name in daemon.runtimes` — that was a TOCTOU
+        # race with concurrent deletes (could KeyError through to 500).
+        # Treat "already unmounted" as a no-op so two near-simultaneous
+        # DELETE requests both end up with the same final state.
         try:
             await daemon.unmount_vault(name, force=force)
         except VaultBusyError as exc:
@@ -130,6 +134,8 @@ async def delete_project(
                     "hint": "delete with ?force=true to drain",
                 },
             ) from exc
+        except KeyError:
+            pass  # already unmounted by a previous/concurrent delete
 
     try:
         ProjectStore().remove(name)

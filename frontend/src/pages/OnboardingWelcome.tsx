@@ -73,6 +73,12 @@ export function OnboardingWelcome() {
           count: failures.length,
         }),
       );
+      // Stay on the wizard so the user can see which workspaces failed,
+      // uncheck the successful ones, and retry the rest. Previously we
+      // navigated to the last successful project — the failure toast
+      // vanished after ~4s with no way to know which entries needed
+      // re-attention.
+      return;
     }
 
     const lastSlug = successes[successes.length - 1];

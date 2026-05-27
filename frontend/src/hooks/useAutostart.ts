@@ -12,7 +12,17 @@ export function useSetAutostart() {
   const { t } = useTranslation();
   return useMutation({
     mutationFn: setAutostart,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["autostart"] }),
+    onSuccess: (_data, enabled) => {
+      void qc.invalidateQueries({ queryKey: ["autostart"] });
+      // Previously this path was silent on success — the user had no
+      // confirmation that the autostart entry was created (or removed).
+      // Note the "next login" caveat in the success-on copy.
+      toast.success(
+        enabled
+          ? t("settings.autostart_enabled_toast", "Autostart enabled — takes effect on next login")
+          : t("settings.autostart_disabled_toast", "Autostart disabled"),
+      );
+    },
     onError: (err: Error) => {
       toast.error(t("settings.autostart_error", { message: err.message }));
     },

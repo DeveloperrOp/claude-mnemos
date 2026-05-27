@@ -348,6 +348,13 @@ class MnemosDaemon:
                 raise KeyError(name)
             await runtime.unmount(timeout=drain_timeout, force=force)
             del self.runtimes[name]
+        # Drop any cached inject-preview computed against the old vault root.
+        # `invalidate_project_cache` was defined but never called; without
+        # this the widget could return ≤30s of stale data after unmount.
+        from claude_mnemos.daemon.routes.inject_preview import (
+            invalidate_project_cache,
+        )
+        invalidate_project_cache(name)
 
     async def remount_vault(self, entry: ProjectMapEntry) -> VaultRuntime:
         """Unmount the existing runtime for ``entry.name`` (if any) and mount a
@@ -367,7 +374,13 @@ class MnemosDaemon:
             runtime = VaultRuntime(project=entry, settings=settings)
             await runtime.mount(scheduler=self.scheduler, alerts=self.alerts)
             self.runtimes[entry.name] = runtime
-            return runtime
+        # Invalidate inject-preview cache: the old vault_root's cached
+        # output is meaningless for the new vault.
+        from claude_mnemos.daemon.routes.inject_preview import (
+            invalidate_project_cache,
+        )
+        invalidate_project_cache(entry.name)
+        return runtime
 
     # ─── Settings hot-reload (Task 15) ────────────────────────────
 

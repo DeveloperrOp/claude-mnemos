@@ -951,6 +951,8 @@
     "not_found_body": "This project may have been deleted or renamed.",
     "not_found_back": "Go back",
     "autostart_error": "Autostart toggle failed: {{message}}",
+    "autostart_enabled_toast": "Autostart enabled — takes effect on next login",
+    "autostart_disabled_toast": "Autostart disabled",
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
