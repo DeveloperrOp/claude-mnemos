@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealth } from "@/hooks/useHealth";
@@ -172,38 +172,37 @@ export function Health() {
       </div>
 
       <div className="rounded-md border border-border/60 bg-card/40 p-4">
-        <button
-          type="button"
-          className="w-full text-left"
-          onClick={() => setAlertsExpanded((x) => !x)}
-          aria-expanded={alertsExpanded}
-        >
-          <div className="section-rail mb-0">
-            <div className="flex items-center gap-2">
-              {alertsExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              <span>{t("health.alerts_count")}</span>
-            </div>
-            <span className="ml-auto font-mono tabular-nums text-foreground/70">{alertsCount}</span>
-          </div>
-        </button>
+        <div className="section-rail mb-0 gap-2">
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-2 text-left"
+            onClick={() => setAlertsExpanded((x) => !x)}
+            aria-expanded={alertsExpanded}
+          >
+            {alertsExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            <span>{t("health.alerts_count")}</span>
+            <span className="font-mono tabular-nums text-foreground/70">
+              {alertsCount}
+            </span>
+          </button>
+          {alerts.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setClearAllOpen(true)}
+              disabled={dismissAll.isPending}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              {t("health.alerts.clear_all_n", { count: alerts.length })}
+            </Button>
+          )}
+        </div>
         {alertsExpanded && (
           <div className="mt-4">
-            {alerts.length > 0 && (
-              <div className="mb-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setClearAllOpen(true)}
-                  disabled={dismissAll.isPending}
-                >
-                  {t("health.alerts.clear_all")}
-                </Button>
-              </div>
-            )}
             {alerts.length === 0 ? (
               <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card/30 px-3 py-3 font-mono text-[11px] text-muted-foreground">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />

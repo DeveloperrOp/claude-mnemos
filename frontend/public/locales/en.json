@@ -213,6 +213,7 @@
       "collapse": "Collapse",
       "dismiss": "Dismiss",
       "clear_all": "Clear all",
+      "clear_all_n": "Clear all ({{count}})",
       "clear_all_confirm": "Dismiss all {{count}} alerts? This cannot be undone.",
       "cleared_all_toast": "All alerts cleared",
       "empty": "No alerts",
