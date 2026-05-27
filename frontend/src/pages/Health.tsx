@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealth } from "@/hooks/useHealth";
+import { useProjects } from "@/hooks/useProjects";
 import { useWatchdogEvents } from "@/hooks/useWatchdogEvents";
 import {
   useDismissWatchdogEvent,
@@ -13,12 +14,22 @@ import {
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { formatDateTime } from "@/lib/datetime";
+import { getProjectDisplayName } from "@/lib/projectDisplayName";
+import {
+  jobKindLabel,
+  parseJobId,
+  parseTrigger,
+  shortenPath,
+  stripTmpSuffix,
+  triggerLabel,
+} from "@/lib/healthFormat";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
 export function Health() {
   const { name: project } = useParams<{ name: string }>();
   const { t, i18n } = useTranslation();
   const healthQuery = useHealth();
+  const projectsQuery = useProjects();
   const alertsQuery = useWatchdogEvents();
   const dismiss = useDismissWatchdogEvent();
   const dismissAll = useDismissAllWatchdogEvents();
@@ -31,6 +42,8 @@ export function Health() {
 
   const health = healthQuery.data;
   const vh = health?.vaults?.[project];
+  const entry = projectsQuery.data?.find((p) => p.name === project);
+  const displayName = entry ? getProjectDisplayName(entry) : project;
 
   if (!vh) {
     return (
@@ -58,6 +71,9 @@ export function Health() {
         </div>
         <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("health.title")}
+          <span className="ml-2 text-base font-normal text-muted-foreground">
+            · {displayName}
+          </span>
         </h1>
       </header>
 
@@ -115,26 +131,43 @@ export function Health() {
             <span className="ml-auto opacity-60">{t("health.no_scheduler_jobs")}</span>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.id")}</th>
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.next_run_time")}</th>
-                <th className="py-2 font-medium text-xs uppercase tracking-wide text-muted-foreground">{t("health.col.trigger")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projectSchedulerJobs.map((j) => (
-                <tr key={j.id} className="border-b last:border-0">
-                  <td className="py-2 font-mono text-xs">{j.id}</td>
-                  <td className="py-2 text-xs">
-                    {j.next_run_time ? formatDateTime(j.next_run_time, i18n.language) : "—"}
-                  </td>
-                  <td className="py-2 text-xs">{j.trigger}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="divide-y divide-border/50">
+            {projectSchedulerJobs.map((j) => {
+              const { kind } = parseJobId(j.id);
+              const triggerInfo = parseTrigger(j.trigger);
+              return (
+                <li
+                  key={j.id}
+                  className="grid gap-2 py-3 md:grid-cols-[1fr_auto_auto] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">
+                      {jobKindLabel(kind, t)}
+                    </div>
+                    <div
+                      className="truncate font-mono text-[10px] text-muted-foreground/70"
+                      title={j.id}
+                    >
+                      {j.id}
+                    </div>
+                  </div>
+                  <div className="text-sm tabular-nums">
+                    {triggerLabel(triggerInfo, t)}
+                  </div>
+                  <div
+                    className="text-xs text-muted-foreground tabular-nums"
+                    title={t("health.col.next_run_time")}
+                  >
+                    {j.next_run_time
+                      ? t("health.jobs.next_run_prefix", {
+                          time: formatDateTime(j.next_run_time, i18n.language),
+                        })
+                      : "—"}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
@@ -179,40 +212,68 @@ export function Health() {
               </div>
             ) : (
               <div className="stagger divide-y divide-border/50 rounded-md bg-card/40 ring-1 ring-border/60">
-                {alerts.map((a, i) => (
-                  <div
-                    key={a.id}
-                    style={{ ["--i" as string]: i }}
-                    className="border-l-2 border-l-transparent px-3 py-2 hover:border-l-accent hover:bg-card/60 flex items-start gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                          {a.kind}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDateTime(a.detected_at, i18n.language)}
-                        </span>
-                      </div>
-                      <div className="mt-1 break-words text-sm">{a.message}</div>
-                      {a.path && (
-                        <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                          {a.path}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => dismiss.mutate(a.id)}
-                      disabled={dismiss.isPending}
-                      title={t("health.alerts.dismiss")}
-                      aria-label={t("health.alerts.dismiss")}
+                {alerts.map((a, i) => {
+                  const tmp = a.path ? stripTmpSuffix(a.path) : null;
+                  const shortPath = tmp ? shortenPath(tmp.path) : null;
+                  // Known watchdog kinds have a human label that fully
+                  // covers the backend message (which is just raw paths).
+                  // For unknown kinds we still show the message so we don't
+                  // hide context.
+                  const KNOWN_KINDS = [
+                    "external_create",
+                    "external_rename",
+                    "lock_timeout",
+                    "parse_failed",
+                    "handler_error",
+                  ];
+                  const isKnownKind = KNOWN_KINDS.includes(a.kind);
+                  return (
+                    <div
+                      key={a.id}
+                      style={{ ["--i" as string]: i }}
+                      className="border-l-2 border-l-transparent px-3 py-2 hover:border-l-accent hover:bg-card/60 flex items-start gap-3"
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                            {t(`health.alerts.kinds.${a.kind}`, {
+                              defaultValue: a.kind,
+                            })}
+                          </span>
+                          {tmp?.isTmp && (
+                            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-warning">
+                              {t("health.alerts.tmp_badge", "temp")}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {formatDateTime(a.detected_at, i18n.language)}
+                          </span>
+                        </div>
+                        {a.message && !isKnownKind && (
+                          <div className="mt-1 break-words text-sm">{a.message}</div>
+                        )}
+                        {shortPath && (
+                          <div
+                            className="mt-1 truncate font-mono text-xs text-muted-foreground"
+                            title={a.path ?? undefined}
+                          >
+                            {shortPath}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => dismiss.mutate(a.id)}
+                        disabled={dismiss.isPending}
+                        title={t("health.alerts.dismiss")}
+                        aria-label={t("health.alerts.dismiss")}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

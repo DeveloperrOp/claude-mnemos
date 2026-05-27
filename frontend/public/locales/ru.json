@@ -216,7 +216,15 @@
       "clear_all_confirm": "Скрыть все {{count}} уведомлений? Действие необратимо.",
       "cleared_all_toast": "Все уведомления скрыты",
       "empty": "Нет уведомлений",
-      "error": "Не удалось обновить уведомление"
+      "error": "Не удалось обновить уведомление",
+      "tmp_badge": "временный",
+      "kinds": {
+        "external_create": "Файл создан извне",
+        "external_rename": "Файл переименован извне",
+        "lock_timeout": "Таймаут блокировки",
+        "parse_failed": "Ошибка разбора",
+        "handler_error": "Ошибка обработчика"
+      }
     },
     "dismiss_error": "Не удалось скрыть: {{message}}",
     "silence_error": "Не удалось заглушить: {{message}}",
@@ -225,6 +233,16 @@
       "id": "идентификатор",
       "next_run_time": "следующий запуск",
       "trigger": "триггер"
+    },
+    "jobs": {
+      "next_run_prefix": "следующий: {{time}}",
+      "kinds": {
+        "daily_snapshot": "Ежедневный снапшот vault'а",
+        "backups_cleanup": "Очистка старых снапшотов"
+      },
+      "trigger": {
+        "daily_at": "Ежедневно в {{time}}"
+      }
     }
   },
   "usage": {

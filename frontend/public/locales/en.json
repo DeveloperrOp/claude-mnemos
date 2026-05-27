@@ -216,7 +216,15 @@
       "clear_all_confirm": "Dismiss all {{count}} alerts? This cannot be undone.",
       "cleared_all_toast": "All alerts cleared",
       "empty": "No alerts",
-      "error": "Failed to update alert"
+      "error": "Failed to update alert",
+      "tmp_badge": "temp",
+      "kinds": {
+        "external_create": "External file created",
+        "external_rename": "External file renamed",
+        "lock_timeout": "Lock timeout",
+        "parse_failed": "Parse failed",
+        "handler_error": "Handler error"
+      }
     },
     "dismiss_error": "Dismiss failed: {{message}}",
     "silence_error": "Silence failed: {{message}}",
@@ -225,6 +233,16 @@
       "id": "id",
       "next_run_time": "next_run_time",
       "trigger": "trigger"
+    },
+    "jobs": {
+      "next_run_prefix": "next: {{time}}",
+      "kinds": {
+        "daily_snapshot": "Daily vault snapshot",
+        "backups_cleanup": "Old snapshots cleanup"
+      },
+      "trigger": {
+        "daily_at": "Daily at {{time}}"
+      }
     }
   },
   "usage": {

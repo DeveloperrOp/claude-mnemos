@@ -216,7 +216,15 @@
       "clear_all_confirm": "Сховати всі {{count}} сповіщень? Дію не можна скасувати.",
       "cleared_all_toast": "Усі сповіщення приховано",
       "empty": "Сповіщень немає",
-      "error": "Не вдалося оновити сповіщення"
+      "error": "Не вдалося оновити сповіщення",
+      "tmp_badge": "тимчасовий",
+      "kinds": {
+        "external_create": "Файл створено ззовні",
+        "external_rename": "Файл перейменовано ззовні",
+        "lock_timeout": "Таймаут блокування",
+        "parse_failed": "Помилка розбору",
+        "handler_error": "Помилка обробника"
+      }
     },
     "dismiss_error": "Не вдалося відхилити: {{message}}",
     "silence_error": "Не вдалося заглушити: {{message}}",
@@ -225,6 +233,16 @@
       "id": "ідентифікатор",
       "next_run_time": "наступний запуск",
       "trigger": "тригер"
+    },
+    "jobs": {
+      "next_run_prefix": "наступний: {{time}}",
+      "kinds": {
+        "daily_snapshot": "Щоденний знімок vault'а",
+        "backups_cleanup": "Очищення старих знімків"
+      },
+      "trigger": {
+        "daily_at": "Щодня о {{time}}"
+      }
     }
   },
   "usage": {
