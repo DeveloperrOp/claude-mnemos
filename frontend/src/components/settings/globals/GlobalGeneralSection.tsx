@@ -75,6 +75,15 @@ export function GlobalGeneralSection() {
           onChange={(e) => setDaemonPort(Number(e.target.value))}
           className="w-32 rounded-md border bg-background px-2 py-1"
         />
+        {daemonPort !== data.daemon_port && (
+          <p className="rounded-md border-2 border-warning bg-warning/10 p-2 text-xs text-warning">
+            ⚠ {t("settings.global.general.daemon_port_warn", {
+              port: daemonPort,
+              defaultValue:
+                "Changing the daemon port requires a daemon restart and reloading the dashboard at the new port (http://127.0.0.1:{{port}}). The UI will go blank until then.",
+            })}
+          </p>
+        )}
       </div>
     </SettingsAccordion>
   );

@@ -66,11 +66,30 @@ export function useLostSessionsImportSelection() {
       void qc.invalidateQueries({ queryKey: ["health"] });
       void qc.invalidateQueries({ queryKey: ["sessions"] });
       void qc.invalidateQueries({ queryKey: ["jobs"] });
-      toast.success(
-        t("lost_sessions.selection.import_toast", {
-          n: agg.total_queued,
-        }),
-      );
+      // The previous toast showed only `total_queued`. Sessions that were
+      // already-ingested (skipped) or whose transcript file vanished from
+      // disk (missing) silently disappeared from the list with no
+      // explanation. Surface every bucket so the user can account for
+      // every selected row.
+      const parts: string[] = [
+        t("lost_sessions.selection.queued_n", { n: agg.total_queued }),
+      ];
+      if (agg.total_skipped > 0) {
+        parts.push(
+          t("lost_sessions.selection.skipped_n", { n: agg.total_skipped }),
+        );
+      }
+      if (agg.total_missing > 0) {
+        parts.push(
+          t("lost_sessions.selection.missing_n", { n: agg.total_missing }),
+        );
+      }
+      const compose = parts.join(" · ");
+      if (agg.total_skipped > 0 || agg.total_missing > 0) {
+        toast.warning(compose);
+      } else {
+        toast.success(compose);
+      }
     },
     onError: (err) => toast.error(extractApiError(err)),
   });

@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { MessageSquare, BookOpen, ScrollText, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,10 +29,25 @@ function formatNum(n: number | undefined): string {
 
 export function ProjectCard({ project, vault_health, usage }: Props) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const detailHref = `/project/${project.name}`;
+  // Previously the card was a `<Link>` with inner `<Link>` icon-buttons —
+  // an `<a>` nested inside another `<a>`. Browsers force-close the outer
+  // anchor on parse and React emits a hydration warning each render. Now
+  // the card is a div; we get equivalent behaviour by listening to clicks
+  // on the wrapper and inner Links handle their own routes natively.
   return (
-    <Link
-      to={`/project/${project.name}`}
-      className="group relative block overflow-hidden rounded-md border border-border/60 bg-card/40 p-4 transition-all hover:border-accent/60 hover:bg-card/70"
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(detailHref)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(detailHref);
+        }
+      }}
+      className="group relative block cursor-pointer overflow-hidden rounded-md border border-border/60 bg-card/40 p-4 transition-all hover:border-accent/60 hover:bg-card/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* Lime hairline left edge — appears on hover */}
       <span className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-accent opacity-0 transition-opacity group-hover:opacity-100" />
@@ -96,7 +111,7 @@ export function ProjectCard({ project, vault_health, usage }: Props) {
           <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
         </span>
       </div>
-    </Link>
+    </div>
   );
 }
 

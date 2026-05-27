@@ -1,11 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
+import { RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/useSession";
 import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
 import { pageHref } from "@/lib/pageHref";
+import { formatDateTime } from "@/lib/datetime";
 import type { SessionStatus } from "@/types/Session";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -19,7 +21,7 @@ const STATUS_COLOR: Record<SessionStatus, string> = {
 
 export function SessionDetail() {
   const { name: project, sid } = useParams<{ name: string; sid: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const sessionQuery = useSession(project, sid);
   const ingest = useSessionIngest();
 
@@ -43,23 +45,53 @@ export function SessionDetail() {
         <Link to={`/project/${project}/sessions`} className="text-sm text-primary underline">
           ← {t("navigation.sessions")}
         </Link>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={ingest.isPending || !s.transcript_path}
-          onClick={() => {
-            if (project && sid && s.transcript_path) {
-              ingest.mutate({
-                project,
-                session_id: sid,
-                transcript_path: s.transcript_path,
-              });
-            }
-          }}
-          title={t("sessions.ingest_button")}
-        >
-          {t("sessions.ingest_button")}
-        </Button>
+        <div className="flex gap-2">
+          {/* Primary: run LLM extraction (creates real knowledge pages).
+              The previous lone "Ingest" button posted extract=false, so it
+              only wrote a raw transcript copy — confused users who expected
+              knowledge to land in the brain. */}
+          <Button
+            size="sm"
+            variant="default"
+            disabled={ingest.isPending || !s.transcript_path}
+            onClick={() => {
+              if (project && sid && s.transcript_path) {
+                ingest.mutate({
+                  project,
+                  session_id: sid,
+                  transcript_path: s.transcript_path,
+                  extract: true,
+                });
+              }
+            }}
+            title={t("sessions.extract_hint")}
+          >
+            <Sparkles className="mr-1 h-3 w-3" />
+            {ingest.isPending
+              ? t("sessions.ingesting")
+              : t("sessions.extract_button")}
+          </Button>
+          {/* Secondary: re-dump transcript without LLM tokens. */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={ingest.isPending || !s.transcript_path}
+            onClick={() => {
+              if (project && sid && s.transcript_path) {
+                ingest.mutate({
+                  project,
+                  session_id: sid,
+                  transcript_path: s.transcript_path,
+                  extract: false,
+                });
+              }
+            }}
+            title={t("sessions.reingest_button")}
+          >
+            <RotateCcw className="mr-1 h-3 w-3" />
+            {t("sessions.reingest_button")}
+          </Button>
+        </div>
       </div>
 
       <header className="relative overflow-hidden rounded-lg border border-border/60 bg-card/40 px-5 py-4">
@@ -106,7 +138,7 @@ export function SessionDetail() {
           {s.ingested_at && (
             <>
               <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{t("sessions.ingested_at")}</dt>
-              <dd className="font-mono text-xs">{s.ingested_at}</dd>
+              <dd className="text-xs">{formatDateTime(s.ingested_at, i18n.language)}</dd>
             </>
           )}
           {s.transcript_path && (

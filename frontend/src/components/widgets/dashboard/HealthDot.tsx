@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useHealth } from "@/hooks/useHealth";
+import { useHealthAlerts } from "@/hooks/dashboard/useHealthAlerts";
 import { useProjects } from "@/hooks/useProjects";
 
 /* Top-level frontend has no /health route — Health page lives under
@@ -11,11 +12,16 @@ import { useProjects } from "@/hooks/useProjects";
 export function HealthDot() {
   const { t } = useTranslation();
   const q = useHealth();
+  const alertsQ = useHealthAlerts();
   const projects = useProjects();
   const firstProject = projects.data?.[0]?.name;
 
   const status = q.data?.status ?? "ok";
-  const alertsCount = q.data?.alerts_count ?? 0;
+  // Previously this used q.data.alerts_count which is the historical
+  // watchdog-notifications counter (grew without bound). The Overview dot
+  // should reflect *active* health alerts only — same source HealthAlertsBar
+  // uses.
+  const alertsCount = alertsQ.data?.alerts.length ?? 0;
 
   const isOk = status === "ok" && alertsCount === 0;
   const dotColor = isOk

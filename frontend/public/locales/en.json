@@ -611,6 +611,9 @@
       "bar_ignore": "Ignore",
       "bar_clear": "Cancel",
       "import_toast": "Queued: {{n}}",
+      "queued_n": "Queued: {{n}}",
+      "skipped_n": "Skipped (already ingested): {{n}}",
+      "missing_n": "Transcript file missing: {{n}}",
       "ignore_toast": "Ignored: {{n}}",
       "confirm_import_title": "Import {{n}} sessions?",
       "confirm_import_desc": "Each session creates a separate ingest job. May take time and consume LLM tokens (unless ingesting with --no-llm).",
@@ -1021,7 +1024,8 @@
       "general": {
         "title": "General",
         "locale": "Dashboard language",
-        "daemon_port": "Daemon port"
+        "daemon_port": "Daemon port",
+        "daemon_port_warn": "Changing the daemon port requires a daemon restart and reloading the dashboard at the new port (http://127.0.0.1:{{port}}). The UI will go blank until then."
       },
       "defaults": {
         "title": "Defaults",

@@ -11,7 +11,11 @@ import { getProjectDisplayName } from "@/lib/projectDisplayName";
 import { UNASSIGNED_PROJECT, isUnassigned } from "@/lib/lostSessionsConst";
 import type { LostSession } from "@/types/LostSession";
 
-const BULK_IGNORE_CONFIRM_THRESHOLD = 1;
+// Confirm every ignore — moving a session to "ignored" is reversible only
+// by navigating to /lost-sessions/ignored, which most users won't think to
+// do. A misclick on the floating action bar at threshold>=1 caused real
+// users to silently lose sessions.
+const BULK_IGNORE_CONFIRM_THRESHOLD = 0;
 const BULK_IMPORT_CONFIRM_THRESHOLD = 10;
 
 interface Props {
