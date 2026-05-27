@@ -9,16 +9,9 @@ import { LintSection } from "../components/settings/sections/LintSection";
 
 const FULL = {
   version: 1,
-  locale: null,
-  auto_ingest: { enabled: true, mode: "auto" },
-  lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  ontology: { auto_mode: false, confidence_min: 0.7, confidence_auto_apply: 0.95 },
-  watchdog: { mode: "merge" },
+  auto_ingest: {},
+  lint: { schedule: null, enabled_rules: null },
   snapshots: { daily_enabled: true, retention_days: 180 },
-  lifecycle: { auto_stale_days: 90, auto_archive: false },
-  prompts: { custom_system_path: null, custom_extract_user_path: null },
-  telemetry: { opt_in: false },
-  ingest: { model: null, language_hint: null, max_input_tokens: null, context_limit: null },
 };
 
 beforeEach(() => {
@@ -34,7 +27,6 @@ beforeEach(() => {
             title: "Lint",
             schedule: "Cron schedule",
             enabled_rules: "Enabled rules",
-            autofix_on_save: "Autofix on save",
           },
         },
       },
@@ -68,22 +60,18 @@ describe("LintSection", () => {
     expect(save).toBeDisabled();
   });
 
-  it("change autofix enables Save and PATCHes", async () => {
+  it("editing cron schedule enables Save and PATCHes", async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
-      data: {
-        ...FULL,
-        lint: { schedule: null, enabled_rules: null, autofix_on_save: true },
-      },
+      data: { ...FULL, lint: { schedule: "0 4 * * *", enabled_rules: null } },
     });
     wrap(<LintSection slug="p1" />);
     await waitFor(() =>
       expect(screen.getByText("Lint")).toBeInTheDocument(),
     );
 
-    await userEvent.click(
-      screen.getByRole("checkbox", { name: /Autofix on save/i }),
-    );
+    const scheduleInput = screen.getByPlaceholderText("0 4 * * *");
+    await userEvent.type(scheduleInput, "0 4 * * *");
     const save = screen.getByRole("button", { name: /Save/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);
@@ -91,9 +79,8 @@ describe("LintSection", () => {
     await waitFor(() =>
       expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", {
         lint: {
-          schedule: null,
+          schedule: "0 4 * * *",
           enabled_rules: null,
-          autofix_on_save: true,
         },
       }),
     );

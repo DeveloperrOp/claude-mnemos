@@ -33,7 +33,6 @@ RULE_VERSIONS = {
     "provenance_inferred_high": "v1",
     "provenance_ambiguous_high": "v1",
     "trailing_whitespace": "v1",
-    "missing_required_frontmatter": "v1",
 }
 
 
@@ -324,19 +323,6 @@ def trailing_whitespace(vault: Path, pages: list[PageEntry]) -> list[LintFinding
     return out
 
 
-# ---------------------------------------------------------------- missing_required
-
-
-def missing_required_frontmatter(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
-    """Most missing-required cases are caught by page_parse_failed (Pydantic strict).
-    This rule covers the narrow case where a default-eligible field (agent_written)
-    is explicitly null in the YAML — Pydantic accepts the model_construct path but
-    we want to flag the page anyway. In Plan #10 the strict model means this rule
-    rarely fires; kept as a placeholder for future schema extensions.
-    """
-    return []
-
-
 # ---------------------------------------------------------------- registry
 
 RULE_REGISTRY: dict[str, RuleFn] = {
@@ -348,5 +334,4 @@ RULE_REGISTRY: dict[str, RuleFn] = {
     "provenance_inferred_high": provenance_inferred_high,
     "provenance_ambiguous_high": provenance_ambiguous_high,
     "trailing_whitespace": trailing_whitespace,
-    "missing_required_frontmatter": missing_required_frontmatter,
 }

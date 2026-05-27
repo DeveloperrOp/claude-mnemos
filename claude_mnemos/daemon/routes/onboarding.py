@@ -25,12 +25,16 @@ def _registered_cwds(request: Request) -> set[str]:
     if daemon is None:
         return set()
     out: set[str] = set()
-    try:
-        for rt in daemon.runtimes.values():
-            for pat in (rt.entry.cwd_patterns or []):
-                out.add(pat.replace("\\**", "").replace("\\*", "").rstrip("\\/").rstrip("/"))
-    except Exception:  # noqa: BLE001
-        pass
+    # VaultRuntime stores its ProjectMapEntry as `.project`, not `.entry`.
+    # The previous code did `rt.entry.cwd_patterns` inside a bare-except
+    # which swallowed the AttributeError silently — the result was that
+    # this filter always returned an empty set in production, so the
+    # Onboarding wizard re-offered already-tracked workspaces.
+    for rt in daemon.runtimes.values():
+        for pat in (rt.project.cwd_patterns or []):
+            out.add(
+                pat.replace("\\**", "").replace("\\*", "").rstrip("\\/").rstrip("/"),
+            )
     return out
 
 
@@ -38,23 +42,14 @@ def _project_count(request: Request) -> int:
     daemon = request.app.state.daemon
     if daemon is None:
         return 0
-    try:
-        return len(daemon.runtimes)
-    except Exception:  # noqa: BLE001
-        return 0
+    return len(daemon.runtimes)
 
 
 def _vault_roots(request: Request) -> list:
     daemon = request.app.state.daemon
     if daemon is None:
         return []
-    out = []
-    try:
-        for rt in daemon.runtimes.values():
-            out.append(rt.vault_root)
-    except Exception:  # noqa: BLE001
-        pass
-    return out
+    return [rt.vault_root for rt in daemon.runtimes.values()]
 
 
 @router.get("/onboarding/detected-cwds")

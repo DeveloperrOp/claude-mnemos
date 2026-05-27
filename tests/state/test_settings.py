@@ -25,10 +25,10 @@ from claude_mnemos.state.settings import (
 def test_project_settings_defaults():
     s = ProjectSettings()
     assert s.version == 1
-    assert s.locale is None
+    # v0.0.31: locale removed from ProjectSettings — it's global-only.
+    assert not hasattr(s, "locale")
     # v0.0.10: auto_ingest fields default to None (= "inherit from
-    # GlobalSettings.auto_ingest_defaults"), not True/auto. The legacy
-    # ``enabled``/``mode`` fields are dead-coded and now Optional.
+    # GlobalSettings.auto_ingest_defaults"), not True/auto.
     assert s.auto_ingest.dump_on_session_end is None
     assert s.auto_ingest.dump_stale_after_24h is None
     assert s.auto_ingest.extract_after_dump is None
@@ -89,23 +89,20 @@ def test_extra_fields_ignored_at_top_level():
 
 
 def test_auto_ingest_settings_ignores_unknown_fields():
-    """v0.0.10: AutoIngestSettings uses extra="ignore" so on-disk JSON
-    written by v0.0.9- (with the old ``enabled``/``mode`` fields, plus
-    any future migration crumbs) loads cleanly without forcing every
-    user to nuke their settings dir."""
-    # Legacy v0.0.9 field shape — must load as if it were a fresh v0.0.10 object.
+    """AutoIngestSettings uses extra="ignore" so on-disk JSON written by
+    v0.0.9 (old `enabled`/`mode`) or v0.0.30 (per-project locale, legacy
+    fields) loads cleanly without forcing the user to nuke ~/.claude-mnemos."""
     legacy = AutoIngestSettings.model_validate({
         "enabled": True, "mode": "auto", "garbage_field": "value",
     })
-    assert legacy.enabled is True
-    assert legacy.mode == "auto"
+    assert not hasattr(legacy, "enabled")
+    assert not hasattr(legacy, "mode")
     # New fields default to None in absence.
     assert legacy.dump_on_session_end is None
 
 
 def test_round_trip_json():
     s = ProjectSettings(
-        locale="ru",
         auto_ingest=AutoIngestSettings(
             dump_on_session_end=True, extract_after_dump=False,
         ),
@@ -114,15 +111,12 @@ def test_round_trip_json():
     loaded = ProjectSettings.model_validate_json(js)
     assert loaded.auto_ingest.dump_on_session_end is True
     assert loaded.auto_ingest.extract_after_dump is False
-    assert loaded.locale == "ru"
 
 
 def test_get_by_dot_path():
     s = ProjectSettings()
     assert get_by_dot_path(s, "lint.enabled_rules") is None
     assert get_by_dot_path(s, "snapshots.retention_days") == 180
-    # v0.0.10: auto_ingest.mode defaults to None now (legacy field).
-    assert get_by_dot_path(s, "auto_ingest.mode") is None
     assert get_by_dot_path(s, "auto_ingest.dump_on_session_end") is None
     assert get_by_dot_path(s, "lint") == s.lint
 
@@ -231,20 +225,24 @@ def test_settings_store_get_project_returns_defaults_if_missing(tmp_path: Path):
 
 def test_settings_store_patch_project_persists(tmp_path: Path):
     store = SettingsStore(root=tmp_path)
-    updated = store.patch_project("foo", {"auto_ingest": {"enabled": False}})
-    assert updated.auto_ingest.enabled is False
+    updated = store.patch_project(
+        "foo", {"auto_ingest": {"dump_on_session_end": False}},
+    )
+    assert updated.auto_ingest.dump_on_session_end is False
     f = tmp_path / "settings" / "foo.json"
     assert f.is_file()
     data = json.loads(f.read_text())
-    assert data["auto_ingest"]["enabled"] is False
+    assert data["auto_ingest"]["dump_on_session_end"] is False
 
 
 def test_settings_store_patch_partial_preserves_others(tmp_path: Path):
     store = SettingsStore(root=tmp_path)
     store.patch_project("foo", {"snapshots": {"retention_days": 30}})
-    updated = store.patch_project("foo", {"lint": {"autofix_on_save": True}})
+    updated = store.patch_project(
+        "foo", {"lint": {"schedule": "0 4 * * *"}},
+    )
     assert updated.snapshots.retention_days == 30
-    assert updated.lint.autofix_on_save is True
+    assert updated.lint.schedule == "0 4 * * *"
 
 
 def test_settings_store_patch_invalid_value_raises(tmp_path: Path):

@@ -22,7 +22,6 @@ const AVAILABLE_RULES = [
   "provenance_inferred_high",
   "provenance_ambiguous_high",
   "trailing_whitespace",
-  "missing_required_frontmatter",
 ] as const;
 
 export function LintSection({ slug }: Props) {
@@ -34,7 +33,6 @@ export function LintSection({ slug }: Props) {
   const [schedule, setSchedule] = useState("");
   // null = "all rules" (server convention); a Set = explicit subset.
   const [rulesSet, setRulesSet] = useState<Set<string> | null>(null);
-  const [autofix, setAutofix] = useState(false);
 
   useEffect(() => {
     if (server) {
@@ -43,8 +41,6 @@ export function LintSection({ slug }: Props) {
       setSchedule(server.schedule ?? "");
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRulesSet(server.enabled_rules ? new Set(server.enabled_rules) : null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAutofix(server.autofix_on_save);
     }
   }, [server]);
 
@@ -58,16 +54,11 @@ export function LintSection({ slug }: Props) {
 
   const dirty =
     localSchedule !== server.schedule ||
-    JSON.stringify(localRules) !== JSON.stringify(serverRulesSorted) ||
-    autofix !== server.autofix_on_save;
+    JSON.stringify(localRules) !== JSON.stringify(serverRulesSorted);
 
   const onSave = () => {
     mut.mutate({
-      lint: {
-        schedule: localSchedule,
-        enabled_rules: localRules,
-        autofix_on_save: autofix,
-      },
+      lint: { schedule: localSchedule, enabled_rules: localRules },
     });
   };
 
@@ -131,22 +122,6 @@ export function LintSection({ slug }: Props) {
           ))}
         </div>
       </div>
-      <label className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={autofix}
-          onChange={(e) => setAutofix(e.target.checked)}
-          className="mt-0.5"
-        />
-        <span className="space-y-0.5">
-          <span className="block">
-            {t("settings.section.lint.autofix_on_save")}
-          </span>
-          <span className="block text-xs text-muted-foreground">
-            {t("settings.section.lint.autofix_on_save_hint")}
-          </span>
-        </span>
-      </label>
     </SettingsAccordion>
   );
 }

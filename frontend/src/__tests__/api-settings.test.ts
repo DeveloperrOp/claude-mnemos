@@ -9,9 +9,8 @@ import {
 
 const FULL_PROJECT = {
   version: 1,
-  locale: null,
-  auto_ingest: { enabled: true, mode: "auto" },
-  lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
+  auto_ingest: {},
+  lint: { schedule: null, enabled_rules: null },
   snapshots: { daily_enabled: true, retention_days: 180 },
 };
 
@@ -23,6 +22,11 @@ const FULL_GLOBAL = {
   default_language_hint: "auto",
   default_max_input_tokens: 150000,
   default_retention_days: 180,
+  auto_ingest_defaults: {
+    dump_on_session_end: true,
+    dump_stale_after_24h: true,
+    extract_after_dump: false,
+  },
 };
 
 describe("settings API", () => {
@@ -38,8 +42,7 @@ describe("settings API", () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL_PROJECT });
     const result = await getProjectSettings("p1");
     expect(apiClient.get).toHaveBeenCalledWith("/settings/p1");
-    expect(result.locale).toBeNull();
-    expect(result.auto_ingest.enabled).toBe(true);
+    expect(result.auto_ingest.dump_on_session_end).toBeNull();
     expect(result.snapshots.retention_days).toBe(180);
   });
 
@@ -69,17 +72,15 @@ describe("settings API", () => {
     expect(g.daemon_port).toBe(6000);
   });
 
-  // v0.0.17 regression: backend after v0.0.10 returns auto_ingest with the
-  // legacy `enabled` and `mode` fields as null (their replacements live under
-  // GlobalSettings.auto_ingest_defaults). Pre-v0.0.17 the Zod schema required
-  // non-null bool/enum, so the entire ProjectSettings parse threw and the
-  // ProjectSettings UI showed only General + Danger Zone (every other section
-  // shares the same query and saw `data === undefined`).
-  it("getProjectSettings parses v0.0.10+ auto_ingest with null legacy fields", async () => {
+  // v0.0.31: legacy v0.0.9 fields (`enabled`, `mode`) and per-project
+  // `locale` were dropped from both the backend Pydantic model and the
+  // Zod schema. Old on-disk JSON still contains them — z.object()
+  // strips unknown keys by default, so loading must not throw.
+  it("getProjectSettings tolerates legacy fields in payload", async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({
       data: {
         version: 1,
-        locale: null,
+        locale: "ru",
         auto_ingest: {
           enabled: null,
           mode: null,
@@ -92,9 +93,10 @@ describe("settings API", () => {
       },
     });
     const result = await getProjectSettings("p1");
-    expect(result.auto_ingest.enabled).toBeNull();
-    expect(result.auto_ingest.mode).toBeNull();
     expect(result.auto_ingest.dump_on_session_end).toBeNull();
     expect(result.auto_ingest.extract_after_dump).toBeNull();
+    // Dropped fields are absent on the parsed object.
+    expect((result.auto_ingest as Record<string, unknown>).enabled).toBeUndefined();
+    expect(result).not.toHaveProperty("locale");
   });
 });

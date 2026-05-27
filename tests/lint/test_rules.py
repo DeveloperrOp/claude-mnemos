@@ -185,19 +185,6 @@ def test_trailing_whitespace_clean_no_finding(tmp_path: Path):
     assert findings == []
 
 
-# --- missing_required_frontmatter ---
-# (Handled mostly via page_parse_failed since ParsedPage validates strictly.
-# Missing optional-with-default fields like agent_written are auto-default,
-# so this rule mostly fires when ParsedPage validates BUT some default-eligible
-# field was nulled out. Covered in separate negative test.)
-
-
-def test_missing_required_no_finding_for_valid_page(tmp_path: Path):
-    _seed(tmp_path, "wiki/entities/ok.md")
-    findings = RULE_REGISTRY["missing_required_frontmatter"](tmp_path, _parse_all(tmp_path))
-    assert findings == []
-
-
 # --- page_parse_failed ---
 
 

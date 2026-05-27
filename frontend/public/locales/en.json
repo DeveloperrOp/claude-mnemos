@@ -1003,9 +1003,7 @@
         "schedule": "Auto-run (cron format)",
         "schedule_hint": "Leave empty — lint never runs on its own. Example: \"0 4 * * *\" = every day at 04:00. Format: minute hour day-of-month month day-of-week.",
         "enabled_rules": "Active rules",
-        "enabled_rules_hint": "All ticked rules run on each lint pass. Uncheck only if a rule emits false positives in your vault.",
-        "autofix_on_save": "Auto-apply fixable findings",
-        "autofix_on_save_hint": "After you edit a page by hand, findings flagged as \"fixable\" are applied automatically. Other rules stay informational."
+        "enabled_rules_hint": "All ticked rules run on each lint pass. Uncheck only if a rule emits false positives in your vault."
       },
       "snapshots": {
         "title": "Snapshots",
@@ -1135,8 +1133,7 @@
       "duplicate_titles": "Duplicate titles",
       "provenance_inferred_high": "High inferred provenance",
       "provenance_ambiguous_high": "High ambiguous provenance",
-      "trailing_whitespace": "Trailing whitespace",
-      "missing_required_frontmatter": "Missing required frontmatter"
+      "trailing_whitespace": "Trailing whitespace"
     }
   }
 }

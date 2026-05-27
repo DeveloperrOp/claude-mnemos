@@ -24,10 +24,11 @@ def test_get_settings_returns_defaults(client):
     assert r.status_code == 200
     data = r.json()
     assert data["snapshots"]["retention_days"] == 180
-    # v0.0.10: legacy ``enabled``/``mode`` fields default to None now;
-    # the active toggles are the new dump_*/extract_* flags, also None
-    # by default (= "inherit from GlobalSettings.auto_ingest_defaults").
-    assert data["auto_ingest"]["enabled"] is None
+    # v0.0.31: legacy ``enabled``/``mode`` removed from the model.
+    # Only tri-state dump_*/extract_after_dump remain, defaulting to None
+    # (= "inherit from GlobalSettings.auto_ingest_defaults").
+    assert "enabled" not in data["auto_ingest"]
+    assert "mode" not in data["auto_ingest"]
     assert data["auto_ingest"]["dump_on_session_end"] is None
     assert data["auto_ingest"]["dump_stale_after_24h"] is None
     assert data["auto_ingest"]["extract_after_dump"] is None

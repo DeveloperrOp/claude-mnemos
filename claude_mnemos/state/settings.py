@@ -52,14 +52,11 @@ class AutoIngestSettings(BaseModel):
       - dump_stale_after_24h is a safety net that fires on a different
         timer (cron) and should be opt-in separately from the per-/exit hook.
     """
+    # extra="ignore" silently absorbs legacy v0.0.9 fields (`enabled`,
+    # `mode`) from old on-disk JSON — dropped in v0.0.31 because they
+    # were never read by any code path. The three real toggles below are
+    # tri-state; None = inherit from GlobalSettings.auto_ingest_defaults.
     model_config = ConfigDict(extra="ignore")
-    # Legacy fields kept for forward-compat with v0.0.9- on-disk JSON.
-    # They were never read by hooks/worker (dead code path), but
-    # ``foo.json`` test fixtures and any user files would otherwise fail
-    # ``extra="forbid"`` validation. Drop after a migration release.
-    enabled: bool | None = None
-    mode: Literal["auto", "hybrid", "manual"] | None = None
-    # v0.0.10 fields — None means "inherit from GlobalSettings.auto_ingest_defaults".
     dump_on_session_end: bool | None = None
     dump_stale_after_24h: bool | None = None
     extract_after_dump: bool | None = None
@@ -84,10 +81,13 @@ class AutoIngestDefaults(BaseModel):
 
 
 class LintSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # extra="ignore" so legacy on-disk settings keep loading after fields
+    # are dropped. `autofix_on_save` (dropped v0.0.31) was placebo — no
+    # daemon code ever read it; users could still run autofix manually
+    # from the Lint page.
+    model_config = ConfigDict(extra="ignore")
     schedule: str | None = None
     enabled_rules: list[str] | None = None
-    autofix_on_save: bool = False
 
 
 class SnapshotsSettings(BaseModel):
@@ -97,12 +97,11 @@ class SnapshotsSettings(BaseModel):
 
 
 class ProjectSettings(BaseModel):
-    # extra="ignore": forward-compat — silently absorbs v0.0.11- files that
-    # had watchdog/ontology/lifecycle/prompts/telemetry/ingest subgroups.
-    # Those were never read by any code path; dropped in v0.0.12.
+    # extra="ignore": forward-compat — silently absorbs old v0.0.11- groups
+    # (watchdog/ontology/lifecycle/prompts/telemetry/ingest, dropped v0.0.12)
+    # and the per-project `locale` (dropped v0.0.31 — locale is global-only).
     model_config = ConfigDict(extra="ignore")
     version: Literal[1] = 1
-    locale: Literal["uk", "ru", "en"] | None = None
     auto_ingest: AutoIngestSettings = Field(default_factory=AutoIngestSettings)
     lint: LintSettings = Field(default_factory=LintSettings)
     snapshots: SnapshotsSettings = Field(default_factory=SnapshotsSettings)
