@@ -16,20 +16,37 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
 import type { SessionStatus, SessionView } from "@/types/Session";
 
-// Brain-presence buckets. We deliberately key off created_pages.length —
-// not the ingest-job status — because "in the brain" means "produced
-// pages the user can actually browse", not "the job exited 0".
-type BrainState = "in_brain" | "in_progress" | "failed" | "not_in_brain";
+// Brain-presence buckets. A session goes through two stages:
+//   raw dump  →   "raw/chats/<id>.md" only; transcript saved, no knowledge
+//   extracted →   LLM-derived pages under wiki/, areas/, sources/, etc.
+// Both live in created_pages, distinguished only by path prefix. A session
+// that only has a raw dump is "saved but not in the brain" — Overview's
+// "pages included in context" stays 0 because raw chats don't get injected.
+type BrainState =
+  | "extracted"        // real knowledge pages exist
+  | "raw_only"         // transcript dumped but no extraction yet
+  | "in_progress"
+  | "failed"
+  | "not_in_brain";
+
+function isRawDumpPage(path: string): boolean {
+  return path.startsWith("raw/chats/") || path.startsWith("raw\\chats\\");
+}
 
 function brainState(s: SessionView): BrainState {
-  if (s.created_pages.length > 0) return "in_brain";
+  if (s.created_pages.length > 0) {
+    const hasExtracted = s.created_pages.some((p) => !isRawDumpPage(p));
+    if (hasExtracted) return "extracted";
+    return "raw_only";
+  }
   if (s.status === "queued" || s.status === "running") return "in_progress";
   if (s.status === "failed" || s.status === "dead_letter") return "failed";
   return "not_in_brain";
 }
 
 const STATE_BADGE: Record<BrainState, string> = {
-  in_brain: "bg-success/15 text-success border-success/30",
+  extracted: "bg-success/15 text-success border-success/30",
+  raw_only: "bg-info/15 text-info border-info/30",
   in_progress: "bg-warning/15 text-warning border-warning/30",
   failed: "bg-danger/15 text-danger border-danger/30",
   not_in_brain: "bg-muted/40 text-muted-foreground border-border",
@@ -55,8 +72,10 @@ export function SessionCard({ project, session: s }: Props) {
   const reingest = useReingestSession();
   const detailHref = `/project/${project}/sessions/${s.session_id}`;
   const state = brainState(s);
+  const extractedCount = s.created_pages.filter((p) => !isRawDumpPage(p)).length;
   const StateIcon = {
-    in_brain: BrainCircuit,
+    extracted: BrainCircuit,
+    raw_only: Brain,
     in_progress: Loader2,
     failed: CircleAlert,
     not_in_brain: Brain,
@@ -66,7 +85,8 @@ export function SessionCard({ project, session: s }: Props) {
     <Card
       className={cn(
         "border-l-4 transition-colors hover:bg-muted",
-        state === "in_brain" && "border-l-success/60",
+        state === "extracted" && "border-l-success/60",
+        state === "raw_only" && "border-l-info/60",
         state === "in_progress" && "border-l-warning/60",
         state === "failed" && "border-l-danger/60",
         state === "not_in_brain" && "border-l-accent/60",
@@ -96,12 +116,12 @@ export function SessionCard({ project, session: s }: Props) {
                   state === "in_progress" && "animate-spin",
                 )}
               />
-              {state === "in_brain"
-                ? t("sessions.brain.in_brain", { count: s.created_pages.length })
+              {state === "extracted"
+                ? t("sessions.brain.extracted", { count: extractedCount })
                 : t(`sessions.brain.${state}`)}
             </span>
           </div>
-          {s.status !== "succeeded" || state !== "in_brain" ? (
+          {s.status !== "succeeded" || state !== "extracted" ? (
             <span
               className={cn(
                 "mt-1 inline-flex items-center self-start rounded px-1.5 py-0.5 font-mono text-[10px] tracking-wider opacity-60",
@@ -156,54 +176,71 @@ export function SessionCard({ project, session: s }: Props) {
         </CardContent>
       </Link>
       {s.transcript_path && (
-        <CardContent className="pt-0">
-          {state === "not_in_brain" || state === "failed" ? (
-            <Button
-              size="sm"
-              variant="default"
-              disabled={reingest.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                reingest.mutate({
-                  project,
-                  session_id: s.session_id,
-                  transcript_path: s.transcript_path!,
-                });
-              }}
-            >
-              <Sparkles className="mr-1 h-3 w-3" />
-              {reingest.isPending
-                ? t("sessions.ingesting")
-                : state === "failed"
-                  ? t("sessions.retry_button")
-                  : t("sessions.ingest_button")}
-            </Button>
-          ) : state === "in_brain" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={reingest.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                reingest.mutate({
-                  project,
-                  session_id: s.session_id,
-                  transcript_path: s.transcript_path!,
-                });
-              }}
-            >
-              <RotateCcw className="mr-1 h-3 w-3" />
-              {reingest.isPending
-                ? t("sessions.ingesting")
-                : t("sessions.reingest_button")}
-            </Button>
-          ) : (
+        <CardContent className="flex flex-wrap gap-2 pt-0">
+          {state === "in_progress" ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("sessions.brain.in_progress")}…
             </span>
+          ) : (
+            <>
+              {/* Primary "extract" CTA when extraction would actually
+                  add something — i.e. raw dump exists but no pages yet,
+                  nothing exists at all, or extraction previously failed. */}
+              {(state === "not_in_brain" ||
+                state === "raw_only" ||
+                state === "failed") && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={reingest.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    reingest.mutate({
+                      project,
+                      session_id: s.session_id,
+                      transcript_path: s.transcript_path!,
+                      extract: true,
+                    });
+                  }}
+                  title={t("sessions.extract_hint")}
+                >
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  {reingest.isPending
+                    ? t("sessions.ingesting")
+                    : state === "raw_only"
+                      ? t("sessions.extract_button")
+                      : state === "failed"
+                        ? t("sessions.retry_button")
+                        : t("sessions.ingest_button")}
+                </Button>
+              )}
+              {/* Secondary "re-dump" — useful when transcript on disk was
+                  refreshed but we don't want to spend LLM tokens again. */}
+              {state === "extracted" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={reingest.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    reingest.mutate({
+                      project,
+                      session_id: s.session_id,
+                      transcript_path: s.transcript_path!,
+                      extract: false,
+                    });
+                  }}
+                >
+                  <RotateCcw className="mr-1 h-3 w-3" />
+                  {reingest.isPending
+                    ? t("sessions.ingesting")
+                    : t("sessions.reingest_button")}
+                </Button>
+              )}
+            </>
           )}
         </CardContent>
       )}

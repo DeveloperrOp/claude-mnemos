@@ -8,6 +8,8 @@ interface ReingestArgs {
   project: string;
   session_id: string;
   transcript_path: string;
+  /** Run LLM extraction in addition to raw dump (burns tokens). */
+  extract?: boolean;
 }
 
 /**
@@ -19,8 +21,13 @@ export function useReingestSession() {
   const qc = useQueryClient();
   const { t } = useTranslation();
   return useMutation({
-    mutationFn: ({ project, session_id, transcript_path }: ReingestArgs) =>
-      ingestSession(project, session_id, transcript_path),
+    mutationFn: ({
+      project,
+      session_id,
+      transcript_path,
+      extract = false,
+    }: ReingestArgs) =>
+      ingestSession(project, session_id, transcript_path, extract),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["session", vars.project, vars.session_id] });
       void qc.invalidateQueries({ queryKey: ["sessions", vars.project] });

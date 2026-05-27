@@ -392,12 +392,15 @@
     "ingesting": "Ingesting…",
     "job_status_hint": "Technical status of the last ingest job",
     "brain": {
-      "in_brain_one": "In brain · {{count}} page",
-      "in_brain_other": "In brain · {{count}} pages",
+      "extracted_one": "In brain · {{count}} knowledge page",
+      "extracted_other": "In brain · {{count}} knowledge pages",
+      "raw_only": "Saved · knowledge not extracted yet",
       "in_progress": "In progress",
       "failed": "Failed",
       "not_in_brain": "Not in brain"
     },
+    "extract_button": "Extract knowledge",
+    "extract_hint": "Run LLM extraction — creates Markdown knowledge pages. Burns subscription tokens.",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back",
     "bulk_import": {

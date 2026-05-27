@@ -39,10 +39,11 @@ export async function ingestSession(
   project: string,
   session_id: string,
   transcript_path: string,
+  extract = false,
 ): Promise<Job> {
   const r = await apiClient.post(
     `/sessions/${encodeURIComponent(project)}/${encodeURIComponent(session_id)}/ingest`,
-    { transcript_path },
+    { transcript_path, extract },
   );
   return r.data as Job;
 }

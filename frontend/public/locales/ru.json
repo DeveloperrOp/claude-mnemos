@@ -382,14 +382,17 @@
     "ingesting": "Ингестирую…",
     "job_status_hint": "Технический статус последнего ingest-задания",
     "brain": {
-      "in_brain_one": "В мозге · {{count}} страница",
-      "in_brain_few": "В мозге · {{count}} страницы",
-      "in_brain_many": "В мозге · {{count}} страниц",
-      "in_brain_other": "В мозге · {{count}} страниц",
+      "extracted_one": "В мозге · {{count}} страница знаний",
+      "extracted_few": "В мозге · {{count}} страницы знаний",
+      "extracted_many": "В мозге · {{count}} страниц знаний",
+      "extracted_other": "В мозге · {{count}} страниц знаний",
+      "raw_only": "Сохранён · знания ещё не извлечены",
       "in_progress": "В работе",
       "failed": "Ошибка",
       "not_in_brain": "Не в мозге"
     },
+    "extract_button": "Извлечь знания",
+    "extract_hint": "Запустит LLM-извлечение — создаст Markdown-страницы знаний. Тратит токены подписки.",
     "not_found_title": "Сессия не найдена",
     "not_found_hint": "Вернуться назад",
     "bulk_import": {

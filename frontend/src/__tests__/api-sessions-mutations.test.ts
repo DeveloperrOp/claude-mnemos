@@ -22,7 +22,7 @@ describe("sessions mutations", () => {
     const out = await ingestSession("alpha", "abc", "/x.md");
     expect(apiClient.post).toHaveBeenCalledWith(
       "/sessions/alpha/abc/ingest",
-      { transcript_path: "/x.md" },
+      { transcript_path: "/x.md", extract: false },
     );
     expect(out.id).toBe("j1");
   });

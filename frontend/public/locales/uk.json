@@ -382,14 +382,17 @@
     "ingesting": "Інжестую…",
     "job_status_hint": "Технічний статус останнього ingest-задачі",
     "brain": {
-      "in_brain_one": "У мозку · {{count}} сторінка",
-      "in_brain_few": "У мозку · {{count}} сторінки",
-      "in_brain_many": "У мозку · {{count}} сторінок",
-      "in_brain_other": "У мозку · {{count}} сторінок",
+      "extracted_one": "У мозку · {{count}} сторінка знань",
+      "extracted_few": "У мозку · {{count}} сторінки знань",
+      "extracted_many": "У мозку · {{count}} сторінок знань",
+      "extracted_other": "У мозку · {{count}} сторінок знань",
+      "raw_only": "Збережено · знання ще не витягнуті",
       "in_progress": "У роботі",
       "failed": "Помилка",
       "not_in_brain": "Не в мозку"
     },
+    "extract_button": "Витягти знання",
+    "extract_hint": "Запустить LLM-екстракцію — створить Markdown-сторінки знань. Витрачає токени підписки.",
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад",
     "bulk_import": {
