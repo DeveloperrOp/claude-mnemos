@@ -119,7 +119,7 @@ describe("GlobalGeneralSection", () => {
 });
 
 describe("GlobalDefaultsSection", () => {
-  it("changes default_model and PATCHes /settings/global", async () => {
+  it("changes default_model via preset dropdown and PATCHes /settings/global", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: FULL_GLOBAL });
     vi.spyOn(apiClient, "patch").mockResolvedValue({
       data: { ...FULL_GLOBAL, default_model: "claude-opus-4-7" },
@@ -128,9 +128,11 @@ describe("GlobalDefaultsSection", () => {
     await waitFor(() =>
       expect(screen.getByText("Defaults")).toBeInTheDocument(),
     );
-    const modelInput = screen.getByDisplayValue("claude-sonnet-4-6");
-    await userEvent.clear(modelInput);
-    await userEvent.type(modelInput, "claude-opus-4-7");
+    // v0.0.36 replaced the free-text model input with a preset select
+    // when the current value matches one of the known model IDs.
+    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    const modelSelect = selects.find((s) => s.value === "claude-sonnet-4-6")!;
+    await userEvent.selectOptions(modelSelect, "claude-opus-4-7");
     const save = screen.getByRole("button", { name: /Save/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);

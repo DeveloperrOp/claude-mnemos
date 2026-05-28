@@ -61,12 +61,58 @@ export function GlobalDefaultsSection() {
         <label className="text-xs text-muted-foreground">
           {t("settings.global.defaults.default_model")}
         </label>
-        <input
-          type="text"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          className="w-full rounded-md border bg-background px-2 py-1 font-mono"
-        />
+        {/* Preset dropdown for the three current top-tier Claude models +
+            "Custom" if the user wants to override (e.g. a future model id
+            we don't ship a preset for yet). Until v0.0.36 this was a free
+            text input — fine for the spec author, opaque for users. */}
+        {[
+          "claude-opus-4-7",
+          "claude-sonnet-4-6",
+          "claude-haiku-4-5",
+        ].includes(model) ? (
+          <select
+            value={model}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "__custom__") {
+                setModel("");  // empty → reveals raw input below
+              } else {
+                setModel(v);
+              }
+            }}
+            className="w-full rounded-md border bg-background px-2 py-1"
+          >
+            <option value="claude-opus-4-7">
+              Claude Opus 4.7 — {t("settings.global.defaults.model_opus_hint", "лучший, медленнее, дороже")}
+            </option>
+            <option value="claude-sonnet-4-6">
+              Claude Sonnet 4.6 — {t("settings.global.defaults.model_sonnet_hint", "баланс цена/качество (по умолчанию)")}
+            </option>
+            <option value="claude-haiku-4-5">
+              Claude Haiku 4.5 — {t("settings.global.defaults.model_haiku_hint", "быстрый и дешёвый, для простых задач")}
+            </option>
+            <option value="__custom__">
+              {t("settings.global.defaults.model_custom", "Своя модель (advanced)")}
+            </option>
+          </select>
+        ) : (
+          <div className="space-y-1">
+            <input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="claude-sonnet-4-6"
+              className="w-full rounded-md border bg-background px-2 py-1 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setModel("claude-sonnet-4-6")}
+              className="text-xs text-primary underline"
+            >
+              ← {t("settings.global.defaults.model_back_to_presets", "Вернуться к выбору")}
+            </button>
+          </div>
+        )}
       </div>
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">

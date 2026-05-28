@@ -406,8 +406,8 @@
       "failed": "Failed",
       "not_in_brain": "Not in brain"
     },
-    "extract_button": "Extract knowledge",
-    "extract_hint": "Run LLM extraction — creates Markdown knowledge pages. Burns subscription tokens.",
+    "extract_button": "Save as knowledge",
+    "extract_hint": "Claude reads the chat and creates Markdown knowledge pages. Uses your Claude subscription quota.",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back",
     "bulk_import": {
@@ -987,8 +987,8 @@
         "display_name_hint": "Shown in dashboard. Leave empty to clear.",
         "slug": "Slug (read-only)",
         "slug_hint": "Used in URLs and file paths. Fixed at creation.",
-        "vault": "Vault path",
-        "vault_hint": "Absolute path to vault. Changing it only updates the registry — move existing data files manually before saving.",
+        "vault": "Knowledge folder",
+        "vault_hint": "Where mnemos stores Markdown pages. Open this folder in Obsidian to see the brain.",
         "vault_warn": "Path changed. The daemon does NOT move data files automatically — make sure the new directory contains your vault content (or is empty for a fresh start) before saving.",
         "browse": "Browse",
         "cwd": "Project folders (auto-routing)",
@@ -996,7 +996,7 @@
       },
       "auto_ingest": {
         "title": "Auto-ingest",
-        "hint": "Controls what happens to your Claude Code sessions automatically. Dump = copy .jsonl into the vault (free). Extract = LLM extracts knowledge into Markdown pages (paid, tokens).",
+        "hint": "Controls what happens to your Claude Code sessions automatically. Save transcript = copy .jsonl into the vault (free). Save as knowledge = Claude extracts knowledge into Markdown pages (uses subscription quota).",
         "inherit": "Use global default",
         "inherit_on": "Use global (currently: ON)",
         "inherit_off": "Use global (currently: OFF)",
@@ -1007,7 +1007,7 @@
         "dump_stale_after_24h_label": "Dump stale sessions (24h cron)",
         "dump_stale_after_24h_hint": "A cron job at 03:00 picks up sessions that weren't updated for 24+ hours and were never dumped. Safety net for when the hook didn't fire (Claude crashed, etc.).",
         "extract_after_dump_label": "Extract after dump",
-        "extract_after_dump_hint": "After each dump the LLM extracts knowledge into Markdown pages. Burns subscription/API tokens on every session — enable only for a fully-automatic pipeline."
+        "extract_after_dump_hint": "After each chat is saved, Claude automatically extracts knowledge into Markdown pages. Uses your Claude subscription quota on every session — enable only for a fully-automatic pipeline."
       },
       "lint": {
         "title": "Lint",
@@ -1051,7 +1051,7 @@
         "dump_stale_after_24h_label": "Dump stale sessions (24h cron)",
         "dump_stale_after_24h_hint": "A cron job at 03:00 picks up sessions that weren't updated for 24+ hours.",
         "extract_after_dump_label": "Extract after dump",
-        "extract_after_dump_hint": "LLM extracts knowledge into Markdown pages after each dump. Burns tokens — enable only for a fully-automatic pipeline."
+        "extract_after_dump_hint": "Claude extracts knowledge into Markdown pages after each chat is saved. Uses subscription quota — enable only for a fully-automatic pipeline."
       }
     },
     "system": {
@@ -1147,6 +1147,16 @@
       "provenance_inferred_high": "High inferred provenance",
       "provenance_ambiguous_high": "High ambiguous provenance",
       "trailing_whitespace": "Trailing whitespace"
+    },
+    "rule_hints": {
+      "page_parse_failed": "Markdown page fails to parse (broken YAML frontmatter). With this rule off, the page is invisible in the list — keep it on.",
+      "wikilinks_broken": "Catches `[[entity]]` links pointing nowhere. Useful to clean out links to deleted/renamed pages.",
+      "orphan_pages": "Pages nothing else links to. In a large vault — deletion candidates; in a small one — fine.",
+      "stale_pages": "Pages not updated for > 90 days. Possibly outdated and worth a check.",
+      "duplicate_titles": "Two pages share a title. Useful — confuses Obsidian's lookup.",
+      "provenance_inferred_high": "Pages where the LLM inferred more than it extracted (provenance.inferred > 50%). Re-check — content may be speculative.",
+      "provenance_ambiguous_high": "Pages with a high share of ambiguous claims (provenance.ambiguous > 30%). Re-read and tighten.",
+      "trailing_whitespace": "Trailing whitespace on lines. Cosmetic — disable if it doesn't bother you."
     }
   }
 }

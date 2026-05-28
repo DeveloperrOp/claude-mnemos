@@ -60,7 +60,7 @@ describe("LintSection", () => {
     expect(save).toBeDisabled();
   });
 
-  it("editing cron schedule enables Save and PATCHes", async () => {
+  it("selecting daily preset enables Save and PATCHes the cron value", async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
       data: { ...FULL, lint: { schedule: "0 4 * * *", enabled_rules: null } },
@@ -70,8 +70,10 @@ describe("LintSection", () => {
       expect(screen.getByText("Lint")).toBeInTheDocument(),
     );
 
-    const scheduleInput = screen.getByPlaceholderText("0 4 * * *");
-    await userEvent.type(scheduleInput, "0 4 * * *");
+    // v0.0.36: schedule is a preset dropdown, raw cron input only shown
+    // when "Своё" is picked. Choose the daily preset = "0 4 * * *".
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    await userEvent.selectOptions(select, "0 4 * * *");
     const save = screen.getByRole("button", { name: /Save/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);

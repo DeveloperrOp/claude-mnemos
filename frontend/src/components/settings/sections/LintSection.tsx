@@ -91,16 +91,45 @@ export function LintSection({ slug }: Props) {
         <label className="text-xs font-medium">
           {t("settings.section.lint.schedule")}
         </label>
-        <input
-          type="text"
-          value={schedule}
-          onChange={(e) => setSchedule(e.target.value)}
-          placeholder="0 4 * * *"
-          className="w-full rounded-md border bg-background px-2 py-1 font-mono text-xs"
-        />
-        <p className="text-xs text-muted-foreground">
-          {t("settings.section.lint.schedule_hint")}
-        </p>
+        {/* Preset dropdown first — covers 90% of cases without the user
+            knowing cron syntax. "Своё" surfaces the raw text field. */}
+        <select
+          value={
+            schedule === "" ? "" :
+            schedule === "0 * * * *" ? "0 * * * *" :
+            schedule === "0 4 * * *" ? "0 4 * * *" :
+            schedule === "0 4 * * 0" ? "0 4 * * 0" :
+            "custom"
+          }
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "custom") {
+              // Keep current value (or seed with daily preset for editing)
+              if (schedule === "" || ["0 * * * *", "0 4 * * *", "0 4 * * 0"].includes(schedule)) {
+                setSchedule("0 4 * * *");
+              }
+            } else {
+              setSchedule(v);
+            }
+          }}
+          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+        >
+          <option value="">{t("settings.section.lint.schedule_none", "Не запускать автоматически")}</option>
+          <option value="0 * * * *">{t("settings.section.lint.schedule_hourly", "Каждый час")}</option>
+          <option value="0 4 * * *">{t("settings.section.lint.schedule_daily", "Каждый день в 04:00")}</option>
+          <option value="0 4 * * 0">{t("settings.section.lint.schedule_weekly", "Раз в неделю (Вс 04:00)")}</option>
+          <option value="custom">{t("settings.section.lint.schedule_custom", "Своё (cron-формат)")}</option>
+        </select>
+        {/* Raw cron input shown only when "custom" preset is active */}
+        {schedule !== "" && !["0 * * * *", "0 4 * * *", "0 4 * * 0"].includes(schedule) && (
+          <input
+            type="text"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            placeholder="0 4 * * *"
+            className="w-full rounded-md border bg-background px-2 py-1 font-mono text-xs"
+          />
+        )}
       </div>
       <div className="space-y-1">
         <label className="text-xs font-medium">
@@ -109,15 +138,26 @@ export function LintSection({ slug }: Props) {
         <p className="text-xs text-muted-foreground">
           {t("settings.section.lint.enabled_rules_hint")}
         </p>
-        <div className="grid grid-cols-1 gap-1 rounded-md border bg-muted/30 p-2 sm:grid-cols-2">
+        <div className="space-y-1 rounded-md border bg-muted/30 p-2">
           {AVAILABLE_RULES.map((rule) => (
-            <label key={rule} className="flex items-center gap-2 text-xs">
+            <label
+              key={rule}
+              className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 hover:bg-muted/50"
+            >
               <input
                 type="checkbox"
                 checked={isRuleOn(rule)}
                 onChange={() => toggleRule(rule)}
+                className="mt-0.5"
               />
-              <span className="font-mono">{t(`lint.rules.${rule}`, rule)}</span>
+              <span className="block flex-1 space-y-0.5">
+                <span className="block text-xs">
+                  {t(`lint.rules.${rule}`, rule)}
+                </span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {t(`lint.rule_hints.${rule}`, { defaultValue: "" })}
+                </span>
+              </span>
             </label>
           ))}
         </div>

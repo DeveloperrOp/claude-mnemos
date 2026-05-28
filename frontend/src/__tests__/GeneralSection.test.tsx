@@ -62,13 +62,13 @@ function wrap(ui: ReactNode) {
 }
 
 describe("GeneralSection", () => {
-  it("renders display_name, slug RO, vault editable + Browse, CWD list", () => {
+  it("renders display_name, vault editable + Browse, CWD list (slug field removed v0.0.36)", () => {
     wrap(<GeneralSection project={PROJECT} />);
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Project One")).toBeInTheDocument();
-    const slugInput = screen.getByDisplayValue("p1");
-    expect(slugInput).toHaveAttribute("readonly");
-    // Vault is now editable (no readonly attribute) and has a Browse button.
+    // Slug input dropped from the UI in v0.0.36 — internal-only detail.
+    expect(screen.queryByDisplayValue("p1")).not.toBeInTheDocument();
+    // Vault is editable + Browse button.
     const vaultInput = screen.getByDisplayValue("/tmp/p1");
     expect(vaultInput).not.toHaveAttribute("readonly");
     expect(screen.getByRole("button", { name: /Browse|Обзор|Огляд/i })).toBeInTheDocument();

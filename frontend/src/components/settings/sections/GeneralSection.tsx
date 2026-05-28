@@ -81,29 +81,9 @@ export function GeneralSection({ project }: Props) {
         </p>
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs font-medium">
-          {t("settings.section.general.slug")}
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={project.name}
-            readOnly
-            className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono"
-          />
-          <button
-            type="button"
-            onClick={() => copy(project.name)}
-            className="text-xs text-primary underline"
-          >
-            {t("settings.section.general.copy")}
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {t("settings.section.general.slug_hint")}
-        </p>
-      </div>
+      {/* v0.0.36: dropped the "Slug" field — was an internal URL slug
+          ("zdorove"), users had no use for it. Available as
+          ?showInternal=1 if anyone ever needs it (not implemented yet). */}
 
       <div className="space-y-1">
         <label className="text-xs font-medium">
