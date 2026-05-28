@@ -26,14 +26,26 @@ LicenseFile=
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=dist
 OutputBaseFilename=claude-mnemos-setup-x64
-Compression=lzma2/ultra
-SolidCompression=yes
+; Switched from lzma2/ultra + SolidCompression in v0.0.34 — those
+; settings produce a tightly packed exe that Defender's heuristic
+; scanner increasingly flags as suspicious on Win11. Default lzma
+; (no /ultra, no solid) yields a slightly larger but more readily
+; trusted binary.
+Compression=lzma
 WizardStyle=modern
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 CloseApplications=force
 RestartApplications=no
 UninstallDisplayIcon={app}\{#MyAppExeName}
+; Full VersionInfo block — exe with rich metadata is less likely to
+; trip Defender's "unknown vendor" heuristic.
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=claude-mnemos installer
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (c) 2026 {#MyAppPublisher}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
