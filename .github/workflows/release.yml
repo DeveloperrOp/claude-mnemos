@@ -72,6 +72,27 @@ jobs:
           choco install innosetup -y --no-progress
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/mnemos.iss
 
+      # Portable zip — bypasses Windows App Control / SmartScreen which
+      # blocks unsigned installers. User unzips and runs claude-mnemos.exe
+      # directly. Includes the same PyInstaller bundle the installer ships.
+      - name: Build Windows portable zip
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/windows/dist | Out-Null
+          Compress-Archive `
+            -Path dist/claude-mnemos/* `
+            -DestinationPath installer/windows/dist/claude-mnemos-portable-x64.zip `
+            -Force
+
+      - name: Upload portable zip artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-mnemos-portable-x64.zip
+          path: installer/windows/dist/claude-mnemos-portable-x64.zip
+          if-no-files-found: error
+
       - name: Build macOS DMG
         if: matrix.os == 'macos-latest'
         run: |
@@ -109,5 +130,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/claude-mnemos-setup-x64.exe/claude-mnemos-setup-x64.exe
+            artifacts/claude-mnemos-portable-x64.zip/claude-mnemos-portable-x64.zip
             artifacts/claude-mnemos.dmg/claude-mnemos.dmg
             artifacts/claude-mnemos-x86_64.AppImage/claude-mnemos-x86_64.AppImage
