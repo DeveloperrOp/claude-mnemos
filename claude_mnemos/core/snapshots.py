@@ -368,6 +368,24 @@ def create_snapshot_at(
     in a snapshot path before promote, so activity entries can reference it).
     """
     if snap_path.exists():
+        # Idempotent reuse: if the existing snapshot was created for the
+        # exact same (operation_id, operation_type) — i.e. this is a retry
+        # of the same logical operation hitting the same-second timestamp —
+        # treat it as the snapshot we'd be creating anyway and return it.
+        # The previous behaviour (always raise SnapshotError) dead-lettered
+        # legitimate retries when the worker re-ran a failed ingest within
+        # one second of the first attempt.
+        meta_file = snap_path / META_FILENAME
+        if meta_file.is_file():
+            try:
+                existing_meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                if (
+                    existing_meta.get("operation_id") == operation_id
+                    and existing_meta.get("operation_type") == operation_type
+                ):
+                    return snap_path
+            except (json.JSONDecodeError, OSError):
+                pass  # corrupt meta — fall through to raise below
         raise SnapshotError(f"snapshot already exists: {snap_path}")
 
     snap_path.parent.mkdir(parents=True, exist_ok=True)

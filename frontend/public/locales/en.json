@@ -225,6 +225,13 @@
         "lock_timeout": "Lock timeout",
         "parse_failed": "Parse failed",
         "handler_error": "Handler error"
+      },
+      "kind_hints": {
+        "external_create": "Some other tool (Obsidian, an IDE, etc.) added a file to the vault. If you didn't expect it, check the contents, then dismiss the alert.",
+        "external_rename": "An external process renamed a file in the vault. Usually safe (often Obsidian during atomic save). Dismiss if everything looks right.",
+        "lock_timeout": "Another process held the pipeline lock longer than expected. Check that mnemos / Obsidian aren't stuck and retry the operation.",
+        "parse_failed": "A Markdown page failed to parse — broken YAML frontmatter. Open the file in your editor and fix the syntax.",
+        "handler_error": "Internal background-task error. See the details below; if it repeats, file an issue on GitHub."
       }
     },
     "dismiss_error": "Dismiss failed: {{message}}",

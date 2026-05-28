@@ -109,8 +109,16 @@ export function LostSessionsManager({
 
   function runImport() {
     if (selectedSessions.length === 0) return;
+    // Previously the whole Import button was disabled when any selected
+    // session had no project_name. Now we import the assigned ones and
+    // skip the rest — useLostSessionsImportSelection already emits a
+    // multi-bucket toast (queued / skipped / missing).
+    const assignable = selectedSessions.filter(
+      (s) => !isUnassigned(s.project_name),
+    );
+    if (assignable.length === 0) return;
     importSelection.mutate(
-      { selected: selectedSessions },
+      { selected: assignable },
       { onSuccess: () => setSelected(new Set()) },
     );
     setConfirmImport(false);
@@ -251,11 +259,18 @@ export function LostSessionsManager({
               disabled={
                 importSelection.isPending ||
                 ignoreSelection.isPending ||
-                selectionHasUnassigned
+                // Only fully disabled when ALL selected sessions are
+                // unassigned — there'd be nothing to import. Otherwise
+                // the unassigned ones are silently skipped (the toast
+                // surfaces the count).
+                selectedSessions.every((s) => isUnassigned(s.project_name))
               }
               title={
                 selectionHasUnassigned
-                  ? t("lost_sessions.selection.unassigned_import_blocked")
+                  ? t("lost_sessions.selection.unassigned_skipped_hint", {
+                      defaultValue:
+                        "Сессии без проекта будут пропущены — назначь их вручную чтобы импортировать.",
+                    })
                   : undefined
               }
             >

@@ -23,7 +23,7 @@ export function PageCard({ project, path, frontmatter: fm }: Props) {
           <Link to={href} className="line-clamp-2 font-semibold hover:underline">
             {fm.title}
           </Link>
-          <StatusBadge status={fm.status} />
+          <StatusBadge status={fm.status} hideDefault />
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
           <span>{t(`wiki.type.${fm.type}`)}</span>

@@ -33,7 +33,7 @@ const fm: WikiPageFrontmatter = {
 };
 
 describe("PageCard", () => {
-  it("renders title, type, status, confidence", () => {
+  it("renders title, type, confidence — but hides Draft badge (default)", () => {
     render(
       <MemoryRouter>
         <PageCard project="alpha" path="wiki/concepts/foo.md" frontmatter={fm} />
@@ -41,9 +41,24 @@ describe("PageCard", () => {
     );
     expect(screen.getByText("Foo")).toBeInTheDocument();
     expect(screen.getByText("Concept")).toBeInTheDocument();
-    expect(screen.getByText("Draft")).toBeInTheDocument();
+    // v0.0.35: the "Draft" badge no longer renders for the default status —
+    // every LLM-extracted page lands as draft, so the badge was noise.
+    expect(screen.queryByText("Draft")).not.toBeInTheDocument();
     expect(screen.getByText("70%")).toBeInTheDocument();
     expect(screen.getByText("Pattern")).toBeInTheDocument();
+  });
+
+  it("still renders non-default status (e.g. verified)", () => {
+    render(
+      <MemoryRouter>
+        <PageCard
+          project="alpha"
+          path="wiki/concepts/foo.md"
+          frontmatter={{ ...fm, status: "verified" }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Verified")).toBeInTheDocument();
   });
 
   it("links to page detail", () => {

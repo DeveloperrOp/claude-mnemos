@@ -71,21 +71,38 @@ def ingest(
         manifest = Manifest.load(vault_root)
         if sha in manifest.ingested:
             existing = manifest.ingested[sha]
-            return IngestResult(
-                status="already_ingested",
-                session_id=existing.session_id,
-                raw_path=vault_root / existing.raw_path,
-                source_path=(
-                    vault_root / existing.source_path if existing.source_path else None
-                ),
-                created_pages=[vault_root / p for p in existing.created_pages],
-                skipped_collisions=existing.skipped_collisions,
-                model=existing.model,
-                input_tokens=existing.input_tokens,
-                output_tokens=existing.output_tokens,
-                snapshot_path=None,
-                activity_id=None,
+            # If we already have real knowledge pages — or the caller didn't
+            # ask for extract this run — the previous result is final.
+            # Otherwise this is the "first run was raw-only, user clicked
+            # Extract knowledge" case: drop the manifest entry so the
+            # extract path below runs from scratch. Without this the
+            # session reports success and stays raw-only forever, which
+            # was reported as "Извлечь знания → очередь сразу завершено,
+            # ничего не появилось в мозге".
+            already_extracted = any(
+                not (p.startswith("raw/chats/") or p.startswith("raw\\chats\\"))
+                for p in existing.created_pages
             )
+            if already_extracted or not extract:
+                return IngestResult(
+                    status="already_ingested",
+                    session_id=existing.session_id,
+                    raw_path=vault_root / existing.raw_path,
+                    source_path=(
+                        vault_root / existing.source_path
+                        if existing.source_path
+                        else None
+                    ),
+                    created_pages=[vault_root / p for p in existing.created_pages],
+                    skipped_collisions=existing.skipped_collisions,
+                    model=existing.model,
+                    input_tokens=existing.input_tokens,
+                    output_tokens=existing.output_tokens,
+                    snapshot_path=None,
+                    activity_id=None,
+                )
+            # Fall through: re-run extract on top of the existing raw dump.
+            manifest.ingested.pop(sha, None)
 
         activity = ActivityLog.load(vault_root)
 

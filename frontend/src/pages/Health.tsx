@@ -251,6 +251,13 @@ export function Health() {
                         {a.message && !isKnownKind && (
                           <div className="mt-1 break-words text-sm">{a.message}</div>
                         )}
+                        {isKnownKind && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {t(`health.alerts.kind_hints.${a.kind}`, {
+                              defaultValue: "",
+                            })}
+                          </div>
+                        )}
                         {shortPath && (
                           <div
                             className="mt-1 truncate font-mono text-xs text-muted-foreground"

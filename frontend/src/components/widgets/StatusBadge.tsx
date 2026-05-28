@@ -14,8 +14,17 @@ const VARIANT: Record<PageStatus, string> = {
   archived: "bg-muted/30 text-muted-foreground/60",
 };
 
-export function StatusBadge({ status }: { status: PageStatus }) {
+interface Props {
+  status: PageStatus;
+  /** Hide the badge entirely for the boring default (draft) status. The
+   * page list otherwise lights up "ЧЕРНОВИК" on every single LLM-extracted
+   * page, which conveys no information — every fresh page starts there. */
+  hideDefault?: boolean;
+}
+
+export function StatusBadge({ status, hideDefault = false }: Props) {
   const { t } = useTranslation();
+  if (hideDefault && status === "draft") return null;
   return (
     <span
       data-status={status}
