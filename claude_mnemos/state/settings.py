@@ -15,7 +15,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from claude_mnemos.core.atomic import atomic_write
 from claude_mnemos.state.projects import (
@@ -90,10 +90,35 @@ class LintSettings(BaseModel):
     enabled_rules: list[str] | None = None
 
 
+SnapshotSchedule = Literal["off", "daily", "weekly", "monthly"]
+
+
 class SnapshotsSettings(BaseModel):
+    # extra="forbid" keeps schema tight, but a model_validator below first
+    # migrates the legacy v0.0.38 `daily_enabled` boolean so old on-disk
+    # files keep loading instead of tripping the forbid rule.
     model_config = ConfigDict(extra="forbid")
-    daily_enabled: bool = True
+    # v0.0.39: `daily_enabled: bool` → `schedule` preset. The job always
+    # produces a `daily-<date>` snapshot; the preset only controls how
+    # often the scheduler fires it ("off" = no automatic snapshots).
+    schedule: SnapshotSchedule = "daily"
     retention_days: int = Field(default=180, ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_daily_enabled(cls, data: Any) -> Any:
+        """Convert the legacy `daily_enabled` boolean to `schedule`.
+
+        v0.0.38- on-disk files store ``daily_enabled: true|false``. Pop it
+        before field validation (extra="forbid" would otherwise reject it)
+        and map True→"daily", False→"off". An explicit ``schedule`` already
+        present in the payload always wins.
+        """
+        if isinstance(data, dict) and "daily_enabled" in data:
+            data = dict(data)
+            legacy = data.pop("daily_enabled")
+            data.setdefault("schedule", "daily" if legacy else "off")
+        return data
 
 
 class ProjectSettings(BaseModel):

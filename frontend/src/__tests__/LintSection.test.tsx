@@ -11,7 +11,7 @@ const FULL = {
   version: 1,
   auto_ingest: {},
   lint: { schedule: null, enabled_rules: null },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
 };
 
 beforeEach(() => {

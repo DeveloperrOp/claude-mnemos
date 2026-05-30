@@ -10,19 +10,24 @@ See docs/plans/2026-04-30-llm-cli-provider-design.md §5 for rationale.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from collections.abc import Callable
 from typing import Any
 
-from claude_mnemos.config import Config
+from claude_mnemos.config import Config, fallback_model
 from claude_mnemos.ingest.llm import (
     ExtractionRaw,
     LLMExtractionError,
+    ModelNotFoundError,
 )
 from claude_mnemos.ingest.llm.auth import find_claude_binary
+from claude_mnemos.ingest.llm.model_fallback import looks_like_model_not_found
 from claude_mnemos.ingest.llm.rate_limit import parse_rate_limit_from_stderr
 from claude_mnemos.ingest.llm.tokens import count_tokens_local
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT_SEC = 600  # 10 min — large chats (4MB+ jsonl) need it
 # v0.0.37: was 120s, killed extraction on every >2MB transcript. The CLI
@@ -55,6 +60,10 @@ class CliLLMClient:
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
+        # Effective model passed to `claude -p --model`. Flipped to
+        # fallback_model(cfg.model) once if the CLI rejects cfg.model as
+        # unknown, so subsequent calls reuse the working id.
+        self._model = cfg.model
 
     def extract(
         self,
@@ -71,7 +80,7 @@ class CliLLMClient:
                 "switch to ApiLLMClient via ingest_provider='api'"
             )
 
-        payload = self._call_once(str(binary), system, user, tool)
+        payload = self._call_with_model_fallback(str(binary), system, user, tool)
 
         first_validation_error: Exception | None = None
         if validate is not None:
@@ -108,6 +117,32 @@ class CliLLMClient:
             ) from exc
         return self._build_result(system, retry_user, payload2)
 
+    def _call_with_model_fallback(
+        self,
+        binary: str,
+        system: str,
+        user: str,
+        tool: dict[str, Any],
+    ) -> dict[str, Any]:
+        """First model call. If ``claude -p`` rejects ``cfg.model`` as unknown,
+        switch ``self._model`` to ``fallback_model(cfg.model)`` once and retry,
+        so a retired model id doesn't break every ingest until the user edits
+        the setting. Subsequent calls (validation retries) reuse the fallback.
+        """
+        try:
+            return self._call_once(binary, system, user, tool)
+        except ModelNotFoundError:
+            fb = fallback_model(self.cfg.model)
+            if fb == self._model:
+                raise  # nothing else to try
+            logger.warning(
+                "model %s rejected by claude -p; retrying with fallback %s",
+                self._model,
+                fb,
+            )
+            self._model = fb
+            return self._call_once(binary, system, user, tool)
+
     def _call_once(
         self,
         binary: str,
@@ -118,6 +153,7 @@ class CliLLMClient:
         cmd = [
             binary,
             "-p",
+            "--model", self._model,
             "--output-format", "json",
             "--json-schema", json.dumps(tool["input_schema"]),
             "--system-prompt", system,
@@ -146,6 +182,11 @@ class CliLLMClient:
             rate_err = parse_rate_limit_from_stderr(result.stderr)
             if rate_err is not None:
                 raise rate_err
+            if looks_like_model_not_found(result.stderr):
+                raise ModelNotFoundError(
+                    f"model {self._model!r} rejected by claude -p: "
+                    f"{result.stderr.strip()[:500]}"
+                )
             raise LLMExtractionError(
                 f"claude -p exit {result.returncode}: {result.stderr.strip()[:500]}"
             )

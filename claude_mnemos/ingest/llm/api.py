@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
 
-from claude_mnemos.config import Config
+from claude_mnemos.config import Config, fallback_model
+from claude_mnemos.ingest.llm.model_fallback import looks_like_model_not_found
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_TOKENS = 8000
 DEFAULT_TIMEOUT_SEC = 120.0
@@ -22,6 +26,24 @@ class TranscriptTooLargeError(RuntimeError):
 
 class LLMExtractionError(RuntimeError):
     """Raised when LLM call fails to produce a valid tool_use payload after retry."""
+
+
+class ModelNotFoundError(LLMExtractionError):
+    """The configured model id was rejected by the provider (CLI or API).
+
+    Subclasses ``LLMExtractionError`` so existing ``except LLMExtractionError``
+    catches still fire if no usable fallback exists. The extract() flow catches
+    it internally and retries once with ``config.fallback_model`` before letting
+    it propagate.
+    """
+
+
+def _api_error_is_model_not_found(exc: Exception) -> bool:
+    """True if an anthropic exception means 'that model id does not exist'."""
+    status = getattr(exc, "status_code", None)
+    if status == 404:
+        return True
+    return looks_like_model_not_found(str(exc))
 
 
 @dataclass(frozen=True)
@@ -43,6 +65,10 @@ class ApiLLMClient:
                 "ANTHROPIC_API_KEY is not set. Use --no-llm to skip extraction."
             )
         self.cfg = cfg
+        # Effective model for this client. extract() flips it to
+        # fallback_model(cfg.model) once if the provider rejects cfg.model,
+        # so all subsequent calls (validation retries) reuse the working one.
+        self._model = cfg.model
         self._client = _client or anthropic.Anthropic(
             api_key=cfg.api_key,
             max_retries=2,
@@ -69,13 +95,17 @@ class ApiLLMClient:
 
         try:
             tc = self._client.messages.count_tokens(
-                model=self.cfg.model,
+                model=self._model,
                 system=system_blocks,  # type: ignore[arg-type]
                 tools=[tool],  # type: ignore[list-item]
                 messages=user_messages,  # type: ignore[arg-type]
             )
             input_tokens = int(tc.input_tokens)
         except (AttributeError, TypeError):
+            input_tokens = 0
+        except anthropic.APIError:
+            # Can't pre-count (e.g. the model id is rejected) — skip the size
+            # guard and let _call_once() surface/handle the real error.
             input_tokens = 0
 
         if input_tokens > self.cfg.max_input_tokens:
@@ -84,7 +114,7 @@ class ApiLLMClient:
                 f"max_input_tokens={self.cfg.max_input_tokens}"
             )
 
-        payload = self._call_once(system_blocks, user_messages, tool)
+        payload = self._call_with_model_fallback(system_blocks, user_messages, tool)
         first_validation_error: Exception | None = None
         if validate is not None:
             try:
@@ -120,6 +150,31 @@ class ApiLLMClient:
             ) from exc
         return self._build_result(payload2)
 
+    def _call_with_model_fallback(
+        self,
+        system_blocks: list[dict[str, Any]],
+        messages: list[dict[str, Any]],
+        tool: dict[str, Any],
+    ) -> dict[str, Any]:
+        """First model call. If the provider rejects ``cfg.model`` as unknown,
+        switch ``self._model`` to ``fallback_model(cfg.model)`` once and retry,
+        so a retired model id doesn't break every ingest until the user edits
+        the setting. Subsequent calls (validation retries) reuse the fallback.
+        """
+        try:
+            return self._call_once(system_blocks, messages, tool)
+        except ModelNotFoundError:
+            fb = fallback_model(self.cfg.model)
+            if fb == self._model:
+                raise  # nothing else to try
+            logger.warning(
+                "model %s rejected by Anthropic API; retrying with fallback %s",
+                self._model,
+                fb,
+            )
+            self._model = fb
+            return self._call_once(system_blocks, messages, tool)
+
     def _call_once(
         self,
         system_blocks: list[dict[str, Any]],
@@ -128,7 +183,7 @@ class ApiLLMClient:
     ) -> dict[str, Any]:
         try:
             resp = self._client.messages.create(  # type: ignore[call-overload]
-                model=self.cfg.model,
+                model=self._model,
                 system=system_blocks,
                 tools=[tool],
                 tool_choice={"type": "tool", "name": tool["name"]},
@@ -136,6 +191,10 @@ class ApiLLMClient:
                 max_tokens=DEFAULT_MAX_TOKENS,
             )
         except anthropic.APIError as exc:
+            if _api_error_is_model_not_found(exc):
+                raise ModelNotFoundError(
+                    f"model {self._model!r} not available: {exc}"
+                ) from exc
             raise LLMExtractionError(f"anthropic API error: {exc}") from exc
 
         self._last_input_tokens = int(getattr(resp.usage, "input_tokens", 0))

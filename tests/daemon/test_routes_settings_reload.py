@@ -36,7 +36,7 @@ def test_patch_project_settings_reloads_runtime(
     tmp_path: Path,
 ) -> None:
     """PATCH /settings/{name} must remove the daily_snapshot job when
-    snapshots.daily_enabled is flipped to False on a mounted runtime."""
+    snapshots.schedule is flipped to "off" on a mounted runtime."""
     daemon, client = daemon_with_app
     vault = tmp_path / "alpha"
     vault.mkdir()
@@ -48,7 +48,7 @@ def test_patch_project_settings_reloads_runtime(
     # After mount the daily_snapshot job must be present.
     assert daemon.scheduler.get_job("daily_snapshot:alpha") is not None
 
-    r = client.patch("/api/settings/alpha", json={"snapshots": {"daily_enabled": False}})
+    r = client.patch("/api/settings/alpha", json={"snapshots": {"schedule": "off"}})
     assert r.status_code == 200, r.text
 
     # reload_project_settings must have removed the job.

@@ -19,8 +19,19 @@ export const LintSettingsSchema = z.object({
 });
 export type LintSettings = z.infer<typeof LintSettingsSchema>;
 
+// v0.0.39: `daily_enabled` boolean → `schedule` preset. The backend
+// migrates legacy files, so responses always carry `schedule`; the
+// default keeps us safe if an older cached payload omits it.
+export const SnapshotScheduleSchema = z.enum([
+  "off",
+  "daily",
+  "weekly",
+  "monthly",
+]);
+export type SnapshotSchedule = z.infer<typeof SnapshotScheduleSchema>;
+
 export const SnapshotsSettingsSchema = z.object({
-  daily_enabled: z.boolean().default(true),
+  schedule: SnapshotScheduleSchema.default("daily"),
   retention_days: z.number().int().min(1).default(180),
 });
 export type SnapshotsSettings = z.infer<typeof SnapshotsSettingsSchema>;

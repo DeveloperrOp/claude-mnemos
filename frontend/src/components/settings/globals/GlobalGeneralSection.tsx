@@ -33,10 +33,39 @@ export function GlobalGeneralSection() {
         ? "linux"
         : "win";
 
-  // Programmatic restart: POST /api/daemon/restart. The daemon exits
-  // cleanly after replying; the tray supervisor (Windows) respawns it.
-  // We poll the new instance for ~15s after the request to know when
-  // to reload the page.
+  // Shared restart flow used by both "Restart daemon" and "Save + restart".
+  // The daemon exits cleanly after replying to /daemon/restart; the tray
+  // supervisor (Windows) respawns it. We poll the new instance for ~15s and
+  // reload the SPA once it answers /version, else fall back to manual help.
+  const handleRestartResponse = async (data: {
+    ok: boolean;
+    supervised: boolean;
+  }) => {
+    if (!data.supervised) {
+      // No supervisor — daemon will go down and stay down. Show the
+      // platform-specific manual-restart dialog.
+      setRestartHelpOpen(true);
+      return;
+    }
+    toast.info(
+      t("settings.global.general.restart_in_progress", "Демон перезапускается…"),
+    );
+    const t0 = Date.now();
+    while (Date.now() - t0 < 15000) {
+      await new Promise((r) => setTimeout(r, 800));
+      try {
+        await apiClient.get("/version");
+        // It's back — reload to drop any stale state in the SPA.
+        window.location.reload();
+        return;
+      } catch {
+        // not back yet
+      }
+    }
+    setRestartHelpOpen(true);
+  };
+
+  // Programmatic restart: POST /api/daemon/restart only (no save).
   const restartMut = useMutation({
     mutationFn: async () => {
       const r = await apiClient.post<{ ok: boolean; supervised: boolean }>(
@@ -44,39 +73,30 @@ export function GlobalGeneralSection() {
       );
       return r.data;
     },
-    onSuccess: async (data) => {
-      if (!data.supervised) {
-        // No supervisor — daemon will go down and stay down. Show the
-        // platform-specific manual-restart dialog.
-        setRestartHelpOpen(true);
-        return;
-      }
-      toast.info(
-        t(
-          "settings.global.general.restart_in_progress",
-          "Демон перезапускается…",
-        ),
-      );
-      // Poll for the new instance by hitting /version. Reload once it
-      // answers, or fall back to the help dialog after ~15s.
-      const t0 = Date.now();
-      while (Date.now() - t0 < 15000) {
-        await new Promise((r) => setTimeout(r, 800));
-        try {
-          await apiClient.get("/version");
-          // It's back — reload to drop any stale state in the SPA.
-          window.location.reload();
-          return;
-        } catch {
-          // not back yet
-        }
-      }
-      setRestartHelpOpen(true);
-    },
+    onSuccess: handleRestartResponse,
     onError: (err) => {
       toast.error(extractApiError(err));
     },
   });
+
+  // One-click "save settings, then restart". Persists the port change first
+  // (PATCH must succeed) so the daemon comes back up on the new port — the
+  // user no longer has to remember to Save before restarting.
+  const saveAndRestartMut = useMutation({
+    mutationFn: async () => {
+      await mut.mutateAsync({ locale, daemon_port: daemonPort });
+      const r = await apiClient.post<{ ok: boolean; supervised: boolean }>(
+        "/daemon/restart",
+      );
+      return r.data;
+    },
+    onSuccess: handleRestartResponse,
+    onError: (err) => {
+      toast.error(extractApiError(err));
+    },
+  });
+
+  const restarting = restartMut.isPending || saveAndRestartMut.isPending;
 
   useEffect(() => {
     if (data) {
@@ -146,26 +166,43 @@ export function GlobalGeneralSection() {
                   "Changing the daemon port requires a daemon restart and reloading the dashboard at the new port (http://127.0.0.1:{{port}}). The UI will go blank until then.",
               })}
             </p>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={restartMut.isPending}
-              onClick={() => restartMut.mutate()}
-            >
-              <RefreshCw
-                className={`mr-1 h-3 w-3 ${restartMut.isPending ? "animate-spin" : ""}`}
-              />
-              {restartMut.isPending
-                ? t(
-                    "settings.global.general.restart_in_progress",
-                    "Демон перезапускается…",
-                  )
-                : t(
-                    "settings.global.general.restart_daemon_btn",
-                    "Перезапустить демон",
-                  )}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Primary path: persist the new port, THEN restart, in one
+                  click — so the daemon actually comes back on the new port. */}
+              <Button
+                size="sm"
+                variant="default"
+                type="button"
+                disabled={restarting || mut.isPending}
+                onClick={() => saveAndRestartMut.mutate()}
+              >
+                <RefreshCw
+                  className={`mr-1 h-3 w-3 ${restarting ? "animate-spin" : ""}`}
+                />
+                {restarting
+                  ? t(
+                      "settings.global.general.restart_in_progress",
+                      "Демон перезапускается…",
+                    )
+                  : t(
+                      "settings.global.general.save_and_restart_btn",
+                      "Сохранить и перезапустить",
+                    )}
+              </Button>
+              {/* Secondary: restart only (when the port was already saved). */}
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                disabled={restarting}
+                onClick={() => restartMut.mutate()}
+              >
+                {t(
+                  "settings.global.general.restart_daemon_btn",
+                  "Перезапустить демон",
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </div>

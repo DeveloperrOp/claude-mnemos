@@ -18,7 +18,7 @@ const FULL = {
     extract_after_dump: null,
   },
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
 };
 
 const GLOBAL = {

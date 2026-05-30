@@ -114,7 +114,7 @@ def test_e2e_register_project_then_patch_settings(isolated_home: Path) -> None:
 
         r = httpx.patch(
             f"{url}/api/settings/myvault",
-            json={"snapshots": {"retention_days": 7, "daily_enabled": False}},
+            json={"snapshots": {"retention_days": 7, "schedule": "off"}},
             timeout=2.0,
         )
         assert r.status_code == 200

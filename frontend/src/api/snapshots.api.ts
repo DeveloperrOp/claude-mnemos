@@ -56,3 +56,30 @@ export async function previewSnapshot(
   );
   return RestorePreviewSchema.parse(r.data);
 }
+
+// --- Trash (soft-delete recovery) — v0.0.39 ----------------------------------
+
+export async function listTrash(project: string): Promise<SnapshotInfo[]> {
+  const r = await apiClient.get(
+    `/snapshots/${encodeURIComponent(project)}/trash`,
+  );
+  return SnapshotListResponseSchema.parse(r.data).snapshots;
+}
+
+export async function restoreFromTrash(
+  project: string,
+  name: string,
+): Promise<void> {
+  await apiClient.post(
+    `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}/restore-from-trash`,
+  );
+}
+
+export async function purgeFromTrash(
+  project: string,
+  name: string,
+): Promise<void> {
+  await apiClient.delete(
+    `/snapshots/${encodeURIComponent(project)}/${encodeURIComponent(name)}/purge`,
+  );
+}

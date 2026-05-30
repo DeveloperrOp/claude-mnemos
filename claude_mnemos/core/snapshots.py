@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 SNAPSHOTS_DIRNAME = ".backups"
 META_FILENAME = ".meta.json"
+TRASH_PREFIX = "_trash-"  # delete_snapshot() renames here (soft-delete)
 
 _EXCLUDED_DIRS = {".staging", ".backups", ".trash"}
 _EXCLUDED_FILES = {
@@ -222,8 +223,8 @@ def list_snapshots(vault: Path) -> list[SnapshotInfo]:
         if not entry.is_dir():
             continue
         # Skip soft-deleted snapshots silently (renamed by delete_snapshot()
-        # to `_trash-<original>`). Logging a warning here would spam.
-        if entry.name.startswith("_trash-"):
+        # to `_trash-<original>`). They surface separately via list_trash().
+        if entry.name.startswith(TRASH_PREFIX):
             continue
         parsed = parse_snapshot_name(entry.name)
         if parsed is None:
@@ -274,11 +275,10 @@ def delete_snapshot(vault: Path, name: str) -> None:
         raise FileNotFoundError(f"snapshot not found: {name}")
 
     # v0.0.37: soft-delete — rename with `_trash-` prefix instead of
-    # rmtree. The list_snapshots() routine skips entries whose name
-    # doesn't parse via parse_snapshot_name() (logs warning), so
-    # _trash-* won't appear in the UI. Permanent removal happens via
-    # backups_cleanup_task on the configured retention schedule.
-    trash_target = target.parent / f"_trash-{target.name}"
+    # rmtree. list_snapshots() skips _trash-* entries; list_trash() surfaces
+    # them so the user can restore or permanently purge. prune_old_backups()
+    # also reclaims trashed entries once they age past the retention window.
+    trash_target = target.parent / f"{TRASH_PREFIX}{target.name}"
     # If a previous soft-delete already renamed something to this path
     # (e.g. multiple deletes of the same snapshot would be impossible
     # because of the prefix, but tests can stage this scenario), fall
@@ -286,6 +286,100 @@ def delete_snapshot(vault: Path, name: str) -> None:
     if trash_target.exists():
         shutil.rmtree(trash_target)
     target.rename(trash_target)
+
+
+def _resolve_trash_target(vault: Path, name: str) -> Path:
+    """Validate *name* (an original snapshot name) and return the absolute
+    path to its `.backups/_trash-<name>` directory. Path-traversal-safe.
+
+    Raises ValueError for malformed/escaping names (same rules as
+    delete_snapshot, applied to the un-prefixed original name).
+    """
+    if "/" in name or "\\" in name or ".." in name:
+        raise ValueError(f"snapshot name contains path separators: {name!r}")
+    if Path(name).is_absolute():
+        raise ValueError(f"snapshot name must be relative: {name!r}")
+    if parse_snapshot_name(name) is None:
+        raise ValueError(f"not a snapshot name: {name!r}")
+
+    backups_root = (vault / SNAPSHOTS_DIRNAME).resolve()
+    target = (vault / SNAPSHOTS_DIRNAME / f"{TRASH_PREFIX}{name}").resolve()
+    if backups_root not in target.parents:
+        raise ValueError(f"trash path escapes .backups/: {name!r}")
+    return target
+
+
+def list_trash(vault: Path) -> list[SnapshotInfo]:
+    """List soft-deleted snapshots (the `_trash-<original>` dirs), newest-first.
+
+    Each entry's ``name`` is the *original* (un-prefixed) snapshot name so the
+    restore/purge endpoints can address it the same way as a live snapshot;
+    ``path`` points at the actual on-disk trash directory.
+    """
+    backups_root = vault / SNAPSHOTS_DIRNAME
+    if not backups_root.is_dir():
+        return []
+
+    items: list[SnapshotInfo] = []
+    for entry in backups_root.iterdir():
+        if not entry.is_dir() or not entry.name.startswith(TRASH_PREFIX):
+            continue
+        original = entry.name[len(TRASH_PREFIX):]
+        parsed = parse_snapshot_name(original)
+        if parsed is None:
+            # Trash of something that no longer parses — leave it (only
+            # purge_trash/prune can remove it), don't crash the listing.
+            logger.warning("skipping unparseable trash entry: %s", entry.name)
+            continue
+        items.append(
+            SnapshotInfo(
+                name=original,
+                kind=parsed.kind,
+                timestamp=parsed.timestamp,
+                op_id=parsed.op_id,
+                op_type=parsed.op_type,
+                label=parsed.label,
+                size_bytes=_snapshot_size(entry),
+                path=f".backups/{entry.name}",
+            )
+        )
+
+    items.sort(key=lambda s: s.timestamp, reverse=True)
+    return items
+
+
+def restore_from_trash(vault: Path, name: str) -> None:
+    """Move a soft-deleted snapshot back into the live set.
+
+    Renames `.backups/_trash-<name>` → `.backups/<name>`. Path-traversal-safe.
+
+    Raises:
+        ValueError: malformed name.
+        FileNotFoundError: no such trash entry.
+        FileExistsError: a live snapshot of the same name already exists.
+    """
+    trash_target = _resolve_trash_target(vault, name)
+    if not trash_target.exists():
+        raise FileNotFoundError(f"trashed snapshot not found: {name}")
+    live_target = vault / SNAPSHOTS_DIRNAME / name
+    if live_target.exists():
+        raise FileExistsError(
+            f"a snapshot named {name!r} already exists; cannot restore from trash"
+        )
+    trash_target.rename(live_target)
+
+
+def purge_trash(vault: Path, name: str) -> None:
+    """Permanently delete a soft-deleted snapshot (real rmtree). Irreversible.
+
+    Raises:
+        ValueError: malformed name.
+        FileNotFoundError: no such trash entry.
+    """
+    trash_target = _resolve_trash_target(vault, name)
+    if not trash_target.exists():
+        raise FileNotFoundError(f"trashed snapshot not found: {name}")
+    shutil.rmtree(trash_target)
 
 
 def prune_old_backups(
@@ -309,17 +403,23 @@ def prune_old_backups(
     for entry in backups_root.iterdir():
         if not entry.is_dir():
             continue
-        parsed = parse_snapshot_name(entry.name)
+        name = entry.name
+        # Soft-deleted snapshots also age out: parse the original name behind
+        # the `_trash-` prefix so the trash doesn't accumulate forever (the
+        # only other way to reclaim it is a manual purge from the UI).
+        is_trash = name.startswith(TRASH_PREFIX)
+        parse_name = name[len(TRASH_PREFIX):] if is_trash else name
+        parsed = parse_snapshot_name(parse_name)
         if parsed is None:
             # Junk: not ours, leave it alone
             continue
         if parsed.timestamp.date() < cutoff:
             try:
                 shutil.rmtree(entry)
-                pruned.append(entry.name)
+                pruned.append(name)
             except OSError as exc:
-                errors.append((entry.name, str(exc)))
-        else:
+                errors.append((name, str(exc)))
+        elif not is_trash:
             kept += 1
 
     return PruneResult(pruned=pruned, kept=kept, errors=errors)

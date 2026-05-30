@@ -265,3 +265,85 @@ async def test_restore_snapshot_unknown_project_404(client: Any) -> None:
     r = await client.post("/api/snapshots/ghost/daily-2026-01-01/restore")
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
+
+
+# ---------------------------------------------------------------------------
+# Trash (soft-delete recovery) — v0.0.39
+# ---------------------------------------------------------------------------
+
+async def test_list_trash_empty(client: Any) -> None:
+    r = await client.get("/api/snapshots/alpha/trash")
+    assert r.status_code == 200
+    assert r.json() == {"snapshots": []}
+
+
+async def test_list_trash_after_delete(client: Any, alpha_vault: Path) -> None:
+    snap = create_daily_snapshot(alpha_vault, date(2026, 4, 26))
+    await client.request("DELETE", f"/api/snapshots/alpha/{snap.name}")
+
+    # Gone from the live list...
+    live = await client.get("/api/snapshots/alpha")
+    assert live.json()["snapshots"] == []
+    # ...present in trash under its original name.
+    r = await client.get("/api/snapshots/alpha/trash")
+    body = r.json()
+    assert len(body["snapshots"]) == 1
+    assert body["snapshots"][0]["name"] == "daily-2026-04-26"
+
+
+async def test_restore_from_trash_brings_back(client: Any, alpha_vault: Path) -> None:
+    snap = create_daily_snapshot(alpha_vault, date(2026, 4, 26))
+    await client.request("DELETE", f"/api/snapshots/alpha/{snap.name}")
+
+    r = await client.post("/api/snapshots/alpha/daily-2026-04-26/restore-from-trash")
+    assert r.status_code == 200
+    assert r.json()["restored"] == "daily-2026-04-26"
+    assert snap.exists()
+    trash = await client.get("/api/snapshots/alpha/trash")
+    assert trash.json()["snapshots"] == []
+
+
+async def test_restore_from_trash_missing_404(client: Any) -> None:
+    r = await client.post("/api/snapshots/alpha/daily-2099-12-31/restore-from-trash")
+    assert r.status_code == 404
+
+
+async def test_restore_from_trash_conflict_409(client: Any, alpha_vault: Path) -> None:
+    snap = create_daily_snapshot(alpha_vault, date(2026, 4, 26))
+    await client.request("DELETE", f"/api/snapshots/alpha/{snap.name}")
+    # A live snapshot of the same name re-appears before restore.
+    create_daily_snapshot(alpha_vault, date(2026, 4, 26))
+    r = await client.post("/api/snapshots/alpha/daily-2026-04-26/restore-from-trash")
+    assert r.status_code == 409
+
+
+async def test_restore_from_trash_invalid_name_400(client: Any) -> None:
+    r = await client.post("/api/snapshots/alpha/random-stuff/restore-from-trash")
+    assert r.status_code == 400
+
+
+async def test_purge_trash_removes_permanently(client: Any, alpha_vault: Path) -> None:
+    snap = create_daily_snapshot(alpha_vault, date(2026, 4, 26))
+    await client.request("DELETE", f"/api/snapshots/alpha/{snap.name}")
+
+    r = await client.request(
+        "DELETE", "/api/snapshots/alpha/daily-2026-04-26/purge"
+    )
+    assert r.status_code == 200
+    assert r.json()["purged"] == "daily-2026-04-26"
+    assert not (alpha_vault / ".backups" / f"_trash-{snap.name}").exists()
+    trash = await client.get("/api/snapshots/alpha/trash")
+    assert trash.json()["snapshots"] == []
+
+
+async def test_purge_trash_missing_404(client: Any) -> None:
+    r = await client.request(
+        "DELETE", "/api/snapshots/alpha/daily-2099-12-31/purge"
+    )
+    assert r.status_code == 404
+
+
+async def test_trash_unknown_project_404(client: Any) -> None:
+    r = await client.get("/api/snapshots/ghost/trash")
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "unknown_project"

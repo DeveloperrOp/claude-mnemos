@@ -100,17 +100,24 @@ def test_create_snapshot_with_empty_vault(tmp_path: Path):
     assert meta.vault_size_bytes == 0
 
 
-def test_create_snapshot_collision_raises(tmp_path: Path):
+def test_create_snapshot_same_op_is_idempotent(tmp_path: Path):
+    """Re-running the same logical operation within the same second reuses the
+    existing snapshot instead of raising. (The worker re-runs a failed ingest
+    with the same operation_id; raising here used to dead-letter the retry.)
+    The path embeds operation_id, so a same-path collision can only be the same
+    operation — hence idempotent, not an error.
+    """
     vault = tmp_path / "vault"
     _populate_vault(vault)
     snap1 = create_snapshot(vault, operation_id="abc", operation_type="ingest")
-    # Trying to create the exact same path again should raise
     fixed_ts = snap1.name.split("pre-op-")[1].rsplit("-ingest-", 1)[0]
-    with (
-        patch("claude_mnemos.core.snapshots._timestamp", return_value=fixed_ts),
-        pytest.raises(SnapshotError),
-    ):
-        create_snapshot(vault, operation_id="abc", operation_type="ingest")
+    with patch("claude_mnemos.core.snapshots._timestamp", return_value=fixed_ts):
+        snap2 = create_snapshot(vault, operation_id="abc", operation_type="ingest")
+    assert snap2 == snap1
+    # No duplicate pre-op dir created (the `.backups/old-snapshot` seeded by
+    # _populate_vault is unrelated and stays).
+    pre_ops = [p.name for p in (vault / ".backups").iterdir() if p.name.startswith("pre-op-")]
+    assert pre_ops == [snap1.name]
 
 
 def test_restore_swaps_vault_atomically(tmp_path: Path):
@@ -246,7 +253,9 @@ def test_create_snapshot_at_uses_provided_path(tmp_path: Path):
 
 
 def test_create_snapshot_at_collision_raises(tmp_path: Path):
-    """Reuses spec'd 'collision raises' behavior."""
+    """A caller-dictated path that already holds a DIFFERENT operation must
+    raise (genuine collision). The same-operation case is the idempotent retry
+    handled by ``test_create_snapshot_at_same_op_is_idempotent``."""
     from claude_mnemos.core.snapshots import SnapshotError, create_snapshot_at
 
     vault = tmp_path / "vault"
@@ -255,7 +264,21 @@ def test_create_snapshot_at_collision_raises(tmp_path: Path):
     create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
 
     with pytest.raises(SnapshotError):
-        create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
+        create_snapshot_at(
+            vault, target, operation_id="different", operation_type="ingest"
+        )
+
+
+def test_create_snapshot_at_same_op_is_idempotent(tmp_path: Path):
+    """Same path + same (operation_id, operation_type) → reuse, no raise."""
+    from claude_mnemos.core.snapshots import create_snapshot_at
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    target = vault / ".backups" / "fixed-name"
+    first = create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
+    second = create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
+    assert second == first
 
 
 def test_create_snapshot_delegates_to_create_snapshot_at(tmp_path: Path):
@@ -616,6 +639,158 @@ def test_delete_snapshot_missing_raises(tmp_path: Path):
     (vault / ".backups").mkdir(parents=True)
     with pytest.raises(FileNotFoundError):
         delete_snapshot(vault, "daily-2026-04-26")
+
+
+def test_delete_snapshot_soft_deletes_to_trash(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        TRASH_PREFIX,
+        create_daily_snapshot,
+        delete_snapshot,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    delete_snapshot(vault, snap.name)
+    # Soft-delete: original gone, but a `_trash-<name>` sibling exists.
+    assert not snap.exists()
+    assert (vault / ".backups" / f"{TRASH_PREFIX}{snap.name}").is_dir()
+
+
+def test_list_trash_returns_soft_deleted_with_original_name(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        create_daily_snapshot,
+        delete_snapshot,
+        list_snapshots,
+        list_trash,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    delete_snapshot(vault, snap.name)
+
+    # Gone from the live list, present in trash under its original name.
+    assert list_snapshots(vault) == []
+    trash = list_trash(vault)
+    assert len(trash) == 1
+    assert trash[0].name == "daily-2026-04-26"
+    assert trash[0].kind == "daily"
+    assert trash[0].path == f".backups/_trash-{snap.name}"
+
+
+def test_restore_from_trash_moves_back_to_live(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        create_daily_snapshot,
+        delete_snapshot,
+        list_snapshots,
+        list_trash,
+        restore_from_trash,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    delete_snapshot(vault, snap.name)
+
+    restore_from_trash(vault, "daily-2026-04-26")
+    assert snap.exists()
+    assert [s.name for s in list_snapshots(vault)] == ["daily-2026-04-26"]
+    assert list_trash(vault) == []
+
+
+def test_restore_from_trash_missing_raises(tmp_path: Path):
+    from claude_mnemos.core.snapshots import restore_from_trash
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        restore_from_trash(vault, "daily-2026-04-26")
+
+
+def test_restore_from_trash_conflict_raises(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        create_daily_snapshot,
+        delete_snapshot,
+        restore_from_trash,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    delete_snapshot(vault, snap.name)
+    # Re-create a live snapshot with the same name → restore must refuse.
+    create_daily_snapshot(vault, date(2026, 4, 26))
+    with pytest.raises(FileExistsError):
+        restore_from_trash(vault, "daily-2026-04-26")
+
+
+def test_restore_from_trash_rejects_traversal(tmp_path: Path):
+    from claude_mnemos.core.snapshots import restore_from_trash
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(ValueError):
+        restore_from_trash(vault, "../etc-passwd")
+
+
+def test_purge_trash_removes_permanently(tmp_path: Path):
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import (
+        TRASH_PREFIX,
+        create_daily_snapshot,
+        delete_snapshot,
+        list_trash,
+        purge_trash,
+    )
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_daily_snapshot(vault, date(2026, 4, 26))
+    delete_snapshot(vault, snap.name)
+
+    purge_trash(vault, "daily-2026-04-26")
+    assert not (vault / ".backups" / f"{TRASH_PREFIX}{snap.name}").exists()
+    assert list_trash(vault) == []
+
+
+def test_purge_trash_missing_raises(tmp_path: Path):
+    from claude_mnemos.core.snapshots import purge_trash
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        purge_trash(vault, "daily-2026-04-26")
+
+
+def test_prune_old_backups_purges_aged_trash(tmp_path: Path):
+    """v0.0.39: trashed snapshots also age out, else the trash grows forever."""
+    from datetime import date
+
+    from claude_mnemos.core.snapshots import prune_old_backups
+
+    vault = tmp_path / "vault"
+    (vault / ".backups").mkdir(parents=True)
+    old_trash = vault / ".backups" / "_trash-daily-2025-08-19"
+    old_trash.mkdir()
+    new_trash = vault / ".backups" / "_trash-daily-2026-04-25"
+    new_trash.mkdir()
+
+    result = prune_old_backups(vault, retention_days=180, today=date(2026, 4, 26))
+
+    assert "_trash-daily-2025-08-19" in result.pruned
+    assert "_trash-daily-2026-04-25" not in result.pruned
+    assert not old_trash.exists()
+    assert new_trash.exists()
 
 
 def test_prune_old_backups_removes_old_keeps_new(tmp_path: Path):

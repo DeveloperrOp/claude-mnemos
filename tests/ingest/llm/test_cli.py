@@ -10,6 +10,7 @@ from claude_mnemos.config import Config
 from claude_mnemos.ingest.llm import (
     ExtractionRaw,
     LLMExtractionError,
+    ModelNotFoundError,
 )
 from claude_mnemos.ingest.llm.cli import CliLLMClient
 from claude_mnemos.ingest.llm.rate_limit import RateLimitError
@@ -20,6 +21,19 @@ def cfg() -> Config:
     return Config(
         api_key=None,
         model="claude-sonnet-4-5",
+        language_hint="auto",
+        max_input_tokens=180000,
+        lock_timeout=30.0,
+    )
+
+
+@pytest.fixture
+def cfg_known() -> Config:
+    """cfg whose model IS in KNOWN_MODELS_NEWEST_FIRST, so fallback_model()
+    can resolve a different id (needed to exercise the fallback path)."""
+    return Config(
+        api_key=None,
+        model="claude-opus-4-8",
         language_hint="auto",
         max_input_tokens=180000,
         lock_timeout=30.0,
@@ -78,6 +92,61 @@ def test_extract_invokes_claude_p_with_correct_args(cfg: Config) -> None:
     assert "--json-schema" in cmd
     assert "--system-prompt" in cmd
     assert "--setting-sources" in cmd
+    # v0.0.39: the configured model is now passed explicitly so the picker
+    # actually controls CLI extraction (was previously subscription default).
+    midx = cmd.index("--model")
+    assert cmd[midx + 1] == cfg.model
+
+
+def test_extract_falls_back_when_model_rejected(cfg_known: Config) -> None:
+    """If claude -p rejects the configured model as unknown, the client retries
+    once with fallback_model() and the second invocation uses the fallback id."""
+    from pathlib import Path
+
+    from claude_mnemos.config import fallback_model
+
+    payload = {"pages": []}
+    with (
+        patch("claude_mnemos.ingest.llm.cli.subprocess.run") as run,
+        patch(
+            "claude_mnemos.ingest.llm.cli.find_claude_binary",
+            return_value=Path("/x/claude"),
+        ),
+    ):
+        run.side_effect = [
+            _stub_completed(1, stderr='API Error: 404 {"type":"not_found_error"}'),
+            _stub_completed(0, stdout=_ok_envelope(payload)),
+        ]
+        result = CliLLMClient(cfg_known).extract(
+            system="S", user="U", tool=_TOOL_SCHEMA,
+        )
+
+    assert result.payload == payload
+    assert run.call_count == 2
+    fb = fallback_model(cfg_known.model)
+    assert fb != cfg_known.model
+    second_cmd = run.call_args_list[1][0][0]
+    midx = second_cmd.index("--model")
+    assert second_cmd[midx + 1] == fb
+
+
+def test_extract_raises_model_not_found_when_no_fallback(cfg: Config) -> None:
+    """An unknown model id outside KNOWN_MODELS has no fallback — the error
+    propagates as ModelNotFoundError (still an LLMExtractionError subclass)."""
+    with (
+        patch("claude_mnemos.ingest.llm.cli.subprocess.run") as run,
+        patch(
+            "claude_mnemos.ingest.llm.cli.find_claude_binary",
+            return_value=__import__("pathlib").Path("/x/claude"),
+        ),
+    ):
+        run.return_value = _stub_completed(
+            1, stderr='API Error: 404 {"type":"not_found_error"}'
+        )
+        with pytest.raises(ModelNotFoundError):
+            CliLLMClient(cfg).extract(system="S", user="U", tool=_TOOL_SCHEMA)
+        # cfg.model is not in the known set → no second attempt.
+        assert run.call_count == 1
 
 
 def test_extract_uses_default_max_turns(cfg: Config) -> None:

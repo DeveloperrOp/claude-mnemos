@@ -5,6 +5,7 @@ from claude_mnemos.config import (
     DEFAULT_MODEL,
     Config,
     UnknownLanguageHintError,
+    fallback_model,
     resolve_model_id,
 )
 
@@ -54,11 +55,25 @@ def test_with_overrides_explicit_full_id_passes_through():
 def test_resolve_model_id_aliases():
     assert resolve_model_id("sonnet") == "claude-sonnet-4-6"
     assert resolve_model_id("haiku") == "claude-haiku-4-5-20251001"
-    assert resolve_model_id("opus") == "claude-opus-4-7"
+    # v0.0.38: the "opus" alias points at the newest 4.8.
+    assert resolve_model_id("opus") == "claude-opus-4-8"
 
 
 def test_resolve_model_id_pass_through():
     assert resolve_model_id("claude-something-custom") == "claude-something-custom"
+
+
+def test_fallback_model_returns_next_known_for_known_id():
+    # Newest known → next newest, never the same id.
+    assert fallback_model("claude-opus-4-8") == "claude-opus-4-7"
+    fb = fallback_model("claude-sonnet-4-6")
+    assert fb != "claude-sonnet-4-6"
+
+
+def test_fallback_model_passes_through_unknown_id():
+    # Unknown id → unchanged (no fallback to attempt).
+    assert fallback_model("claude-sonnet-4-5") == "claude-sonnet-4-5"
+    assert fallback_model("totally-made-up") == "totally-made-up"
 
 
 def test_invalid_language_hint_raises(monkeypatch):

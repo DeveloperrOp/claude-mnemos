@@ -269,9 +269,9 @@ async def test_reload_project_settings_applies_to_runtime(
         await daemon.mount_vault(e)
         from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
 
-        new = ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False))
+        new = ProjectSettings(snapshots=SnapshotsSettings(schedule="off"))
         await daemon.reload_project_settings("alpha", new)
-        assert daemon.runtimes["alpha"].settings.snapshots.daily_enabled is False
+        assert daemon.runtimes["alpha"].settings.snapshots.schedule == "off"
         assert daemon.scheduler.get_job("daily_snapshot:alpha") is None
     finally:
         async with daemon._runtimes_lock:

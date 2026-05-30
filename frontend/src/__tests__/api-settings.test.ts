@@ -11,7 +11,7 @@ const FULL_PROJECT = {
   version: 1,
   auto_ingest: {},
   lint: { schedule: null, enabled_rules: null },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
 };
 
 const FULL_GLOBAL = {
@@ -48,7 +48,7 @@ describe("settings API", () => {
 
   it("patchProjectSettings sends partial body", async () => {
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
-      data: { ...FULL_PROJECT, snapshots: { daily_enabled: true, retention_days: 30 } },
+      data: { ...FULL_PROJECT, snapshots: { schedule: "daily", retention_days: 30 } },
     });
     const result = await patchProjectSettings("p1", { snapshots: { retention_days: 30 } });
     expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", { snapshots: { retention_days: 30 } });
@@ -89,7 +89,7 @@ describe("settings API", () => {
           extract_after_dump: null,
         },
         lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-        snapshots: { daily_enabled: true, retention_days: 180 },
+        snapshots: { schedule: "daily", retention_days: 180 },
       },
     });
     const result = await getProjectSettings("p1");

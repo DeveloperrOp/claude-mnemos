@@ -15,8 +15,11 @@ from claude_mnemos.core.snapshots import (
     create_manual_snapshot,
     delete_snapshot,
     list_snapshots,
+    list_trash,
     parse_snapshot_name,
+    purge_trash,
     restore_from_snapshot,
+    restore_from_trash,
 )
 from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
@@ -60,6 +63,16 @@ async def list_snapshots_endpoint(
 ) -> dict[str, list[SnapshotInfo]]:
     runtime = get_runtime(request, project)
     return {"snapshots": list_snapshots(runtime.vault_root)}
+
+
+# Declared before the `/{name}/...` routes so the literal `trash` segment is
+# matched here rather than captured as a {name} path param.
+@router.get("/snapshots/{project}/trash")
+async def list_trash_endpoint(
+    project: str, request: Request
+) -> dict[str, list[SnapshotInfo]]:
+    runtime = get_runtime(request, project)
+    return {"snapshots": list_trash(runtime.vault_root)}
 
 
 @router.post("/snapshots/{project}", response_model=SnapshotInfo, status_code=201)
@@ -112,6 +125,69 @@ def delete_snapshot_endpoint(
                 status_code=400, detail={"error": "invalid_name", "detail": str(exc)}
             ) from exc
     return {"deleted": name}
+
+
+@router.post("/snapshots/{project}/{name}/restore-from-trash")
+def restore_from_trash_endpoint(
+    project: str, name: str, request: Request
+) -> dict[str, str]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
+    _validate_snapshot_name(name)
+    with pipeline_lock(vault):
+        try:
+            restore_from_trash(vault, name)
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "message": "Этот снимок уже удалён из корзины или восстановлен.",
+                    "name": name,
+                },
+            ) from exc
+        except FileExistsError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "conflict",
+                    "message": (
+                        f"Снимок с именем «{name}» уже существует — "
+                        "восстановление из корзины невозможно."
+                    ),
+                },
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail={"error": "invalid_name", "detail": str(exc)}
+            ) from exc
+    return {"restored": name}
+
+
+@router.delete("/snapshots/{project}/{name}/purge")
+def purge_trash_endpoint(
+    project: str, name: str, request: Request
+) -> dict[str, str]:
+    runtime = get_runtime(request, project)
+    vault = runtime.vault_root
+    _validate_snapshot_name(name)
+    with pipeline_lock(vault):
+        try:
+            purge_trash(vault, name)
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "message": "Этот снимок уже удалён из корзины.",
+                    "name": name,
+                },
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail={"error": "invalid_name", "detail": str(exc)}
+            ) from exc
+    return {"purged": name}
 
 
 @router.post(

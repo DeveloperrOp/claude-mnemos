@@ -13,7 +13,7 @@ const FULL = {
   locale: null,
   auto_ingest: { enabled: true, mode: "auto" },
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
 };
 
 function makeWrapper(client: QueryClient) {
@@ -52,7 +52,7 @@ describe("useProjectSettings", () => {
     const client = makeClient();
     vi.mocked(apiClient.get).mockResolvedValueOnce({ data: FULL });
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
-      data: { ...FULL, snapshots: { daily_enabled: true, retention_days: 30 } },
+      data: { ...FULL, snapshots: { schedule: "daily", retention_days: 30 } },
     });
 
     const wrapper = makeWrapper(client);

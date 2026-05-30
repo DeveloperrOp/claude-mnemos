@@ -39,7 +39,7 @@ def test_patch_settings_partial_persists(client):
     r = c.patch("/api/settings/foo", json={"snapshots": {"retention_days": 30}})
     assert r.status_code == 200
     assert r.json()["snapshots"]["retention_days"] == 30
-    assert r.json()["snapshots"]["daily_enabled"] is True
+    assert r.json()["snapshots"]["schedule"] == "daily"
     r2 = c.get("/api/settings/foo")
     assert r2.json()["snapshots"]["retention_days"] == 30
 
@@ -75,7 +75,7 @@ def test_patch_settings_triggers_daemon_reload_project_settings(tmp_path, monkey
     fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(daemon=fake_daemon)
     c = TestClient(app)
-    r = c.patch("/api/settings/foo", json={"snapshots": {"daily_enabled": False}})
+    r = c.patch("/api/settings/foo", json={"snapshots": {"schedule": "off"}})
     assert r.status_code == 200
     fake_daemon.reload_project_settings.assert_called_once()
     call_args = fake_daemon.reload_project_settings.call_args
@@ -93,7 +93,7 @@ def test_patch_settings_triggers_reload_regardless_of_vault(tmp_path, monkeypatc
     fake_daemon.reload_project_settings = AsyncMock()
     app = create_app(daemon=fake_daemon)
     c = TestClient(app)
-    r = c.patch("/api/settings/bar", json={"snapshots": {"daily_enabled": False}})
+    r = c.patch("/api/settings/bar", json={"snapshots": {"schedule": "off"}})
     assert r.status_code == 200
     fake_daemon.reload_project_settings.assert_called_once()
     assert fake_daemon.reload_project_settings.call_args.args[0] == "bar"

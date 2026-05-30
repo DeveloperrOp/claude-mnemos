@@ -48,6 +48,10 @@ beforeAll(async () => {
             title: "General",
             locale: "Dashboard language",
             daemon_port: "Daemon port",
+            daemon_port_warn: "Port change needs a restart.",
+            save_and_restart_btn: "Save & restart",
+            restart_daemon_btn: "Restart daemon",
+            restart_in_progress: "Daemon is restarting…",
           },
           defaults: {
             title: "Defaults",
@@ -106,7 +110,9 @@ describe("GlobalGeneralSection", () => {
     const portInput = screen.getByDisplayValue("5757");
     await userEvent.clear(portInput);
     await userEvent.type(portInput, "6000");
-    const save = screen.getByRole("button", { name: /Save/i });
+    // The accordion "Save" button — not the "Save & restart" one that the
+    // port-change warning block now also renders.
+    const save = screen.getByRole("button", { name: /^Save$/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);
     await waitFor(() =>
@@ -114,6 +120,40 @@ describe("GlobalGeneralSection", () => {
         "/settings/global",
         expect.objectContaining({ daemon_port: 6000, locale: "uk" }),
       ),
+    );
+  });
+
+  it("'Save & restart' PATCHes then POSTs /daemon/restart", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: FULL_GLOBAL });
+    vi.spyOn(apiClient, "patch").mockResolvedValue({
+      data: { ...FULL_GLOBAL, daemon_port: 6000 },
+    });
+    // supervised:false → flow opens the manual-help dialog instead of
+    // polling /version + reloading the window (keeps the test deterministic).
+    const post = vi
+      .spyOn(apiClient, "post")
+      .mockResolvedValue({ data: { ok: true, supervised: false } });
+
+    wrap(<GlobalGeneralSection />);
+    await waitFor(() =>
+      expect(screen.getByText("General")).toBeInTheDocument(),
+    );
+    const portInput = screen.getByDisplayValue("5757");
+    await userEvent.clear(portInput);
+    await userEvent.type(portInput, "6000");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Save & restart/i }),
+    );
+
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        "/settings/global",
+        expect.objectContaining({ daemon_port: 6000 }),
+      ),
+    );
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith("/daemon/restart"),
     );
   });
 });

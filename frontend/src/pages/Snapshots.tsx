@@ -7,6 +7,7 @@ import { useSnapshotCreate } from "@/hooks/useSnapshotCreate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { SnapshotCard } from "@/components/widgets/SnapshotCard";
+import { SnapshotTrashSection } from "@/components/widgets/SnapshotTrashSection";
 import { EmptyState } from "@/components/widgets/EmptyState";
 import { SnapshotFilters, type KindFilter } from "@/components/filters/SnapshotFilters";
 import {
@@ -119,6 +120,8 @@ export function Snapshots() {
             </div>
           </>
         )}
+        {/* Soft-deleted snapshots — shown even when the live list is empty. */}
+        <SnapshotTrashSection project={project} />
       </div>
 
       <AlertDialog

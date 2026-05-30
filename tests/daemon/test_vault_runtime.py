@@ -88,7 +88,7 @@ async def test_mount_skips_daily_snapshot_when_disabled(
 
     rt = VaultRuntime(
         project=_entry(tmp_path, "noscan"),
-        settings=ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False)),
+        settings=ProjectSettings(snapshots=SnapshotsSettings(schedule="off")),
     )
     try:
         await rt.mount(scheduler=scheduler, alerts=alerts)
@@ -215,7 +215,7 @@ async def test_reload_settings_disable_daily_snapshot(
     try:
         assert scheduler.get_job("daily_snapshot:rs1") is not None
         rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False))
+            ProjectSettings(snapshots=SnapshotsSettings(schedule="off"))
         )
         assert scheduler.get_job("daily_snapshot:rs1") is None
         assert scheduler.get_job("backups_cleanup:rs1") is not None
@@ -231,15 +231,72 @@ async def test_reload_settings_re_enable_daily_snapshot(
 
     rt = VaultRuntime(
         project=_entry(tmp_path, "rs2"),
-        settings=ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=False)),
+        settings=ProjectSettings(snapshots=SnapshotsSettings(schedule="off")),
     )
     await rt.mount(scheduler=scheduler, alerts=alerts)
     try:
         assert scheduler.get_job("daily_snapshot:rs2") is None
         rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(daily_enabled=True))
+            ProjectSettings(snapshots=SnapshotsSettings(schedule="daily"))
         )
         assert scheduler.get_job("daily_snapshot:rs2") is not None
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+def test_snapshot_cron_kwargs_presets() -> None:
+    from claude_mnemos.daemon.vault_runtime import _snapshot_cron_kwargs
+
+    assert _snapshot_cron_kwargs("off") is None
+    assert _snapshot_cron_kwargs("daily") == {"hour": 4, "minute": 0}
+    assert _snapshot_cron_kwargs("weekly") == {
+        "day_of_week": "sun",
+        "hour": 4,
+        "minute": 0,
+    }
+    assert _snapshot_cron_kwargs("monthly") == {"day": 1, "hour": 4, "minute": 0}
+
+
+@pytest.mark.asyncio
+async def test_mount_weekly_registers_weekly_cron(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "wk"),
+        settings=ProjectSettings(snapshots=SnapshotsSettings(schedule="weekly")),
+    )
+    try:
+        await rt.mount(scheduler=scheduler, alerts=alerts)
+        job = scheduler.get_job("daily_snapshot:wk")
+        assert job is not None
+        # The weekly preset constrains day_of_week; daily does not.
+        fields = {f.name: str(f) for f in job.trigger.fields}
+        assert fields["day_of_week"] == "sun"
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_reload_settings_changes_cadence_daily_to_weekly(
+    tmp_path: Path, scheduler: AsyncIOScheduler, alerts: Alerts
+) -> None:
+    from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
+
+    rt = VaultRuntime(project=_entry(tmp_path, "cad"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        # default is daily — day_of_week is unconstrained ("*")
+        job = scheduler.get_job("daily_snapshot:cad")
+        assert job is not None
+        rt.reload_settings(
+            ProjectSettings(snapshots=SnapshotsSettings(schedule="weekly"))
+        )
+        job2 = scheduler.get_job("daily_snapshot:cad")
+        assert job2 is not None
+        fields = {f.name: str(f) for f in job2.trigger.fields}
+        assert fields["day_of_week"] == "sun"
     finally:
         await rt.unmount(timeout=2.0, force=True)
 

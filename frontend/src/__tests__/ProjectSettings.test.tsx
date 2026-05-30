@@ -23,7 +23,7 @@ const FULL_SETTINGS = {
   locale: null,
   auto_ingest: { enabled: true, mode: "auto" },
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
 };
 
 const FULL_GLOBAL = {
@@ -80,7 +80,7 @@ beforeAll(async () => {
           locale: { title: "Locale", inherit: "Inherit" },
           auto_ingest: { title: "Auto-ingest", enabled: "Enabled", mode: "Mode" },
           lint: { title: "Lint", schedule: "Schedule", enabled_rules: "Rules", autofix_on_save: "Autofix" },
-          snapshots: { title: "Snapshots", daily_enabled: "Daily", retention_days: "Retention" },
+          snapshots: { title: "Snapshots", schedule: "Frequency", schedule_daily: "Daily", schedule_weekly: "Weekly", schedule_monthly: "Monthly", schedule_off: "Off", retention_days: "Retention" },
         },
       },
     },

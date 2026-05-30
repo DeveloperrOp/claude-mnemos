@@ -1,14 +1,28 @@
 from unittest.mock import MagicMock
 
+import anthropic
 import pytest
 
-from claude_mnemos.config import Config
+from claude_mnemos.config import Config, fallback_model
 from claude_mnemos.ingest.llm import (
     ApiLLMClient,
     LLMExtractionError,
     MissingApiKeyError,
+    ModelNotFoundError,
     TranscriptTooLargeError,
 )
+
+
+class _FakeNotFound(anthropic.APIError):
+    """Minimal anthropic.APIError subclass standing in for a 404 model-not-found
+    response, without the SDK's required (message, request, body) ctor args."""
+
+    def __init__(self, message: str = 'not_found_error: model not found') -> None:
+        self.message = message
+        self.status_code = 404
+
+    def __str__(self) -> str:
+        return self.message
 
 
 def _cfg(**overrides) -> Config:
@@ -164,6 +178,43 @@ def test_raises_after_two_validation_failures():
         )
 
     assert inner.messages.create.call_count == 2
+
+
+def test_falls_back_when_model_rejected():
+    """If the API rejects cfg.model as unknown (404), the client retries once
+    with fallback_model() and the second create() call uses the fallback id."""
+    cfg = _cfg(model="claude-opus-4-8")  # in KNOWN_MODELS → has a fallback
+    inner = MagicMock()
+    # count_tokens also fails on the bad model — must be swallowed, not fatal.
+    inner.messages.count_tokens.side_effect = _FakeNotFound()
+    valid = {"summary": "x", "pages": []}
+    inner.messages.create.side_effect = [
+        _FakeNotFound(),
+        _make_response_with_tool_use(valid),
+    ]
+
+    client = ApiLLMClient(cfg, _client=inner)
+    result = client.extract(system="sys", user="usr", tool=_dummy_tool())
+
+    assert result.payload == valid
+    assert inner.messages.create.call_count == 2
+    fb = fallback_model("claude-opus-4-8")
+    assert fb != "claude-opus-4-8"
+    assert inner.messages.create.call_args_list[1].kwargs["model"] == fb
+
+
+def test_model_not_found_raises_when_no_fallback():
+    """An unknown model id outside KNOWN_MODELS has no fallback — the error
+    propagates as ModelNotFoundError."""
+    cfg = _cfg(model="claude-sonnet-4-5")  # not in KNOWN_MODELS
+    inner = MagicMock()
+    inner.messages.count_tokens.return_value = _make_token_count(500)
+    inner.messages.create.side_effect = _FakeNotFound()
+
+    client = ApiLLMClient(cfg, _client=inner)
+    with pytest.raises(ModelNotFoundError):
+        client.extract(system="sys", user="usr", tool=_dummy_tool())
+    assert inner.messages.create.call_count == 1
 
 
 def test_response_without_tool_use_block_raises():

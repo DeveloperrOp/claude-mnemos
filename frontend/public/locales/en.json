@@ -578,7 +578,20 @@
       "truncated": "List truncated to {{count}} items",
       "error": "Could not load preview"
     },
-    "delete_typed_label": "Type the snapshot name to confirm"
+    "delete_typed_label": "Type the snapshot name to confirm",
+    "trash": {
+      "title": "Snapshot trash",
+      "hint": "Deleted snapshots are kept here until they age past the retention window, then removed automatically. You can restore or permanently delete them by hand.",
+      "restore_button": "Restore",
+      "purge_button": "Delete forever",
+      "restore_modal_title": "Restore snapshot?",
+      "restore_modal_desc": "The snapshot returns to the snapshots list. This does not restore the vault itself.",
+      "purge_modal_title": "Delete snapshot forever?",
+      "purge_modal_desc": "The snapshot will be removed permanently. It cannot be recovered.",
+      "purge_typed_label": "Type the snapshot name to confirm",
+      "restored_toast": "Snapshot restored",
+      "purged_toast": "Snapshot permanently deleted"
+    }
   },
   "lost_sessions": {
     "title": "Lost sessions",
@@ -1026,8 +1039,12 @@
       },
       "snapshots": {
         "title": "Snapshots",
-        "hint": "Archive copies of the whole knowledge folder. Made daily at 04:00 and before risky operations. At 05:00 only copies older than the retention window below are pruned — fresh ones are kept.",
-        "daily_enabled": "Daily snapshots enabled",
+        "hint": "Archive copies of the whole knowledge folder. Made on the chosen schedule at 04:00 and before risky operations. At 05:00 only copies older than the retention window below are pruned — fresh ones are kept.",
+        "schedule": "Frequency",
+        "schedule_daily": "Every day",
+        "schedule_weekly": "Weekly (Sun)",
+        "schedule_monthly": "Monthly (1st)",
+        "schedule_off": "Off",
         "retention_days": "Retention (days)",
         "next_run": "Next scheduled run: {{time}}",
         "next_run_pending": "Next scheduled run: calculating…",
@@ -1041,7 +1058,10 @@
         "title": "General",
         "locale": "Dashboard language",
         "daemon_port": "Daemon port",
-        "daemon_port_warn": "Changing the daemon port requires a daemon restart and reloading the dashboard at the new port (http://127.0.0.1:{{port}}). The UI will go blank until then."
+        "daemon_port_warn": "Changing the daemon port requires a daemon restart and reloading the dashboard at the new port (http://127.0.0.1:{{port}}). The UI will go blank until then.",
+        "save_and_restart_btn": "Save & restart",
+        "restart_daemon_btn": "Restart daemon",
+        "restart_in_progress": "Daemon is restarting…"
       },
       "defaults": {
         "title": "Defaults",

@@ -46,6 +46,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _snapshot_cron_kwargs(schedule: str) -> dict[str, int | str] | None:
+    """Map a snapshot `schedule` preset to APScheduler cron keyword args.
+
+    Returns None for "off" (no automatic snapshot job). All presets fire at
+    04:00 local time; the snapshot itself is always named ``daily-<date>``
+    (idempotent per day) — the preset only changes the cadence.
+    """
+    if schedule == "daily":
+        return {"hour": 4, "minute": 0}
+    if schedule == "weekly":
+        return {"day_of_week": "sun", "hour": 4, "minute": 0}
+    if schedule == "monthly":
+        return {"day": 1, "hour": 4, "minute": 0}
+    return None
+
+
 class VaultRuntimeError(Exception):
     """Base error for VaultRuntime lifecycle issues."""
 
@@ -128,25 +144,31 @@ class VaultRuntime:
             self.observer = observer
 
             # 3. Cron jobs in shared scheduler.
-            if self.settings.snapshots.daily_enabled:
+            cron_kwargs = _snapshot_cron_kwargs(self.settings.snapshots.schedule)
+            if cron_kwargs is not None:
                 scheduler.add_job(
                     daily_snapshot_task,
                     "cron",
-                    hour=4,
-                    minute=0,
                     args=[self.vault_root],
                     id=f"daily_snapshot:{self.name}",
                     replace_existing=True,
+                    **cron_kwargs,
                 )
                 # Catch-up: if the user's machine was off at 04:00 today,
                 # the daily snapshot didn't run. `daily_snapshot_task` is
                 # idempotent (no-op if today's snapshot already exists),
                 # so it's safe to fire-and-forget on mount. Runs in a
                 # thread because tar.gz creation is blocking.
-                import asyncio as _asyncio
-                _asyncio.create_task(
-                    _asyncio.to_thread(daily_snapshot_task, self.vault_root),
-                )
+                #
+                # Only for the "daily" preset: weekly/monthly snapshots are
+                # named `daily-<date>` too, so firing catch-up on every mount
+                # would create off-cadence snapshots and defeat the chosen
+                # frequency. Missing one weekly/monthly run is acceptable.
+                if self.settings.snapshots.schedule == "daily":
+                    import asyncio as _asyncio
+                    _asyncio.create_task(
+                        _asyncio.to_thread(daily_snapshot_task, self.vault_root),
+                    )
             scheduler.add_job(
                 backups_cleanup_task,
                 "cron",
@@ -294,20 +316,27 @@ class VaultRuntime:
         old = self.settings
         self.settings = new
 
-        if old.snapshots.daily_enabled != new.snapshots.daily_enabled:
+        if old.snapshots.schedule != new.snapshots.schedule:
             jid = f"daily_snapshot:{self.name}"
+            new_kwargs = _snapshot_cron_kwargs(new.snapshots.schedule)
             existing = self._scheduler.get_job(jid)
-            if new.snapshots.daily_enabled and existing is None:
-                self._scheduler.add_job(
-                    daily_snapshot_task,
-                    "cron",
-                    hour=4,
-                    minute=0,
-                    args=[self.vault_root],
-                    id=jid,
-                    replace_existing=True,
-                )
-            elif not new.snapshots.daily_enabled and existing is not None:
+            if new_kwargs is not None:
+                if existing is not None:
+                    # Cadence changed on a live job — reschedule_job is the
+                    # canonical way to swap the trigger (add_job replace
+                    # leaves the old trigger in place on a running scheduler).
+                    self._scheduler.reschedule_job(jid, trigger="cron", **new_kwargs)
+                else:
+                    # off → on: register a fresh job.
+                    self._scheduler.add_job(
+                        daily_snapshot_task,
+                        "cron",
+                        args=[self.vault_root],
+                        id=jid,
+                        replace_existing=True,
+                        **new_kwargs,
+                    )
+            elif existing is not None:
                 self._scheduler.remove_job(jid)
 
         if old.snapshots.retention_days != new.snapshots.retention_days:

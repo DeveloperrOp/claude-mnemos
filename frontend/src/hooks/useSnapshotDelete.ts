@@ -11,6 +11,8 @@ export function useSnapshotDelete(project: string) {
     mutationFn: (name: string) => deleteSnapshot(project, name),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["snapshots", project] });
+      // Soft-delete moves it into the trash list — refresh that too.
+      void qc.invalidateQueries({ queryKey: ["snapshots-trash", project] });
       toast.success(t("snapshots.deleted_toast"));
     },
     onError: (err) => toast.error(extractApiError(err)),

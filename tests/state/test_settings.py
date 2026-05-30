@@ -33,7 +33,7 @@ def test_project_settings_defaults():
     assert s.auto_ingest.dump_stale_after_24h is None
     assert s.auto_ingest.extract_after_dump is None
     assert s.lint.enabled_rules is None
-    assert s.snapshots.daily_enabled is True
+    assert s.snapshots.schedule == "daily"
     assert s.snapshots.retention_days == 180
 
 
@@ -43,6 +43,53 @@ def test_subgroup_models_construct_with_defaults():
     assert isinstance(s.auto_ingest, AutoIngestSettings)
     assert isinstance(s.lint, LintSettings)
     assert isinstance(s.snapshots, SnapshotsSettings)
+
+
+def test_snapshots_schedule_migrates_legacy_daily_enabled_true():
+    """v0.0.38- on-disk files store ``daily_enabled: true`` — must migrate to
+    schedule="daily" without tripping extra='forbid'."""
+    s = SnapshotsSettings.model_validate({"daily_enabled": True, "retention_days": 90})
+    assert s.schedule == "daily"
+    assert s.retention_days == 90
+    assert not hasattr(s, "daily_enabled")
+
+
+def test_snapshots_schedule_migrates_legacy_daily_enabled_false():
+    s = SnapshotsSettings.model_validate({"daily_enabled": False})
+    assert s.schedule == "off"
+
+
+def test_snapshots_explicit_schedule_wins_over_legacy():
+    """If both fields are present, the explicit schedule is authoritative."""
+    s = SnapshotsSettings.model_validate(
+        {"daily_enabled": True, "schedule": "weekly"}
+    )
+    assert s.schedule == "weekly"
+
+
+def test_snapshots_schedule_rejects_unknown_value():
+    with pytest.raises(ValidationError):
+        SnapshotsSettings.model_validate({"schedule": "fortnightly"})
+
+
+def test_snapshots_schedule_round_trip_through_store(tmp_path: Path):
+    """A legacy file on disk loads and re-saves as the new schedule field."""
+    store = SettingsStore(root=tmp_path)
+    f = tmp_path / "settings" / "legacy.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(
+        json.dumps({"version": 1, "snapshots": {"daily_enabled": False, "retention_days": 30}}),
+        encoding="utf-8",
+    )
+    loaded = store.get_project("legacy")
+    assert loaded.snapshots.schedule == "off"
+    assert loaded.snapshots.retention_days == 30
+    # Patching writes the migrated field out; daily_enabled no longer present.
+    updated = store.patch_project("legacy", {"snapshots": {"schedule": "monthly"}})
+    assert updated.snapshots.schedule == "monthly"
+    data = json.loads(f.read_text())
+    assert data["snapshots"]["schedule"] == "monthly"
+    assert "daily_enabled" not in data["snapshots"]
 
 
 def test_global_settings_defaults():

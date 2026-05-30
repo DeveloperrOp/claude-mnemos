@@ -10,10 +10,18 @@ import {
 import { useHealth } from "@/hooks/useHealth";
 import { useSnapshotCreate } from "@/hooks/useSnapshotCreate";
 import { formatDateTime } from "@/lib/datetime";
+import type { SnapshotSchedule } from "@/types/Settings";
 
 interface Props {
   slug: string;
 }
+
+const SCHEDULE_OPTIONS: SnapshotSchedule[] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "off",
+];
 
 export function SnapshotsSection({ slug }: Props) {
   const { t, i18n } = useTranslation();
@@ -23,14 +31,14 @@ export function SnapshotsSection({ slug }: Props) {
   const runNow = useSnapshotCreate(slug);
 
   const server = data?.snapshots;
-  const [dailyEnabled, setDailyEnabled] = useState(true);
+  const [schedule, setSchedule] = useState<SnapshotSchedule>("daily");
   const [retention, setRetention] = useState(180);
 
   useEffect(() => {
     if (server) {
       // Server-data sync into local form state — intentional initialization pattern.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDailyEnabled(server.daily_enabled);
+      setSchedule(server.schedule);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRetention(server.retention_days);
     }
@@ -39,11 +47,11 @@ export function SnapshotsSection({ slug }: Props) {
   if (!data || !server) return null;
 
   const dirty =
-    dailyEnabled !== server.daily_enabled || retention !== server.retention_days;
+    schedule !== server.schedule || retention !== server.retention_days;
 
   const onSave = () => {
     mut.mutate({
-      snapshots: { daily_enabled: dailyEnabled, retention_days: retention },
+      snapshots: { schedule, retention_days: retention },
     });
   };
 
@@ -63,16 +71,24 @@ export function SnapshotsSection({ slug }: Props) {
       onSave={onSave}
       errorMessage={mut.isError ? (mut.error as Error).message : null}
     >
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={dailyEnabled}
-          onChange={(e) => setDailyEnabled(e.target.checked)}
-        />
-        <span>{t("settings.section.snapshots.daily_enabled")}</span>
-      </label>
-      {server.daily_enabled && (
-        <p className="pl-6 text-xs text-muted-foreground">
+      <div className="space-y-1">
+        <label className="text-xs font-medium">
+          {t("settings.section.snapshots.schedule")}
+        </label>
+        <select
+          value={schedule}
+          onChange={(e) => setSchedule(e.target.value as SnapshotSchedule)}
+          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+        >
+          {SCHEDULE_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {t(`settings.section.snapshots.schedule_${opt}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+      {server.schedule !== "off" && (
+        <p className="text-xs text-muted-foreground">
           {nextRun
             ? t("settings.section.snapshots.next_run", { time: nextRun })
             : t("settings.section.snapshots.next_run_pending")}

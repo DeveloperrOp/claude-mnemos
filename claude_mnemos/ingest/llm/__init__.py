@@ -20,6 +20,7 @@ from claude_mnemos.ingest.llm.api import (
     ExtractionRaw,
     LLMExtractionError,
     MissingApiKeyError,
+    ModelNotFoundError,
     TranscriptTooLargeError,
 )
 
@@ -75,6 +76,7 @@ __all__ = [
     "LLMClient",
     "LLMExtractionError",
     "MissingApiKeyError",
+    "ModelNotFoundError",
     "TranscriptTooLargeError",
     "make_llm_client",
 ]

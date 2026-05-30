@@ -14,7 +14,7 @@ const FULL = {
   lint: { schedule: null, enabled_rules: null, autofix_on_save: false },
   ontology: { auto_mode: false, confidence_min: 0.7, confidence_auto_apply: 0.95 },
   watchdog: { mode: "merge" },
-  snapshots: { daily_enabled: true, retention_days: 180 },
+  snapshots: { schedule: "daily", retention_days: 180 },
   lifecycle: { auto_stale_days: 90, auto_archive: false },
   prompts: { custom_system_path: null, custom_extract_user_path: null },
   telemetry: { opt_in: false },
@@ -33,7 +33,11 @@ beforeEach(() => {
           snapshots: {
             title: "Snapshots",
             hint: "Archive of the whole vault",
-            daily_enabled: "Daily snapshots",
+            schedule: "Frequency",
+            schedule_daily: "Daily",
+            schedule_weekly: "Weekly (Sun)",
+            schedule_monthly: "Monthly (1st)",
+            schedule_off: "Off",
             retention_days: "Retention (days)",
             next_run: "Next scheduled run: {{time}}",
             next_run_pending: "Next scheduled run: calculating…",
@@ -95,12 +99,12 @@ describe("SnapshotsSection", () => {
     expect(save).toBeDisabled();
   });
 
-  it("toggle daily_enabled enables Save and PATCHes", async () => {
+  it("changing schedule preset enables Save and PATCHes", async () => {
     stubGet();
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
       data: {
         ...FULL,
-        snapshots: { daily_enabled: false, retention_days: 180 },
+        snapshots: { schedule: "off", retention_days: 180 },
       },
     });
     wrap(<SnapshotsSection slug="p1" />);
@@ -108,14 +112,14 @@ describe("SnapshotsSection", () => {
       expect(screen.getByText("Snapshots")).toBeInTheDocument(),
     );
 
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.selectOptions(screen.getByRole("combobox"), "off");
     const save = screen.getByRole("button", { name: /^Save$/i });
     expect(save).toBeEnabled();
     await userEvent.click(save);
 
     await waitFor(() =>
       expect(apiClient.patch).toHaveBeenCalledWith("/settings/p1", {
-        snapshots: { daily_enabled: false, retention_days: 180 },
+        snapshots: { schedule: "off", retention_days: 180 },
       }),
     );
   });
