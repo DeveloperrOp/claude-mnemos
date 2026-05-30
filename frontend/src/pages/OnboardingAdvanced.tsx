@@ -179,7 +179,9 @@ export function OnboardingAdvanced() {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="onb-vault" className="text-sm font-medium">{t("onboarding.vault_label")}</label>
+          <label htmlFor="onb-vault" className="text-sm font-medium">
+            {t("onboarding.vault_label")}
+          </label>
           <div className="flex gap-2">
             <input
               id="onb-vault"
@@ -196,10 +198,12 @@ export function OnboardingAdvanced() {
               disabled={create.isPending}
               onClick={() => setVaultPickerOpen(true)}
             >
-              📁 {t("onboarding.vault_browse")}
+              {t("onboarding.vault_browse")}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">{t("onboarding.vault_hint")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("onboarding.vault_hint")}
+          </p>
         </div>
       </div>
 

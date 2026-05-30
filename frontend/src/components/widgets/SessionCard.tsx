@@ -65,13 +65,22 @@ const STATUS_COLOR: Record<SessionStatus, string> = {
 interface Props {
   project: string;
   session: SessionView;
+  /** v0.0.37: live ingest-job status for this session's transcript (from
+   * the queue), so we can show a "В работе" badge and block the buttons
+   * until the job finishes. SessionView.status is the DB record of the
+   * last *completed* ingest, not the queue state, so it's not enough. */
+  activeJob?: "queued" | "running" | null;
 }
 
-export function SessionCard({ project, session: s }: Props) {
+export function SessionCard({ project, session: s, activeJob = null }: Props) {
   const { t, i18n } = useTranslation();
   const reingest = useReingestSession();
   const detailHref = `/project/${project}/sessions/${s.session_id}`;
-  const state = brainState(s);
+  // Live queue status takes precedence over DB-recorded session status.
+  // Without this, the card stays "Saved · knowledge not extracted" with
+  // a live button even while the LLM is mid-extraction in the queue.
+  const liveBusy = activeJob === "queued" || activeJob === "running";
+  const state = liveBusy ? "in_progress" : brainState(s);
   const extractedCount = s.created_pages.filter((p) => !isRawDumpPage(p)).length;
   const StateIcon = {
     extracted: BrainCircuit,

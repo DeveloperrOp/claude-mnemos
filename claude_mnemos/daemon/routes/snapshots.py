@@ -130,13 +130,29 @@ def restore_snapshot_endpoint(
         )
 
     with pipeline_lock(vault):
-        result = restore_from_snapshot(vault, snap_path)
+        try:
+            result = restore_from_snapshot(vault, snap_path)
+        except Exception as exc:  # noqa: BLE001
+            import traceback as _tb
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "restore_failed",
+                    "message": (
+                        f"Не удалось восстановить снимок: {type(exc).__name__}: {exc}"
+                    ),
+                    "traceback": _tb.format_exc(limit=5),
+                },
+            ) from exc
         if not result.success:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "restore_failed",
-                    "detail": result.error or "unknown",
+                    "message": (
+                        "Восстановление не завершилось: "
+                        f"{result.error or 'неизвестная ошибка'}"
+                    ),
                     "recovery_hint": result.recovery_hint,
                 },
             )

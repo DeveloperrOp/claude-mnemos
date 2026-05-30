@@ -24,7 +24,10 @@ from claude_mnemos.ingest.llm.auth import find_claude_binary
 from claude_mnemos.ingest.llm.rate_limit import parse_rate_limit_from_stderr
 from claude_mnemos.ingest.llm.tokens import count_tokens_local
 
-DEFAULT_TIMEOUT_SEC = 120
+DEFAULT_TIMEOUT_SEC = 600  # 10 min — large chats (4MB+ jsonl) need it
+# v0.0.37: was 120s, killed extraction on every >2MB transcript. The CLI
+# itself has no upper bound; we set a generous outer limit so genuinely
+# stuck calls still fail eventually, but normal ones finish.
 DEFAULT_MAX_TURNS = 5
 """Maximum tool-use turns per extract call. Must be ≥2 so the CLI can
 complete a tool_use → result loop. 5 accommodates validation retries

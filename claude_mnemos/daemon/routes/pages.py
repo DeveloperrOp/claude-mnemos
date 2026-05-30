@@ -145,14 +145,40 @@ async def patch_page(project: str, page_ref: str, request: Request) -> dict[str,
     vault = runtime.vault_root
     page_path = _resolve_page(vault, page_ref)
     body = await request.json()
-    fm_patch, body_text = _validate_patch_body(body)
-    result = apply_patch(
-        vault,
-        page_path,
-        frontmatter_patch=fm_patch,
-        body=body_text,
-        tracker=runtime.tracker,
-    )
+    try:
+        fm_patch, body_text = _validate_patch_body(body)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_patch_body",
+                "message": f"Не удалось сохранить страницу: {exc}",
+            },
+        ) from exc
+    try:
+        result = apply_patch(
+            vault,
+            page_path,
+            frontmatter_patch=fm_patch,
+            body=body_text,
+            tracker=runtime.tracker,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # v0.0.37: was raising a bare 500 with no detail in the UI.
+        # Wrap with the actual exception type+message so the user sees
+        # something actionable in the toast.
+        import traceback as _tb
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "page_patch_failed",
+                "message": (
+                    "Не удалось сохранить страницу. "
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                "traceback": _tb.format_exc(limit=5),
+            },
+        ) from exc
     return _patch_result_to_dict(result)
 
 

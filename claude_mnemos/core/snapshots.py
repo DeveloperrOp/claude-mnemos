@@ -221,6 +221,10 @@ def list_snapshots(vault: Path) -> list[SnapshotInfo]:
     for entry in backups_root.iterdir():
         if not entry.is_dir():
             continue
+        # Skip soft-deleted snapshots silently (renamed by delete_snapshot()
+        # to `_trash-<original>`). Logging a warning here would spam.
+        if entry.name.startswith("_trash-"):
+            continue
         parsed = parse_snapshot_name(entry.name)
         if parsed is None:
             logger.warning("skipping unrecognized backup entry: %s", entry.name)
@@ -269,7 +273,19 @@ def delete_snapshot(vault: Path, name: str) -> None:
     if not target.exists():
         raise FileNotFoundError(f"snapshot not found: {name}")
 
-    shutil.rmtree(target)
+    # v0.0.37: soft-delete — rename with `_trash-` prefix instead of
+    # rmtree. The list_snapshots() routine skips entries whose name
+    # doesn't parse via parse_snapshot_name() (logs warning), so
+    # _trash-* won't appear in the UI. Permanent removal happens via
+    # backups_cleanup_task on the configured retention schedule.
+    trash_target = target.parent / f"_trash-{target.name}"
+    # If a previous soft-delete already renamed something to this path
+    # (e.g. multiple deletes of the same snapshot would be impossible
+    # because of the prefix, but tests can stage this scenario), fall
+    # back to a hard remove of the orphan first.
+    if trash_target.exists():
+        shutil.rmtree(trash_target)
+    target.rename(trash_target)
 
 
 def prune_old_backups(

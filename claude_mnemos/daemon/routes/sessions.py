@@ -80,14 +80,32 @@ async def ingest_session_route(
     del session_id  # informational only; payload carries the path
     runtime = get_runtime(request, project)
     transcript_path = body.get("transcript_path")
-    if (
-        not isinstance(transcript_path, str)
-        or not transcript_path
-        or not Path(transcript_path).is_file()
-    ):
+    if not isinstance(transcript_path, str) or not transcript_path:
         raise HTTPException(
             status_code=400,
-            detail={"error": "missing_or_invalid_transcript_path"},
+            detail={
+                "error": "missing_or_invalid_transcript_path",
+                "message": "Путь к файлу транскрипта не указан или невалидный.",
+            },
+        )
+    if not Path(transcript_path).is_file():
+        # The most common case in production: Claude Code or a cleanup
+        # job deleted the original .jsonl (e.g. subagent transcripts are
+        # ephemeral). The session record in our DB still points at the
+        # old path. The previous error message ("Request failed with
+        # status code 400") was opaque; spell it out.
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "transcript_file_missing",
+                "message": (
+                    "Файл транскрипта чата не найден на диске. "
+                    "Возможно Claude Code удалил его (subagent-сессии и "
+                    "очень старые чаты чистятся автоматически). "
+                    "Эта сессия больше не может быть переингещена."
+                ),
+                "path": transcript_path,
+            },
         )
     # Reject path-traversal: client-supplied path must live under the
     # canonical transcripts root (MNEMOS_TRANSCRIPTS_ROOT or

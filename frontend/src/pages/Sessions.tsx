@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useSessions } from "@/hooks/useSessions";
+import { useJobs } from "@/hooks/useJobs";
 import { useLostSessions } from "@/hooks/useLostSessions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +28,19 @@ export function Sessions() {
     status: filters.status === "all" ? undefined : filters.status,
     limit: filters.limit,
   });
+  // Active ingest jobs (queued/running) per session → drives the
+  // "In work" badge + button-disable state on the card.
+  const queuedJobsQ = useJobs({ project, status: "queued", limit: 200 });
+  const runningJobsQ = useJobs({ project, status: "running", limit: 50 });
+  const activeJobsByTranscript = new Map<string, "queued" | "running">();
+  for (const j of queuedJobsQ.data?.jobs ?? []) {
+    const tp = (j.payload as { transcript_path?: string })?.transcript_path;
+    if (typeof tp === "string") activeJobsByTranscript.set(tp, "queued");
+  }
+  for (const j of runningJobsQ.data?.jobs ?? []) {
+    const tp = (j.payload as { transcript_path?: string })?.transcript_path;
+    if (typeof tp === "string") activeJobsByTranscript.set(tp, "running");
+  }
   const lostQuery = useLostSessions();
   const lostForProject = (lostQuery.data?.sessions ?? []).filter(
     (s) => s.project_name === project,
@@ -139,7 +153,16 @@ export function Sessions() {
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         {sessions.map((s) => (
-          <SessionCard key={s.session_id} project={project} session={s} />
+          <SessionCard
+            key={s.session_id}
+            project={project}
+            session={s}
+            activeJob={
+              s.transcript_path
+                ? activeJobsByTranscript.get(s.transcript_path) ?? null
+                : null
+            }
+          />
         ))}
       </div>
     </div>

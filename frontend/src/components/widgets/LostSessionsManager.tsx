@@ -107,22 +107,28 @@ export function LostSessionsManager({
     setSelected(new Set());
   }
 
-  function runImport() {
+  function runImport(forceAssignTo?: string) {
     if (selectedSessions.length === 0) return;
-    // Previously the whole Import button was disabled when any selected
-    // session had no project_name. Now we import the assigned ones and
-    // skip the rest — useLostSessionsImportSelection already emits a
-    // multi-bucket toast (queued / skipped / missing).
-    const assignable = selectedSessions.filter(
-      (s) => !isUnassigned(s.project_name),
+    // Rewrite unassigned sessions to the chosen target project (if any
+    // was picked through the "Assign on import" dialog), then forward
+    // everything as a single batch. Assigned sessions keep their
+    // existing project_name.
+    const batch = selectedSessions.map((s) =>
+      isUnassigned(s.project_name) && forceAssignTo
+        ? { ...s, project_name: forceAssignTo }
+        : s,
     );
+    const assignable = batch.filter((s) => !isUnassigned(s.project_name));
     if (assignable.length === 0) return;
     importSelection.mutate(
       { selected: assignable },
       { onSuccess: () => setSelected(new Set()) },
     );
     setConfirmImport(false);
+    setAssignTo("");
   }
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignTo, setAssignTo] = useState("");
 
   function runIgnore() {
     if (selectedSessions.length === 0) return;
@@ -134,6 +140,17 @@ export function LostSessionsManager({
   }
 
   function requestImport() {
+    // If selection contains unassigned sessions, ask which project to put
+    // them in before kicking off the actual import. Previously the
+    // unassigned ones were silently skipped.
+    const hasUnassigned = selectedSessions.some((s) =>
+      isUnassigned(s.project_name),
+    );
+    if (hasUnassigned) {
+      setAssignTo("");
+      setAssignDialogOpen(true);
+      return;
+    }
     if (selectedSessions.length >= BULK_IMPORT_CONFIRM_THRESHOLD) setConfirmImport(true);
     else runImport();
   }
@@ -321,6 +338,45 @@ export function LostSessionsManager({
         destructive
         onConfirm={runIgnore}
         isPending={ignoreSelection.isPending}
+      />
+      {/* "Назначить проект на лету" — opens when the user clicks Import
+          on a selection that contains sessions with no project_name.
+          Previously these were silently filtered out of the batch; now
+          we ask the user where to put them. */}
+      <ConfirmDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        title={t(
+          "lost_sessions.selection.assign_title",
+          "Выбери проект для непривязанных сессий",
+        )}
+        description={t(
+          "lost_sessions.selection.assign_desc",
+          "Среди выбранных есть сессии без проекта. Они попадут в выбранный проект.",
+        )}
+        confirmLabel={t("lost_sessions.selection.bar_import")}
+        onConfirm={() => {
+          if (!assignTo) return;
+          setAssignDialogOpen(false);
+          runImport(assignTo);
+        }}
+        isPending={importSelection.isPending}
+        extraContent={
+          <select
+            value={assignTo}
+            onChange={(e) => setAssignTo(e.target.value)}
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+          >
+            <option value="">
+              {t("lost_sessions.selection.assign_placeholder", "— выбери проект —")}
+            </option>
+            {projects.map((p) => (
+              <option key={p.name} value={p.name}>
+                {getProjectDisplayName(p)}
+              </option>
+            ))}
+          </select>
+        }
       />
     </div>
   );

@@ -31,14 +31,22 @@ export function LintSection({ slug }: Props) {
 
   const server = data?.lint;
   const [schedule, setSchedule] = useState("");
+  // Tri-state for the schedule preset dropdown so "Своё" can show an
+  // empty text input without colliding with the "Не запускать" preset
+  // (which also represents an empty schedule).
+  const [customMode, setCustomMode] = useState(false);
   // null = "all rules" (server convention); a Set = explicit subset.
   const [rulesSet, setRulesSet] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     if (server) {
       // Server-data sync into local form state — intentional initialization pattern.
+      const incoming = server.schedule ?? "";
+      const PRESETS = ["", "0 * * * *", "0 4 * * *", "0 4 * * 0"];
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSchedule(server.schedule ?? "");
+      setSchedule(incoming);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCustomMode(incoming !== "" && !PRESETS.includes(incoming));
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRulesSet(server.enabled_rules ? new Set(server.enabled_rules) : null);
     }
@@ -95,6 +103,7 @@ export function LintSection({ slug }: Props) {
             knowing cron syntax. "Своё" surfaces the raw text field. */}
         <select
           value={
+            customMode ? "custom" :
             schedule === "" ? "" :
             schedule === "0 * * * *" ? "0 * * * *" :
             schedule === "0 4 * * *" ? "0 4 * * *" :
@@ -104,11 +113,14 @@ export function LintSection({ slug }: Props) {
           onChange={(e) => {
             const v = e.target.value;
             if (v === "custom") {
-              // Keep current value (or seed with daily preset for editing)
-              if (schedule === "" || ["0 * * * *", "0 4 * * *", "0 4 * * 0"].includes(schedule)) {
-                setSchedule("0 4 * * *");
-              }
+              // v0.0.37: previously the dropdown auto-seeded "0 4 * * *"
+              // here, which confused the user (clicked Custom, got a
+              // daily cron they didn't ask for). Now we just flip into
+              // custom-mode and clear the text — the user types their own.
+              setCustomMode(true);
+              setSchedule("");
             } else {
+              setCustomMode(false);
               setSchedule(v);
             }
           }}
@@ -121,7 +133,7 @@ export function LintSection({ slug }: Props) {
           <option value="custom">{t("settings.section.lint.schedule_custom", "Своё (cron-формат)")}</option>
         </select>
         {/* Raw cron input shown only when "custom" preset is active */}
-        {schedule !== "" && !["0 * * * *", "0 4 * * *", "0 4 * * 0"].includes(schedule) && (
+        {customMode && (
           <input
             type="text"
             value={schedule}
