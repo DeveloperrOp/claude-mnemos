@@ -13,10 +13,29 @@ thread must never die from an uncaught exception.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
+
+# Atomic-save marker that Obsidian / VSCode / many other text editors
+# use: `note.md.{hex32}.tmp` first, then rename to `note.md`. We treat
+# this exact pattern as an editor save, not as an alert-worthy external
+# rename. The hex character set is deliberately strict so a real user
+# rename can't accidentally match.
+_EDITOR_TMP_SUFFIX_RE = re.compile(r"\.[a-f0-9]{6,}\.tmp$", re.IGNORECASE)
+
+
+def _looks_like_editor_atomic_save(src: Path, dst: Path) -> bool:
+    """Return True if src/dst look like a text editor's atomic save."""
+    s = str(src)
+    m = _EDITOR_TMP_SUFFIX_RE.search(s)
+    if m is None:
+        return False
+    # Strip the `.{hex}.tmp` suffix from src and compare to dst.
+    stripped = s[: m.start()]
+    return stripped == str(dst)
 
 from watchdog.events import (
     FileMovedEvent,
@@ -118,6 +137,15 @@ class VaultChangeHandler(FileSystemEventHandler):
             # StagingTransaction registers move sources/destinations in the
             # tracker before shutil.move runs.
             if self.tracker.contains(src) or self.tracker.contains(dst):
+                return
+            # v0.0.38: also suppress the Obsidian/VSCode-style atomic
+            # save pattern: `note.md.{hexUUID}.tmp` → `note.md`. These
+            # produce one external_rename alert per save and flood the
+            # Health page with noise even though the user did nothing
+            # we'd want to surface. The hex-suffix-before-.tmp marker
+            # is specific enough to atomic-write editors not to misfire
+            # on a real manual rename.
+            if _looks_like_editor_atomic_save(src, dst):
                 return
             self.alerts.add(
                 kind="external_rename",

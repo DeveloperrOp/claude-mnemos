@@ -110,6 +110,14 @@
   @keyframes blink { 50% { opacity: 0 } }
   .cursor-blink { animation: blink 1.06s steps(2, start) infinite; }
 
+  /* Indeterminate progress bar — slides 1/3-wide pill back and forth.
+     Used in Queue.tsx for running ingest jobs (no real %). */
+  @keyframes progress-slide {
+    0%   { left: -33%; }
+    50%  { left: 100%; }
+    100% { left: 100%; }
+  }
+
   @keyframes pulse-accent {
     0%, 100% { opacity: 0.6 }
     50%      { opacity: 1.0 }

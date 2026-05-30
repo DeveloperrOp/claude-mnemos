@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
 import { useCancelJob } from "@/hooks/useCancelJob";
 import { useRetryJob } from "@/hooks/useRetryJob";
@@ -32,6 +32,28 @@ function basename(p: string): string {
   return p.replace(/\\/g, "/").split("/").pop() ?? p;
 }
 
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}с`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  if (m < 60) return `${m}м ${s}с`;
+  const h = Math.floor(m / 60);
+  return `${h}ч ${m % 60}м`;
+}
+
+/** Tick once per second so a running job's elapsed counter updates live. */
+function useElapsedSeconds(startedAt: string | null): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!startedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  if (!startedAt) return 0;
+  const start = new Date(startedAt).getTime();
+  return Math.max(0, (now - start) / 1000);
+}
+
 function JobRow({ job }: { job: Job }) {
   const { t, i18n } = useTranslation();
   const [tracebackOpen, setTracebackOpen] = useState(false);
@@ -44,6 +66,11 @@ function JobRow({ job }: { job: Job }) {
       : null;
   const filename = transcriptPath ? basename(transcriptPath) : null;
   const showTraceback = job.status === "failed" || job.status === "dead_letter";
+
+  // Live elapsed counter for running jobs. Stops once finished_at is set.
+  const elapsedSeconds = useElapsedSeconds(
+    job.status === "running" && !job.finished_at ? job.started_at : null,
+  );
 
   return (
     <Card>
@@ -72,6 +99,24 @@ function JobRow({ job }: { job: Job }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-1 text-xs">
+        {job.status === "running" && (
+          <div className="space-y-1">
+            {/* Indeterminate progress bar — LLM extraction is opaque so we
+                can't show a real percentage. The animated stripe + live
+                elapsed counter communicate "still alive, still working". */}
+            <div className="relative h-1.5 overflow-hidden rounded-full bg-warning/15">
+              <div className="absolute inset-y-0 left-0 w-1/3 animate-[progress-slide_1.6s_ease-in-out_infinite] rounded-full bg-warning" />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-warning">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>
+                {t("queue.running_elapsed", "Идёт {{elapsed}}", {
+                  elapsed: formatElapsed(elapsedSeconds),
+                })}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="text-muted-foreground">
           {t("dead_letter.attempt_n_of_m", { n: job.attempt, max: JOB_MAX_ATTEMPTS })}
           {" · "}

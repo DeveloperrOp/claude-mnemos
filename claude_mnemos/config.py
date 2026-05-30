@@ -16,8 +16,36 @@ DEFAULT_LANGUAGE_HINT: LanguageHint = "auto"
 _MODEL_ALIASES = {
     "sonnet": "claude-sonnet-4-6",
     "haiku": "claude-haiku-4-5-20251001",
-    "opus": "claude-opus-4-7",
+    # v0.0.38: "opus" alias points at the newest 4.8. Anthropic typically
+    # retires older models 6-12 months after a new tier ships, so we
+    # keep the alias on the latest while explicit "claude-opus-4-7"
+    # users keep what they asked for.
+    "opus": "claude-opus-4-8",
 }
+
+# Known-good Claude model IDs as of 2026-05. When the user has configured
+# a model that the local CLI rejects ("model not found"), the LLM client
+# falls back through this list to keep extraction working until the user
+# updates the setting in the UI.
+KNOWN_MODELS_NEWEST_FIRST = (
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+)
+
+
+def fallback_model(requested: str) -> str:
+    """Pick the newest known-good model that is *not* the requested one,
+    used as a last-resort when the configured model is rejected by the
+    local CLI/API. Returns the requested model unchanged if it's not in
+    our known set (assume the user knows what they're doing)."""
+    if requested not in KNOWN_MODELS_NEWEST_FIRST:
+        return requested
+    for m in KNOWN_MODELS_NEWEST_FIRST:
+        if m != requested:
+            return m
+    return requested
 
 _VALID_HINTS: set[str] = {"auto", "uk", "ru", "en"}
 

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { SettingsAccordion } from "../SettingsAccordion";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import { apiClient } from "@/api/client";
+import { extractApiError } from "@/lib/error";
 import {
   useGlobalSettings,
   useGlobalSettingsMutation,
@@ -19,15 +23,60 @@ export function GlobalGeneralSection() {
   const [locale, setLocale] = useState<Locale>("uk");
   const [daemonPort, setDaemonPort] = useState(5757);
   const [restartHelpOpen, setRestartHelpOpen] = useState(false);
-  // Best-effort platform detection — used only to pick which restart
-  // instructions to show. Server-side info would be more reliable but
-  // adds an extra round-trip; userAgent is good enough.
+  // Best-effort platform detection — used to pick the manual-restart
+  // fallback text if the programmatic restart endpoint reports that no
+  // tray supervisor is present.
   const platform =
     typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent)
       ? "mac"
       : typeof navigator !== "undefined" && /Linux/i.test(navigator.userAgent)
         ? "linux"
         : "win";
+
+  // Programmatic restart: POST /api/daemon/restart. The daemon exits
+  // cleanly after replying; the tray supervisor (Windows) respawns it.
+  // We poll the new instance for ~15s after the request to know when
+  // to reload the page.
+  const restartMut = useMutation({
+    mutationFn: async () => {
+      const r = await apiClient.post<{ ok: boolean; supervised: boolean }>(
+        "/daemon/restart",
+      );
+      return r.data;
+    },
+    onSuccess: async (data) => {
+      if (!data.supervised) {
+        // No supervisor — daemon will go down and stay down. Show the
+        // platform-specific manual-restart dialog.
+        setRestartHelpOpen(true);
+        return;
+      }
+      toast.info(
+        t(
+          "settings.global.general.restart_in_progress",
+          "Демон перезапускается…",
+        ),
+      );
+      // Poll for the new instance by hitting /version. Reload once it
+      // answers, or fall back to the help dialog after ~15s.
+      const t0 = Date.now();
+      while (Date.now() - t0 < 15000) {
+        await new Promise((r) => setTimeout(r, 800));
+        try {
+          await apiClient.get("/version");
+          // It's back — reload to drop any stale state in the SPA.
+          window.location.reload();
+          return;
+        } catch {
+          // not back yet
+        }
+      }
+      setRestartHelpOpen(true);
+    },
+    onError: (err) => {
+      toast.error(extractApiError(err));
+    },
+  });
 
   useEffect(() => {
     if (data) {
@@ -101,13 +150,21 @@ export function GlobalGeneralSection() {
               size="sm"
               variant="outline"
               type="button"
-              onClick={() => setRestartHelpOpen(true)}
+              disabled={restartMut.isPending}
+              onClick={() => restartMut.mutate()}
             >
-              <RefreshCw className="mr-1 h-3 w-3" />
-              {t(
-                "settings.global.general.restart_daemon_btn",
-                "Как перезапустить демон",
-              )}
+              <RefreshCw
+                className={`mr-1 h-3 w-3 ${restartMut.isPending ? "animate-spin" : ""}`}
+              />
+              {restartMut.isPending
+                ? t(
+                    "settings.global.general.restart_in_progress",
+                    "Демон перезапускается…",
+                  )
+                : t(
+                    "settings.global.general.restart_daemon_btn",
+                    "Перезапустить демон",
+                  )}
             </Button>
           </div>
         )}

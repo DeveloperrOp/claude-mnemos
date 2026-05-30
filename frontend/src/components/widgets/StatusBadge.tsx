@@ -28,8 +28,9 @@ export function StatusBadge({ status, hideDefault = false }: Props) {
   return (
     <span
       data-status={status}
+      title={t(`wiki.status_hints.${status}`, { defaultValue: "" })}
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest",
+        "inline-flex cursor-help items-center rounded-full px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest",
         VARIANT[status],
       )}
     >

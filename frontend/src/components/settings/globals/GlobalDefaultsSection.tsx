@@ -66,6 +66,7 @@ export function GlobalDefaultsSection() {
             we don't ship a preset for yet). Until v0.0.36 this was a free
             text input — fine for the spec author, opaque for users. */}
         {[
+          "claude-opus-4-8",
           "claude-opus-4-7",
           "claude-sonnet-4-6",
           "claude-haiku-4-5",
@@ -82,6 +83,9 @@ export function GlobalDefaultsSection() {
             }}
             className="w-full rounded-md border bg-background px-2 py-1"
           >
+            <option value="claude-opus-4-8">
+              Claude Opus 4.8 — {t("settings.global.defaults.model_opus48_hint", "новейшая, лучшее качество (Декабрь 2025)")}
+            </option>
             <option value="claude-opus-4-7">
               Claude Opus 4.7 — {t("settings.global.defaults.model_opus_hint", "лучший, медленнее, дороже")}
             </option>

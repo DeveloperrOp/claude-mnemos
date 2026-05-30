@@ -485,6 +485,13 @@
       "stale": "Stale",
       "archived": "Archived"
     },
+    "status_hints": {
+      "draft": "LLM-generated, not yet checked by a human. Default state for all new pages.",
+      "reviewed": "A human has skimmed the page and didn't spot obvious errors, but the content isn't fully fact-checked.",
+      "verified": "A human confirmed the page is accurate. Highest quality.",
+      "stale": "Page hasn't been updated in a long time and may be out of date. Re-read and update, or mark as verified.",
+      "archived": "Page is no longer relevant but worth keeping. Hidden from the main lists but still exists."
+    },
     "flavor": {
       "pattern": "Pattern",
       "mistake": "Mistake",
