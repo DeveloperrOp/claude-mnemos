@@ -18,7 +18,6 @@ from claude_mnemos.core.snapshots import (
     list_trash,
     parse_snapshot_name,
     purge_trash,
-    restore_from_snapshot,
     restore_from_trash,
 )
 from claude_mnemos.daemon.routes._helpers import get_runtime
@@ -193,7 +192,7 @@ def purge_trash_endpoint(
 @router.post(
     "/snapshots/{project}/{name}/restore", response_model=RestoreSnapshotResponse
 )
-def restore_snapshot_endpoint(
+async def restore_snapshot_endpoint(
     project: str, name: str, request: Request
 ) -> RestoreSnapshotResponse:
     runtime = get_runtime(request, project)
@@ -207,7 +206,9 @@ def restore_snapshot_endpoint(
 
     with pipeline_lock(vault):
         try:
-            result = restore_from_snapshot(vault, snap_path)
+            # restore_with_quiesce closes the sqlite jobs.db handle around the
+            # swap so the vault-dir rename succeeds on Windows (then reopens it).
+            result = await runtime.restore_with_quiesce(snap_path)
         except Exception as exc:  # noqa: BLE001
             import traceback as _tb
             raise HTTPException(

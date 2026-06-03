@@ -155,6 +155,62 @@ async def test_unmount_removes_lint_check(tmp_path: Path, scheduler, alerts):
 
 
 @pytest.mark.asyncio
+async def test_restore_with_quiesce_succeeds_with_open_jobs_db(
+    tmp_path: Path, scheduler, alerts
+):
+    # A mounted runtime keeps <vault>/.jobs.db open — the handle that blocks the
+    # vault-directory rename on Windows. restore_with_quiesce must close it
+    # around the swap, succeed, then reopen the store + restart the worker.
+    from claude_mnemos.core.snapshots import create_manual_snapshot
+
+    rt = VaultRuntime(project=_entry(tmp_path, "rq"), settings=ProjectSettings())
+    page = rt.vault_root / "wiki" / "entities" / "foo.md"
+    page.parent.mkdir(parents=True, exist_ok=True)
+    page.write_text("original\n", encoding="utf-8")
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        snap = create_manual_snapshot(rt.vault_root, label="probe")
+        page.write_text("mutated\n", encoding="utf-8")  # diverge from snapshot
+
+        result = await rt.restore_with_quiesce(snap)
+
+        assert result.success is True, result.error
+        # page reverted to the snapshot content
+        assert page.read_text(encoding="utf-8") == "original\n"
+        # store reopened + usable, worker restarted
+        rt.job_store.count_by_status()  # must not raise (fresh open store)
+        assert rt.job_worker is not None
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_restore_with_quiesce_preserves_jobs_db_rows(
+    tmp_path: Path, scheduler, alerts
+):
+    # Dead-letter / queued rows must survive a restore (jobs.db is preserved
+    # across the swap and reopened, not wiped).
+    from claude_mnemos.core.snapshots import create_manual_snapshot
+
+    rt = VaultRuntime(project=_entry(tmp_path, "rqp"), settings=ProjectSettings())
+    (rt.vault_root / "wiki").mkdir(parents=True, exist_ok=True)
+    (rt.vault_root / "wiki" / "p.md").write_text("x\n", encoding="utf-8")
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        rt.job_store.create(
+            kind="ingest", payload={"transcript_path": "/x.jsonl"}
+        )
+        before = rt.job_store.count_by_status()
+        snap = create_manual_snapshot(rt.vault_root, label="probe2")
+        result = await rt.restore_with_quiesce(snap)
+        assert result.success is True, result.error
+        after = rt.job_store.count_by_status()
+        assert sum(after.values()) == sum(before.values())  # rows preserved
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
 async def test_mount_twice_raises(tmp_path: Path, scheduler, alerts):
     rt = VaultRuntime(project=_entry(tmp_path, "x"), settings=ProjectSettings())
     try:

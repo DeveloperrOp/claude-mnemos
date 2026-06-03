@@ -140,6 +140,31 @@ def test_restore_swaps_vault_atomically(tmp_path: Path):
     assert not (vault / "wiki" / "entities" / "new.md").exists()
 
 
+def test_restore_with_open_handle_inside_vault_os_contract(tmp_path: Path):
+    # Documents WHY restore needs the quiesce step on Windows: an open handle
+    # INSIDE the vault (in production, the daemon's .jobs.db) blocks the vault
+    # directory rename on Windows — but a POSIX rename survives open files.
+    # restore_with_quiesce closes that handle first; this pins the OS contract.
+    import sys
+
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="oc", operation_type="ingest")
+    (vault / "wiki" / "entities" / "foo.md").write_text("mutated\n", encoding="utf-8")
+
+    with open(vault / "wiki" / "entities" / "foo.md", "rb"):  # handle inside vault
+        result = restore_from_snapshot(vault, snap)
+
+    if sys.platform == "win32":
+        # open handle blocks vault.rename -> restore fails BUT vault is intact
+        assert result.success is False
+        assert result.vault_intact is True
+        assert "cannot rename vault to old" in (result.error or "")
+    else:
+        # POSIX: rename survives open files
+        assert result.success is True
+
+
 def test_restore_drops_meta_json_from_swap(tmp_path: Path):
     vault = tmp_path / "vault"
     _populate_vault(vault)
@@ -256,7 +281,7 @@ def test_create_snapshot_at_collision_raises(tmp_path: Path):
     """A caller-dictated path that already holds a DIFFERENT operation must
     raise (genuine collision). The same-operation case is the idempotent retry
     handled by ``test_create_snapshot_at_same_op_is_idempotent``."""
-    from claude_mnemos.core.snapshots import SnapshotError, create_snapshot_at
+    from claude_mnemos.core.snapshots import create_snapshot_at
 
     vault = tmp_path / "vault"
     _populate_vault(vault)

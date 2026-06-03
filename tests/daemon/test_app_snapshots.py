@@ -30,6 +30,12 @@ class _FakeRuntime:
     def __init__(self, vault: Path) -> None:
         self.vault_root = vault
 
+    async def restore_with_quiesce(self, snapshot: Path) -> Any:
+        # No open jobs.db in the shim — just run the real core swap.
+        from claude_mnemos.core.snapshots import restore_from_snapshot
+
+        return restore_from_snapshot(self.vault_root, snapshot)
+
 
 class _FakeDaemon:
     def __init__(self, alpha_vault: Path) -> None:

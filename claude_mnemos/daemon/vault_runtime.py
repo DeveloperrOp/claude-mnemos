@@ -49,6 +49,9 @@ from claude_mnemos.state.settings import ProjectSettings
 if TYPE_CHECKING:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+    from claude_mnemos.core.snapshots import RestoreResult
+    from claude_mnemos.daemon.jobs.worker import JobWorker
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +128,6 @@ class VaultRuntime:
 
         self.observer: VaultObserver | None = None
         # Forward-ref import to break circular dep with daemon.jobs
-        from claude_mnemos.daemon.jobs.worker import JobWorker
 
         self.job_worker: JobWorker | None = None
         self._mounted: bool = False
@@ -216,37 +218,7 @@ class VaultRuntime:
                 )
 
             # 4. Jobs subsystem.
-            from claude_mnemos.daemon.jobs.worker import JobWorker
-
-            def cfg_factory() -> Config:
-                return Config.from_env()
-
-            def llm_factory(cfg: Config) -> LLMClient | None:
-                """Resolve LLMClient via factory. Return None only if both
-                provider paths are unavailable (API key missing AND CLI
-                unavailable) — IngestHandler then falls back to --no-llm
-                behaviour (manual extraction skipped)."""
-                try:
-                    return make_llm_client(cfg)
-                except MissingApiKeyError:
-                    return None
-
-            from claude_mnemos.daemon.jobs.handlers import JobHandler
-            from claude_mnemos.state.jobs import JobKind
-
-            handlers: dict[JobKind, JobHandler] = {
-                "ingest": IngestHandler(
-                    vault=self.vault_root,
-                    cfg_factory=cfg_factory,
-                    llm_factory=llm_factory,
-                    job_store=self.job_store,
-                )
-            }
-            worker = JobWorker(
-                store=self.job_store,
-                handlers=handlers,
-                scheduler=scheduler,
-            )
+            worker = self._build_job_worker()
             await worker.start()
             self.job_worker = worker
 
@@ -254,6 +226,97 @@ class VaultRuntime:
         except Exception as exc:
             await self._rollback_mount(error=str(exc))
             raise VaultMountError(f"failed to mount vault {self.name!r}: {exc}") from exc
+
+    def _build_job_worker(self) -> JobWorker:
+        """Construct (not start) the JobWorker for this vault.
+
+        Shared by mount() and restore_with_quiesce() so the post-restore worker
+        can never drift from the mounted-worker config. Requires self.job_store
+        and self._scheduler to be set.
+        """
+        from claude_mnemos.daemon.jobs.handlers import JobHandler
+        from claude_mnemos.daemon.jobs.worker import JobWorker
+        from claude_mnemos.state.jobs import JobKind
+
+        def cfg_factory() -> Config:
+            return Config.from_env()
+
+        def llm_factory(cfg: Config) -> LLMClient | None:
+            """Resolve LLMClient via factory. Return None only if both provider
+            paths are unavailable (API key missing AND CLI unavailable) —
+            IngestHandler then falls back to --no-llm (manual extraction
+            skipped)."""
+            try:
+                return make_llm_client(cfg)
+            except MissingApiKeyError:
+                return None
+
+        handlers: dict[JobKind, JobHandler] = {
+            "ingest": IngestHandler(
+                vault=self.vault_root,
+                cfg_factory=cfg_factory,
+                llm_factory=llm_factory,
+                job_store=self.job_store,
+            )
+        }
+        assert self._scheduler is not None
+        return JobWorker(
+            store=self.job_store,
+            handlers=handlers,
+            scheduler=self._scheduler,
+        )
+
+    async def restore_with_quiesce(self, snapshot: Path) -> RestoreResult:
+        """Restore the vault from ``snapshot``, releasing the sqlite jobs.db
+        handle around the swap so the vault-directory rename succeeds on Windows.
+
+        The blocker for the Windows rename is the open ``.jobs.db`` handle, not
+        the watchdog observer (the existing code already runs the swap with the
+        observer alive and only fails on Windows). So we stop the worker, close
+        the JobStore, run the UNCHANGED atomic swap (paused via the tracker so
+        the still-running observer ignores the swap's events), then reopen the
+        store and restart the worker. If a corrupted final-rename left the vault
+        directory missing we do NOT reopen — recreating an empty .jobs.db over
+        the loss would mask it.
+        """
+        import asyncio
+
+        from claude_mnemos.core.snapshots import restore_from_snapshot
+
+        # 1. Drain + stop the worker, release the jobs.db handle (the blocker).
+        if self.job_worker is not None:
+            try:
+                await self.job_worker.stop(timeout=10.0)
+            except Exception:
+                logger.exception("restore: worker stop failed")
+            self.job_worker = None
+        self.job_store.close()
+
+        # 2. Run the unchanged atomic swap off the event loop, paused.
+        result = await asyncio.to_thread(
+            restore_from_snapshot, self.vault_root, snapshot, tracker=self.tracker
+        )
+
+        # 3. Reopen the store + restart the worker — never recreate a vault
+        #    that a corrupted final-rename left missing.
+        if self.vault_root.exists():
+            self.job_store = JobStore(self.vault_root / JOBS_DB_FILENAME)
+            self.job_store.recover_zombie_running()
+            worker = self._build_job_worker()
+            await worker.start()
+            self.job_worker = worker
+        elif self._alerts is not None:
+            with contextlib.suppress(Exception):
+                self._alerts.add(
+                    kind="handler_error",
+                    path=str(self.vault_root),
+                    message=(
+                        f"restore left vault {self.name!r} missing; "
+                        "manual recovery needed"
+                    ),
+                    detected_at=datetime.now(UTC),
+                )
+        return result
 
     async def _rollback_mount(self, *, error: str) -> None:
         if self.job_worker is not None:
