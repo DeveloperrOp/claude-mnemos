@@ -30,7 +30,7 @@ router = APIRouter()
 async def lint_run(project: str, request: Request) -> dict[str, Any]:
     runtime = get_runtime(request, project)
     vault = runtime.vault_root
-    report = LintRunner(vault).run()
+    report = LintRunner(vault, runtime.settings.lint.enabled_rules).run()
     save_report(vault, report, tracker=runtime.tracker)
     return report.model_dump(mode="json")
 

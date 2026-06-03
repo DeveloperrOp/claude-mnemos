@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import ValidationError
 
 from claude_mnemos.core.page_apply import (
     DeleteResult,
@@ -163,6 +164,11 @@ async def patch_page(project: str, page_ref: str, request: Request) -> dict[str,
             body=body_text,
             tracker=runtime.tracker,
         )
+    except ValidationError:
+        # Invalid frontmatter value (e.g. bad status/confidence) → let it reach
+        # the global @app.exception_handler(ValidationError) which returns 422.
+        # The broad except below would otherwise mask it as a 500.
+        raise
     except Exception as exc:  # noqa: BLE001
         # v0.0.37: was raising a bare 500 with no detail in the UI.
         # Wrap with the actual exception type+message so the user sees

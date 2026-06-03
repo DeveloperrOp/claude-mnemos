@@ -19,8 +19,12 @@ PageEntry = tuple[Path, ParsedPage | None]
 
 
 class LintRunner:
-    def __init__(self, vault: Path) -> None:
+    def __init__(self, vault: Path, enabled_rules: list[str] | None = None) -> None:
         self.vault = vault
+        # None → run every rule (default). A list → run only those rule_ids;
+        # the rest are skipped. Mirrors LintSettings.enabled_rules semantics
+        # ("all ticked" normalises to None on the frontend).
+        self.enabled_rules = enabled_rules
 
     def run(self) -> LintReport:
         run_id = uuid4().hex
@@ -28,7 +32,11 @@ class LintRunner:
 
         pages: list[PageEntry] = []
         for p in sorted(self.vault.glob("wiki/**/*.md")):
-            if any(part.startswith(".") for part in p.parts):
+            # Skip dot-subdirs *inside* the vault (e.g. wiki/.archive/). Use the
+            # path relative to the vault — the vault itself often lives under a
+            # dot-dir (~/.mnemos-dev), and the absolute path would otherwise skip
+            # every page.
+            if any(part.startswith(".") for part in p.relative_to(self.vault).parts):
                 continue
             try:
                 pages.append((p, read_page(p)))
@@ -37,6 +45,8 @@ class LintRunner:
 
         all_findings: list[LintFinding] = []
         for rule_id, rule_fn in RULE_REGISTRY.items():
+            if self.enabled_rules is not None and rule_id not in self.enabled_rules:
+                continue
             try:
                 all_findings.extend(rule_fn(self.vault, pages))
             except Exception as exc:

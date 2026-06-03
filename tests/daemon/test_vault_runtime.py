@@ -60,9 +60,7 @@ def alerts():
 
 
 @pytest.mark.asyncio
-async def test_mount_starts_observer_and_registers_cron_jobs(
-    tmp_path: Path, scheduler, alerts
-):
+async def test_mount_starts_observer_and_registers_cron_jobs(tmp_path: Path, scheduler, alerts):
     rt = VaultRuntime(
         project=_entry(tmp_path, "alpha"),
         settings=ProjectSettings(),  # snapshots.daily_enabled defaults True
@@ -81,9 +79,7 @@ async def test_mount_starts_observer_and_registers_cron_jobs(
 
 
 @pytest.mark.asyncio
-async def test_mount_skips_daily_snapshot_when_disabled(
-    tmp_path: Path, scheduler, alerts
-):
+async def test_mount_skips_daily_snapshot_when_disabled(tmp_path: Path, scheduler, alerts):
     from claude_mnemos.state.settings import ProjectSettings, SnapshotsSettings
 
     rt = VaultRuntime(
@@ -100,6 +96,65 @@ async def test_mount_skips_daily_snapshot_when_disabled(
 
 
 @pytest.mark.asyncio
+async def test_mount_registers_lint_check_when_scheduled(tmp_path: Path, scheduler, alerts):
+    from claude_mnemos.state.settings import LintSettings, ProjectSettings
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "lc1"),
+        settings=ProjectSettings(lint=LintSettings(schedule="0 * * * *")),
+    )
+    try:
+        await rt.mount(scheduler=scheduler, alerts=alerts)
+        ids = {j.id for j in scheduler.get_jobs()}
+        assert "lint_check:lc1" in ids
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_mount_no_lint_check_when_schedule_none(tmp_path: Path, scheduler, alerts):
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "lc2"),
+        settings=ProjectSettings(),  # lint.schedule defaults None
+    )
+    try:
+        await rt.mount(scheduler=scheduler, alerts=alerts)
+        ids = {j.id for j in scheduler.get_jobs()}
+        assert "lint_check:lc2" not in ids
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_reload_settings_enable_and_disable_lint_check(tmp_path: Path, scheduler, alerts):
+    from claude_mnemos.state.settings import LintSettings, ProjectSettings
+
+    rt = VaultRuntime(project=_entry(tmp_path, "lc3"), settings=ProjectSettings())
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    try:
+        assert scheduler.get_job("lint_check:lc3") is None
+        rt.reload_settings(ProjectSettings(lint=LintSettings(schedule="0 4 * * *")))
+        assert scheduler.get_job("lint_check:lc3") is not None
+        rt.reload_settings(ProjectSettings(lint=LintSettings(schedule=None)))
+        assert scheduler.get_job("lint_check:lc3") is None
+    finally:
+        await rt.unmount(timeout=2.0, force=True)
+
+
+@pytest.mark.asyncio
+async def test_unmount_removes_lint_check(tmp_path: Path, scheduler, alerts):
+    from claude_mnemos.state.settings import LintSettings, ProjectSettings
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "lc4"),
+        settings=ProjectSettings(lint=LintSettings(schedule="0 * * * *")),
+    )
+    await rt.mount(scheduler=scheduler, alerts=alerts)
+    await rt.unmount(timeout=2.0, force=True)
+    assert scheduler.get_job("lint_check:lc4") is None
+
+
+@pytest.mark.asyncio
 async def test_mount_twice_raises(tmp_path: Path, scheduler, alerts):
     rt = VaultRuntime(project=_entry(tmp_path, "x"), settings=ProjectSettings())
     try:
@@ -111,9 +166,7 @@ async def test_mount_twice_raises(tmp_path: Path, scheduler, alerts):
 
 
 @pytest.mark.asyncio
-async def test_mount_rollback_on_observer_failure(
-    tmp_path: Path, scheduler, alerts, monkeypatch
-):
+async def test_mount_rollback_on_observer_failure(tmp_path: Path, scheduler, alerts, monkeypatch):
     """If observer.start() raises, no scheduler jobs nor JobWorker leak."""
 
     class _Boom:
@@ -126,9 +179,7 @@ async def test_mount_rollback_on_observer_failure(
     def _bad_observer(_root, _handler):
         return _Boom()
 
-    monkeypatch.setattr(
-        "claude_mnemos.daemon.vault_runtime.VaultObserver", _bad_observer
-    )
+    monkeypatch.setattr("claude_mnemos.daemon.vault_runtime.VaultObserver", _bad_observer)
 
     rt = VaultRuntime(project=_entry(tmp_path, "rb"), settings=ProjectSettings())
     with pytest.raises(VaultMountError, match="disk full"):
@@ -188,6 +239,7 @@ async def test_unmount_force_drains_queued(
     assert rt.is_mounted is False
     # Underlying file is closed; can't query rt.job_store. Re-open to verify.
     from claude_mnemos.state.jobs import JobStore
+
     fresh = JobStore(rt.vault_root / ".jobs.db")
     try:
         statuses = [r["status"] for r in fresh._conn.execute("SELECT status FROM jobs").fetchall()]
@@ -214,9 +266,7 @@ async def test_reload_settings_disable_daily_snapshot(
     await rt.mount(scheduler=scheduler, alerts=alerts)
     try:
         assert scheduler.get_job("daily_snapshot:rs1") is not None
-        rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(schedule="off"))
-        )
+        rt.reload_settings(ProjectSettings(snapshots=SnapshotsSettings(schedule="off")))
         assert scheduler.get_job("daily_snapshot:rs1") is None
         assert scheduler.get_job("backups_cleanup:rs1") is not None
     finally:
@@ -236,9 +286,7 @@ async def test_reload_settings_re_enable_daily_snapshot(
     await rt.mount(scheduler=scheduler, alerts=alerts)
     try:
         assert scheduler.get_job("daily_snapshot:rs2") is None
-        rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(schedule="daily"))
-        )
+        rt.reload_settings(ProjectSettings(snapshots=SnapshotsSettings(schedule="daily")))
         assert scheduler.get_job("daily_snapshot:rs2") is not None
     finally:
         await rt.unmount(timeout=2.0, force=True)
@@ -290,9 +338,7 @@ async def test_reload_settings_changes_cadence_daily_to_weekly(
         # default is daily — day_of_week is unconstrained ("*")
         job = scheduler.get_job("daily_snapshot:cad")
         assert job is not None
-        rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(schedule="weekly"))
-        )
+        rt.reload_settings(ProjectSettings(snapshots=SnapshotsSettings(schedule="weekly")))
         job2 = scheduler.get_job("daily_snapshot:cad")
         assert job2 is not None
         fields = {f.name: str(f) for f in job2.trigger.fields}
@@ -313,9 +359,7 @@ async def test_reload_settings_updates_retention_days(
     )
     await rt.mount(scheduler=scheduler, alerts=alerts)
     try:
-        rt.reload_settings(
-            ProjectSettings(snapshots=SnapshotsSettings(retention_days=30))
-        )
+        rt.reload_settings(ProjectSettings(snapshots=SnapshotsSettings(retention_days=30)))
         job = scheduler.get_job("backups_cleanup:rs3")
         assert job is not None
         # args = [vault_root, retention_days]

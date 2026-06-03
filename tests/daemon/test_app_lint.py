@@ -11,14 +11,16 @@ from httpx import ASGITransport
 
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
+from claude_mnemos.state.settings import LintSettings, ProjectSettings
 
 
 class _FakeRuntime:
     """Minimal VaultRuntime shim for lint route tests."""
 
-    def __init__(self, vault: Path) -> None:
+    def __init__(self, vault: Path, enabled_rules: list[str] | None = None) -> None:
         self.vault_root = vault
         self.tracker = OurWritesTracker(ttl_s=60.0)
+        self.settings = ProjectSettings(lint=LintSettings(enabled_rules=enabled_rules))
 
 
 class _FakeDaemon:
@@ -92,6 +94,33 @@ async def test_run_unknown_project_404(client: Any) -> None:
     assert r.status_code == 404
 
 
+async def test_run_respects_enabled_rules(tmp_path: Path) -> None:
+    # Vault with two orphan pages (would trip orphan_pages) + one broken
+    # page (page_parse_failed). enabled_rules restricts to page_parse_failed.
+    vault = tmp_path / "beta"
+    vault.mkdir()
+    for rel in ("wiki/entities/foo.md", "wiki/entities/bar.md"):
+        p = vault / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            "---\ntitle: T\ntype: entity\ncreated: 2026-04-26\nupdated: 2026-04-26\n"
+            "agent_written: true\n---\nbody\n",
+            encoding="utf-8",
+        )
+    (vault / "wiki/entities/broken.md").write_text("invalid", encoding="utf-8")
+
+    daemon = _FakeDaemon(vault)
+    daemon.runtimes = {"alpha": _FakeRuntime(vault, enabled_rules=["page_parse_failed"])}
+    app = create_app(daemon=daemon)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.post("/api/lint/alpha/run")
+        assert r.status_code == 200
+        rule_ids = {f["rule_id"] for f in r.json()["findings"]}
+        assert "page_parse_failed" in rule_ids
+        assert "orphan_pages" not in rule_ids
+
+
 # ---------------------------------------------------------------------------
 # POST /lint/{project}/autofix
 # ---------------------------------------------------------------------------
@@ -125,6 +154,4 @@ async def test_autofix_after_run(client: Any, alpha_vault: Path) -> None:
     assert body["success"] is True
     assert body["snapshot_path"]
     assert body["activity_id"]
-    assert "body  " not in (alpha_vault / "wiki/entities/foo.md").read_text(
-        encoding="utf-8"
-    )
+    assert "body  " not in (alpha_vault / "wiki/entities/foo.md").read_text(encoding="utf-8")

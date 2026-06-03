@@ -81,7 +81,9 @@ def test_sessions_ingest_bad_path_returns_400_not_503(
         json={"transcript_path": "/does/not/exist.jsonl"},
     )
     assert r.status_code == 400, r.text
-    assert r.json()["detail"]["error"] == "missing_or_invalid_transcript_path"
+    # Non-empty but non-existent path → the more-specific code added in v0.0.37
+    # (the missing/empty-path branch is covered by test_app_sessions.py).
+    assert r.json()["detail"]["error"] == "transcript_file_missing"
 
 
 def test_sessions_ingest_enqueues_job(

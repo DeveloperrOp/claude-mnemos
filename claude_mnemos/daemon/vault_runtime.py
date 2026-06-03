@@ -27,12 +27,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from apscheduler.triggers.cron import CronTrigger
+
 from claude_mnemos.config import Config
 from claude_mnemos.core.lost_sessions import LostSessionsCache
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.jobs.handlers import IngestHandler
 from claude_mnemos.daemon.our_writes import OurWritesTracker
-from claude_mnemos.daemon.tasks import backups_cleanup_task, daily_snapshot_task
+from claude_mnemos.daemon.tasks import (
+    backups_cleanup_task,
+    daily_snapshot_task,
+    lint_check_task,
+)
 from claude_mnemos.daemon.watchdog_handler import VaultChangeHandler
 from claude_mnemos.daemon.watchdog_observer import VaultObserver
 from claude_mnemos.ingest.llm import LLMClient, MissingApiKeyError, make_llm_client
@@ -62,6 +68,26 @@ def _snapshot_cron_kwargs(schedule: str) -> dict[str, int | str] | None:
     return None
 
 
+def _lint_cron_trigger(schedule: str | None) -> CronTrigger | None:
+    """Parse a lint `schedule` crontab string into a CronTrigger.
+
+    Unlike snapshots (which use a fixed preset), lint stores a raw 5-field
+    crontab expression ("m h dom mon dow"). Returns None for a blank schedule
+    (no automatic lint) or an unparseable expression (logged, lint not
+    scheduled rather than crashing the mount).
+    """
+    if not schedule or not schedule.strip():
+        return None
+    try:
+        return CronTrigger.from_crontab(schedule.strip(), timezone="UTC")
+    except (ValueError, TypeError):
+        logger.warning(
+            "invalid lint cron schedule %r — lint will not run automatically",
+            schedule,
+        )
+        return None
+
+
 class VaultRuntimeError(Exception):
     """Base error for VaultRuntime lifecycle issues."""
 
@@ -74,9 +100,7 @@ class VaultBusyError(VaultRuntimeError):
     """unmount() rejected because there are active jobs and force=False."""
 
     def __init__(self, *, name: str, queued: int, running: int) -> None:
-        super().__init__(
-            f"vault {name!r} has {queued} queued and {running} running jobs"
-        )
+        super().__init__(f"vault {name!r} has {queued} queued and {running} running jobs")
         self.name = name
         self.queued = queued
         self.running = running
@@ -166,6 +190,7 @@ class VaultRuntime:
                 # frequency. Missing one weekly/monthly run is acceptable.
                 if self.settings.snapshots.schedule == "daily":
                     import asyncio as _asyncio
+
                     _asyncio.create_task(
                         _asyncio.to_thread(daily_snapshot_task, self.vault_root),
                     )
@@ -178,6 +203,17 @@ class VaultRuntime:
                 id=f"backups_cleanup:{self.name}",
                 replace_existing=True,
             )
+
+            # Lint auto-run: only when the project configured a schedule.
+            lint_trigger = _lint_cron_trigger(self.settings.lint.schedule)
+            if lint_trigger is not None:
+                scheduler.add_job(
+                    lint_check_task,
+                    lint_trigger,
+                    args=[self.vault_root, self.settings.lint.enabled_rules],
+                    id=f"lint_check:{self.name}",
+                    replace_existing=True,
+                )
 
             # 4. Jobs subsystem.
             from claude_mnemos.daemon.jobs.worker import JobWorker
@@ -217,9 +253,7 @@ class VaultRuntime:
             self._mounted = True
         except Exception as exc:
             await self._rollback_mount(error=str(exc))
-            raise VaultMountError(
-                f"failed to mount vault {self.name!r}: {exc}"
-            ) from exc
+            raise VaultMountError(f"failed to mount vault {self.name!r}: {exc}") from exc
 
     async def _rollback_mount(self, *, error: str) -> None:
         if self.job_worker is not None:
@@ -233,6 +267,7 @@ class VaultRuntime:
             for jid in (
                 f"daily_snapshot:{self.name}",
                 f"backups_cleanup:{self.name}",
+                f"lint_check:{self.name}",
             ):
                 with contextlib.suppress(Exception):
                     self._scheduler.remove_job(jid)
@@ -285,6 +320,7 @@ class VaultRuntime:
             for jid in (
                 f"daily_snapshot:{self.name}",
                 f"backups_cleanup:{self.name}",
+                f"lint_check:{self.name}",
             ):
                 with contextlib.suppress(Exception):
                     self._scheduler.remove_job(jid)
@@ -344,3 +380,23 @@ class VaultRuntime:
                 f"backups_cleanup:{self.name}",
                 args=[self.vault_root, new.snapshots.retention_days],
             )
+
+        # Lint schedule or enabled_rules changed: rebuild the lint job. We
+        # remove + re-add (rather than reschedule_job) because the args
+        # (enabled_rules) may also have changed, not just the trigger.
+        if (
+            old.lint.schedule != new.lint.schedule
+            or old.lint.enabled_rules != new.lint.enabled_rules
+        ):
+            jid = f"lint_check:{self.name}"
+            trigger = _lint_cron_trigger(new.lint.schedule)
+            if self._scheduler.get_job(jid) is not None:
+                self._scheduler.remove_job(jid)
+            if trigger is not None:
+                self._scheduler.add_job(
+                    lint_check_task,
+                    trigger,
+                    args=[self.vault_root, new.lint.enabled_rules],
+                    id=jid,
+                    replace_existing=True,
+                )
