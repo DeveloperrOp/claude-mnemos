@@ -192,11 +192,67 @@ begin
   Sleep(1500);
 end;
 
+// ---------------------------------------------------------------------------
+// Autostart shortcut repair (2026-06-10 incident).
+//
+// The Startup-folder Mnemos.lnk can go stale two ways:
+//   1. It points at a DIFFERENT install (dev venv pythonw.exe, an old install
+//      dir). At sign-in that stale tray grabs the single-instance mutex and
+//      the freshly installed exe exits silently — "переустановил, ничего не
+//      открылось".
+//   2. The uninstall-old-version step above removes it (its [UninstallRun]
+//      includes `tray uninstall`), silently dropping autostart on upgrades.
+//
+// Strategy: remember whether the user HAD an autostart shortcut before any
+// uninstall runs; after files land, rewrite it from scratch to point at the
+// just-installed exe. No shortcut beforehand → user never had / declined
+// autostart → leave it that way (first-run postinstall handles fresh installs).
+// ---------------------------------------------------------------------------
+
+var
+  HadAutostartLnk: Boolean;
+
+function AutostartLnkPath: String;
+begin
+  Result := ExpandConstant('{userstartup}\Mnemos.lnk');
+end;
+
+procedure RewriteAutostartLnk;
+var
+  Sh, Lnk: Variant;
+begin
+  try
+    Sh := CreateOleObject('WScript.Shell');
+    Lnk := Sh.CreateShortcut(AutostartLnkPath());
+    Lnk.TargetPath := ExpandConstant('{app}\{#MyAppExeName}');
+    // Bare subcommand — the bundled exe rejects the legacy
+    // "-m claude_mnemos.tray run" arguments with exit 2.
+    Lnk.Arguments := 'tray run';
+    Lnk.WorkingDirectory := ExpandConstant('{app}');
+    Lnk.WindowStyle := 7;  // minimized; tray app has no main window
+    Lnk.Save;
+    Log('Autostart shortcut rewritten to ' + ExpandConstant('{app}\{#MyAppExeName}'));
+  except
+    // Better no autostart than a stale one that hijacks the mutex.
+    Log('Autostart shortcut rewrite failed (' + GetExceptionMessage + '); deleting it');
+    DeleteFile(AutostartLnkPath());
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and HadAutostartLnk then
+    RewriteAutostartLnk();
+end;
+
 function InitializeSetup(): Boolean;
 var
   Response: Integer;
 begin
   Result := True;
+
+  // Snapshot BEFORE the old version's uninstaller (below) deletes the .lnk.
+  HadAutostartLnk := FileExists(AutostartLnkPath());
 
   // Always run the kill sweep before anything else — handles both fresh and
   // upgrade installs. Fresh installs are no-ops (no processes to kill);

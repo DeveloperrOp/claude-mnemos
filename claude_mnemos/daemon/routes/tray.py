@@ -14,6 +14,7 @@ import sys
 import psutil
 from fastapi import APIRouter, HTTPException
 
+from claude_mnemos import runtime
 from claude_mnemos.daemon.lockfile import is_daemon_running
 from claude_mnemos.tray.__main__ import (
     DAEMON_PID_FILE,
@@ -30,6 +31,10 @@ router = APIRouter(prefix="/tray", tags=["tray"])
 def _resolve_target() -> tuple[str, list[str]]:
     """Mirror of __main__._resolve_target so /status reports the path the
     autostart entry would use without importing __main__."""
+    # Frozen daemon: sys.executable is the bundled exe with its own argparse —
+    # `-m` exits 2 ("invalid choice"), see tray.__main__._resolve_target.
+    if runtime.is_frozen():
+        return sys.executable, ["tray", "run"]
     found = shutil.which("mnemos-tray")
     if found:
         return found, ["run"]
@@ -37,11 +42,17 @@ def _resolve_target() -> tuple[str, list[str]]:
 
 
 def _exec_tray(action: str) -> None:
-    mnemos_exe = shutil.which("mnemos")
-    if mnemos_exe:
-        cmd = [mnemos_exe, "tray", action]
+    if runtime.is_frozen():
+        # Bundled exe parses its own subcommands; `-m claude_mnemos ...`
+        # exits 2 → every dashboard autostart toggle answered HTTP 500 on
+        # installs without a `mnemos` on PATH.
+        cmd = [sys.executable, "tray", action]
     else:
-        cmd = [sys.executable, "-m", "claude_mnemos", "tray", action]
+        mnemos_exe = shutil.which("mnemos")
+        if mnemos_exe:
+            cmd = [mnemos_exe, "tray", action]
+        else:
+            cmd = [sys.executable, "-m", "claude_mnemos", "tray", action]
     result = subprocess.run(
         cmd,
         capture_output=True,

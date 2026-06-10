@@ -10,6 +10,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import shutil
@@ -18,10 +19,10 @@ import sys
 import threading
 import time
 from pathlib import Path
-from pathlib import Path
 
 import psutil
 
+from claude_mnemos import runtime
 from claude_mnemos.daemon.lockfile import is_daemon_running
 from claude_mnemos.tray.icon import TrayApp
 from claude_mnemos.tray.ipc import IpcServer, ipc_send
@@ -63,6 +64,13 @@ def _resolve_target() -> tuple[str, list[str]]:
     sibling of ``python.exe``) so the tray doesn't drag a black console
     window into taskbar / alt-tab.
     """
+    # Frozen bundle FIRST: the exe parses its own subcommands and exits 2 on
+    # `-m ...` — every autostart .lnk written by a frozen first-run install
+    # carried "-m claude_mnemos.tray run" and silently never worked.
+    # sys.executable here is the windowed claude-mnemos.exe — correct for a
+    # sign-in launch (no console window).
+    if runtime.is_frozen():
+        return sys.executable, ["tray", "run"]
     found = shutil.which("mnemos-tray")
     if found:
         return found, ["run"]
@@ -75,15 +83,42 @@ def _resolve_target() -> tuple[str, list[str]]:
     return exe, ["-m", "claude_mnemos.tray", "run"]
 
 
+def _notify_stale_lock() -> None:
+    """Lock held but its owner doesn't answer IPC — almost always a stale
+    tray from ANOTHER install (dev venv, previous install dir) that grabbed
+    the mutex at sign-in. Exiting silently looked like "nothing happened"
+    after a reinstall (2026-06-10 incident), so say it out loud. The
+    windowed exe has no console, hence the MessageBox on Windows."""
+    msg = (
+        "claude-mnemos is already running, but its tray is not responding.\n\n"
+        "A copy from another install (an old version or a development "
+        "environment) may be holding the single-instance lock.\n\n"
+        "Open Task Manager, end any claude-mnemos.exe / pythonw.exe tray "
+        "processes, then launch claude-mnemos again."
+    )
+    logging.error("[tray] %s", msg)
+    with contextlib.suppress(OSError):
+        print(f"[tray] {msg}", file=sys.stderr)
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            MB_ICONWARNING = 0x30
+            ctypes.windll.user32.MessageBoxW(None, msg, "claude-mnemos", MB_ICONWARNING)
+        except Exception:
+            logging.exception("[tray] stale-lock MessageBox failed")
+
+
 def _cmd_run() -> int:
     si = get_single_instance(TRAY_INSTANCE_NAME)
     if not si.acquire():
         # Already running — tell that one to show its launcher window, exit clean.
         ok = ipc_send(IPC_ADDRESS, "show")
         if ok:
-            print("[tray] another instance running; sent 'show'.")
+            with contextlib.suppress(OSError):
+                print("[tray] another instance running; sent 'show'.")
         else:
-            print("[tray] another instance running but IPC unreachable.", file=sys.stderr)
+            _notify_stale_lock()
         return 0
 
     sv = Supervisor(daemon_pid_file=DAEMON_PID_FILE, log_path=DAEMON_LOG)
@@ -147,7 +182,6 @@ def _cmd_install() -> int:
         if tray_pid > 0 and psutil.pid_exists(tray_pid):
             tray_alive = True
     if not tray_alive:
-        from claude_mnemos import runtime
         # Frozen bundle has its own argparse — `-m` is invalid as a subcommand.
         # In source mode sys.executable is python.exe and we need the explicit
         # module path. Same pattern as cli_launcher._spawn_tray and
