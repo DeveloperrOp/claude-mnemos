@@ -235,6 +235,24 @@ def test_git_toplevel_is_cached(tmp_path: Path, monkeypatch):
     _resolver._git_toplevel.cache_clear()
 
 
+def test_git_toplevel_tolerates_none_stdout(tmp_path: Path, monkeypatch):
+    """Frozen windowed exe: subprocess.run can return stdout=None even with
+    capture_output=True. _git_toplevel must not crash (it 500'd the whole
+    lost-sessions scan on v0.0.45)."""
+    from claude_mnemos.mapping import resolver as _resolver
+
+    _resolver._git_toplevel.cache_clear()
+
+    class _R:
+        returncode = 0
+        stdout = None
+
+    monkeypatch.setattr(_resolver.shutil, "which", lambda name: "git")
+    monkeypatch.setattr(_resolver.subprocess, "run", lambda *a, **k: _R())
+    assert _resolver._git_toplevel(tmp_path / "x") is None  # no AttributeError
+    _resolver._git_toplevel.cache_clear()
+
+
 def test_git_fallback_returns_none_when_not_a_repo(tmp_path: Path, monkeypatch):
     _seed_map(tmp_path, [
         ProjectMapEntry(name="x", vault_root=tmp_path / "vx",

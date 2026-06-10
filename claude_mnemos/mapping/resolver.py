@@ -57,7 +57,11 @@ def _git_toplevel(cwd: Path) -> Path | None:
         return None
     if out.returncode != 0:
         return None
-    top = out.stdout.strip()
+    # out.stdout can be None in a frozen windowed exe (no valid std handles),
+    # even with capture_output=True — guard before .strip() or the whole
+    # lost-sessions scan 500s (caught live on v0.0.45, invisible in dev/tests
+    # where stdout is a real pipe).
+    top = (out.stdout or "").strip()
     if not top:
         return None
     try:
