@@ -38,7 +38,10 @@ OPTIONS = {
     # package at runtime — invisible to modulegraph's static analysis, exactly
     # like PyInstaller (see mnemos.spec). Without both packages the .app raises
     # "Unknown encoding cl100k_base. Plugins found: []" on every extract.
-    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview", "tiktoken", "tiktoken_ext"],
+    # tiktoken_ext itself is a NAMESPACE package — py2app cannot bundle it via
+    # `packages` (ImportError at build); it is pulled in by the direct import
+    # in claude_mnemos/ingest/llm/tokens.py instead.
+    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview", "tiktoken"],
     "includes": ["uvicorn.logging", "uvicorn.lifespan.on", "uvicorn.protocols.http.auto"],
     # PyInstaller is installed via the [installer] pip extra so that the same
     # workflow can build the PyInstaller bundle for non-mac platforms — but on

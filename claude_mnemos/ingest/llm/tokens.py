@@ -14,9 +14,20 @@ approximation. See docs/plans/2026-04-30-llm-cli-provider-design.md §5.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 
 import tiktoken
+
+# Frozen builds (PyInstaller exe, py2app .app): tiktoken discovers its
+# encodings by scanning the tiktoken_ext namespace package via pkgutil at
+# runtime — invisible to both bundlers' static analysis, and py2app cannot
+# even list a namespace package in `packages`. A direct import makes the
+# plugin module visible to any bundler. Suppressed so an exotic tiktoken
+# build without the plugin degrades to the old behaviour instead of
+# breaking module import.
+with contextlib.suppress(ImportError):
+    import tiktoken_ext.openai_public  # type: ignore[import-untyped]  # noqa: F401
 
 
 @functools.lru_cache(maxsize=1)
