@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from claude_mnemos.ingest.transcript import (
+    CorruptTranscriptError,
     EmptyTranscriptError,
     TranscriptMessage,
     parse_jsonl,
@@ -62,3 +63,33 @@ def test_parse_skips_malformed_json(tmp_path: Path):
     messages = parse_jsonl(f)
     assert len(messages) == 1
     assert messages[0].text == "ok"
+
+
+def test_parse_fully_corrupt_file_raises_corrupt_not_empty(tmp_path: Path):
+    """A file where EVERY non-blank line fails to parse is corruption, not an
+    empty transcript — it must raise CorruptTranscriptError so the ingest
+    handler dead-letters it instead of marking the job a silent success."""
+    f = tmp_path / "corrupt.jsonl"
+    f.write_text("{garbage\nmore junk\n\x00\x01binary\n", encoding="utf-8")
+    with pytest.raises(CorruptTranscriptError):
+        parse_jsonl(f)
+
+
+def test_parse_valid_lines_no_messages_is_empty_not_corrupt(tmp_path: Path):
+    """Valid JSON lines but no user/assistant text (pure-tool session) stays
+    EmptyTranscriptError — a legitimate no-op, NOT corruption."""
+    f = tmp_path / "tooly.jsonl"
+    f.write_text(
+        '{"type":"summary","summary":"x"}\n'
+        '{"type":"user","message":{"role":"user","content":[{"type":"tool_use"}]}}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(EmptyTranscriptError):
+        parse_jsonl(f)
+
+
+def test_corrupt_is_not_an_empty_subclass() -> None:
+    """The handler swallows EmptyTranscriptError only; CorruptTranscriptError
+    must NOT be caught by that except, so verify they're unrelated types."""
+    assert not issubclass(CorruptTranscriptError, EmptyTranscriptError)
+    assert not issubclass(EmptyTranscriptError, CorruptTranscriptError)

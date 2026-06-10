@@ -206,6 +206,35 @@ def test_git_fallback_attributes_via_repo_root(tmp_path: Path, monkeypatch):
     assert e is not None and e.name == "repo-proj"
 
 
+def test_git_toplevel_is_cached(tmp_path: Path, monkeypatch):
+    """_git_toplevel must cache per-cwd: a lost-sessions scan resolves the same
+    repo for dozens of unassigned sessions — without the cache that's dozens of
+    git subprocesses, each blocking up to the timeout on a dead path."""
+    from claude_mnemos.mapping import resolver as _resolver
+
+    _resolver._git_toplevel.cache_clear()
+    calls = {"n": 0}
+
+    def fake_run(*args, **kwargs):
+        calls["n"] += 1
+
+        class _R:
+            returncode = 0
+            stdout = str(tmp_path / "repo") + "\n"
+
+        return _R()
+
+    monkeypatch.setattr(_resolver.shutil, "which", lambda name: "git")
+    monkeypatch.setattr(_resolver.subprocess, "run", fake_run)
+
+    cwd = tmp_path / "repo" / "sub"
+    _resolver._git_toplevel(cwd)
+    _resolver._git_toplevel(cwd)
+    _resolver._git_toplevel(cwd)
+    assert calls["n"] == 1, "git was invoked more than once for the same cwd"
+    _resolver._git_toplevel.cache_clear()
+
+
 def test_git_fallback_returns_none_when_not_a_repo(tmp_path: Path, monkeypatch):
     _seed_map(tmp_path, [
         ProjectMapEntry(name="x", vault_root=tmp_path / "vx",

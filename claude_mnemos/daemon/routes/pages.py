@@ -178,6 +178,19 @@ async def patch_page(project: str, page_ref: str, request: Request) -> dict[str,
     base_version = body.get("base_version") if isinstance(body, dict) else None
     if isinstance(base_version, str) and base_version:
         current = _file_version(page_path)
+        if current == "" and not page_path.exists():
+            # File vanished since the editor opened it (deleted / trashed).
+            # 404 with a clear reason beats the 500 apply_patch would raise.
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "page_deleted_since_open",
+                    "message": (
+                        "Страница была удалена после того, как вы её открыли. "
+                        "Сохранить правки невозможно."
+                    ),
+                },
+            )
         if current and current != base_version:
             raise HTTPException(
                 status_code=409,

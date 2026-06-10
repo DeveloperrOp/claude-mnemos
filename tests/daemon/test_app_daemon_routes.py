@@ -73,6 +73,22 @@ async def test_resume_route_unpauses_the_queue(
     assert js.is_paused() is False
 
 
+async def test_resume_does_not_clear_a_rate_limit_pause(
+    client, fake_daemon: _FakeDaemon
+) -> None:
+    """A rate-limit pause (near-future reset) must survive a user /resume —
+    otherwise the worker resumes before the API limit reset and re-trips 429."""
+    from datetime import UTC, datetime, timedelta
+
+    js = fake_daemon.runtimes["alpha"].job_store
+    reset_at = datetime.now(UTC) + timedelta(seconds=60)
+    js.pause_queue(until=reset_at)  # simulate rate-limit pause
+    r = await client.post("/api/daemon/resume")
+    assert r.status_code == 200
+    assert r.json()["resumed"] == 0  # nothing user-resumable
+    assert js.is_paused() is True  # rate-limit pause preserved
+
+
 async def test_pause_route_503_when_no_daemon_bound() -> None:
     app = create_app(daemon=None)
     transport = ASGITransport(app=app)

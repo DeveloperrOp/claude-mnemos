@@ -4,7 +4,10 @@ from pathlib import Path
 import pytest
 
 from claude_mnemos.daemon.jobs.handlers import IngestHandler
-from claude_mnemos.ingest.transcript import EmptyTranscriptError
+from claude_mnemos.ingest.transcript import (
+    CorruptTranscriptError,
+    EmptyTranscriptError,
+)
 from claude_mnemos.state.jobs import Job
 
 
@@ -94,6 +97,23 @@ async def test_ingest_handler_swallows_empty_transcript(tmp_path: Path):
     )
     # Must NOT raise — job completes as a no-op success.
     await handler.run(_job({"transcript_path": "/x.jsonl"}))
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_propagates_corrupt_transcript(tmp_path: Path):
+    """A fully-corrupt JSONL must NOT be swallowed as success (that would hide
+    data loss) — CorruptTranscriptError propagates so the job dead-letters."""
+    def corrupt(*args, **kwargs):
+        raise CorruptTranscriptError("no parseable JSON lines in /x.jsonl")
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,
+        ingest_fn=corrupt,
+    )
+    with pytest.raises(CorruptTranscriptError):
+        await handler.run(_job({"transcript_path": "/x.jsonl"}))
 
 
 @pytest.mark.asyncio

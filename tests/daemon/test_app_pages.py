@@ -127,6 +127,23 @@ async def test_patch_with_stale_base_version_returns_409(
     assert r.json()["detail"]["error"] == "stale_page"
 
 
+async def test_patch_deleted_page_returns_404_not_500(
+    client: Any, alpha_vault: Path
+) -> None:
+    """Page deleted between GET and PATCH must yield a clean 404, never a 500.
+    (page_ref_to_path 404s first for an already-gone file; the base_version
+    branch additionally guards the rare resolve→apply TOCTOU window.)"""
+    p = _seed(alpha_vault)
+    version = (await client.get("/api/pages/alpha/wiki/entities/foo.md")).json()["version"]
+    p.unlink()  # deleted since the editor opened it
+    r = await client.patch(
+        "/api/pages/alpha/wiki/entities/foo.md",
+        json={"frontmatter": {"status": "verified"}, "body": None, "base_version": version},
+    )
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"]["error"] in ("page_not_found", "page_deleted_since_open")
+
+
 async def test_patch_without_base_version_still_works(
     client: Any, alpha_vault: Path
 ) -> None:

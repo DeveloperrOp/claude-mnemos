@@ -7,6 +7,7 @@ Plan #13b-α — performance optimization deferred to #13b-β if needed).
 from __future__ import annotations
 
 import fnmatch
+import functools
 import shutil
 import subprocess
 import sys
@@ -28,11 +29,19 @@ def _normalize(p: str | Path) -> str:
     return s.lower() if sys.platform == "win32" else s
 
 
+@functools.lru_cache(maxsize=512)
 def _git_toplevel(cwd: Path) -> Path | None:
     """Return the git working-tree root for *cwd*, or None if not a repo / git
     unavailable. Used as a fallback when a session's cwd matches no project
     pattern: the repo root often DOES (you registered the project at the repo
-    root but ran Claude from a sibling path or an uncovered subdir)."""
+    root but ran Claude from a sibling path or an uncovered subdir).
+
+    Cached per resolved cwd (a lost-sessions scan resolves the same handful of
+    repos for dozens of unassigned sessions — without the cache that is dozens
+    of git subprocesses, each blocking up to the timeout on a dead/unmounted
+    path). Repo membership doesn't change within a process run, so caching is
+    safe; maxsize bounds memory.
+    """
     git = shutil.which("git")
     if git is None:
         return None
@@ -41,7 +50,7 @@ def _git_toplevel(cwd: Path) -> Path | None:
             [git, "-C", str(cwd), "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=3,
             check=False,
         )
     except (OSError, subprocess.SubprocessError):

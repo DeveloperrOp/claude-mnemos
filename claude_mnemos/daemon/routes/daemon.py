@@ -19,6 +19,7 @@ import asyncio
 import os
 import platform
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
@@ -30,7 +31,7 @@ router = APIRouter()
 _PAUSE_SENTINEL = datetime(9999, 1, 1, tzinfo=UTC)
 
 
-def _job_stores(daemon: object) -> list:
+def _job_stores(daemon: object) -> list[Any]:
     stores = []
     for rt in getattr(daemon, "runtimes", {}).values():
         js = getattr(rt, "job_store", None)
@@ -40,7 +41,7 @@ def _job_stores(daemon: object) -> list:
 
 
 @router.post("/daemon/pause")
-def pause_route(request: Request) -> dict:
+def pause_route(request: Request) -> dict[str, Any]:
     daemon = request.app.state.daemon
     if daemon is None:
         raise HTTPException(503, "daemon not bound")
@@ -51,14 +52,21 @@ def pause_route(request: Request) -> dict:
 
 
 @router.post("/daemon/resume")
-def resume_route(request: Request) -> dict:
+def resume_route(request: Request) -> dict[str, Any]:
     daemon = request.app.state.daemon
     if daemon is None:
         raise HTTPException(503, "daemon not bound")
     stores = _job_stores(daemon)
+    resumed = 0
     for js in stores:
-        js.resume_queue()
-    return {"ok": True, "paused": False, "queues": len(stores)}
+        # Only clear a USER pause (the far-future sentinel). A rate-limit
+        # pause sets a near-future reset_at; clearing it here would resume
+        # dequeuing before the API limit reset and re-trip the 429 immediately.
+        until = js.paused_until()
+        if until is not None and until >= _PAUSE_SENTINEL:
+            js.resume_queue()
+            resumed += 1
+    return {"ok": True, "paused": False, "queues": len(stores), "resumed": resumed}
 
 
 def _is_supervised() -> bool:
@@ -71,7 +79,7 @@ def _is_supervised() -> bool:
 
 
 @router.post("/daemon/restart")
-async def restart_route(request: Request, background: BackgroundTasks) -> dict:
+async def restart_route(request: Request, background: BackgroundTasks) -> dict[str, Any]:
     """Schedule a clean daemon exit. On supervised setups the tray
     process notices the exit code and respawns us. Returns whether
     the user will need to relaunch manually."""

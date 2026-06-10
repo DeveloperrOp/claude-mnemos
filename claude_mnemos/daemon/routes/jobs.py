@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, cast
@@ -55,17 +56,27 @@ async def create_job(request: Request, body: dict[str, Any]) -> dict[str, Any]:
     # POST here — without this check an arbitrary readable file would be
     # ingested into the vault (and shipped to the LLM on extract). Same
     # check as routes/sessions.py and routes/lost_sessions.py.
+    #
+    # normcase both sides before comparing: on Windows resolve() preserves the
+    # drive/dir letter case as typed, so "C:\Users\Yaroslav\..." vs a home of
+    # "C:\Users\yaroslav" would spuriously fail relative_to and 400 a legit
+    # file. normcase lowercases on Windows, no-op on POSIX.
     root = _resolve_transcripts_root(None).resolve()
+    root_cmp = os.path.normcase(str(root))
+    tp_cmp = os.path.normcase(str(Path(transcript_path).resolve()))
     try:
-        Path(transcript_path).resolve().relative_to(root)
-    except ValueError as exc:
+        outside = os.path.commonpath([root_cmp, tp_cmp]) != root_cmp
+    except ValueError:
+        # Different drives (Windows) → no common path → definitely outside.
+        outside = True
+    if outside:
         raise HTTPException(
             400,
             detail={
                 "error": "transcript_outside_root",
                 "detail": f"transcript_path must be under {root}",
             },
-        ) from exc
+        )
 
     try:
         job = runtime.job_store.create(kind=kind, payload=payload)
