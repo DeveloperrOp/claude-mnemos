@@ -1165,7 +1165,7 @@
     "autofix_confirm_body": "Буде виправлено {{count}} findings. Спершу створюється знімок — скасувати можна через Історію.",
     "fixable_badge": "Fix",
     "last_run": "Останній прогін: {{time}}",
-    "run_toast": "Лінт завершено — {{findings}} findings",
+    "run_toast": "Перевірку завершено — знайдено зауважень: {{findings}}",
     "autofix_toast": "Виправлено: {{fixed}}, пропущено: {{skipped}}",
     "empty": {
       "title": "Лінт ще не запускався",

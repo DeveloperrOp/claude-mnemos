@@ -1155,7 +1155,7 @@
     "autofix_confirm_body": "{{count}} fixable findings will be patched. A pre-op snapshot is created first; you can undo via Activity.",
     "fixable_badge": "Fix",
     "last_run": "Last run: {{time}}",
-    "run_toast": "Lint finished — {{findings}} findings",
+    "run_toast": "Check finished — {{findings}} issues found",
     "autofix_toast": "Fixed: {{fixed}}, skipped: {{skipped}}",
     "empty": {
       "title": "Lint has not run yet",

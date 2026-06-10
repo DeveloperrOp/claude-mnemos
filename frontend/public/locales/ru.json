@@ -1163,7 +1163,7 @@
     "autofix_confirm_body": "Будет исправлено {{count}} findings. Сначала создаётся снимок — отменить можно через Историю.",
     "fixable_badge": "Fix",
     "last_run": "Последний прогон: {{time}}",
-    "run_toast": "Линт завершён — {{findings}} findings",
+    "run_toast": "Проверка завершена — найдено замечаний: {{findings}}",
     "autofix_toast": "Исправлено: {{fixed}}, пропущено: {{skipped}}",
     "empty": {
       "title": "Линт ещё не запускался",

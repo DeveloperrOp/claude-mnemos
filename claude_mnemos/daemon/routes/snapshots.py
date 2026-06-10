@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
+from filelock import Timeout
 from pydantic import BaseModel, ConfigDict, Field
 
-from claude_mnemos.core.locks import pipeline_lock
+from claude_mnemos.core.locks import build_pipeline_lock, pipeline_lock
 from claude_mnemos.core.snapshots import (
     RestorePreview,
     SnapshotInfo,
@@ -204,7 +206,23 @@ async def restore_snapshot_endpoint(
             status_code=404, detail={"error": "not_found", "name": name}
         )
 
-    with pipeline_lock(vault):
+    # This handler is async, so the blocking FileLock acquire (up to 60s)
+    # must NOT run on the event loop — offload acquire/release to threads and
+    # keep the async restore on the loop. (The sync snapshot endpoints below
+    # use the blocking `pipeline_lock` CM directly — FastAPI runs them in a
+    # threadpool, so blocking there is fine.)
+    lock = build_pipeline_lock(vault)
+    try:
+        await asyncio.to_thread(lock.acquire)
+    except Timeout as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "vault_busy",
+                "message": "Хранилище занято другой операцией. Повторите позже.",
+            },
+        ) from exc
+    try:
         try:
             # restore_with_quiesce closes the sqlite jobs.db handle around the
             # swap so the vault-dir rename succeeds on Windows (then reopens it).
@@ -251,6 +269,8 @@ async def restore_snapshot_endpoint(
             )
         )
         log.save(vault)
+    finally:
+        await asyncio.to_thread(lock.release)
 
     return RestoreSnapshotResponse(success=True, snapshot=name, activity_id=new_id)
 

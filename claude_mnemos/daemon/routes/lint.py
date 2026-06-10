@@ -14,12 +14,14 @@ URL structure::
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.lint.autofix import apply_autofix
+from claude_mnemos.lint.models import LintReport
 from claude_mnemos.lint.runner import LintRunner
 from claude_mnemos.lint.state import load_last_report, save_report
 
@@ -30,8 +32,18 @@ router = APIRouter()
 async def lint_run(project: str, request: Request) -> dict[str, Any]:
     runtime = get_runtime(request, project)
     vault = runtime.vault_root
-    report = LintRunner(vault, runtime.settings.lint.enabled_rules).run()
-    save_report(vault, report, tracker=runtime.tracker)
+    enabled = runtime.settings.lint.enabled_rules
+    tracker = runtime.tracker
+
+    # LintRunner walks the whole vault + parses YAML; save_report writes to
+    # disk. Both are blocking — offload off the event loop so a large vault
+    # doesn't freeze every other request for the duration of the lint.
+    def _run() -> LintReport:
+        report = LintRunner(vault, enabled).run()
+        save_report(vault, report, tracker=tracker)
+        return report
+
+    report = await asyncio.to_thread(_run)
     return report.model_dump(mode="json")
 
 
@@ -58,7 +70,10 @@ async def lint_autofix(project: str, request: Request) -> dict[str, Any]:
                 "hint": "POST /lint/{project}/run first, then call /lint/{project}/autofix",
             },
         )
-    result = apply_autofix(vault, report, tracker=runtime.tracker)
+    # apply_autofix mutates files through a staging transaction — blocking.
+    result = await asyncio.to_thread(
+        apply_autofix, vault, report, tracker=runtime.tracker
+    )
     return {
         "success": result.success,
         "snapshot_path": str(result.snapshot_path) if result.snapshot_path else None,
