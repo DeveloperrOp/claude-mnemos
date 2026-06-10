@@ -164,6 +164,74 @@ def test_resolve_by_cwd_handles_corrupt_via_exception(tmp_path: Path):
         r.resolve_by_cwd(tmp_path / "x")
 
 
+# ── git-root fallback (resolve_by_cwd git_fallback=True) ─────────────────────
+
+
+def test_git_fallback_off_by_default(tmp_path: Path, monkeypatch):
+    """Without git_fallback the pure pattern semantics are unchanged: a cwd
+    that matches nothing returns None and _git_toplevel is never consulted."""
+    _seed_map(tmp_path, [
+        ProjectMapEntry(name="x", vault_root=tmp_path / "vx",
+                        cwd_patterns=[str(tmp_path / "repo")]),  # bare path, no wildcard
+    ])
+    called = {"git": False}
+    monkeypatch.setattr(
+        "claude_mnemos.mapping.resolver._git_toplevel",
+        lambda cwd: called.__setitem__("git", True) or None,
+    )
+    r = ProjectResolver()
+    # Subdir of a bare-path pattern does NOT match → None, and git is untouched.
+    assert r.resolve_by_cwd(tmp_path / "repo" / "sub") is None
+    assert called["git"] is False
+
+
+def test_git_fallback_attributes_via_repo_root(tmp_path: Path, monkeypatch):
+    """cwd matches no pattern, but its git root does → attribute to that
+    project. This is the main rescue for 'unassigned' lost sessions."""
+    repo = tmp_path / "repo"
+    sub = repo / "packages" / "foo"
+    sub.mkdir(parents=True)
+    _seed_map(tmp_path, [
+        ProjectMapEntry(name="repo-proj", vault_root=tmp_path / "v",
+                        cwd_patterns=[str(repo)]),  # bare repo root, no wildcard
+    ])
+    # The subdir does not match the bare-root pattern; git toplevel does.
+    monkeypatch.setattr(
+        "claude_mnemos.mapping.resolver._git_toplevel",
+        lambda cwd: repo,
+    )
+    r = ProjectResolver()
+    assert r.resolve_by_cwd(sub) is None  # no direct match
+    e = r.resolve_by_cwd(sub, git_fallback=True)
+    assert e is not None and e.name == "repo-proj"
+
+
+def test_git_fallback_returns_none_when_not_a_repo(tmp_path: Path, monkeypatch):
+    _seed_map(tmp_path, [
+        ProjectMapEntry(name="x", vault_root=tmp_path / "vx",
+                        cwd_patterns=[str(tmp_path / "repo")]),
+    ])
+    monkeypatch.setattr(
+        "claude_mnemos.mapping.resolver._git_toplevel", lambda cwd: None
+    )
+    r = ProjectResolver()
+    assert r.resolve_by_cwd(tmp_path / "elsewhere", git_fallback=True) is None
+
+
+def test_git_fallback_no_infinite_when_toplevel_equals_cwd(tmp_path: Path, monkeypatch):
+    """If git toplevel == cwd (already matched nothing), don't loop — return None."""
+    _seed_map(tmp_path, [
+        ProjectMapEntry(name="x", vault_root=tmp_path / "vx",
+                        cwd_patterns=[str(tmp_path / "repo")]),
+    ])
+    elsewhere = tmp_path / "elsewhere"
+    monkeypatch.setattr(
+        "claude_mnemos.mapping.resolver._git_toplevel", lambda cwd: elsewhere
+    )
+    r = ProjectResolver()
+    assert r.resolve_by_cwd(elsewhere, git_fallback=True) is None
+
+
 def test_list_all(tmp_path: Path):
     _seed_map(tmp_path, [
         ProjectMapEntry(name="a", vault_root=tmp_path / "va", cwd_patterns=[]),

@@ -104,7 +104,7 @@ async def auto_dump_stale(
         if not e.cwd:
             continue
         try:
-            entry = resolver.resolve_by_cwd(_path(e.cwd))
+            entry = resolver.resolve_by_cwd(_path(e.cwd), git_fallback=True)
         except (ResolverAmbiguityError, OSError):
             continue
         if entry is None:

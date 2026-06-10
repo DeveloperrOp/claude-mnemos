@@ -96,7 +96,7 @@ def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
             assigned = UNASSIGNED_PROJECT
             if item.cwd:
                 try:
-                    entry = resolver.resolve_by_cwd(Path(item.cwd))
+                    entry = resolver.resolve_by_cwd(Path(item.cwd), git_fallback=True)
                     if entry is not None:
                         assigned = entry.name
                 except (ResolverAmbiguityError, OSError):

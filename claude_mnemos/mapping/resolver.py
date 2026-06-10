@@ -7,6 +7,8 @@ Plan #13b-α — performance optimization deferred to #13b-β if needed).
 from __future__ import annotations
 
 import fnmatch
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,6 +26,35 @@ class ResolverAmbiguityError(ProjectMapError):
 def _normalize(p: str | Path) -> str:
     s = str(Path(p).expanduser().resolve())
     return s.lower() if sys.platform == "win32" else s
+
+
+def _git_toplevel(cwd: Path) -> Path | None:
+    """Return the git working-tree root for *cwd*, or None if not a repo / git
+    unavailable. Used as a fallback when a session's cwd matches no project
+    pattern: the repo root often DOES (you registered the project at the repo
+    root but ran Claude from a sibling path or an uncovered subdir)."""
+    git = shutil.which("git")
+    if git is None:
+        return None
+    try:
+        out = subprocess.run(
+            [git, "-C", str(cwd), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    top = out.stdout.strip()
+    if not top:
+        return None
+    try:
+        return Path(top)
+    except (ValueError, OSError):
+        return None
 
 
 class ProjectResolver:
@@ -58,7 +89,26 @@ class ProjectResolver:
                 continue
         return None
 
-    def resolve_by_cwd(self, cwd: Path) -> ProjectMapEntry | None:
+    def resolve_by_cwd(
+        self, cwd: Path, *, git_fallback: bool = False
+    ) -> ProjectMapEntry | None:
+        """Resolve cwd → project via cwd_patterns (most-specific-wins).
+
+        With ``git_fallback=True``, if cwd matches nothing, retry against the
+        cwd's git working-tree root before giving up. This rescues sessions
+        run from an uncovered path of a repo whose root IS registered — the
+        single largest source of "unassigned" lost sessions. Off by default so
+        the pure pattern semantics (and CLI callers) are unchanged.
+        """
+        direct = self._match_cwd(cwd)
+        if direct is not None or not git_fallback:
+            return direct
+        top = _git_toplevel(cwd)
+        if top is None or _normalize(top) == _normalize(cwd):
+            return None
+        return self._match_cwd(top)
+
+    def _match_cwd(self, cwd: Path) -> ProjectMapEntry | None:
         cwd_norm = _normalize(cwd)
         candidates: list[tuple[ProjectMapEntry, str, int]] = []
         for entry in self._get_entries():
