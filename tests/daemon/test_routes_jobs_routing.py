@@ -16,6 +16,9 @@ def daemon_with_two(
 ) -> Generator[tuple[MnemosDaemon, TestClient, Path], None, None]:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    # POST /jobs now rejects transcripts outside the transcripts root; these
+    # test transcripts live under tmp_path, so point the root there.
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     with TestClient(daemon.app) as client:
         a = tmp_path / "a"

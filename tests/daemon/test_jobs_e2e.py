@@ -75,6 +75,9 @@ def test_jobs_e2e_ingest_via_queue(tmp_path: Path):
     child_env = os.environ.copy()
     child_env["HOME"] = str(isolated_home)
     child_env["USERPROFILE"] = str(isolated_home)
+    # POST /jobs rejects transcripts outside the transcripts root; the seeded
+    # transcript lives under tmp_path, so widen the root for the subprocess.
+    child_env["MNEMOS_TRANSCRIPTS_ROOT"] = str(tmp_path)
     child_env.pop("MNEMOS_VAULT_ROOT", None)
     (isolated_home / ".claude-mnemos").mkdir(parents=True, exist_ok=True)
     (isolated_home / ".claude-mnemos" / "project-map.json").write_text(

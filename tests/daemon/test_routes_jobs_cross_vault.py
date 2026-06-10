@@ -21,6 +21,9 @@ def daemon_with_two_vaults_jobs(
     """Real MnemosDaemon, alpha + beta mounted, each with a queued job."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    # POST /jobs rejects transcripts outside the transcripts root; the test
+    # transcripts live under tmp_path, so point the root there.
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     with TestClient(daemon.app) as client:
         a = tmp_path / "a"
@@ -35,6 +38,10 @@ def daemon_with_two_vaults_jobs(
             "/api/projects",
             json={"name": "beta", "vault_root": str(b), "cwd_patterns": []},
         )
+        # Pause the queue so enqueued jobs deterministically STAY queued — the
+        # worker would otherwise dequeue and complete the (empty) transcripts,
+        # leaving status=queued empty and the cancel/listing assertions flaky.
+        client.post("/api/daemon/pause")
         # Enqueue one job in each
         for name, vault in (("alpha", a), ("beta", b)):
             t = vault / f"{name}.jsonl"
@@ -64,6 +71,9 @@ def daemon_with_two_vaults_many_jobs(
     """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    # POST /jobs rejects transcripts outside the transcripts root; the test
+    # transcripts live under tmp_path, so point the root there.
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
     daemon = MnemosDaemon(DaemonConfig(pid_file=tmp_path / "d.pid"))
     with TestClient(daemon.app) as client:
         a = tmp_path / "a"
@@ -78,6 +88,9 @@ def daemon_with_two_vaults_many_jobs(
             "/api/projects",
             json={"name": "beta", "vault_root": str(b), "cwd_patterns": []},
         )
+        # Pause so the 10 jobs stay queued for the pagination assertions
+        # instead of being completed out from under the test by the worker.
+        client.post("/api/daemon/pause")
         # Enqueue 5 jobs in each vault
         for name, vault in (("alpha", a), ("beta", b)):
             for i in range(5):

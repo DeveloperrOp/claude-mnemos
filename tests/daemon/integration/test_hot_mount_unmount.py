@@ -33,6 +33,10 @@ def test_hot_mount_then_post_jobs(
         **os.environ,
         "HOME": str(home),
         "USERPROFILE": str(home),
+        # POST /jobs rejects transcripts outside the transcripts root; this
+        # test's transcript lives under tmp_path/live, so widen the root.
+        # Goes into the SUBPROCESS env (the daemon runs out-of-process here).
+        "MNEMOS_TRANSCRIPTS_ROOT": str(tmp_path),
     }
     env.pop("MNEMOS_VAULT_ROOT", None)
 
