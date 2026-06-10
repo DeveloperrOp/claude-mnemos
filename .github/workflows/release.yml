@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*"
+  # Manual trigger: builds all platforms WITHOUT publishing a release.
+  # Used to verify the pipeline itself (e.g. the Node 24 actions migration).
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,13 +30,16 @@ jobs:
             artifact_path: installer/linux/dist/claude-mnemos-x86_64.AppImage
 
     steps:
-      - uses: actions/checkout@v4
+      # Node 24 migration (GitHub forces node24 runtime from 2026-06-16):
+      # checkout v6 / setup-python v6 / setup-node v6 / upload-artifact v7 /
+      # download-artifact v8 / action-gh-release v3 are the node24-native majors.
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -87,7 +93,7 @@ jobs:
 
       - name: Upload portable zip artifact
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: claude-mnemos-portable-x64.zip
           path: installer/windows/dist/claude-mnemos-portable-x64.zip
@@ -107,7 +113,7 @@ jobs:
           bash installer/linux/build-appimage.sh
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact_path }}
@@ -116,20 +122,24 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
+    # workflow_dispatch runs are pipeline checks — build everything, publish nothing.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          # ** glob: tolerant to download-artifact changing its per-artifact
+          # subdirectory layout between majors.
           files: |
-            artifacts/claude-mnemos-setup-x64.exe/claude-mnemos-setup-x64.exe
-            artifacts/claude-mnemos-portable-x64.zip/claude-mnemos-portable-x64.zip
-            artifacts/claude-mnemos.dmg/claude-mnemos.dmg
-            artifacts/claude-mnemos-x86_64.AppImage/claude-mnemos-x86_64.AppImage
+            artifacts/**/claude-mnemos-setup-x64.exe
+            artifacts/**/claude-mnemos-portable-x64.zip
+            artifacts/**/claude-mnemos.dmg
+            artifacts/**/claude-mnemos-x86_64.AppImage
