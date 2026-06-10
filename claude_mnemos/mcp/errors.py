@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+# Single canonical definition lives in core.pages (a LookupError). Re-exported
+# here so the MCP layer keeps its `from claude_mnemos.mcp.errors import
+# PageRefError` import path, but `except PageRefError` now catches the same
+# class no matter which module raised it — previously there were TWO unrelated
+# PageRefError classes (ValueError here vs LookupError in core.pages), so a
+# handler importing one silently failed to catch the other.
+from claude_mnemos.core.pages import PageRefError
 
-class PageRefError(ValueError):
-    """Raised when a page reference cannot be resolved safely (traversal,
-    missing file, ambiguous prefix)."""
+__all__ = [
+    "DaemonRefusedError",
+    "DaemonTimeoutError",
+    "DaemonUnreachableError",
+    "PageRefError",
+]
 
 
 class DaemonUnreachableError(RuntimeError):
