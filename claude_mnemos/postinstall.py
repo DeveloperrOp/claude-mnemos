@@ -20,7 +20,7 @@ Why silent (not `mnemos init`):
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from claude_mnemos import runtime
 from claude_mnemos.state.install_state import load_install_state
@@ -43,7 +43,10 @@ def _silent_init() -> list[str]:
 
     try:
         from claude_mnemos.tray.__main__ import _cmd_install as _tray_install_impl
-        rc = _tray_install_impl()
+        # spawn_tray=False: this runs DURING app entry (`tray run` itself, or
+        # the launcher which spawns its own tray) — a second spawned `tray
+        # run` would race the host process for the single-instance mutex.
+        rc = _tray_install_impl(spawn_tray=False)
         if rc == 0:
             state = load_install_state()
             if state.autostart_decision is None:
@@ -67,5 +70,5 @@ def maybe_run_first_time_init() -> None:
     errors = _silent_init()
     state = load_install_state()  # _silent_init may have updated autostart_decision
     state.last_install_error = "; ".join(errors) if errors else None
-    state.first_run_ts = datetime.now(tz=timezone.utc)
+    state.first_run_ts = datetime.now(tz=UTC)
     state.save()

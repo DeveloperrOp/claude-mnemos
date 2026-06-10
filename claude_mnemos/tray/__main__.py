@@ -13,6 +13,7 @@ import argparse
 import contextlib
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -103,8 +104,13 @@ def _notify_stale_lock() -> None:
         try:
             import ctypes
 
+            # MB_TOPMOST: at sign-in (the autostart case) the desktop is still
+            # assembling and a non-topmost box can end up buried behind it.
             MB_ICONWARNING = 0x30
-            ctypes.windll.user32.MessageBoxW(None, msg, "claude-mnemos", MB_ICONWARNING)
+            MB_TOPMOST = 0x40000
+            ctypes.windll.user32.MessageBoxW(
+                None, msg, "claude-mnemos", MB_ICONWARNING | MB_TOPMOST
+            )
         except Exception:
             logging.exception("[tray] stale-lock MessageBox failed")
 
@@ -120,6 +126,12 @@ def _cmd_run() -> int:
         else:
             _notify_stale_lock()
         return 0
+
+    # Record our PID — /tray/status and _cmd_install's tray-alive check read
+    # this file (the mutex refactor dropped the write but kept the readers,
+    # leaving tray_running permanently false).
+    TRAY_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TRAY_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
 
     sv = Supervisor(daemon_pid_file=DAEMON_PID_FILE, log_path=DAEMON_LOG)
     sv.start()
@@ -163,15 +175,25 @@ def _cmd_run() -> int:
             sv.stop()
         except Exception:
             logging.exception("[tray] supervisor stop failed")
+        TRAY_PID_FILE.unlink(missing_ok=True)
         si.release()
     return 0
 
 
-def _cmd_install() -> int:
+def _cmd_install(*, spawn_tray: bool = True) -> int:
+    """Register autostart; optionally spawn the tray if none is running.
+
+    spawn_tray=False is for callers already inside a starting tray process
+    (postinstall first-run init fires DURING `tray run`) — spawning another
+    `tray run` there races the caller for the single-instance mutex, and the
+    loser pops a spurious stale-lock warning at first sign-in.
+    """
     target_exe, target_args = _resolve_target()
     mgr = get_autostart_manager(target_exe=target_exe, target_args=target_args)
     mgr.install()
     print(f"Auto-start installed ({platform_label()}).")
+    if not spawn_tray:
+        return 0
     # Detached spawn of `mnemos-tray run` if no tray currently running
     tray_alive = False
     if TRAY_PID_FILE.is_file():
@@ -218,7 +240,9 @@ def _cmd_uninstall() -> int:
         state.autostart_decision = "declined"
         state.save()
     except Exception:
-        pass
+        # Non-fatal (the .lnk IS removed), but an unsaved decision means the
+        # default-on logic may re-enable autostart later — leave a trace.
+        logging.exception("[tray] failed to persist autostart_decision=declined")
     return 0
 
 
