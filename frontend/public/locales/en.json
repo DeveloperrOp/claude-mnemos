@@ -297,8 +297,11 @@
     "total_label": "total"
   },
   "placeholder": {
-    "title": "{{section}}",
-    "body": "This section is coming in plan {{plan}}.",
+    "back_link": "Back to Overview"
+  },
+  "not_found": {
+    "title": "Page not found",
+    "hint": "There is no such page. The link may be stale, or the address may be a typo.",
     "back_link": "Back to Overview"
   },
   "pages": {
@@ -389,6 +392,8 @@
     "ingested_at": "Ingested at",
     "transcript": "Transcript",
     "created_pages": "Created pages",
+    "skipped_collisions_one": "⚠ {{count}} page not saved — one already exists in the base",
+    "skipped_collisions_other": "⚠ {{count}} pages not saved — they already exist in the base",
     "no_pages_created": "No pages created",
     "showing_n_of_m": "{{shown}} of {{total}}",
     "ingest_button": "Ingest into brain",

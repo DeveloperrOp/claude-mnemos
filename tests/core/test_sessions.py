@@ -28,6 +28,7 @@ def _ingest_record(
     output_tokens: int | None = None,
     model: str | None = None,
     created_pages: list[str] | None = None,
+    skipped_collisions: list[str] | None = None,
 ) -> IngestRecord:
     return IngestRecord(
         session_id=sid,
@@ -35,7 +36,7 @@ def _ingest_record(
         raw_path=f"raw/chats/{sid}.md",
         source_path=f"wiki/sources/{sid}.md",
         created_pages=created_pages or [],
-        skipped_collisions=[],
+        skipped_collisions=skipped_collisions or [],
         model=model,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
@@ -193,6 +194,26 @@ def test_session_view_surfaces_new_ingest_record_fields(tmp_path: Path) -> None:
     assert view.raw_transcript_bytes == 98765
     assert view.created_pages == ["wiki/sources/x.md", "wiki/entities/y.md"]
     assert view.error is None
+
+
+def test_session_view_surfaces_skipped_collisions(tmp_path: Path) -> None:
+    """A page whose slug already exists is silently dropped into
+    skipped_collisions during extract. The session must carry that fact so
+    the UI can warn 'N pages not saved' instead of claiming full success."""
+    m = Manifest()
+    m.add(
+        "sha-c",
+        _ingest_record(
+            "collide-sid",
+            ingested_at=datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC),
+            created_pages=["wiki/sources/collide-sid.md"],
+            skipped_collisions=["wiki/entities/postgresql.md"],
+        ),
+    )
+    m.save(tmp_path)
+
+    view = list_sessions(tmp_path)[0]
+    assert view.skipped_collisions == ["wiki/entities/postgresql.md"]
 
 
 def test_list_sessions_job_without_transcript_path_falls_back_to_id(

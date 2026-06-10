@@ -33,6 +33,10 @@ class SessionView(BaseModel):
     output_tokens: int | None
     raw_transcript_bytes: int | None
     created_pages: list[str] = Field(default_factory=list)
+    # Pages the extract produced but could NOT write because a same-slug file
+    # already existed. Surfaced so the UI can warn "N pages not saved" instead
+    # of silently claiming full success (these knowledge bits are lost).
+    skipped_collisions: list[str] = Field(default_factory=list)
     error: str | None = None
     cwd: str | None = None
     preview: str | None = None
@@ -78,6 +82,7 @@ def _session_view_from_record(record: IngestRecord) -> SessionView:
         output_tokens=record.output_tokens,
         raw_transcript_bytes=record.raw_transcript_bytes,
         created_pages=list(record.created_pages),
+        skipped_collisions=list(record.skipped_collisions),
         error=None,
         cwd=cwd,
         preview=preview,

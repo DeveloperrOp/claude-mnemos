@@ -26,6 +26,7 @@ import { OnboardingAdvanced } from "./pages/OnboardingAdvanced";
 import { ProjectSettings } from "./pages/ProjectSettings";
 import { GlobalSettings } from "./pages/GlobalSettings";
 import { Diagnostics } from "./pages/Diagnostics";
+import { NotFound } from "./pages/NotFound";
 
 const Help = lazy(() => import("./pages/Help"));
 const Metrics = lazy(() => import("./pages/Metrics"));
@@ -53,6 +54,9 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <Layout />,
+    // Any thrown render/loader error (and unmatched-route fallthrough) shows
+    // the friendly NotFound instead of React Router's raw dev stack trace.
+    errorElement: <NotFound />,
     children: [
       { index: true, element: <Overview /> },
       { path: "onboarding", element: <OnboardingWelcome /> },
@@ -91,7 +95,13 @@ const router = createBrowserRouter([
       { path: "help", element: <Suspense fallback={<Skeleton className="h-64" />}><Help /></Suspense> },
       { path: "metrics", element: <Suspense fallback={<Skeleton className="h-64" />}><Metrics /></Suspense> },
       { path: "settings/global", element: <GlobalSettings /> },
+      // Bare /settings is a natural typo/bookmark for the only global
+      // settings page — redirect instead of 404.
+      { path: "settings", element: <Navigate to="/settings/global" replace /> },
       { path: "diagnostics", element: <Diagnostics /> },
+      // Catch-all: friendly NotFound for any unmatched URL (stale bookmarks,
+      // removed routes, bare /queue|/activity|/health which are project-scoped).
+      { path: "*", element: <NotFound /> },
     ],
   },
 ]);

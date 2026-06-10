@@ -172,6 +172,16 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
               {t("sessions.created_pages")}: {s.created_pages.length}
             </div>
           )}
+          {s.skipped_collisions.length > 0 && (
+            <div
+              className="rounded bg-warning/10 px-2 py-1 text-warning"
+              title={s.skipped_collisions.join("\n")}
+            >
+              {t("sessions.skipped_collisions", {
+                count: s.skipped_collisions.length,
+              })}
+            </div>
+          )}
           {s.ingested_at && (
             <div className="text-muted-foreground">
               {t("sessions.ingested_at")}: {formatDateTime(s.ingested_at, i18n.language)}

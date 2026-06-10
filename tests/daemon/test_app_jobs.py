@@ -43,6 +43,13 @@ class _FakeDaemon:
         return []
 
 
+@pytest.fixture(autouse=True)
+def _transcripts_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST /jobs rejects transcript paths outside the transcripts root —
+    pin the root to tmp_path so the fixtures' transcript files pass."""
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
+
+
 @pytest.fixture
 def daemon(tmp_path: Path):
     d = _FakeDaemon(tmp_path)
@@ -190,6 +197,29 @@ async def test_post_rejects_missing_transcript_path(client):
     )
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "missing_transcript_path"
+
+
+async def test_post_rejects_transcript_outside_root(client, tmp_path: Path):
+    """Path traversal: an existing file OUTSIDE the transcripts root must be
+    rejected — otherwise any local process could ingest an arbitrary readable
+    file into the vault (and have it shipped to the LLM on extract)."""
+    outside = tmp_path.parent / "outside-root.jsonl"
+    outside.write_text("[]", encoding="utf-8")
+    try:
+        r = await client.post(
+            "/api/jobs",
+            json={
+                "kind": "ingest",
+                "payload": {
+                    "project_name": _PROJECT,
+                    "transcript_path": str(outside),
+                },
+            },
+        )
+    finally:
+        outside.unlink(missing_ok=True)
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "transcript_outside_root"
 
 
 async def test_post_rejects_nonexistent_transcript(client):

@@ -28,6 +28,8 @@ export const SessionViewSchema = z.object({
   output_tokens: z.number().int().nullable(),
   raw_transcript_bytes: z.number().int().nullable(),
   created_pages: z.array(z.string()),
+  // Pages extract produced but dropped because a same-slug file existed.
+  skipped_collisions: z.array(z.string()).default([]),
   error: z.string().nullable(),
   cwd: z.string().nullable().optional(),
   preview: z.string().nullable().optional(),

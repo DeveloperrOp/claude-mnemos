@@ -287,8 +287,11 @@
     "total_label": "всего"
   },
   "placeholder": {
-    "title": "{{section}}",
-    "body": "Этот раздел появится в плане {{plan}}.",
+    "back_link": "Вернуться в Обзор"
+  },
+  "not_found": {
+    "title": "Страница не найдена",
+    "hint": "Такой страницы нет. Возможно, ссылка устарела или вы ошиблись адресом.",
     "back_link": "Вернуться в Обзор"
   },
   "pages": {
@@ -379,6 +382,10 @@
     "ingested_at": "Загружено в",
     "transcript": "Транскрипт",
     "created_pages": "Созданные страницы",
+    "skipped_collisions_one": "⚠ {{count}} страница не сохранена — такая уже есть в базе",
+    "skipped_collisions_few": "⚠ {{count}} страницы не сохранены — такие уже есть в базе",
+    "skipped_collisions_many": "⚠ {{count}} страниц не сохранено — такие уже есть в базе",
+    "skipped_collisions_other": "⚠ {{count}} страниц не сохранено — такие уже есть в базе",
     "no_pages_created": "Страниц не создано",
     "showing_n_of_m": "{{shown}} из {{total}}",
     "ingest_button": "Ингестить в мозг",

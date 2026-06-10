@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from claude_mnemos.core.transcript_helpers import _resolve_transcripts_root
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 
 router = APIRouter()
@@ -50,6 +51,21 @@ async def create_job(request: Request, body: dict[str, Any]) -> dict[str, Any]:
                 "transcript_path": transcript_path,
             },
         )
+    # Path traversal: the daemon is local-only, but any local process can
+    # POST here — without this check an arbitrary readable file would be
+    # ingested into the vault (and shipped to the LLM on extract). Same
+    # check as routes/sessions.py and routes/lost_sessions.py.
+    root = _resolve_transcripts_root(None).resolve()
+    try:
+        Path(transcript_path).resolve().relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "transcript_outside_root",
+                "detail": f"transcript_path must be under {root}",
+            },
+        ) from exc
 
     try:
         job = runtime.job_store.create(kind=kind, payload=payload)

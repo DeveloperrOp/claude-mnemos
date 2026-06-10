@@ -287,8 +287,11 @@
     "total_label": "всього"
   },
   "placeholder": {
-    "title": "{{section}}",
-    "body": "Цей розділ з'явиться в плані {{plan}}.",
+    "back_link": "Повернутись до Огляду"
+  },
+  "not_found": {
+    "title": "Сторінку не знайдено",
+    "hint": "Такої сторінки немає. Можливо, посилання застаріло або ви помилилися адресою.",
     "back_link": "Повернутись до Огляду"
   },
   "pages": {
@@ -379,6 +382,10 @@
     "ingested_at": "Завантажено о",
     "transcript": "Транскрипт",
     "created_pages": "Створені сторінки",
+    "skipped_collisions_one": "⚠ {{count}} сторінку не збережено — така вже є в базі",
+    "skipped_collisions_few": "⚠ {{count}} сторінки не збережено — такі вже є в базі",
+    "skipped_collisions_many": "⚠ {{count}} сторінок не збережено — такі вже є в базі",
+    "skipped_collisions_other": "⚠ {{count}} сторінок не збережено — такі вже є в базі",
     "no_pages_created": "Сторінок не створено",
     "showing_n_of_m": "{{shown}} з {{total}}",
     "ingest_button": "Інжестити в мозок",
