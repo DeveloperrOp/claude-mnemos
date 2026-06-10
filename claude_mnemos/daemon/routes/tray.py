@@ -20,25 +20,15 @@ from claude_mnemos.tray.__main__ import (
     DAEMON_PID_FILE,
     TRAY_PID_FILE,
 )
+from claude_mnemos.tray.__main__ import (
+    _resolve_target as _resolve_target,
+)
 from claude_mnemos.tray.platform import (
     get_autostart_manager,
     platform_label,
 )
 
 router = APIRouter(prefix="/tray", tags=["tray"])
-
-
-def _resolve_target() -> tuple[str, list[str]]:
-    """Mirror of __main__._resolve_target so /status reports the path the
-    autostart entry would use without importing __main__."""
-    # Frozen daemon: sys.executable is the bundled exe with its own argparse —
-    # `-m` exits 2 ("invalid choice"), see tray.__main__._resolve_target.
-    if runtime.is_frozen():
-        return sys.executable, ["tray", "run"]
-    found = shutil.which("mnemos-tray")
-    if found:
-        return found, ["run"]
-    return sys.executable, ["-m", "claude_mnemos.tray", "run"]
 
 
 def _exec_tray(action: str) -> None:

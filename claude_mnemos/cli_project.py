@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from collections.abc import Mapping
 
 import httpx
 
-from claude_mnemos.daemon_url import daemon_base_url
+from claude_mnemos.daemon_url import daemon_url
 from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
 from claude_mnemos.state.projects import (
     ProjectMapEntry,
@@ -33,9 +32,6 @@ EXIT_PROJECT_NOT_FOUND = 97
 EXIT_DAEMON_UNREACHABLE = 84  # reused from jobs
 
 
-def _daemon_url() -> str:
-    env = os.environ.get("MNEMOS_DAEMON_URL")
-    return env if env is not None else daemon_base_url()
 
 
 def handle(args: argparse.Namespace) -> int:
@@ -65,7 +61,7 @@ def _handle_add(args: argparse.Namespace) -> int:
         "cwd_patterns": args.cwd_pattern,
     }
     try:
-        r = httpx.post(f"{_daemon_url()}/api/projects", json=body, timeout=2.0)
+        r = httpx.post(f"{daemon_url()}/api/projects", json=body, timeout=2.0)
         if r.status_code == 201:
             print(f"added project {args.name!r}")
             return 0
@@ -156,7 +152,7 @@ def _handle_update(args: argparse.Namespace) -> int:
     if display_name is not None:
         body["display_name"] = display_name
     try:
-        r = httpx.patch(f"{_daemon_url()}/api/projects/{args.name}", json=body, timeout=2.0)
+        r = httpx.patch(f"{daemon_url()}/api/projects/{args.name}", json=body, timeout=2.0)
         if r.status_code == 200:
             print(f"updated project {args.name!r}")
             return 0
@@ -195,7 +191,7 @@ def _handle_remove(args: argparse.Namespace) -> int:
             print("aborted")
             return 0
     try:
-        r = httpx.delete(f"{_daemon_url()}/api/projects/{args.name}", timeout=2.0)
+        r = httpx.delete(f"{daemon_url()}/api/projects/{args.name}", timeout=2.0)
         if r.status_code in (200, 204):
             print(f"removed project {args.name!r}")
             return 0

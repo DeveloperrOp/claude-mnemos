@@ -1,8 +1,10 @@
 """Daemon control routes: pause/resume/restart.
 
-The supervisor (and the tray menu) calls these to toggle daemon-wide pause
-state. Pause-semantics (skip ingest in scheduler/watchdog) are read by
-existing components from ``daemon.paused``; this route only flips the flag.
+Pause/resume halt the JOB QUEUE across all mounted vaults — they reuse the
+same per-vault ``job_store.pause_queue``/``resume_queue`` mechanism the
+worker already honours (``is_paused``), so the pause actually stops work
+instead of flipping a flag nobody read. (The old ``daemon.paused`` flag was
+a placebo — set by these routes, read by nothing.)
 
 Restart works by exiting cleanly (`os._exit(0)`) after responding — the
 tray supervisor's main loop notices the exit and respawns the daemon
@@ -16,10 +18,25 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 router = APIRouter()
+
+# "Pause indefinitely" sentinel — the queue stays paused until an explicit
+# /daemon/resume (or a rate-limit pause with an earlier reset). is_paused()
+# only compares now < until, so a far-future UTC time means "paused".
+_PAUSE_SENTINEL = datetime(9999, 1, 1, tzinfo=UTC)
+
+
+def _job_stores(daemon: object) -> list:
+    stores = []
+    for rt in getattr(daemon, "runtimes", {}).values():
+        js = getattr(rt, "job_store", None)
+        if js is not None:
+            stores.append(js)
+    return stores
 
 
 @router.post("/daemon/pause")
@@ -27,8 +44,10 @@ def pause_route(request: Request) -> dict:
     daemon = request.app.state.daemon
     if daemon is None:
         raise HTTPException(503, "daemon not bound")
-    daemon.paused = True
-    return {"ok": True, "paused": True}
+    stores = _job_stores(daemon)
+    for js in stores:
+        js.pause_queue(until=_PAUSE_SENTINEL)
+    return {"ok": True, "paused": True, "queues": len(stores)}
 
 
 @router.post("/daemon/resume")
@@ -36,8 +55,10 @@ def resume_route(request: Request) -> dict:
     daemon = request.app.state.daemon
     if daemon is None:
         raise HTTPException(503, "daemon not bound")
-    daemon.paused = False
-    return {"ok": True, "paused": False}
+    stores = _job_stores(daemon)
+    for js in stores:
+        js.resume_queue()
+    return {"ok": True, "paused": False, "queues": len(stores)}
 
 
 def _is_supervised() -> bool:

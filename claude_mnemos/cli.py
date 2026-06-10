@@ -24,7 +24,7 @@ from claude_mnemos.daemon.config import BootFilter, DaemonConfig, default_pid_fi
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, is_daemon_running
 from claude_mnemos.daemon.process import MnemosDaemon
 from claude_mnemos.daemon.runtime_state import DaemonRuntimeState
-from claude_mnemos.daemon_url import daemon_base_url
+from claude_mnemos.daemon_url import daemon_url
 from claude_mnemos.ingest.llm import (
     LLMClient,
     LLMExtractionError,
@@ -578,7 +578,6 @@ def main(argv: list[str] | None = None) -> int:
     # rogue trays before they can save first_run_ts. Trigger only on the
     # primary application entry: `tray run`. Also support an env-var escape
     # hatch for tests.
-    import os
     _argv = sys.argv if argv is None else [sys.argv[0], *argv]
     is_app_entry = (
         len(_argv) >= 3 and _argv[1] == "tray" and _argv[2] == "run"
@@ -1396,11 +1395,11 @@ def _cmd_jobs_dismiss(args: argparse.Namespace) -> int:
 def _post_or_delete_to_daemon(
     args: argparse.Namespace, *, method: str, path: str
 ) -> int:
-    daemon_url = os.environ.get("MNEMOS_DAEMON_URL") or daemon_base_url()
+    base = daemon_url()
     try:
-        r = httpx.request(method, f"{daemon_url}/api{path}", timeout=5.0)
+        r = httpx.request(method, f"{base}/api{path}", timeout=5.0)
     except httpx.HTTPError as exc:
-        print(f"daemon unreachable at {daemon_url}: {exc}", file=sys.stderr)
+        print(f"daemon unreachable at {base}: {exc}", file=sys.stderr)
         return 84
     if r.status_code in (200, 201, 204):
         if r.status_code != 204:
@@ -1429,11 +1428,6 @@ _EXIT_LOST_SESSION_NOT_FOUND = 92
 _EXIT_MANIFEST_CORRUPT = 93
 
 
-def _daemon_url() -> str:
-    env = os.environ.get("MNEMOS_DAEMON_URL")
-    return env if env is not None else daemon_base_url()
-
-
 def _http_request_to_daemon(
     method: str,
     path: str,
@@ -1447,11 +1441,12 @@ def _http_request_to_daemon(
     ``path`` is the bare REST path (e.g. ``/pages/foo``); the ``/api``
     prefix is applied here so call-sites stay clean.
     """
-    url = f"{_daemon_url()}/api{path}"
+    base = daemon_url()
+    url = f"{base}/api{path}"
     try:
         r = httpx.request(method, url, json=json_body, timeout=timeout)
     except httpx.HTTPError as exc:
-        print(f"daemon unreachable at {_daemon_url()}: {exc}", file=sys.stderr)
+        print(f"daemon unreachable at {base}: {exc}", file=sys.stderr)
         return None, _EXIT_DAEMON_OFFLINE
     return r, None
 

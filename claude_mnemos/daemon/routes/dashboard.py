@@ -29,6 +29,7 @@ def _kpi_for(runtimes: list[Any]) -> dict[str, Any]:
     queue = {"queued": 0, "running": 0, "failed": 0}
     today_ingest = 0
     today_pages = 0
+    tokens_today = 0
     today_start = datetime.now(tz=UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
     for rt in runtimes:
@@ -54,11 +55,20 @@ def _kpi_for(runtimes: list[Any]) -> dict[str, Any]:
         except Exception as exc:
             log.debug("kpi activity-read failed for %s: %s", rt.name, exc)
 
+        # Tokens actually injected into sessions today (the proof-of-life
+        # metric). Read from the per-vault inject-metrics log.
+        try:
+            from claude_mnemos.state.inject_metrics import InjectMetricsLog
+            for ev in InjectMetricsLog.load(rt.vault_root).events:
+                if ev.timestamp >= today_start:
+                    tokens_today += ev.tokens_actual
+        except Exception as exc:
+            log.debug("kpi inject-metrics read failed for %s: %s", rt.name, exc)
+
     return {
         "queue": queue,
         "today": {"ingest_count": today_ingest, "pages_count": today_pages},
-        # TODO(v2): tokens_today aggregator from inject_metrics
-        "tokens_today": 0,
+        "tokens_today": tokens_today,
         "lost_total": 0,
     }
 

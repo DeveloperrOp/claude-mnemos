@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -73,7 +73,10 @@ class IngestHandler:
                 llm_client=llm,
                 extract=effective_extract,
                 dry_run=dry_run,
-                today=date.today(),
+                # UTC to match the rest of the codebase — date.today() uses the
+                # OS local zone, so a session finishing near local midnight
+                # could file its source page under the wrong day.
+                today=datetime.now(UTC).date(),
                 raw_filename_suffix=raw_filename_suffix,
                 tracker=self._tracker,
             )

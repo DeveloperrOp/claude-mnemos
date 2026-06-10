@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from typing import Any
 
 import httpx
 from pydantic import BaseModel
 
-from claude_mnemos.daemon_url import daemon_base_url
+from claude_mnemos.daemon_url import daemon_url
 from claude_mnemos.state.settings import (
     GlobalSettings,
     ProjectSettings,
@@ -26,11 +25,6 @@ from claude_mnemos.state.settings import (
 )
 
 EXIT_SETTINGS_ERROR = 95
-
-
-def _daemon_url() -> str:
-    env = os.environ.get("MNEMOS_DAEMON_URL")
-    return env if env is not None else daemon_base_url()
 
 
 def handle(args: argparse.Namespace) -> int:
@@ -77,10 +71,11 @@ def _handle_set(args: argparse.Namespace) -> int:
         return EXIT_SETTINGS_ERROR
     patch = patch_dict_for_dot_path(args.key, parsed)
     target_global = getattr(args, "is_global", False)
+    base = daemon_url()
     url = (
-        f"{_daemon_url()}/api/settings/global"
+        f"{base}/api/settings/global"
         if target_global
-        else f"{_daemon_url()}/api/settings/{args.project}"
+        else f"{base}/api/settings/{args.project}"
     )
     try:
         r = httpx.patch(url, json=patch, timeout=2.0)

@@ -33,7 +33,16 @@ class HealthSnapshot:
 
 
 def _default_health_url() -> str:
-    return "http://localhost:5757/api/health"
+    """Health URL honouring a user-configured daemon port. Falls back to the
+    default port if settings can't be read (don't block supervisor startup)."""
+    try:
+        from claude_mnemos.daemon.config import DEFAULT_HOST
+        from claude_mnemos.state.settings import SettingsStore
+
+        port = SettingsStore().get_global().daemon_port
+        return f"http://{DEFAULT_HOST}:{port}/api/health"
+    except Exception:
+        return "http://localhost:5757/api/health"
 
 
 class RestartLimiter:
