@@ -145,6 +145,20 @@ def _resolve_vault_from_project_arg(
     return Path(entry.vault_root)
 
 
+def _cmd_tokenizer_probe(_args: argparse.Namespace) -> int:
+    """Hard tokenizer check: frozen-bundle plugin registration + BPE load.
+
+    count_tokens_local degrades to 0 on tokenizer failure by design, so a
+    broken bundle would pass every soft path — this command is the one
+    place where the failure is surfaced (CI bundle smoke uses it).
+    """
+    from claude_mnemos.ingest.llm.tokens import probe_tokenizer
+
+    ok, detail = probe_tokenizer()
+    print(f"tokenizer: {'ok' if ok else 'FAIL'} — {detail}")
+    return 0 if ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claude_mnemos")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -540,6 +554,12 @@ def build_parser() -> argparse.ArgumentParser:
     from claude_mnemos.cli_doctor import add_doctor_subparser
     add_doctor_subparser(sub)
 
+    # ─── tokenizer-probe (CI bundle smoke / diagnostics) ──────────────────
+    sub.add_parser(
+        "tokenizer-probe",
+        help="Verify the bundled tiktoken tokenizer works (exit 1 on failure)",
+    )
+
     from claude_mnemos.cli_hook import add_hook_subparser
     add_hook_subparser(sub)
 
@@ -609,6 +629,8 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     if args.command == "doctor":
         return args.func(args)
+    if args.command == "tokenizer-probe":
+        return _cmd_tokenizer_probe(args)
     if args.command == "hook":
         return args.func(args)
     if args.command == "launcher":

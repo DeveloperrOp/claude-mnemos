@@ -34,3 +34,25 @@ def test_bundle_doctor_runs() -> None:
     assert proc.returncode in (0, 1), f"unexpected rc={proc.returncode}; stderr={proc.stderr}"
     assert "claude_cli" in proc.stdout
     assert "hooks" in proc.stdout
+
+
+@pytest.mark.skipif(not BUNDLE.exists(), reason="PyInstaller bundle not built")
+def test_bundle_tokenizer_probe() -> None:
+    """The frozen tokenizer must actually work, not just be listed in specs.
+
+    Guards the v0.0.42 regression class: tiktoken_ext is a namespace package
+    that both bundlers miss without explicit help — text-level spec checks
+    (test_pyinstaller_spec.py) verify intent, this verifies the built exe.
+    Downloads the BPE table on a cold CI runner, hence the generous timeout.
+    """
+    env = os.environ.copy()
+    env["MNEMOS_SKIP_POSTINSTALL"] = "1"
+    proc = subprocess.run(
+        [str(BUNDLE), "tokenizer-probe"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+    )
+    assert proc.returncode == 0, f"rc={proc.returncode}; out={proc.stdout}; err={proc.stderr}"
+    assert "tokenizer: ok" in proc.stdout
