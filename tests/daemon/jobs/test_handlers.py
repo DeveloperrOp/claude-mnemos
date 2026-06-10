@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from claude_mnemos.daemon.jobs.handlers import IngestHandler
+from claude_mnemos.ingest.transcript import EmptyTranscriptError
 from claude_mnemos.state.jobs import Job
 
 
@@ -75,6 +76,24 @@ async def test_ingest_handler_propagates_exception(tmp_path: Path):
     )
     with pytest.raises(RuntimeError, match="ingest failed"):
         await handler.run(_job({"transcript_path": "/x.jsonl"}))
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_swallows_empty_transcript(tmp_path: Path):
+    """A pure-tool session (no text messages) must NOT be a retryable failure —
+    returning normally marks the job succeeded instead of burning 4 retries
+    and dead-lettering with a cryptic 'no message entries' the user can't fix."""
+    def empty(*args, **kwargs):
+        raise EmptyTranscriptError("no message entries in /x.jsonl")
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,
+        ingest_fn=empty,
+    )
+    # Must NOT raise — job completes as a no-op success.
+    await handler.run(_job({"transcript_path": "/x.jsonl"}))
 
 
 @pytest.mark.asyncio

@@ -63,6 +63,9 @@ export const PageDetailSchema = z.object({
   frontmatter: WikiPageFrontmatterSchema.nullable(),
   body: z.string(),
   raw: z.boolean().optional(),
+  // Content fingerprint for optimistic concurrency: the editor echoes it back
+  // on save so a stale overwrite is rejected (409). Optional for back-compat.
+  version: z.string().optional(),
 });
 export type PageDetail = z.infer<typeof PageDetailSchema>;
 

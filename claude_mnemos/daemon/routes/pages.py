@@ -13,6 +13,7 @@ then dispatch to ``core/page_apply`` operations under the daemon's
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,17 @@ def _resolve_page(vault: Path, page_ref: str) -> Path:
         ) from exc
 
 
+def _file_version(path: Path) -> str:
+    """Content fingerprint for optimistic-concurrency. sha256 of the bytes;
+    empty string if the file is gone. The editor reads this on GET and sends
+    it back on PATCH so a save can't silently clobber a newer version (e.g. an
+    extract job rewrote the page while the user had the editor open)."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
 @router.get("/pages/{project}")
 async def list_pages(project: str, request: Request) -> dict[str, Any]:
     runtime = get_runtime(request, project)
@@ -122,6 +134,7 @@ async def get_page(project: str, page_ref: str, request: Request) -> dict[str, A
     # Wiki pages have YAML frontmatter; raw transcripts under raw/chats/ do
     # not. Return either the parsed wiki page OR a raw dump with frontmatter:
     # null so the frontend can render either form gracefully.
+    version = _file_version(page_path)
     try:
         parsed = read_page(page_path)
         return {
@@ -129,6 +142,7 @@ async def get_page(project: str, page_ref: str, request: Request) -> dict[str, A
             "frontmatter": parsed.frontmatter.model_dump(mode="json"),
             "body": parsed.body,
             "raw": False,
+            "version": version,
         }
     except PageParseError:
         body = page_path.read_text(encoding="utf-8")
@@ -137,6 +151,7 @@ async def get_page(project: str, page_ref: str, request: Request) -> dict[str, A
             "frontmatter": None,
             "body": body,
             "raw": True,
+            "version": version,
         }
 
 
@@ -156,6 +171,25 @@ async def patch_page(project: str, page_ref: str, request: Request) -> dict[str,
                 "message": f"Не удалось сохранить страницу: {exc}",
             },
         ) from exc
+    # Optimistic concurrency: if the editor sent the version it loaded and the
+    # file has changed since (e.g. an extract job rewrote it), reject with 409
+    # instead of silently overwriting the newer content. Opt-in — a PATCH
+    # without base_version behaves exactly as before.
+    base_version = body.get("base_version") if isinstance(body, dict) else None
+    if isinstance(base_version, str) and base_version:
+        current = _file_version(page_path)
+        if current and current != base_version:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "stale_page",
+                    "message": (
+                        "Страница изменилась с момента открытия (её могло "
+                        "перезаписать извлечение знаний). Обновите страницу, "
+                        "чтобы не потерять новую версию, и повторите правку."
+                    ),
+                },
+            )
     try:
         result = apply_patch(
             vault,

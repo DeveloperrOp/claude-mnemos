@@ -46,4 +46,20 @@ describe("pages mutations", () => {
     );
     expect(out.success).toBe(true);
   });
+
+  it("patchPage forwards base_version for optimistic concurrency", async () => {
+    vi.mocked(apiClient.patch).mockResolvedValueOnce({
+      data: { success: true, snapshot_path: "p", activity_id: "a" },
+    });
+    await patchPage("alpha", "wiki/foo.md", {
+      frontmatter: { status: "verified" },
+      body: "## new",
+      base_version: "abc123",
+    });
+    expect(apiClient.patch).toHaveBeenCalledWith("/pages/alpha/wiki/foo.md", {
+      frontmatter: { status: "verified" },
+      body: "## new",
+      base_version: "abc123",
+    });
+  });
 });

@@ -53,6 +53,8 @@ export interface DeleteResult {
 export interface PagePatchBody {
   frontmatter?: Record<string, unknown>;
   body?: string;
+  /** Version the editor loaded; server returns 409 if the file changed since. */
+  base_version?: string;
 }
 
 export async function verifyPage(

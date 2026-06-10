@@ -90,6 +90,55 @@ async def test_patch_frontmatter_success(client: Any, alpha_vault: Path) -> None
     assert parsed.frontmatter.status == "verified"
 
 
+async def test_get_page_returns_version(client: Any, alpha_vault: Path) -> None:
+    _seed(alpha_vault)
+    r = await client.get("/api/pages/alpha/wiki/entities/foo.md")
+    assert r.status_code == 200, r.text
+    assert r.json()["version"], "GET must expose a content version for optimistic concurrency"
+
+
+async def test_patch_with_matching_base_version_succeeds(
+    client: Any, alpha_vault: Path
+) -> None:
+    _seed(alpha_vault)
+    version = (await client.get("/api/pages/alpha/wiki/entities/foo.md")).json()["version"]
+    r = await client.patch(
+        "/api/pages/alpha/wiki/entities/foo.md",
+        json={"frontmatter": {"status": "verified"}, "body": None, "base_version": version},
+    )
+    assert r.status_code == 200, r.text
+
+
+async def test_patch_with_stale_base_version_returns_409(
+    client: Any, alpha_vault: Path
+) -> None:
+    """Editor opened the page, then an extract job rewrote it. Saving with the
+    now-stale version must 409, not silently overwrite the newer content."""
+    _seed(alpha_vault)
+    r = await client.patch(
+        "/api/pages/alpha/wiki/entities/foo.md",
+        json={
+            "frontmatter": {"status": "verified"},
+            "body": None,
+            "base_version": "deadbeef-stale-version",
+        },
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error"] == "stale_page"
+
+
+async def test_patch_without_base_version_still_works(
+    client: Any, alpha_vault: Path
+) -> None:
+    """Backward-compat: omitting base_version skips the concurrency check."""
+    _seed(alpha_vault)
+    r = await client.patch(
+        "/api/pages/alpha/wiki/entities/foo.md",
+        json={"frontmatter": {"status": "verified"}, "body": None},
+    )
+    assert r.status_code == 200, r.text
+
+
 async def test_patch_invalid_value_returns_422(client: Any, alpha_vault: Path) -> None:
     _seed(alpha_vault)
     r = await client.patch(

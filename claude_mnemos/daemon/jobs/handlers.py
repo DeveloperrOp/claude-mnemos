@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -12,10 +13,13 @@ from claude_mnemos.config import Config
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.llm.rate_limit import RateLimitError
 from claude_mnemos.ingest.pipeline import ingest as default_ingest
+from claude_mnemos.ingest.transcript import EmptyTranscriptError
 from claude_mnemos.state.jobs import Job, JobStore
 
 if TYPE_CHECKING:
     from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+_LOG = logging.getLogger(__name__)
 
 CfgFactory = Callable[[], Config]
 LLMFactory = Callable[[Config], LLMClient | None]
@@ -73,6 +77,18 @@ class IngestHandler:
                 raw_filename_suffix=raw_filename_suffix,
                 tracker=self._tracker,
             )
+        except EmptyTranscriptError:
+            # A valid session can have zero text messages (pure tool_use /
+            # tool_result — the user only ran commands). That is a legitimate
+            # no-op, NOT a failure: returning normally marks the job succeeded
+            # so it never burns 4 retries and lands in dead-letter with a
+            # cryptic "no message entries" message the user can't act on.
+            _LOG.info(
+                "ingest: %s has no text messages (pure-tool session) — "
+                "nothing to ingest, marking job done",
+                transcript_path,
+            )
+            return
         except RateLimitError as exc:
             # Pause the queue so worker stops dequeuing until reset_at.
             # Re-raise so the job is retried (not dead-lettered immediately —

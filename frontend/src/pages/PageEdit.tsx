@@ -109,6 +109,10 @@ export function PageEdit() {
             confidence: form.confidence,
           },
           body: form.body,
+          // Reject (409) instead of clobbering if an extract job rewrote the
+          // page while the editor was open. On 409 the toast tells the user
+          // to refresh; their unsaved text stays in the form (dirty unchanged).
+          base_version: pageQuery.data?.version,
         },
       },
       {
