@@ -1,6 +1,19 @@
+import importlib.util
+
 import pytest
 
+# launcher.run() imports pywebview even with --no-window. CI installs the
+# [installer] pip extra so it's always present there; a plain dev venv
+# (pip install -e . without extras) lacks it and run() exits 1 by design.
+_WEBVIEW_MISSING = importlib.util.find_spec("webview") is None
+_NEEDS_WEBVIEW = pytest.mark.skipif(
+    _WEBVIEW_MISSING,
+    reason="pywebview not installed — dev venv without the [installer] extra; "
+    "covered on CI where the extra is always installed",
+)
 
+
+@_NEEDS_WEBVIEW
 def test_launcher_no_window_flag_exits_zero(monkeypatch):
     """Headless mode: launcher initialises but doesn't show a window. CI uses this."""
     from claude_mnemos.launcher import run
@@ -42,6 +55,7 @@ def test_launcher_returns_false_if_daemon_never_ready(monkeypatch):
     assert ok is False
 
 
+@_NEEDS_WEBVIEW
 def test_launcher_no_spawn_tray_flag_does_not_open_window(monkeypatch):
     """--no-window with --no-spawn-tray (used by supervisor as parent) should still exit clean.
 

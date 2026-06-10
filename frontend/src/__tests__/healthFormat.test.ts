@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  cronUtcToLocalHM,
   parseJobId,
   parseTrigger,
   shortenPath,
   stripTmpSuffix,
+  triggerLabel,
 } from "../lib/healthFormat";
+import type { TFunction } from "i18next";
 
 describe("healthFormat", () => {
   describe("parseJobId", () => {
@@ -52,6 +55,46 @@ describe("healthFormat", () => {
         kind: "other",
         raw: "interval[seconds=30]",
       });
+    });
+  });
+
+  describe("cronUtcToLocalHM", () => {
+    it("shifts a UTC firing time by the environment's offset", () => {
+      // Independent expectation via getTimezoneOffset (minutes WEST of UTC),
+      // so the test holds in any TZ the suite runs in.
+      const ref = new Date("2026-06-10T12:00:00Z");
+      const offset = ref.getTimezoneOffset();
+      const utcMinutes = 4 * 60;
+      const expected = (((utcMinutes - offset) % 1440) + 1440) % 1440;
+
+      const { hour, minute } = cronUtcToLocalHM(4, 0, ref);
+      expect(hour * 60 + minute).toBe(expected);
+    });
+  });
+
+  describe("triggerLabel", () => {
+    it("renders cron time converted from scheduler UTC to local", () => {
+      // The daemon scheduler runs on UTC while every other timestamp on the
+      // page is local — the label must agree with the local "next run".
+      const ref = new Date("2026-06-10T12:00:00Z");
+      const local = cronUtcToLocalHM(4, 0, ref);
+      const want = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+
+      const seen: Array<Record<string, unknown>> = [];
+      const t = ((key: string, params: Record<string, unknown>) => {
+        seen.push(params);
+        return key;
+      }) as unknown as TFunction;
+
+      triggerLabel({ kind: "cron", hour: 4, minute: 0 }, t, ref);
+      expect(seen[0]?.time).toBe(want);
+    });
+
+    it("passes non-cron triggers through raw", () => {
+      const t = ((key: string) => key) as unknown as TFunction;
+      expect(triggerLabel({ kind: "other", raw: "interval[seconds=30]" }, t)).toBe(
+        "interval[seconds=30]",
+      );
     });
   });
 

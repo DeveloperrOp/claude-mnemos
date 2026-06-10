@@ -109,6 +109,38 @@ async def test_no_cache_on_root_and_spa_fallback(tmp_path: Path) -> None:
         assert "no-cache" not in r_asset.headers.get("cache-control", "")
 
 
+async def test_explicit_cache_policy_for_assets_fonts_favicon(tmp_path: Path) -> None:
+    """Files outside the no-cache set must carry an explicit policy instead
+    of browser heuristics: Vite-hashed assets/ are content-addressable →
+    cache forever; fonts/ and the favicon are unhashed but stable → bounded
+    one-day max-age (stale at most a day after an upgrade)."""
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text(
+        "<!doctype html><html><body>spa</body></html>", encoding="utf-8"
+    )
+    (static_dir / "assets").mkdir()
+    (static_dir / "assets" / "index-AbCd1234.js").write_text("console.log(1)", encoding="utf-8")
+    (static_dir / "fonts").mkdir()
+    (static_dir / "fonts" / "Geist-Variable.woff2").write_bytes(b"\x00\x01")
+    (static_dir / "favicon.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg"></svg>', encoding="utf-8"
+    )
+
+    app = create_app(static_dir=static_dir)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r_asset = await client.get("/assets/index-AbCd1234.js")
+        r_font = await client.get("/fonts/Geist-Variable.woff2")
+        r_favicon = await client.get("/favicon.svg")
+        r_favicon_ico = await client.get("/favicon.ico")  # served via svg fallback
+
+    assert r_asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+    for r in (r_font, r_favicon, r_favicon_ico):
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == "public, max-age=86400", r.request.url
+
+
 async def test_spa_fallback_favicon_ico_serves_svg(tmp_path: Path) -> None:
     """Browsers ask for /favicon.ico; we ship favicon.svg. The fallback
     must serve the SVG file rather than returning 404 or the SPA shell."""

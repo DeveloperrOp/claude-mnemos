@@ -71,8 +71,9 @@ export function Health() {
         </div>
         <h1 className="relative mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-medium tracking-tight">
           {t("health.title")}
-          <span className="ml-2 text-base font-normal text-muted-foreground">
-            · {displayName}
+          <span className="text-base font-normal text-muted-foreground">
+            {" · "}
+            {displayName}
           </span>
         </h1>
       </header>

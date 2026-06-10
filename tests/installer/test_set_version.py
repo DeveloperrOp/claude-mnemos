@@ -42,20 +42,21 @@ def repo_copy(tmp_path: Path) -> Path:
 def test_stamp_rewrites_all_version_sites(repo_copy: Path) -> None:
     set_version.stamp(repo_copy, "1.2.3")
 
-    assert '__version__ = "1.2.3"' in (repo_copy / "claude_mnemos/__init__.py").read_text()
-    assert 'version = "1.2.3"' in (repo_copy / "pyproject.toml").read_text()
-    iss = (repo_copy / "installer/windows/mnemos.iss").read_text()
+    enc = {"encoding": "utf-8"}
+    assert '__version__ = "1.2.3"' in (repo_copy / "claude_mnemos/__init__.py").read_text(**enc)
+    assert 'version = "1.2.3"' in (repo_copy / "pyproject.toml").read_text(**enc)
+    iss = (repo_copy / "installer/windows/mnemos.iss").read_text(**enc)
     assert '#define MyAppVersion "1.2.3"' in iss
-    mac = (repo_copy / "installer/macos/setup.py").read_text()
+    mac = (repo_copy / "installer/macos/setup.py").read_text(**enc)
     assert '"CFBundleVersion": "1.2.3"' in mac
     assert '"CFBundleShortVersionString": "1.2.3"' in mac
-    assert '"version": "1.2.3"' in (repo_copy / ".claude-plugin/plugin.json").read_text()
+    assert '"version": "1.2.3"' in (repo_copy / ".claude-plugin/plugin.json").read_text(**enc)
 
 
 def test_stamp_writes_windows_version_resource(repo_copy: Path) -> None:
     set_version.stamp(repo_copy, "1.2.3")
 
-    res = (repo_copy / "installer/pyinstaller/version_info.txt").read_text()
+    res = (repo_copy / "installer/pyinstaller/version_info.txt").read_text(encoding="utf-8")
     assert "filevers=(1, 2, 3, 0)" in res
     assert "FileVersion" in res and "1.2.3.0" in res
     assert "claude-mnemos" in res
@@ -83,5 +84,5 @@ def test_repo_init_carries_stampable_version() -> None:
     """
     import re
 
-    text = (REPO / "claude_mnemos/__init__.py").read_text()
+    text = (REPO / "claude_mnemos/__init__.py").read_text(encoding="utf-8")
     assert re.search(r'__version__ = "\d+\.\d+\.\d+"', text)

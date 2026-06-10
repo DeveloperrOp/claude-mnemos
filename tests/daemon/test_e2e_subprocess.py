@@ -41,6 +41,12 @@ def _wait_for_health(url: str, timeout: float = 10.0) -> bool:
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    sys.platform == "win32" and sys.prefix != sys.base_prefix,
+    reason="Windows venv python.exe is a launcher shim: Popen.pid is the shim's "
+    "pid while the daemon records its real interpreter pid — the PID assertions "
+    "below can never match. Passes on CI, whose setup-python is not a venv.",
+)
 def test_daemon_subprocess_lifecycle(tmp_path: Path):
     vault = tmp_path / "vault"
     vault.mkdir()

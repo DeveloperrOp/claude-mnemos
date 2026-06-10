@@ -56,14 +56,34 @@ export function parseTrigger(raw: string): ParsedTrigger {
   return { kind: "other", raw };
 }
 
+/**
+ * Convert a cron firing time from UTC to the browser's local time.
+ *
+ * The daemon scheduler runs on UTC (build_empty_scheduler), so trigger
+ * fields are UTC — but every other timestamp on the page (next run,
+ * alerts) renders local. Showing the raw cron hour produced "Ежедневно в
+ * 04:00" next to "следующий: 07:00" for the same job. `ref` anchors the
+ * conversion to a concrete date so the current DST rules apply.
+ */
+export function cronUtcToLocalHM(
+  hour: number,
+  minute: number,
+  ref: Date = new Date(),
+): { hour: number; minute: number } {
+  const d = new Date(ref);
+  d.setUTCHours(hour, minute, 0, 0);
+  return { hour: d.getHours(), minute: d.getMinutes() };
+}
+
 /** Pretty-print a parsed trigger via locale strings.
  *
- * Cron jobs become "Daily at HH:MM" / "Щодня о HH:MM" / "Ежедневно в HH:MM".
- * Anything else falls back to the raw APScheduler dump so power users can
- * still debug it. */
-export function triggerLabel(parsed: ParsedTrigger, t: TFunction): string {
+ * Cron jobs become "Daily at HH:MM" / "Щодня о HH:MM" / "Ежедневно в HH:MM"
+ * with the time converted from the scheduler's UTC to local. Anything else
+ * falls back to the raw APScheduler dump so power users can still debug it. */
+export function triggerLabel(parsed: ParsedTrigger, t: TFunction, ref?: Date): string {
   if (parsed.kind === "cron") {
-    const time = `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
+    const local = cronUtcToLocalHM(parsed.hour, parsed.minute, ref);
+    const time = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
     return t("health.jobs.trigger.daily_at", { time });
   }
   return parsed.raw;

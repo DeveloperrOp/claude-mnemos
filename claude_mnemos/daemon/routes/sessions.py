@@ -113,14 +113,14 @@ async def ingest_session_route(
     root = _resolve_transcripts_root(None).resolve()
     try:
         Path(transcript_path).resolve().relative_to(root)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "transcript_outside_root",
                 "detail": f"transcript_path must be under {root}",
             },
-        )
+        ) from exc
     if runtime.job_store is None:
         raise HTTPException(
             status_code=503,

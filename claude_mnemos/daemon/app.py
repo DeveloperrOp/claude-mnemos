@@ -264,7 +264,11 @@ class SpaStaticFiles(StaticFiles):
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
                 if path == "favicon.ico":
-                    return await super().get_response("favicon.svg", scope)
+                    # Early return skips the policy block below — set the
+                    # same bounded max-age the svg gets when fetched directly.
+                    response = await super().get_response("favicon.svg", scope)
+                    response.headers["Cache-Control"] = "public, max-age=86400"
+                    return response
                 # Normalise Windows path separators — Starlette passes the
                 # OS-native form on Windows ("assets\\foo.js") while our
                 # prefix tests use POSIX style ("assets/").
@@ -305,4 +309,12 @@ class SpaStaticFiles(StaticFiles):
             or normalised in ("", ".", "index.html")
         ):
             response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif normalised.startswith("assets/"):
+            # Vite content-hashes bundle filenames — safe to cache forever.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif normalised.startswith("fonts/") or normalised == "favicon.svg":
+            # Unhashed but stable between releases. A bounded max-age beats
+            # browser heuristics (which over-cache) and limits staleness to
+            # a day after an upgrade.
+            response.headers["Cache-Control"] = "public, max-age=86400"
         return response
