@@ -78,6 +78,37 @@ async def test_spa_fallback_for_dotted_app_routes(tmp_path: Path) -> None:
     assert r_missing_asset.status_code == 404
 
 
+async def test_no_cache_on_root_and_spa_fallback(tmp_path: Path) -> None:
+    """index.html must carry no-cache wherever it is served from: the literal
+    /index.html, the ROOT '/', and SPA-fallback routes (/lost-sessions). Those
+    last two are the actual entry points users hit — without the header the
+    browser heuristic-caches a stale bundle past upgrades. Hashed assets are
+    content-addressable and must NOT be forced to revalidate.
+    """
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text(
+        "<!doctype html><html><body>spa</body></html>", encoding="utf-8"
+    )
+    (static_dir / "assets").mkdir()
+    (static_dir / "assets" / "index-AbCd1234.js").write_text("console.log(1)", encoding="utf-8")
+    (static_dir / "locales").mkdir()
+    (static_dir / "locales" / "ru.json").write_text("{}", encoding="utf-8")
+
+    app = create_app(static_dir=static_dir)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        for path in ("/", "/index.html", "/lost-sessions", "/locales/ru.json"):
+            r = await client.get(path)
+            assert r.status_code == 200, path
+            assert "no-cache" in r.headers.get("cache-control", ""), (
+                f"{path} must carry no-cache, got {r.headers.get('cache-control')!r}"
+            )
+        r_asset = await client.get("/assets/index-AbCd1234.js")
+        assert r_asset.status_code == 200
+        assert "no-cache" not in r_asset.headers.get("cache-control", "")
+
+
 async def test_spa_fallback_favicon_ico_serves_svg(tmp_path: Path) -> None:
     """Browsers ask for /favicon.ico; we ship favicon.svg. The fallback
     must serve the SVG file rather than returning 404 or the SPA shell."""

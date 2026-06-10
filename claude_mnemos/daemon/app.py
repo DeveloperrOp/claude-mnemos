@@ -10,7 +10,6 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from claude_mnemos import __version__
-from claude_mnemos.runtime import static_dir as _runtime_static_dir
 from claude_mnemos.core.locks import LockTimeoutError
 from claude_mnemos.core.ontology_apply import OntologyError
 from claude_mnemos.core.page_apply import PageRestoreCollisionError
@@ -27,11 +26,11 @@ from claude_mnemos.daemon.routes.health import router as health_router
 from claude_mnemos.daemon.routes.health_alerts import router as health_alerts_router
 from claude_mnemos.daemon.routes.hooks import router as hooks_router
 from claude_mnemos.daemon.routes.inject_preview import router as inject_preview_router
-from claude_mnemos.daemon.routes.onboarding import router as onboarding_router
 from claude_mnemos.daemon.routes.jobs import router as jobs_router
 from claude_mnemos.daemon.routes.lint import router as lint_router
 from claude_mnemos.daemon.routes.lost_sessions import router as lost_sessions_router
 from claude_mnemos.daemon.routes.metrics import router as metrics_router
+from claude_mnemos.daemon.routes.onboarding import router as onboarding_router
 from claude_mnemos.daemon.routes.ontology import router as ontology_router
 from claude_mnemos.daemon.routes.pages import router as pages_router
 from claude_mnemos.daemon.routes.projects import router as projects_router
@@ -44,6 +43,7 @@ from claude_mnemos.daemon.routes.tray import router as tray_router
 from claude_mnemos.daemon.routes.update import router as update_router
 from claude_mnemos.daemon.routes.vault import router as vault_router
 from claude_mnemos.lint.exceptions import LintCorruptError, LintError
+from claude_mnemos.runtime import static_dir as _runtime_static_dir
 from claude_mnemos.state.activity import ActivityCorruptError
 from claude_mnemos.state.jobs import JobsCorruptError
 from claude_mnemos.state.manifest import ManifestCorruptError
@@ -130,15 +130,11 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
 
     @app.exception_handler(LintError)
     async def _lint_error(_request: Request, exc: LintError) -> JSONResponse:
-        return JSONResponse(
-            status_code=409, content={"error": "lint_failed", "detail": str(exc)}
-        )
+        return JSONResponse(status_code=409, content={"error": "lint_failed", "detail": str(exc)})
 
     @app.exception_handler(LintCorruptError)
     async def _lint_corrupt(_request: Request, exc: LintCorruptError) -> JSONResponse:
-        return JSONResponse(
-            status_code=503, content={"error": "lint_corrupt", "detail": str(exc)}
-        )
+        return JSONResponse(status_code=503, content={"error": "lint_corrupt", "detail": str(exc)})
 
     @app.exception_handler(JobsCorruptError)
     async def _jobs_corrupt(_request: Request, exc: JobsCorruptError) -> JSONResponse:
@@ -155,18 +151,14 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
         )
 
     @app.exception_handler(PageRestoreCollisionError)
-    async def _restore_collision(
-        _request: Request, exc: PageRestoreCollisionError
-    ) -> JSONResponse:
+    async def _restore_collision(_request: Request, exc: PageRestoreCollisionError) -> JSONResponse:
         return JSONResponse(
             status_code=409,
             content={"error": "restore_collision", "detail": str(exc)},
         )
 
     @app.exception_handler(TrashEntryNotFoundError)
-    async def _trash_not_found(
-        _request: Request, exc: TrashEntryNotFoundError
-    ) -> JSONResponse:
+    async def _trash_not_found(_request: Request, exc: TrashEntryNotFoundError) -> JSONResponse:
         return JSONResponse(
             status_code=404,
             content={"error": "trash_entry_not_found", "detail": str(exc)},
@@ -194,9 +186,7 @@ def create_app(daemon: Any | None = None, static_dir: Path | None = None) -> Fas
         )
 
     @app.exception_handler(ValidationError)
-    async def _pydantic_validation(
-        _request: Request, exc: ValidationError
-    ) -> JSONResponse:
+    async def _pydantic_validation(_request: Request, exc: ValidationError) -> JSONResponse:
         # Triggered when domain code (e.g. core/page_apply.apply_patch) calls
         # WikiPageFrontmatter.model_validate on a bad PATCH payload. Distinct
         # from FastAPI's RequestValidationError, which already returns 422 for
@@ -247,13 +237,28 @@ class SpaStaticFiles(StaticFiles):
     # missing-resource error). Application route segments may legitimately
     # contain dots (".md" page paths) — those fall through to index.html.
     _ASSET_EXTENSIONS = (
-        ".js", ".css", ".map",
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
-        ".woff", ".woff2", ".ttf", ".eot",
-        ".json", ".webmanifest", ".xml", ".txt",
+        ".js",
+        ".css",
+        ".map",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".webp",
+        ".ico",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot",
+        ".json",
+        ".webmanifest",
+        ".xml",
+        ".txt",
     )
 
-    async def get_response(self, path: str, scope: Any) -> Any:  # type: ignore[override]
+    async def get_response(self, path: str, scope: Any) -> Any:
+        served_index = False
         try:
             response = await super().get_response(path, scope)
         except StarletteHTTPException as exc:
@@ -279,6 +284,7 @@ class SpaStaticFiles(StaticFiles):
                 # Everything else is an application route — let the SPA
                 # take over.
                 response = await super().get_response("index.html", scope)
+                served_index = True
             else:
                 raise
 
@@ -288,7 +294,15 @@ class SpaStaticFiles(StaticFiles):
         # /locales/*.json change every release. Without this, browsers
         # heuristic-cache them on the first install and old translations
         # (sidebar 'NAVIGATION.LINT' literal, etc.) persist past upgrades.
+        # The header must cover EVERY way index.html is served: the literal
+        # /index.html, the root "/" (Starlette normalises its path to "."),
+        # and all SPA-fallback routes (served_index) — root and fallback are
+        # the entry points users actually hit.
         normalised = path.replace("\\", "/")
-        if normalised.startswith("locales/") or normalised in ("", "index.html"):
+        if (
+            served_index
+            or normalised.startswith("locales/")
+            or normalised in ("", ".", "index.html")
+        ):
             response.headers["Cache-Control"] = "no-cache, must-revalidate"
         return response

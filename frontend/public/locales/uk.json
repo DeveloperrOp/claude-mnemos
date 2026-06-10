@@ -552,7 +552,7 @@
     "restore_typed_label": "Введіть назву снапшоту",
     "restore_button": "Відновити",
     "delete_modal_title": "Видалити снапшот?",
-    "delete_modal_desc": "Видаляє резервну копію. Незворотно.",
+    "delete_modal_desc": "Знімок переміститься до кошика знімків — звідти його можна відновити або видалити назавжди.",
     "delete_button": "Видалити",
     "create_button": "Створити снапшот",
     "create_modal_title": "Створити ручний снапшот",
@@ -639,7 +639,15 @@
       "confirm_import_title": "Імпортувати {{n}} сесій?",
       "confirm_import_desc": "Кожна сесія створить окрему задачу в черзі інжесту. Це може зайняти час і витратити токени LLM (якщо інжест не у --no-llm режимі).",
       "confirm_ignore_title": "Ігнорувати {{n}} сесій?",
-      "confirm_ignore_desc": "Сесії будуть приховані зі списку загублених. Файли транскриптів не видаляються."
+      "confirm_ignore_desc": "Сесії будуть приховані зі списку загублених. Файли транскриптів не видаляються.",
+      "confirm_ignore_title_one": "Ігнорувати {{n}} сесію?",
+      "confirm_ignore_title_few": "Ігнорувати {{n}} сесії?",
+      "confirm_ignore_title_many": "Ігнорувати {{n}} сесій?",
+      "confirm_ignore_title_other": "Ігнорувати {{n}} сесій?",
+      "confirm_import_title_one": "Імпортувати {{n}} сесію?",
+      "confirm_import_title_few": "Імпортувати {{n}} сесії?",
+      "confirm_import_title_many": "Імпортувати {{n}} сесій?",
+      "confirm_import_title_other": "Імпортувати {{n}} сесій?"
     },
     "view_ignored": "Переглянути ігноровані",
     "scan_error": "Сканування не вдалося: {{message}}"

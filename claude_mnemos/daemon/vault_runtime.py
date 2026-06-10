@@ -273,11 +273,12 @@ class VaultRuntime:
         The blocker for the Windows rename is the open ``.jobs.db`` handle, not
         the watchdog observer (the existing code already runs the swap with the
         observer alive and only fails on Windows). So we stop the worker, close
-        the JobStore, run the UNCHANGED atomic swap (paused via the tracker so
-        the still-running observer ignores the swap's events), then reopen the
-        store and restart the worker. If a corrupted final-rename left the vault
-        directory missing we do NOT reopen — recreating an empty .jobs.db over
-        the loss would mask it.
+        the JobStore, stop the observer (it would otherwise keep watching the
+        renamed-away directory and go blind), run the UNCHANGED atomic swap,
+        then reopen the store, start a fresh observer on the restored dir and
+        restart the worker. If a corrupted final-rename left the vault directory
+        missing we do NOT reopen/restart — recreating an empty .jobs.db over the
+        loss would mask it.
         """
         import asyncio
 
@@ -292,16 +293,31 @@ class VaultRuntime:
             self.job_worker = None
         self.job_store.close()
 
+        # 1b. Stop the observer: its ReadDirectoryChangesW handle survives the
+        # rename but follows the OLD directory, so after the swap it would
+        # silently watch a deleted path and never see vault events again.
+        if self.observer is not None:
+            try:
+                self.observer.stop()
+            except Exception:
+                logger.exception("restore: observer stop failed")
+            self.observer = None
+
         # 2. Run the unchanged atomic swap off the event loop, paused.
         result = await asyncio.to_thread(
             restore_from_snapshot, self.vault_root, snapshot, tracker=self.tracker
         )
 
-        # 3. Reopen the store + restart the worker — never recreate a vault
-        #    that a corrupted final-rename left missing.
+        # 3. Reopen the store, restart observer + worker — never recreate a
+        #    vault that a corrupted final-rename left missing.
         if self.vault_root.exists():
             self.job_store = JobStore(self.vault_root / JOBS_DB_FILENAME)
             self.job_store.recover_zombie_running()
+            if self._alerts is not None:
+                handler = VaultChangeHandler(self.vault_root, self.tracker, self._alerts)
+                observer = VaultObserver(self.vault_root, handler)
+                observer.start()
+                self.observer = observer
             worker = self._build_job_worker()
             await worker.start()
             self.job_worker = worker
@@ -310,10 +326,7 @@ class VaultRuntime:
                 self._alerts.add(
                     kind="handler_error",
                     path=str(self.vault_root),
-                    message=(
-                        f"restore left vault {self.name!r} missing; "
-                        "manual recovery needed"
-                    ),
+                    message=(f"restore left vault {self.name!r} missing; manual recovery needed"),
                     detected_at=datetime.now(UTC),
                 )
         return result

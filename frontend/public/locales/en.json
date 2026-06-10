@@ -560,7 +560,7 @@
     "restore_typed_label": "Type the snapshot name",
     "restore_button": "Restore",
     "delete_modal_title": "Delete snapshot?",
-    "delete_modal_desc": "Removes this backup. Cannot be undone.",
+    "delete_modal_desc": "The snapshot moves to the snapshot trash — you can restore it from there or delete it permanently.",
     "delete_button": "Delete",
     "create_button": "Create snapshot",
     "create_modal_title": "Create manual snapshot",
@@ -645,7 +645,11 @@
       "confirm_import_title": "Import {{n}} sessions?",
       "confirm_import_desc": "Each session creates a separate ingest job. May take time and consume LLM tokens (unless ingesting with --no-llm).",
       "confirm_ignore_title": "Ignore {{n}} sessions?",
-      "confirm_ignore_desc": "Sessions will be hidden from the lost-sessions list. Transcript files are not deleted."
+      "confirm_ignore_desc": "Sessions will be hidden from the lost-sessions list. Transcript files are not deleted.",
+      "confirm_ignore_title_one": "Ignore {{n}} session?",
+      "confirm_ignore_title_other": "Ignore {{n}} sessions?",
+      "confirm_import_title_one": "Import {{n}} session?",
+      "confirm_import_title_other": "Import {{n}} sessions?"
     },
     "view_ignored": "View ignored",
     "scan_error": "Scan failed: {{message}}"

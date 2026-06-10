@@ -57,7 +57,7 @@ jobs:
 
       - name: Run pytest (smoke)
         run: |
-          python -m pytest tests/test_runtime.py tests/test_cli_hook.py tests/test_postinstall.py -v
+          python -m pytest tests/test_runtime.py tests/test_cli_hook.py tests/test_postinstall.py tests/test_pyinstaller_spec.py -v
 
       - name: Build PyInstaller bundle
         run: python -m PyInstaller installer/pyinstaller/mnemos.spec --noconfirm

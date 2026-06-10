@@ -321,6 +321,7 @@ export function LostSessionsManager({
         onOpenChange={setConfirmImport}
         title={t("lost_sessions.selection.confirm_import_title", {
           n: selectedSessions.length,
+          count: selectedSessions.length,
         })}
         description={t("lost_sessions.selection.confirm_import_desc")}
         confirmLabel={t("lost_sessions.selection.bar_import")}
@@ -332,6 +333,7 @@ export function LostSessionsManager({
         onOpenChange={setConfirmIgnore}
         title={t("lost_sessions.selection.confirm_ignore_title", {
           n: selectedSessions.length,
+          count: selectedSessions.length,
         })}
         description={t("lost_sessions.selection.confirm_ignore_desc")}
         confirmLabel={t("lost_sessions.selection.bar_ignore")}

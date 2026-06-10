@@ -34,7 +34,11 @@ OPTIONS = {
         "LSMinimumSystemVersion": "11.0",
         "NSHighResolutionCapable": True,
     },
-    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview"],
+    # tiktoken discovers its encodings by scanning the tiktoken_ext namespace
+    # package at runtime — invisible to modulegraph's static analysis, exactly
+    # like PyInstaller (see mnemos.spec). Without both packages the .app raises
+    # "Unknown encoding cl100k_base. Plugins found: []" on every extract.
+    "packages": ["claude_mnemos", "fastapi", "uvicorn", "pydantic", "watchdog", "pystray", "apscheduler", "webview", "tiktoken", "tiktoken_ext"],
     "includes": ["uvicorn.logging", "uvicorn.lifespan.on", "uvicorn.protocols.http.auto"],
     # PyInstaller is installed via the [installer] pip extra so that the same
     # workflow can build the PyInstaller bundle for non-mac platforms — but on

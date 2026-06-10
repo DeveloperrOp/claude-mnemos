@@ -12,6 +12,8 @@ Main exe: dist/claude-mnemos/claude-mnemos.exe
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules
+
 ROOT = Path(SPECPATH).resolve().parent.parent  # repo root
 PKG = ROOT / "claude_mnemos"
 
@@ -64,7 +66,13 @@ hiddenimports = [
     "webview.platforms.gtk",
     "clr_loader",
     "pythonnet",
+    # tiktoken finds its encodings (cl100k_base, …) by scanning the
+    # tiktoken_ext namespace package at runtime — invisible to static
+    # analysis. Without these the frozen exe raises "Unknown encoding
+    # cl100k_base. Plugins found: []" on every extract.
+    "tiktoken",
 ]
+hiddenimports += collect_submodules("tiktoken_ext")
 
 a = Analysis(
     [str(PKG / "__main__.py")],
