@@ -264,7 +264,7 @@ class SettingsStore:
         if not path.exists():
             return ProjectSettings()
         try:
-            raw = path.read_text(encoding="utf-8")
+            raw = path.read_text(encoding="utf-8-sig")  # tolerate BOM
         except OSError as exc:
             raise SettingsCorruptError(
                 f"project settings at {path} unreadable: {exc}"
@@ -300,7 +300,7 @@ class SettingsStore:
         if not self._global_path.exists():
             return GlobalSettings()
         try:
-            raw = self._global_path.read_text(encoding="utf-8")
+            raw = self._global_path.read_text(encoding="utf-8-sig")  # tolerate BOM
         except OSError as exc:
             raise SettingsCorruptError(
                 f"global settings at {self._global_path} unreadable: {exc}"

@@ -44,7 +44,7 @@ class Manifest(BaseModel):
         if not path.is_file():
             return cls()
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))  # tolerate BOM
         except json.JSONDecodeError as exc:
             raise ManifestCorruptError(
                 f"manifest at {path} is not valid JSON: {exc}"

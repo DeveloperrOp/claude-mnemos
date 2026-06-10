@@ -279,6 +279,20 @@ def test_git_fallback_no_infinite_when_toplevel_equals_cwd(tmp_path: Path, monke
     assert r.resolve_by_cwd(elsewhere, git_fallback=True) is None
 
 
+def test_project_map_with_utf8_bom_loads(tmp_path: Path):
+    """A project-map.json saved with a UTF-8 BOM (some editors / PowerShell
+    Set-Content add one) must still load — a BOM used to crash the daemon on
+    boot via model_validate_json. Regression for the 2026-06-10 incident."""
+    f = tmp_path / HOME_CONFIG_DIRNAME / PROJECT_MAP_FILENAME
+    f.parent.mkdir(parents=True, exist_ok=True)
+    vx = (tmp_path / "vx").as_posix()
+    body = '{"projects":[{"name":"x","vault_root":"' + vx + '","cwd_patterns":[]}]}'
+    f.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))  # UTF-8 BOM prefix
+    r = ProjectResolver()
+    e = r.resolve_by_name("x")
+    assert e is not None and e.name == "x"
+
+
 def test_list_all(tmp_path: Path):
     _seed_map(tmp_path, [
         ProjectMapEntry(name="a", vault_root=tmp_path / "va", cwd_patterns=[]),

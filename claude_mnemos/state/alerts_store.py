@@ -83,7 +83,7 @@ class AlertsStore(BaseModel):
             inst._path = target
             return inst
         try:
-            raw = target.read_text(encoding="utf-8")
+            raw = target.read_text(encoding="utf-8-sig")  # tolerate BOM
             data = json.loads(raw)
             inst = cls.model_validate(data)
         except (json.JSONDecodeError, ValueError, OSError):

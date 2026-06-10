@@ -143,7 +143,10 @@ class ProjectStore:
         if not self._path.exists():
             return ProjectMap()
         try:
-            raw = self._path.read_text(encoding="utf-8")
+            # utf-8-sig: tolerate a UTF-8 BOM (some editors / PowerShell
+            # Set-Content add one). A BOM made model_validate_json reject the
+            # file and crashed the daemon on boot. No-op when no BOM present.
+            raw = self._path.read_text(encoding="utf-8-sig")
         except OSError as exc:
             raise ProjectMapCorruptError(
                 f"project-map at {self._path} unreadable: {exc}"

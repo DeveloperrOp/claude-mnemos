@@ -44,7 +44,7 @@ def load_install_state() -> InstallState:
         if not _STATE_PATH.exists():
             return InstallState()
         try:
-            data = json.loads(_STATE_PATH.read_text(encoding="utf-8"))
+            data = json.loads(_STATE_PATH.read_text(encoding="utf-8-sig"))  # tolerate BOM
             return InstallState.model_validate(data)
         except (json.JSONDecodeError, ValueError):
             return InstallState()

@@ -108,7 +108,7 @@ class SuggestionStore:
 
         def _safe_load(path: Path) -> Suggestion | None:
             try:
-                return Suggestion.parse(path.read_text(encoding="utf-8"))
+                return Suggestion.parse(path.read_text(encoding="utf-8-sig"))  # tolerate BOM
             except OntologyCorruptError as exc:
                 logger.warning("skipping corrupt suggestion %s: %s", path.name, exc)
                 return None
@@ -135,7 +135,7 @@ class SuggestionStore:
         for candidate in (self._file_for(suggestion_id), self._archive_file_for(suggestion_id)):
             if candidate.is_file():
                 try:
-                    return Suggestion.parse(candidate.read_text(encoding="utf-8"))
+                    return Suggestion.parse(candidate.read_text(encoding="utf-8-sig"))
                 except OntologyCorruptError:
                     raise
         return None
