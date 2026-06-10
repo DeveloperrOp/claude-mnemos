@@ -27,6 +27,9 @@ class _FakeRuntime:
 
     def __init__(self, vault: Path) -> None:
         self.vault_root = vault
+        from claude_mnemos.daemon.our_writes import OurWritesTracker
+
+        self.tracker = OurWritesTracker(ttl_s=60.0)
 
 
 class _FakeDaemon:

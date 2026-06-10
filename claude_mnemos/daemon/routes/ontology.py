@@ -113,21 +113,15 @@ def create_suggestion_endpoint(
         if body.proposed_target is None:
             raise _bad("missing_target", "merge_entities requires proposed_target")
         if len(body.affected_pages) < 2:
-            raise _bad(
-                "insufficient_sources", "merge_entities requires at least 2 sources"
-            )
+            raise _bad("insufficient_sources", "merge_entities requires at least 2 sources")
     elif body.operation == "rename_entity":
         if body.proposed_target is None:
             raise _bad("missing_target", "rename_entity requires proposed_target")
         if len(body.affected_pages) != 1:
-            raise _bad(
-                "wrong_source_count", "rename_entity requires exactly 1 source"
-            )
+            raise _bad("wrong_source_count", "rename_entity requires exactly 1 source")
     elif body.operation == "delete_page":
         if len(body.affected_pages) != 1:
-            raise _bad(
-                "wrong_source_count", "delete_page requires exactly 1 source"
-            )
+            raise _bad("wrong_source_count", "delete_page requires exactly 1 source")
 
     now = datetime.now(UTC)
     sid = generate_suggestion_id(now)
@@ -160,7 +154,8 @@ def approve_suggestion_endpoint(
 ) -> dict[str, Any]:
     runtime = get_runtime(request, project)
     vault = runtime.vault_root
-    result = apply_suggestion(vault, suggestion_id)
+    # tracker pauses the watchdog around the staged promote/rollback swap
+    result = apply_suggestion(vault, suggestion_id, tracker=runtime.tracker)
     return {
         "success": result.success,
         "operation": result.operation,
@@ -188,13 +183,9 @@ def reject_suggestion_endpoint(
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "id": suggestion_id}
-        )
+        raise HTTPException(status_code=404, detail={"error": "not_found", "id": suggestion_id})
     if existing.frontmatter.status != "pending":
-        raise OntologyError(
-            f"suggestion already {existing.frontmatter.status}: {suggestion_id}"
-        )
+        raise OntologyError(f"suggestion already {existing.frontmatter.status}: {suggestion_id}")
     store.update_status(suggestion_id, "rejected")
     store.archive_suggestion(suggestion_id)
     return {"success": True, "suggestion_id": suggestion_id, "status": "rejected"}
@@ -216,13 +207,9 @@ def defer_suggestion_endpoint(
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "id": suggestion_id}
-        )
+        raise HTTPException(status_code=404, detail={"error": "not_found", "id": suggestion_id})
     if existing.frontmatter.status != "pending":
-        raise OntologyError(
-            f"suggestion already {existing.frontmatter.status}: {suggestion_id}"
-        )
+        raise OntologyError(f"suggestion already {existing.frontmatter.status}: {suggestion_id}")
     store.update_status(suggestion_id, "deferred")
     return {"success": True, "suggestion_id": suggestion_id, "status": "deferred"}
 
@@ -244,9 +231,7 @@ def patch_suggestion_endpoint(
     store = SuggestionStore(vault)
     existing = store.get(suggestion_id)
     if existing is None:
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "id": suggestion_id}
-        )
+        raise HTTPException(status_code=404, detail={"error": "not_found", "id": suggestion_id})
     updates: dict[str, object] = {}
     if patch.reason is not None:
         updates["reason"] = patch.reason
@@ -288,8 +273,7 @@ async def scan_endpoint(project: str, request: Request) -> dict[str, Any]:
             detail={
                 "error": "llm_unavailable",
                 "hint": (
-                    "Set ANTHROPIC_API_KEY or install Claude Code CLI "
-                    "to enable ontology scanning."
+                    "Set ANTHROPIC_API_KEY or install Claude Code CLI to enable ontology scanning."
                 ),
             },
         ) from exc

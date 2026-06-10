@@ -156,13 +156,48 @@ def test_restore_with_open_handle_inside_vault_os_contract(tmp_path: Path):
         result = restore_from_snapshot(vault, snap)
 
     if sys.platform == "win32":
-        # open handle blocks vault.rename -> restore fails BUT vault is intact
+        # The open handle inside wiki/ blocks the whole-vault rename AND the
+        # per-entry fallback's wiki rename — restore fails gracefully, vault
+        # intact. (The fallback only rescues handles on EXCLUDED root files
+        # like .jobs.db — the daemon's own state — not user-held wiki files.)
         assert result.success is False
         assert result.vault_intact is True
-        assert "cannot rename vault to old" in (result.error or "")
+        assert "cannot swap vault contents" in (result.error or "")
+        # the failed fallback rolled its aside moves back
+        assert (vault / "wiki" / "entities" / "foo.md").exists()
     else:
         # POSIX: rename survives open files
         assert result.success is True
+
+
+def test_restore_succeeds_with_open_excluded_root_file(tmp_path: Path):
+    # The daemon's .jobs.db lives in the vault ROOT and is excluded from the
+    # swap — but on Windows its open handle blocks the whole-vault rename.
+    # That is exactly the state undo and the staging rollback run in (inside
+    # the daemon / inside a worker job, where the store cannot be closed).
+    # restore must fall back to a per-entry content swap that never renames
+    # the vault root, and still restore correctly.
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    (vault / ".jobs.db").write_text("sqlite-stand-in", encoding="utf-8")
+    snap = create_snapshot(vault, operation_id="qdb", operation_type="ingest")
+    (vault / "wiki" / "entities" / "foo.md").write_text("MUTATED", encoding="utf-8")
+    (vault / "wiki" / "entities" / "new-after-snap.md").write_text("n", encoding="utf-8")
+
+    with open(vault / ".jobs.db", "r+b"):  # the daemon's open handle
+        result = restore_from_snapshot(vault, snap)
+
+    assert result.success is True, result.error
+    restored = (vault / "wiki" / "entities" / "foo.md").read_text(encoding="utf-8")
+    assert restored == "---\ntitle: Foo\n---\nbody\n"
+    # entries created after the snapshot are gone (dir-swap semantics)
+    assert not (vault / "wiki" / "entities" / "new-after-snap.md").exists()
+    # excluded root file untouched and still present
+    assert (vault / ".jobs.db").read_text(encoding="utf-8") == "sqlite-stand-in"
+    # internal dirs survive, no aside debris left behind
+    assert (vault / ".backups").is_dir()
+    leftovers = [p.name for p in vault.rglob("*restore-aside*")]
+    assert leftovers == [], leftovers
 
 
 def test_restore_drops_meta_json_from_swap(tmp_path: Path):
@@ -202,28 +237,54 @@ def test_restore_preserves_old_state_on_stage_failure(tmp_path: Path, monkeypatc
     assert leftovers == []
 
 
-def test_restore_aside_rename_failure_keeps_vault(tmp_path: Path, monkeypatch):
-    """If renaming vault -> .mnemos-old fails, vault stays intact and temp is cleaned."""
+def test_restore_whole_rename_failure_falls_back_to_content_swap(tmp_path: Path, monkeypatch):
+    """If renaming vault -> .mnemos-old fails (Windows: open handle on an
+    excluded root file), restore falls back to the per-entry content swap and
+    still succeeds."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="abc-123", operation_type="ingest")
+    (vault / "wiki" / "entities" / "foo.md").write_text("MUTATED", encoding="utf-8")
+
+    real_rename = Path.rename
+
+    def boom_whole(self, target):
+        if ".mnemos-old" in str(target):
+            raise OSError("simulated whole-vault rename failure")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", boom_whole)
+
+    result = restore_from_snapshot(vault, snap)
+
+    assert result.success is True, result.error
+    restored = (vault / "wiki" / "entities" / "foo.md").read_text(encoding="utf-8")
+    assert restored == "---\ntitle: Foo\n---\nbody\n"
+    assert not list(vault.rglob("*restore-aside*"))
+
+
+def test_restore_fails_intact_when_fallback_also_blocked(tmp_path: Path, monkeypatch):
+    """If both the whole-vault rename AND the per-entry aside renames fail,
+    the fallback rolls back its partial moves and the vault stays intact."""
     vault = tmp_path / "vault"
     _populate_vault(vault)
     snap = create_snapshot(vault, operation_id="abc-123", operation_type="ingest")
 
     real_rename = Path.rename
 
-    def boom_aside(self, target):
-        # Fail only on the aside-rename (vault -> .mnemos-old-...)
-        if ".mnemos-old" in str(target):
-            raise OSError("simulated aside-rename failure")
+    def boom_both(self, target):
+        t = str(target)
+        if ".mnemos-old" in t or "restore-aside" in t:
+            raise OSError("simulated rename failure")
         return real_rename(self, target)
 
-    monkeypatch.setattr(Path, "rename", boom_aside)
+    monkeypatch.setattr(Path, "rename", boom_both)
 
     result = restore_from_snapshot(vault, snap)
 
     assert result.success is False
     assert result.vault_intact is True
     assert result.error is not None
-    # Vault content untouched
     assert (vault / "wiki" / "entities" / "foo.md").exists()
     # No temp left over
     leftovers = [p for p in vault.parent.iterdir() if p.name.startswith(".mnemos-")]
@@ -267,9 +328,7 @@ def test_create_snapshot_at_uses_provided_path(tmp_path: Path):
     _populate_vault(vault)
 
     custom_path = vault / ".backups" / "custom-name-here"
-    snap = create_snapshot_at(
-        vault, custom_path, operation_id="abc-123", operation_type="ingest"
-    )
+    snap = create_snapshot_at(vault, custom_path, operation_id="abc-123", operation_type="ingest")
 
     assert snap == custom_path
     assert snap.exists()
@@ -289,9 +348,7 @@ def test_create_snapshot_at_collision_raises(tmp_path: Path):
     create_snapshot_at(vault, target, operation_id="abc", operation_type="ingest")
 
     with pytest.raises(SnapshotError):
-        create_snapshot_at(
-            vault, target, operation_id="different", operation_type="ingest"
-        )
+        create_snapshot_at(vault, target, operation_id="different", operation_type="ingest")
 
 
 def test_create_snapshot_at_same_op_is_idempotent(tmp_path: Path):
@@ -498,9 +555,7 @@ def test_compute_manual_snapshot_path_rejects_empty_after_sanitize(tmp_path: Pat
 
     vault = tmp_path / "vault"
     with pytest.raises(ValueError):
-        compute_manual_snapshot_path(
-            vault, label="///", now=datetime(2026, 4, 26, tzinfo=UTC)
-        )
+        compute_manual_snapshot_path(vault, label="///", now=datetime(2026, 4, 26, tzinfo=UTC))
 
 
 def test_create_daily_snapshot_creates_directory(tmp_path: Path):
@@ -837,9 +892,7 @@ def test_prune_old_backups_removes_old_keeps_new(tmp_path: Path):
     # Old pre-op (manually create with old timestamp in name)
     old_pre_op = vault / ".backups" / "pre-op-2025-08-19-12-00-00-ingest-old"
     old_pre_op.mkdir()
-    new_pre_op = compute_snapshot_path(
-        vault, operation_id="new", operation_type="ingest"
-    )
+    new_pre_op = compute_snapshot_path(vault, operation_id="new", operation_type="ingest")
     new_pre_op.mkdir()
 
     result = prune_old_backups(vault, retention_days=180, today=date(2026, 4, 26))
@@ -1011,3 +1064,74 @@ def test_restore_preserves_jobs_db_wal_companions(tmp_path: Path):
     assert (vault / ".jobs.db-wal").read_bytes() == b"wal-data"
     assert (vault / ".jobs.db-shm").read_bytes() == b"shm-data"
     assert (vault / ".jobs.db-journal").read_bytes() == b"journal-data"
+
+
+def test_content_swap_rolls_back_on_keyboard_interrupt(tmp_path: Path, monkeypatch):
+    """A Ctrl+C mid-swap (realistic in CLI `mnemos undo`, which on Windows is
+    forced into the fallback by the daemon's open .jobs.db) must roll the
+    moves back before propagating — not strand the vault content-empty."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="ki", operation_type="ingest")
+
+    real_rename = Path.rename
+    state = {"phase_a_done": 0}
+
+    def interrupting_rename(self, target):
+        t, src = str(target), str(self)
+        if ".mnemos-old" in t:
+            raise OSError("blocked")  # force the fallback
+        if "restore-aside" in t:
+            state["phase_a_done"] += 1
+            return real_rename(self, target)
+        if "restore-aside" in src or ".mnemos-restore" in src and "vault" not in t:
+            return real_rename(self, target)  # rollback moves must succeed
+        if ".mnemos-restore" in src:
+            # first Phase-B move-in -> simulate Ctrl+C
+            raise KeyboardInterrupt
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", interrupting_rename)
+
+    with pytest.raises(KeyboardInterrupt):
+        restore_from_snapshot(vault, snap)
+
+    monkeypatch.undo()
+    assert state["phase_a_done"] > 0  # the interrupt hit mid-swap, not before
+    # Vault content was rolled back, not stranded in the aside dir.
+    assert (vault / "wiki" / "entities" / "foo.md").exists()
+    assert (vault / ".manifest.json").exists()
+
+
+def test_content_swap_phase_b_failure_rolls_back(tmp_path: Path, monkeypatch):
+    """Move-in failure after a successful Phase A must return the vault to
+    its pre-restore state (both rollback directions)."""
+    vault = tmp_path / "vault"
+    _populate_vault(vault)
+    snap = create_snapshot(vault, operation_id="pb", operation_type="ingest")
+    (vault / "wiki" / "entities" / "foo.md").write_text("MUTATED", encoding="utf-8")
+
+    real_rename = Path.rename
+    calls = {"move_in": 0}
+
+    def failing_move_in(self, target):
+        t, src = str(target), str(self)
+        if ".mnemos-old" in t:
+            raise OSError("blocked")  # force the fallback
+        if "restore-aside" in t or ".mnemos-restore" in t or "restore-aside" in src:
+            return real_rename(self, target)  # aside + rollback moves succeed
+        calls["move_in"] += 1
+        if calls["move_in"] >= 2:
+            raise OSError("simulated move-in failure")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", failing_move_in)
+
+    result = restore_from_snapshot(vault, snap)
+
+    monkeypatch.undo()
+    assert result.success is False
+    assert result.vault_intact is True, result.error
+    # pre-restore state back in place (including the post-snapshot mutation)
+    content = (vault / "wiki" / "entities" / "foo.md").read_text(encoding="utf-8")
+    assert content == "MUTATED"

@@ -89,6 +89,7 @@ def test_can_undo_false_when_snapshot_dir_missing(tmp_path: Path):
     vault, op_id, snap_dir = _populate_vault_with_one_ingest(tmp_path)
     # Remove snapshot dir
     import shutil
+
     shutil.rmtree(snap_dir)
     log = ActivityLog.load(vault)
     entry = log.find_by_id(op_id)
@@ -117,6 +118,7 @@ def test_undo_already_undone_raises(tmp_path: Path):
 def test_undo_snapshot_missing_raises(tmp_path: Path):
     vault, op_id, snap_dir = _populate_vault_with_one_ingest(tmp_path)
     import shutil
+
     shutil.rmtree(snap_dir)
     with pytest.raises(UndoError, match="snapshot"):
         undo(vault, op_id)
@@ -127,7 +129,7 @@ def test_undo_success_marks_entry_undone(tmp_path: Path):
 
     # Stub restore to claim success without actually swapping the vault dir
     # (we just want to verify post-restore log update logic)
-    def fake_restore(vault_arg, snapshot_arg):
+    def fake_restore(vault_arg, snapshot_arg, **kwargs):
         return RestoreResult(success=True, vault_intact=False)
 
     with patch("claude_mnemos.core.undo.restore_from_snapshot", side_effect=fake_restore):
@@ -157,7 +159,7 @@ def test_undo_success_marks_entry_undone(tmp_path: Path):
 def test_undo_restore_failure_raises_with_recovery_hint(tmp_path: Path):
     vault, op_id, _ = _populate_vault_with_one_ingest(tmp_path)
 
-    def fake_failed_restore(vault_arg, snapshot_arg):
+    def fake_failed_restore(vault_arg, snapshot_arg, **kwargs):
         return RestoreResult(
             success=False,
             vault_intact=False,
@@ -253,3 +255,56 @@ def test_undo_preserves_other_snapshots_for_chain_undo(tmp_path: Path):
     # Now undo op1 — it should still work (chain undo)
     result2 = undo(vault, op1_id)
     assert result2.success is True
+
+
+def test_undo_succeeds_with_open_jobs_db(tmp_path: Path):
+    """undo() runs inside the daemon where <vault>/.jobs.db is always open —
+    on Windows that blocks the whole-vault rename, so undo must succeed via
+    the per-entry content-swap fallback (v0.0.43)."""
+    from claude_mnemos.core.snapshots import create_snapshot
+
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    (vault / "wiki" / "page.md").write_text("original", encoding="utf-8")
+    (vault / ".jobs.db").write_text("sqlite-stand-in", encoding="utf-8")
+    snap = create_snapshot(vault, operation_id="u1", operation_type="ingest")
+
+    op_id = uuid4().hex
+    log = ActivityLog()
+    log.append(
+        ActivityEntry(
+            id=op_id,
+            timestamp=datetime.now(UTC),
+            operation_type="ingest_extracted",
+            status="success",
+            snapshot_path=str(snap.relative_to(vault)),
+            can_undo=True,
+            affected_pages=["wiki/page.md"],
+            metadata={},
+        )
+    )
+    log.save(vault)
+    (vault / "wiki" / "page.md").write_text("MUTATED", encoding="utf-8")
+
+    with open(vault / ".jobs.db", "r+b"):  # the daemon's open handle
+        result = undo(vault, op_id)
+
+    assert result.success is True, result.error
+    assert (vault / "wiki" / "page.md").read_text(encoding="utf-8") == "original"
+
+
+def test_undo_passes_tracker_to_restore(tmp_path: Path, monkeypatch):
+    """The daemon route passes its OurWritesTracker so the watchdog is paused
+    around the swap — without it the content-swap fallback floods the alert
+    ring with one external_create per restored page."""
+    vault, op_id, _ = _populate_vault_with_one_ingest(tmp_path)
+    seen = {}
+
+    def fake_restore(vault_root, snap_path, *, tracker=None, **kwargs):
+        seen["tracker"] = tracker
+        return RestoreResult(success=True, vault_intact=False)
+
+    monkeypatch.setattr("claude_mnemos.core.undo.restore_from_snapshot", fake_restore)
+    sentinel = object()
+    undo(vault, op_id, tracker=sentinel)  # type: ignore[arg-type]
+    assert seen["tracker"] is sentinel

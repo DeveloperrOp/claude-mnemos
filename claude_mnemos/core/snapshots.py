@@ -41,9 +41,7 @@ _PRE_OP_RE = re.compile(
     r"(?P<op_id>.+)$"
 )
 _DAILY_RE = re.compile(r"^daily-(?P<date>\d{4}-\d{2}-\d{2})$")
-_MANUAL_RE = re.compile(
-    r"^manual-(?P<ts>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})(?:-(?P<label>.+))?$"
-)
+_MANUAL_RE = re.compile(r"^manual-(?P<ts>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})(?:-(?P<label>.+))?$")
 _LABEL_SANITIZE_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -190,9 +188,7 @@ def create_manual_snapshot(vault: Path, *, label: str | None = None) -> Path:
     """Create a manual snapshot under unique timestamp, op_type='manual'."""
     snap_path = compute_manual_snapshot_path(vault, label=label, now=datetime.now(UTC))
     op_id = label if label else "manual"
-    return create_snapshot_at(
-        vault, snap_path, operation_id=op_id, operation_type="manual"
-    )
+    return create_snapshot_at(vault, snap_path, operation_id=op_id, operation_type="manual")
 
 
 def _snapshot_size(snap_dir: Path) -> int:
@@ -324,7 +320,7 @@ def list_trash(vault: Path) -> list[SnapshotInfo]:
     for entry in backups_root.iterdir():
         if not entry.is_dir() or not entry.name.startswith(TRASH_PREFIX):
             continue
-        original = entry.name[len(TRASH_PREFIX):]
+        original = entry.name[len(TRASH_PREFIX) :]
         parsed = parse_snapshot_name(original)
         if parsed is None:
             # Trash of something that no longer parses — leave it (only
@@ -408,7 +404,7 @@ def prune_old_backups(
         # the `_trash-` prefix so the trash doesn't accumulate forever (the
         # only other way to reclaim it is a manual purge from the UI).
         is_trash = name.startswith(TRASH_PREFIX)
-        parse_name = name[len(TRASH_PREFIX):] if is_trash else name
+        parse_name = name[len(TRASH_PREFIX) :] if is_trash else name
         parsed = parse_snapshot_name(parse_name)
         if parsed is None:
             # Junk: not ours, leave it alone
@@ -550,6 +546,188 @@ def create_snapshot(
     )
 
 
+_ASIDE_PREFIX = "restore-aside-"
+_ASIDE_SWEEP_AGE_S = 24 * 3600.0
+
+
+def _sweep_stale_aside_dirs(vault: Path) -> None:
+    """Best-effort removal of restore-aside-* debris older than 24h.
+
+    A crashed fallback strands a full vault-content copy under .staging/ —
+    without a sweep it is permanent disk bloat AND gets copytree'd into
+    temp_root by the preserve-internal-dirs block on every later restore.
+    The age guard keeps a fresh crash's debris available for manual recovery.
+    """
+    staging = vault / ".staging"
+    if not staging.is_dir():
+        return
+    now = time.time()
+    for entry in staging.iterdir():
+        if not entry.name.startswith(_ASIDE_PREFIX):
+            continue
+        try:
+            ts_ms = int(entry.name[len(_ASIDE_PREFIX) :])
+        except ValueError:
+            continue
+        if now - ts_ms / 1000.0 > _ASIDE_SWEEP_AGE_S:
+            shutil.rmtree(entry, ignore_errors=True)
+
+
+def _restore_content_swap(vault: Path, temp_root: Path) -> RestoreResult:
+    """Per-entry fallback for when the whole-vault rename is blocked.
+
+    On Windows an open handle on ANY file under the vault blocks renaming the
+    vault directory itself. Inside the daemon that is the normal state —
+    ``<vault>/.jobs.db`` is always open, and undo / the staging rollback run
+    inside the worker where the store cannot be closed around the swap. So:
+    swap every non-excluded TOP-LEVEL entry instead (live entries move aside
+    into ``.staging/restore-aside-<ts>/``, staged entries move in, both plain
+    same-filesystem renames). The vault root and the excluded entries
+    (.jobs.db family, .staging/.backups/.trash) are never renamed, so open
+    daemon handles — and the watchdog observer — survive. (The pipeline lock
+    file lives OUTSIDE the vault, ``<parent>/.{name}.pipeline.lock`` — it is
+    unaffected by either swap strategy.)
+
+    Not crash-atomic like the rename swap (a hard crash mid-loop can leave a
+    mixed state), but the in-daemon alternative on Windows is failing
+    outright. ANY mid-swap abort — including KeyboardInterrupt in the CLI
+    undo path — rolls the moves back before propagating; in every failure
+    branch nothing is deleted, so vault∪aside = the full pre-restore set and
+    vault∪temp = the full snapshot set, and reassembly is always possible.
+    """
+    skip = _EXCLUDED_DIRS | _EXCLUDED_FILES | {META_FILENAME}
+    _sweep_stale_aside_dirs(vault)
+    aside_root = vault / ".staging" / f"{_ASIDE_PREFIX}{int(time.time() * 1000)}"
+
+    try:
+        live_entries = [p for p in vault.iterdir() if p.name not in skip]
+        staged_entries = [p for p in temp_root.iterdir() if p.name not in skip]
+        aside_root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        shutil.rmtree(temp_root, ignore_errors=True)
+        return RestoreResult(
+            success=False,
+            vault_intact=True,
+            error=f"content-swap setup failed: {exc}",
+        )
+
+    # Forensic breadcrumb BEFORE any move: a hard crash mid-swap leaves a
+    # gutted-looking vault — this line is the only pointer to the pieces.
+    logger.warning(
+        "restore: whole-vault rename blocked, using content-swap fallback; "
+        "pre-restore entries -> %s, snapshot copy at %s",
+        aside_root,
+        temp_root,
+    )
+
+    def _rollback_aside(moved: list[tuple[Path, Path]]) -> bool:
+        ok = True
+        for orig, target in reversed(moved):
+            try:
+                target.rename(orig)
+            except OSError:
+                ok = False
+        return ok
+
+    # Phase A: move live entries aside.
+    moved_aside: list[tuple[Path, Path]] = []
+    try:
+        for entry in live_entries:
+            target = aside_root / entry.name
+            entry.rename(target)
+            moved_aside.append((entry, target))
+    except BaseException as exc:
+        rolled_back = _rollback_aside(moved_aside)
+        if not isinstance(exc, OSError):
+            logger.exception(
+                "restore: content-swap aborted mid-Phase-A (%s); rollback %s",
+                type(exc).__name__,
+                "complete" if rolled_back else f"INCOMPLETE — see {aside_root}",
+            )
+            raise
+        shutil.rmtree(temp_root, ignore_errors=True)
+        if not rolled_back:
+            return RestoreResult(
+                success=False,
+                vault_intact=False,
+                vault_possibly_corrupted=True,
+                error=f"content-swap aside failed and rollback incomplete: {exc}",
+                recovery_hint=(
+                    f"Entries stranded in {aside_root} — move them back into "
+                    f"{vault}. The source snapshot in .backups/ is untouched; "
+                    f"re-running the restore is safe."
+                ),
+            )
+        shutil.rmtree(aside_root, ignore_errors=True)
+        return RestoreResult(
+            success=False,
+            vault_intact=True,
+            error=f"cannot swap vault contents (open file inside?): {exc}",
+        )
+
+    def _rollback_move_in(moved: list[Path]) -> bool:
+        ok = True
+        for target in reversed(moved):
+            try:
+                target.rename(temp_root / target.name)
+            except OSError:
+                ok = False
+        return ok
+
+    # Phase B: move staged entries in.
+    moved_in: list[Path] = []
+    try:
+        for entry in staged_entries:
+            target = vault / entry.name
+            entry.rename(target)
+            moved_in.append(target)
+    except BaseException as exc:
+        # Per-item best-effort, both directions independently.
+        rolled_in = _rollback_move_in(moved_in)
+        rolled_aside = _rollback_aside(moved_aside)
+        if not isinstance(exc, OSError):
+            logger.exception(
+                "restore: content-swap aborted mid-Phase-B (%s); rollback %s",
+                type(exc).__name__,
+                "complete"
+                if (rolled_in and rolled_aside)
+                else f"INCOMPLETE — pre-restore at {aside_root}, snapshot at {temp_root}",
+            )
+            raise
+        if not (rolled_in and rolled_aside):
+            return RestoreResult(
+                success=False,
+                vault_intact=False,
+                vault_possibly_corrupted=True,
+                error=f"content-swap move-in failed and rollback incomplete: {exc}",
+                recovery_hint=(
+                    f"Invariants: {vault} + {aside_root} = the full pre-restore "
+                    f"set; {vault} + {temp_root} = the full snapshot set; "
+                    f"nothing was deleted. The source snapshot in .backups/ is "
+                    f"untouched and re-running the restore is safe."
+                ),
+            )
+        shutil.rmtree(temp_root, ignore_errors=True)
+        shutil.rmtree(aside_root, ignore_errors=True)
+        return RestoreResult(
+            success=False,
+            vault_intact=True,
+            error=f"cannot move restored contents in: {exc}",
+        )
+
+    # Phase C: cleanup. The live excluded entries never moved, so temp_root's
+    # preserved copies of them are now redundant — drop everything.
+    shutil.rmtree(aside_root, ignore_errors=True)
+    shutil.rmtree(temp_root, ignore_errors=True)
+    if aside_root.exists():
+        logger.warning(
+            "restore: content-swap succeeded but aside cleanup left debris "
+            "at %s (will be swept after 24h)",
+            aside_root,
+        )
+    return RestoreResult(success=True, vault_intact=False)
+
+
 def restore_from_snapshot(
     vault: Path,
     snapshot: Path,
@@ -655,12 +833,18 @@ def restore_from_snapshot(
             try:
                 vault.rename(old_vault)
             except OSError as exc:
-                shutil.rmtree(temp_root, ignore_errors=True)
-                return RestoreResult(
-                    success=False,
-                    vault_intact=True,
-                    error=f"cannot rename vault to old: {exc}",
+                # Windows refuses to rename a directory while ANY handle is
+                # open on it or its contents. Inside the daemon that is the
+                # normal state: <vault>/.jobs.db is open (and undo / the
+                # staging rollback run inside the worker, where the store
+                # cannot be closed around the swap). Fall back to a per-entry
+                # content swap that never renames the vault root — the open
+                # excluded files (.jobs.db family) stay untouched in place.
+                logger.warning(
+                    "restore: vault rename blocked (%s) — falling back to content swap",
+                    exc,
                 )
+                return _restore_content_swap(vault, temp_root)
 
         try:
             temp_root.rename(vault)
@@ -769,9 +953,9 @@ def compute_restore_preview(
 
     will_create = will_create_all[:sample_limit]
     remaining = sample_limit - len(will_create)
-    will_overwrite = will_overwrite_all[:max(0, remaining)]
+    will_overwrite = will_overwrite_all[: max(0, remaining)]
     remaining -= len(will_overwrite)
-    will_delete = will_delete_all[:max(0, remaining)]
+    will_delete = will_delete_all[: max(0, remaining)]
 
     parsed = parse_snapshot_name(snapshot_name)
     snap_kind = parsed.kind if parsed is not None else "manual"

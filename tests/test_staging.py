@@ -138,6 +138,7 @@ def test_promote_failure_restores_from_snapshot(tmp_path: Path, monkeypatch):
     (vault / "preexisting.md").write_text("original", encoding="utf-8")
 
     import shutil as _shutil
+
     real_move = _shutil.move
     calls = {"n": 0}
 
@@ -173,6 +174,7 @@ def test_promote_failure_when_snapshot_create_fails(tmp_path: Path, monkeypatch)
 
     def boom_snapshot(*args, **kwargs):
         from claude_mnemos.core.snapshots import SnapshotError
+
         raise SnapshotError("simulated snapshot failure")
 
     monkeypatch.setattr("claude_mnemos.core.staging.create_snapshot", boom_snapshot)
@@ -234,3 +236,41 @@ def test_pre_promote_snapshot_path_after_promote_raises(tmp_path: Path):
         txn.promote_to_vault()
         with pytest.raises(RuntimeError, match="finalized"):
             txn.pre_promote_snapshot_path()
+
+
+def test_promote_failure_restores_with_open_jobs_db(tmp_path: Path, monkeypatch):
+    """The rollback inside promote() runs in the worker, where .jobs.db is
+    open — on Windows that blocks the whole-vault rename, so the restore must
+    succeed via the per-entry content-swap fallback (v0.0.43)."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "preexisting.md").write_text("original", encoding="utf-8")
+    (vault / ".jobs.db").write_text("sqlite-stand-in", encoding="utf-8")
+
+    import shutil as _shutil
+
+    real_move = _shutil.move
+    calls = {"n": 0}
+
+    def flaky_move(src, dst, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] >= 2:
+            raise OSError("simulated mid-promote disk error")
+        return real_move(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("claude_mnemos.core.staging.shutil.move", flaky_move)
+
+    with (
+        open(vault / ".jobs.db", "r+b"),  # the worker's open handle
+        pytest.raises(StagingPromoteError) as excinfo,
+        StagingTransaction(vault, operation_id="op-odb") as txn,
+    ):
+        txn.write(Path("first.md"), "page one")
+        txn.write(Path("second.md"), "page two")
+        txn.promote_to_vault()
+
+    # The restore must have WORKED (not "restore ALSO failed")
+    assert "restore ALSO failed" not in str(excinfo.value)
+    assert (vault / "preexisting.md").read_text(encoding="utf-8") == "original"
+    assert not (vault / "first.md").exists()
+    assert not (vault / "second.md").exists()

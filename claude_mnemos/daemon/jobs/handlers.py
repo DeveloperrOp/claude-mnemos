@@ -6,13 +6,16 @@ import asyncio
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from claude_mnemos.config import Config
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.llm.rate_limit import RateLimitError
 from claude_mnemos.ingest.pipeline import ingest as default_ingest
 from claude_mnemos.state.jobs import Job, JobStore
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 CfgFactory = Callable[[], Config]
 LLMFactory = Callable[[Config], LLMClient | None]
@@ -34,11 +37,13 @@ class IngestHandler:
         llm_factory: LLMFactory,
         ingest_fn: IngestFn = default_ingest,
         job_store: JobStore | None = None,
+        tracker: OurWritesTracker | None = None,
     ) -> None:
         self._vault = vault
         self._cfg_factory = cfg_factory
         self._llm_factory = llm_factory
         self._ingest_fn = ingest_fn
+        self._tracker = tracker
         self._job_store = job_store
 
     async def run(self, job: Job) -> None:
@@ -66,6 +71,7 @@ class IngestHandler:
                 dry_run=dry_run,
                 today=date.today(),
                 raw_filename_suffix=raw_filename_suffix,
+                tracker=self._tracker,
             )
         except RateLimitError as exc:
             # Pause the queue so worker stops dequeuing until reset_at.

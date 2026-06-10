@@ -5,11 +5,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 from claude_mnemos.config import Config
 from claude_mnemos.core.locks import pipeline_lock
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.core.models import WikiPage, WikiPageFrontmatter
 from claude_mnemos.core.staging import StagingTransaction
 from claude_mnemos.ingest.extraction import ExtractionResult, extract_wiki_pages
@@ -53,6 +56,7 @@ def ingest(
     dry_run: bool = False,
     today: date,
     raw_filename_suffix: str = "",
+    tracker: OurWritesTracker | None = None,
 ) -> IngestResult:
     """Full ingest pipeline. All vault writes go through StagingTransaction.
 
@@ -89,9 +93,7 @@ def ingest(
                     session_id=existing.session_id,
                     raw_path=vault_root / existing.raw_path,
                     source_path=(
-                        vault_root / existing.source_path
-                        if existing.source_path
-                        else None
+                        vault_root / existing.source_path if existing.source_path else None
                     ),
                     created_pages=[vault_root / p for p in existing.created_pages],
                     skipped_collisions=existing.skipped_collisions,
@@ -158,7 +160,7 @@ def ingest(
                         activity_id=None,
                     )
 
-                promote = txn.promote_to_vault()
+                promote = txn.promote_to_vault(tracker=tracker)
                 return IngestResult(
                     status="raw_only",
                     session_id=session_id,
@@ -173,13 +175,9 @@ def ingest(
             if llm_client is None:
                 raise ValueError("llm_client cannot be None when extract=True")
 
-            extraction = extractor(
-                messages=messages, cfg=cfg, llm_client=llm_client, today=today
-            )
+            extraction = extractor(messages=messages, cfg=cfg, llm_client=llm_client, today=today)
 
-            source_relative = (
-                Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
-            )
+            source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
             source_page = _build_source_page(
                 session_id=session_id,
                 summary=extraction.summary,
@@ -267,7 +265,7 @@ def ingest(
                     activity_id=None,
                 )
 
-            promote = txn.promote_to_vault()
+            promote = txn.promote_to_vault(tracker=tracker)
 
             return IngestResult(
                 status="extracted",

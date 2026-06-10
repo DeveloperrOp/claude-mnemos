@@ -4,11 +4,15 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
 
 from claude_mnemos.core.locks import pipeline_lock
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.core.staging import StagingTransaction
 from claude_mnemos.core.wikilinks import find_files_referencing, rewrite_wikilinks
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
@@ -210,6 +214,7 @@ def apply_merge_entities(
     *,
     today: datetime | None = None,
     lock_timeout: float = 60.0,
+    tracker: OurWritesTracker | None = None,
 ) -> ApplyResult:
     today = today or datetime.now(UTC)
     fm = suggestion.frontmatter
@@ -229,9 +234,10 @@ def apply_merge_entities(
 
     activity_id = uuid4().hex
 
-    with pipeline_lock(vault, timeout=lock_timeout), StagingTransaction(
-        vault, operation_id=activity_id, operation_type="ontology"
-    ) as txn:
+    with (
+        pipeline_lock(vault, timeout=lock_timeout),
+        StagingTransaction(vault, operation_id=activity_id, operation_type="ontology") as txn,
+    ):
         snapshot_path = txn.pre_promote_snapshot_path()
         snapshot_relpath = (
             f".backups/{snapshot_path.name}"
@@ -272,7 +278,7 @@ def apply_merge_entities(
             snapshot_relpath=snapshot_relpath,
         )
 
-        txn.promote_to_vault()
+        txn.promote_to_vault(tracker=tracker)
 
     return ApplyResult(
         success=True,
@@ -291,6 +297,7 @@ def apply_rename_entity(
     *,
     today: datetime | None = None,
     lock_timeout: float = 60.0,
+    tracker: OurWritesTracker | None = None,
 ) -> ApplyResult:
     today = today or datetime.now(UTC)
     fm = suggestion.frontmatter
@@ -309,9 +316,10 @@ def apply_rename_entity(
 
     activity_id = uuid4().hex
 
-    with pipeline_lock(vault, timeout=lock_timeout), StagingTransaction(
-        vault, operation_id=activity_id, operation_type="ontology"
-    ) as txn:
+    with (
+        pipeline_lock(vault, timeout=lock_timeout),
+        StagingTransaction(vault, operation_id=activity_id, operation_type="ontology") as txn,
+    ):
         snapshot_path = txn.pre_promote_snapshot_path()
         snapshot_relpath = f".backups/{snapshot_path.name}"
 
@@ -335,7 +343,7 @@ def apply_rename_entity(
             snapshot_relpath=snapshot_relpath,
         )
 
-        txn.promote_to_vault()
+        txn.promote_to_vault(tracker=tracker)
 
     return ApplyResult(
         success=True,
@@ -354,6 +362,7 @@ def apply_delete_page(
     *,
     today: datetime | None = None,
     lock_timeout: float = 60.0,
+    tracker: OurWritesTracker | None = None,
 ) -> ApplyResult:
     today = today or datetime.now(UTC)
     fm = suggestion.frontmatter
@@ -366,9 +375,10 @@ def apply_delete_page(
 
     activity_id = uuid4().hex
 
-    with pipeline_lock(vault, timeout=lock_timeout), StagingTransaction(
-        vault, operation_id=activity_id, operation_type="ontology"
-    ) as txn:
+    with (
+        pipeline_lock(vault, timeout=lock_timeout),
+        StagingTransaction(vault, operation_id=activity_id, operation_type="ontology") as txn,
+    ):
         snapshot_path = txn.pre_promote_snapshot_path()
         snapshot_relpath = f".backups/{snapshot_path.name}"
 
@@ -386,7 +396,7 @@ def apply_delete_page(
             snapshot_relpath=snapshot_relpath,
         )
 
-        txn.promote_to_vault()
+        txn.promote_to_vault(tracker=tracker)
 
     return ApplyResult(
         success=True,
@@ -412,6 +422,7 @@ def apply_suggestion(
     *,
     today: datetime | None = None,
     lock_timeout: float = 60.0,
+    tracker: OurWritesTracker | None = None,
 ) -> ApplyResult:
     """Load a suggestion, dispatch by operation, archive on success."""
     store = SuggestionStore(vault)
@@ -419,16 +430,14 @@ def apply_suggestion(
     if suggestion is None:
         raise OntologyError(f"suggestion not found: {suggestion_id}")
     if suggestion.frontmatter.status != "pending":
-        raise OntologyError(
-            f"suggestion already {suggestion.frontmatter.status}: {suggestion_id}"
-        )
+        raise OntologyError(f"suggestion already {suggestion.frontmatter.status}: {suggestion_id}")
 
     operation = suggestion.frontmatter.operation
     apply_fn = _APPLY_DISPATCH.get(operation)
     if apply_fn is None:
         raise OntologyError(f"unsupported operation: {operation}")
 
-    result = apply_fn(vault, suggestion, today=today, lock_timeout=lock_timeout)
+    result = apply_fn(vault, suggestion, today=today, lock_timeout=lock_timeout, tracker=tracker)
 
     store.update_status(
         suggestion_id,

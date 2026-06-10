@@ -3,10 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from claude_mnemos.core.locks import pipeline_lock
 from claude_mnemos.core.snapshots import restore_from_snapshot
+
+if TYPE_CHECKING:
+    from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.activity import ActivityEntry, ActivityLog
 
 
@@ -39,6 +43,7 @@ def undo(
     op_id: str,
     *,
     lock_timeout: float = 60.0,
+    tracker: OurWritesTracker | None = None,
 ) -> UndoResult:
     """Atomically undo the operation identified by op_id.
 
@@ -66,15 +71,11 @@ def undo(
         if not snap_path.is_dir():
             raise UndoError(f"snapshot at {snap_path} not found")
 
-        result = restore_from_snapshot(vault_root, snap_path)
+        result = restore_from_snapshot(vault_root, snap_path, tracker=tracker)
         if not result.success:
             raise UndoError(
                 f"restore failed: {result.error}"
-                + (
-                    f". recovery hint: {result.recovery_hint}"
-                    if result.recovery_hint
-                    else ""
-                )
+                + (f". recovery hint: {result.recovery_hint}" if result.recovery_hint else "")
             )
 
         # Vault was swapped — re-load activity log from the restored vault.

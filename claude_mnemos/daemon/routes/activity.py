@@ -36,16 +36,18 @@ async def get_activity(project: str, op_id: str, request: Request) -> ActivityEn
     log = ActivityLog.load(runtime.vault_root)
     entry = log.find_by_id(op_id)
     if entry is None:
-        raise HTTPException(
-            status_code=404, detail={"error": "not_found", "id": op_id}
-        )
+        raise HTTPException(status_code=404, detail={"error": "not_found", "id": op_id})
     return entry
 
 
 @router.post("/activity/{project}/{op_id}/undo", response_model=UndoApiResult)
 def undo_activity(project: str, op_id: str, request: Request) -> UndoApiResult:
     runtime = get_runtime(request, project)
-    result = undo(runtime.vault_root, op_id)  # raises UndoError / LockTimeoutError → handled in app
+    # tracker pauses the watchdog around the swap — without it the content-swap
+    # fallback floods the alert ring with one external_create per restored page.
+    result = undo(
+        runtime.vault_root, op_id, tracker=runtime.tracker
+    )  # raises UndoError / LockTimeoutError → handled in app
     return UndoApiResult(
         success=result.success,
         op_id=op_id,

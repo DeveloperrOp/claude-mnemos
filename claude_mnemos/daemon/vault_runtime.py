@@ -257,6 +257,7 @@ class VaultRuntime:
                 cfg_factory=cfg_factory,
                 llm_factory=llm_factory,
                 job_store=self.job_store,
+                tracker=self.tracker,
             )
         }
         assert self._scheduler is not None
