@@ -86,7 +86,7 @@ export function SessionDetail() {
                 });
               }
             }}
-            title={t("sessions.reingest_button")}
+            title={t("sessions.reingest_hint")}
           >
             <RotateCcw className="mr-1 h-3 w-3" />
             {t("sessions.reingest_button")}

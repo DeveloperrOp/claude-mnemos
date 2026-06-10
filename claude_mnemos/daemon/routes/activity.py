@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from claude_mnemos.core.undo import can_undo as live_can_undo
 from claude_mnemos.core.undo import undo
 from claude_mnemos.daemon.routes._helpers import get_runtime
 from claude_mnemos.daemon.schemas import UndoApiResult
@@ -24,10 +25,15 @@ async def list_activity(
     entries = list(reversed(log.entries))  # newest first
     total = len(entries)
     sliced = entries[offset:] if limit == 0 else entries[offset : offset + limit]
-    return {
-        "entries": [e.model_dump(mode="json") for e in sliced],
-        "total": total,
-    }
+    # Recompute can_undo LIVE: the stored flag is set at write time and goes
+    # stale if the user later deletes the underlying snapshot. Without this
+    # the UI keeps an enabled Undo button that fails with a cryptic error.
+    out: list[dict[str, Any]] = []
+    for e in sliced:
+        d = e.model_dump(mode="json")
+        d["can_undo"] = live_can_undo(e, runtime.vault_root)
+        out.append(d)
+    return {"entries": out, "total": total}
 
 
 @router.get("/activity/{project}/{op_id}", response_model=ActivityEntry)
@@ -37,7 +43,10 @@ async def get_activity(project: str, op_id: str, request: Request) -> ActivityEn
     entry = log.find_by_id(op_id)
     if entry is None:
         raise HTTPException(status_code=404, detail={"error": "not_found", "id": op_id})
-    return entry
+    # Live can_undo (see list_activity) — a deleted snapshot flips it to false.
+    return entry.model_copy(
+        update={"can_undo": live_can_undo(entry, runtime.vault_root)}
+    )
 
 
 @router.post("/activity/{project}/{op_id}/undo", response_model=UndoApiResult)

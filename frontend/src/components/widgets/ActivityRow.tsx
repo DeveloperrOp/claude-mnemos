@@ -68,16 +68,22 @@ export function ActivityRow({ project, entry: e }: Props) {
             <ChevronRight className="ml-1 h-3 w-3" />
           </Link>
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!canUndo || undo.isPending}
-          onClick={() => setUndoOpen(true)}
-          title={t("activity.undo_button")}
-        >
-          <Undo2 className="mr-1 h-3 w-3" />
-          {t("activity.undo_button")}
-        </Button>
+        {/* Hidden (not disabled) when undo isn't possible: the row may be a
+            manual_restore (never undoable) or its snapshot was deleted — a
+            greyed-out button there just reads as "something's broken". The
+            backend recomputes can_undo live, so a deleted snapshot removes it. */}
+        {canUndo && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={undo.isPending}
+            onClick={() => setUndoOpen(true)}
+            title={t("activity.undo_button")}
+          >
+            <Undo2 className="mr-1 h-3 w-3" />
+            {t("activity.undo_button")}
+          </Button>
+        )}
       </div>
 
       <ConfirmDialog

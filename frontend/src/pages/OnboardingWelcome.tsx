@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDetectedCwds } from "@/hooks/onboarding/useDetectedCwds";
 import { useProjectCreate } from "@/hooks/useProjectCreate";
+import { useHookStatus } from "@/hooks/useHookStatus";
+import { useInstallHooks } from "@/hooks/useInstallHooks";
 import { deriveSlug } from "@/lib/slugify";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -27,6 +29,8 @@ export function OnboardingWelcome() {
   const navigate = useNavigate();
   const detectedQ = useDetectedCwds();
   const createMut = useProjectCreate();
+  const hookStatus = useHookStatus();
+  const installHooks = useInstallHooks();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (cwd: string) => {
@@ -79,6 +83,20 @@ export function OnboardingWelcome() {
       // vanished after ~4s with no way to know which entries needed
       // re-attention.
       return;
+    }
+
+    // Install Claude Code hooks — WITHOUT them no session ever dumps, so the
+    // fast path would silently leave the user with a tracked project that
+    // never fills. Mirrors OnboardingAdvanced. Failure doesn't block: the
+    // Overview HookStatusBanner offers a manual retry.
+    if (successes.length > 0 && hookStatus.data && !hookStatus.data.all_installed) {
+      try {
+        await installHooks.mutateAsync();
+        toast.success(t("onboarding.hook_install.auto_success"));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "unknown";
+        toast.error(t("onboarding.hook_install.auto_failed", { error: msg }));
+      }
     }
 
     const lastSlug = successes[successes.length - 1];

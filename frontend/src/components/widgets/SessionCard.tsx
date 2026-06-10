@@ -252,6 +252,7 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
                       extract: false,
                     });
                   }}
+                  title={t("sessions.reingest_hint")}
                 >
                   <RotateCcw className="mr-1 h-3 w-3" />
                   {reingest.isPending

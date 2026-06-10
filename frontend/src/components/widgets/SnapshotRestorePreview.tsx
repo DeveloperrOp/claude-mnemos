@@ -59,6 +59,18 @@ export function SnapshotRestorePreview({ project, name, enabled }: Props) {
         <p className="text-xs text-muted-foreground">{t("snapshots.preview.no_changes")}</p>
       )}
 
+      {/* At-a-glance data-loss summary: overwrite + delete are the destructive
+          ones (your post-snapshot edits replaced/removed). Loud so the user
+          doesn't have to scan the file lists to grasp the consequence. */}
+      {data.will_overwrite.length + data.will_delete.length > 0 && (
+        <p className="rounded bg-warning/10 px-2 py-1 text-xs text-warning">
+          {t("snapshots.preview.destructive_warning", {
+            overwrite: data.will_overwrite.length,
+            delete: data.will_delete.length,
+          })}
+        </p>
+      )}
+
       <FileList title={t("snapshots.preview.will_create")} files={data.will_create} />
       <FileList title={t("snapshots.preview.will_overwrite")} files={data.will_overwrite} />
       <FileList title={t("snapshots.preview.will_delete")} files={data.will_delete} />

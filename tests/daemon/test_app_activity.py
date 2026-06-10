@@ -163,6 +163,44 @@ async def test_list_activity_returns_entries(alpha_vault: Path, daemon: _FakeDae
     assert body["entries"][1]["id"] == e1.id
 
 
+async def test_list_activity_recomputes_can_undo_live(
+    alpha_vault: Path, daemon: _FakeDaemon
+) -> None:
+    """The stored can_undo flag goes stale if the snapshot is later deleted.
+    The list endpoint must reflect on-disk reality so the UI doesn't keep an
+    enabled Undo button that fails with a cryptic error."""
+    snap_dir = alpha_vault / ".backups" / "snap-1"
+    snap_dir.mkdir(parents=True)
+    entry = ActivityEntry(
+        id=uuid4().hex,
+        timestamp=datetime(2026, 4, 26, 12, 0, tzinfo=UTC),
+        operation_type="manual_edit",
+        status="success",
+        snapshot_path=".backups/snap-1",
+        can_undo=True,
+    )
+    log = ActivityLog()
+    log.append(entry)
+    log.save(alpha_vault)
+
+    app = create_app(daemon=daemon)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r1 = await c.get("/api/activity/alpha")
+        assert r1.json()["entries"][0]["can_undo"] is True
+
+        # User deletes the snapshot — stored flag is now stale.
+        import shutil
+
+        shutil.rmtree(snap_dir)
+        r2 = await c.get("/api/activity/alpha")
+        assert r2.json()["entries"][0]["can_undo"] is False
+
+        # Detail endpoint must agree.
+        r3 = await c.get(f"/api/activity/alpha/{entry.id}")
+        assert r3.json()["can_undo"] is False
+
+
 async def test_list_activity_pagination(alpha_vault: Path, daemon: _FakeDaemon) -> None:
     log = ActivityLog()
     for hour in range(5):
