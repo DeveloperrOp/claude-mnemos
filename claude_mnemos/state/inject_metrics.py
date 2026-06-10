@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import time
 from datetime import UTC, datetime, timedelta
@@ -27,6 +28,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from claude_mnemos.core.atomic import atomic_write
+
+_LOG = logging.getLogger(__name__)
 
 INJECT_METRICS_FILENAME = ".inject-metrics.json"
 RETENTION_DAYS = 365
@@ -113,9 +116,12 @@ class InjectMetricsLog(BaseModel):
         concurrent writers.
 
         The lock is a vault-local file created with ``O_EXCL``. Other writers
-        poll up to ``LOCK_TIMEOUT_SECONDS``; if the timeout expires (e.g. a
-        stale lock from a crashed writer), this function falls back to
-        last-writer-wins so the hook never blocks the session.
+        poll up to ``LOCK_TIMEOUT_SECONDS``. If the timeout expires (e.g. a
+        stale lock from a crashed writer), the event is DROPPED with a warning
+        rather than written without the lock: a lock-free read-modify-write
+        races every other writer and silently loses their events (corrupting
+        the whole file), whereas these metrics are cosmetic (usage stats), so
+        dropping one is strictly better than losing many.
         """
         lock_path = vault_root / LOCK_FILENAME
         acquired = False
@@ -133,14 +139,24 @@ class InjectMetricsLog(BaseModel):
             except FileExistsError:
                 time.sleep(LOCK_POLL_INTERVAL)
 
+        if not acquired:
+            _LOG.warning(
+                "inject-metrics lock at %s held longer than %.0fs — dropping "
+                "event %s rather than risk a lock-free write clobbering other "
+                "writers' events",
+                lock_path,
+                LOCK_TIMEOUT_SECONDS,
+                event.id,
+            )
+            return
+
         try:
             log = cls.load(vault_root)
             log.append(event)
             log.save(vault_root)
         finally:
-            if acquired:
-                with contextlib.suppress(FileNotFoundError):
-                    lock_path.unlink()
+            with contextlib.suppress(FileNotFoundError):
+                lock_path.unlink()
 
     def _apply_retention(self) -> None:
         cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)

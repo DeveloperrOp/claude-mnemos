@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from typing import Any, Awaitable, Callable, Generic, TypeVar
 
@@ -30,6 +31,13 @@ class TTLCache(Generic[T]):
         self._expires_at: float | None = None
         self._lock = asyncio.Lock()
         self._inflight: asyncio.Future[T] | None = None
+        # asyncio.Lock serializes the async paths against each other, but
+        # invalidate() is a SYNC method that could in principle be called off
+        # the event-loop thread (a future scheduler/watchdog caller). This
+        # plain lock makes the bare-attribute writes (cache state + inflight
+        # pointer) mutually exclusive with invalidate(). Held only around
+        # field assignments — never across an await — so it cannot deadlock.
+        self._sync_lock = threading.Lock()
 
     async def get_or_compute(self, fn: Callable[[], Awaitable[T]]) -> T:
         """Get cached value or compute it if expired/missing.
@@ -75,16 +83,18 @@ class TTLCache(Generic[T]):
                     # (they're already awaiting `inflight`), but we do NOT
                     # repopulate self._value, so the next caller will
                     # trigger a fresh compute as the operator requested.
-                    if self._inflight is inflight:
-                        self._value = result
-                        self._expires_at = time.monotonic() + self.ttl_s
-                        self._inflight = None
+                    with self._sync_lock:
+                        if self._inflight is inflight:
+                            self._value = result
+                            self._expires_at = time.monotonic() + self.ttl_s
+                            self._inflight = None
                     inflight.set_result(result)
                 return result
             except BaseException as e:
                 async with self._lock:
-                    if self._inflight is inflight:
-                        self._inflight = None
+                    with self._sync_lock:
+                        if self._inflight is inflight:
+                            self._inflight = None
                     inflight.set_exception(e)
                 raise
         else:
@@ -99,6 +109,7 @@ class TTLCache(Generic[T]):
         computed value, but the cache will not be repopulated, so the next
         caller after invalidation will trigger a fresh compute.
         """
-        self._value = _MISSING
-        self._expires_at = None
-        self._inflight = None
+        with self._sync_lock:
+            self._value = _MISSING
+            self._expires_at = None
+            self._inflight = None

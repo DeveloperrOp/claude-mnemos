@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 
 from claude_mnemos.state.inject_metrics import (
     INJECT_METRICS_FILENAME,
+    LOCK_FILENAME,
     MAX_EVENTS,
     RETENTION_DAYS,
     InjectMetricEvent,
@@ -154,3 +156,31 @@ def test_concurrent_append_to_vault_does_not_lose_events(tmp_path: Path) -> None
         f"expected {n_events * 2} events, got {len(log.events)} — "
         "concurrent writes lost data"
     )
+
+
+def test_append_drops_event_when_lock_unobtainable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A stale lock that never frees must NOT trigger a lock-free write.
+
+    Old behaviour fell back to last-writer-wins, which races every other
+    writer and silently corrupts the file. New behaviour drops the (cosmetic)
+    event with a warning. Pre-seed one real event, hold the lock, append a
+    second — the file must still contain exactly the first event."""
+    InjectMetricsLog.append_to_vault(tmp_path, _make_event(idx=1))
+
+    # Hold the lock so the appender's O_EXCL create always fails.
+    lock_path = tmp_path / LOCK_FILENAME
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    # Shrink the timeout so the test is fast.
+    monkeypatch.setattr("claude_mnemos.state.inject_metrics.LOCK_TIMEOUT_SECONDS", 0.2)
+    try:
+        with caplog.at_level("WARNING", logger="claude_mnemos.state.inject_metrics"):
+            InjectMetricsLog.append_to_vault(tmp_path, _make_event(idx=2))
+    finally:
+        os.close(fd)
+        lock_path.unlink(missing_ok=True)
+
+    log = InjectMetricsLog.load(tmp_path)
+    assert [e.id for e in log.events] == ["evt-000001"], "dropped event must not corrupt the file"
+    assert any("dropping event" in r.message for r in caplog.records)
