@@ -423,3 +423,74 @@ def test_ignore_routes_to_specified_project(
     ig_beta = LostSessionsIgnore.load(vault_b)
     assert len(ig_alpha.ignored_shas) == 1
     assert len(ig_beta.ignored_shas) == 0
+
+
+class TestGroupRoot:
+    def test_group_root_falls_back_to_cwd_when_not_a_repo(
+        self,
+        daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """cwd вне git-репозитория → group_root == cwd."""
+        _daemon, client, _va, _vb = daemon_with_two
+        work = tmp_path / "some" / "workdir"
+        work.mkdir(parents=True)
+        _make_shared_transcripts(tmp_path, monkeypatch, "sess-gr-1", cwd=str(work))
+        # git-фоллбэк выключаем, чтобы тест не зависел от того, лежит ли
+        # tmp_path внутри чьего-то репозитория
+        monkeypatch.setattr(
+            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            lambda _cwd: None,
+        )
+        client.post("/api/lost-sessions/scan")
+        r = client.get("/api/lost-sessions")
+        assert r.status_code == 200
+        items = [s for s in r.json()["sessions"] if s["session_id"] == "sess-gr-1"]
+        assert items, r.json()
+        assert items[0]["group_root"] == str(work)
+
+    def test_group_root_uses_git_toplevel_for_subdirs(
+        self,
+        daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Две сессии в подпапках одного репо → один group_root (корень репо)."""
+        _daemon, client, _va, _vb = daemon_with_two
+        repo = tmp_path / "myrepo"
+        sub_a = repo / "packages" / "a"
+        sub_b = repo / "packages" / "b"
+        sub_a.mkdir(parents=True)
+        sub_b.mkdir(parents=True)
+        root = tmp_path / "transcripts"
+        root.mkdir(exist_ok=True)
+        import json as _json
+        (root / "sess-sub-a.jsonl").write_text(
+            _json.dumps({"cwd": str(sub_a)}), encoding="utf-8")
+        (root / "sess-sub-b.jsonl").write_text(
+            _json.dumps({"cwd": str(sub_b)}), encoding="utf-8")
+        monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
+        monkeypatch.setattr(
+            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            lambda cwd: repo if str(cwd).startswith(str(repo)) else None,
+        )
+        client.post("/api/lost-sessions/scan")
+        r = client.get("/api/lost-sessions")
+        got = {s["session_id"]: s["group_root"] for s in r.json()["sessions"]}
+        assert got.get("sess-sub-a") == str(repo)
+        assert got.get("sess-sub-b") == str(repo)
+
+    def test_group_root_is_null_without_cwd(
+        self,
+        daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _daemon, client, _va, _vb = daemon_with_two
+        _make_shared_transcripts(tmp_path, monkeypatch, "sess-nocwd")  # cwd=None
+        client.post("/api/lost-sessions/scan")
+        r = client.get("/api/lost-sessions")
+        items = [s for s in r.json()["sessions"] if s["session_id"] == "sess-nocwd"]
+        assert items
+        assert items[0]["group_root"] is None

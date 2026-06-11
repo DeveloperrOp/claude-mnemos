@@ -25,7 +25,11 @@ from claude_mnemos.core.transcript_helpers import _resolve_transcripts_root
 from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
 from claude_mnemos.core.uningested_sessions import global_ingested_shas
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
-from claude_mnemos.mapping.resolver import ProjectResolver, ResolverAmbiguityError
+from claude_mnemos.mapping.resolver import (
+    ProjectResolver,
+    ResolverAmbiguityError,
+    _git_toplevel,
+)
 from claude_mnemos.state.jobs import JobStore
 
 router = APIRouter()
@@ -103,6 +107,16 @@ def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
                     pass
             d = item.model_dump(mode="json")
             d["project_name"] = assigned
+            # Ключ группировки для UI «создать мозг из папки»: корень
+            # git-репозитория схлопывает подпапки одного проекта в одну
+            # группу; вне репо группой служит сам cwd.
+            group: Path | None = None
+            if item.cwd:
+                try:
+                    group = _git_toplevel(Path(item.cwd))
+                except OSError:
+                    group = None
+            d["group_root"] = str(group) if group else item.cwd
             out.append(d)
     return out
 
