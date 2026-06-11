@@ -158,6 +158,48 @@ describe("GlobalGeneralSection", () => {
   });
 });
 
+describe("WindowCloseToggle", () => {
+  function mockGets(action: "hide" | "quit") {
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url === "/system/window-close-action") return { data: { action } };
+      if (url === "/system/autostart") return { data: { enabled: false } };
+      return { data: FULL_GLOBAL };
+    });
+  }
+
+  it("renders window-close toggle and posts quit on check", async () => {
+    mockGets("hide");
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} });
+    wrap(<GlobalSettings />);
+    const cb = await screen.findByLabelText(
+      /закрытие окна|window close|closing the window/i,
+    );
+    expect(cb).not.toBeChecked();
+    await userEvent.click(cb);
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith("/system/window-close-action", {
+        action: "quit",
+      }),
+    );
+  });
+
+  it("shows checked for action=quit and posts hide on uncheck", async () => {
+    mockGets("quit");
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} });
+    wrap(<GlobalSettings />);
+    const cb = await screen.findByLabelText(
+      /закрытие окна|window close|closing the window/i,
+    );
+    expect(cb).toBeChecked();
+    await userEvent.click(cb);
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith("/system/window-close-action", {
+        action: "hide",
+      }),
+    );
+  });
+});
+
 describe("GlobalDefaultsSection", () => {
   it("changes default_model via preset dropdown and PATCHes /settings/global", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: FULL_GLOBAL });

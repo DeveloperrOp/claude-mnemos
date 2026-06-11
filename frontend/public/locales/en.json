@@ -1112,7 +1112,10 @@
     "system": {
       "heading": "System",
       "autostart_label": "Start with Windows",
-      "autostart_hint": "Daemon starts automatically at login. Claude Code sessions are always captured."
+      "autostart_hint": "Daemon starts automatically at login. Claude Code sessions are always captured.",
+      "window_close_label": "Closing the window quits the app",
+      "window_close_hint": "Off: the window minimizes to tray and session capture keeps running.",
+      "window_close_saved": "Saved"
     },
     "saved_toast": "Saved",
     "save_error_toast": "Save failed: {{message}}"

@@ -3,37 +3,89 @@ import { GlobalGeneralSection } from "@/components/settings/globals/GlobalGenera
 import { GlobalDefaultsSection } from "@/components/settings/globals/GlobalDefaultsSection";
 import { GlobalAutoIngestSection } from "@/components/settings/globals/GlobalAutoIngestSection";
 import { useAutostartStatus, useSetAutostart } from "@/hooks/useAutostart";
+import {
+  useWindowCloseActionStatus,
+  useSetWindowCloseAction,
+} from "@/hooks/useWindowCloseAction";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
-function AutostartToggleSection() {
+function AutostartToggle() {
   const { t } = useTranslation();
   const q = useAutostartStatus();
   const m = useSetAutostart();
 
   if (q.isLoading || !q.data) return null;
   return (
+    <label className="flex items-start gap-3 py-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={q.data.enabled}
+        onChange={(e) => m.mutate(e.target.checked)}
+        disabled={m.isPending}
+        className="mt-1"
+      />
+      <div>
+        <div className="text-sm font-medium">
+          {t("settings.system.autostart_label", "Start with Windows")}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {t(
+            "settings.system.autostart_hint",
+            "Daemon starts automatically at login. Claude Code sessions are always captured.",
+          )}
+        </div>
+      </div>
+    </label>
+  );
+}
+
+function WindowCloseToggle() {
+  const { t } = useTranslation();
+  const q = useWindowCloseActionStatus();
+  const m = useSetWindowCloseAction();
+
+  if (q.isLoading || !q.data) return null;
+  return (
+    <label className="flex items-start gap-3 py-2 cursor-pointer">
+      <input
+        type="checkbox"
+        aria-label={t(
+          "settings.system.window_close_label",
+          "Закрытие окна полностью выключает программу",
+        )}
+        checked={q.data.action === "quit"}
+        onChange={(e) => m.mutate(e.target.checked ? "quit" : "hide")}
+        disabled={m.isPending}
+        className="mt-1"
+      />
+      <div>
+        <div className="text-sm font-medium">
+          {t(
+            "settings.system.window_close_label",
+            "Закрытие окна полностью выключает программу",
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {t(
+            "settings.system.window_close_hint",
+            "Выключено: окно сворачивается в трей, запись сессий продолжается.",
+          )}
+        </div>
+      </div>
+    </label>
+  );
+}
+
+function SystemSection() {
+  const { t } = useTranslation();
+  // The heading renders unconditionally; each toggle decides about its own
+  // loading state, so a slow/failed autostart probe never hides the
+  // window-close toggle (and vice versa).
+  return (
     <section className="rounded-md border border-border/60 bg-card/40 p-4">
       <div className="eyebrow mb-2">{t("settings.system.heading", "System")}</div>
-      <label className="flex items-start gap-3 py-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={q.data.enabled}
-          onChange={(e) => m.mutate(e.target.checked)}
-          disabled={m.isPending}
-          className="mt-1"
-        />
-        <div>
-          <div className="text-sm font-medium">
-            {t("settings.system.autostart_label", "Start with Windows")}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {t(
-              "settings.system.autostart_hint",
-              "Daemon starts automatically at login. Claude Code sessions are always captured.",
-            )}
-          </div>
-        </div>
-      </label>
+      <AutostartToggle />
+      <WindowCloseToggle />
     </section>
   );
 }
@@ -54,7 +106,7 @@ export function GlobalSettings() {
       <GlobalGeneralSection />
       <GlobalDefaultsSection />
       <GlobalAutoIngestSection />
-      <AutostartToggleSection />
+      <SystemSection />
     </div>
   );
 }

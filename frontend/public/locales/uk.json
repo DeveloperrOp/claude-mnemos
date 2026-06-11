@@ -1116,7 +1116,10 @@
     "system": {
       "heading": "Система",
       "autostart_label": "Запускати з Windows",
-      "autostart_hint": "Daemon стартує автоматично при логіні. Сесії Claude Code збираються завжди."
+      "autostart_hint": "Daemon стартує автоматично при логіні. Сесії Claude Code збираються завжди.",
+      "window_close_label": "Закриття вікна повністю вимикає програму",
+      "window_close_hint": "Вимкнено: вікно згортається в трей, запис сесій триває.",
+      "window_close_saved": "Збережено"
     },
     "saved_toast": "Збережено",
     "save_error_toast": "Помилка збереження: {{message}}"
