@@ -8,6 +8,7 @@ export const LostSessionSchema = z.object({
   mtime: z.string(),
   project_name: z.string(),
   cwd: z.string().nullable().optional(),
+  group_root: z.string().nullable().optional(),
   preview: z.string().nullable().optional(),
 });
 export type LostSession = z.infer<typeof LostSessionSchema>;

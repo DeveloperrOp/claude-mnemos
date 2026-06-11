@@ -9,20 +9,8 @@ import { useProjectCreate } from "@/hooks/useProjectCreate";
 import { useHookStatus } from "@/hooks/useHookStatus";
 import { useInstallHooks } from "@/hooks/useInstallHooks";
 import { deriveSlug } from "@/lib/slugify";
+import { humanize, lastSegment } from "@/lib/pathDisplay";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
-
-function lastSegment(p: string): string {
-  return p.replace(/[\\/]+$/, "").split(/[\\/]/).slice(-1)[0] ?? p;
-}
-
-function humanize(name: string): string {
-  return name
-    .replace(/[-_]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 export function OnboardingWelcome() {
   const { t } = useTranslation();
