@@ -85,6 +85,10 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+# Pin the typecheck platform: win32-only attrs (ctypes.WinDLL,
+# subprocess.CREATE_NO_WINDOW) are real code here; without the pin a Linux CI
+# runner typechecks a different branch set than the Windows dev machine.
+platform = "win32"
 
 [[tool.mypy.overrides]]
 module = "yaml"

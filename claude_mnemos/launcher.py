@@ -137,6 +137,9 @@ def _open_window() -> int:
         height=800,
         min_size=(900, 600),
     )
+    # pywebview types create_window as Optional; in practice it only returns
+    # None for gtk unique-instance setups we don't use. Narrow for mypy.
+    assert window is not None
 
     # Wire window-close handler
     handler = _make_on_closing(window)
