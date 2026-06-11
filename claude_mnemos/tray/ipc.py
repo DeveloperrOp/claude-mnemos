@@ -34,7 +34,9 @@ class IpcServer:
         from os import unlink
         with contextlib.suppress(FileNotFoundError):
             unlink(self.address)
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # POSIX-only path (start() guards on sys.platform); AF_UNIX is
+        # invisible to mypy when analyzing on win32.
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined, unused-ignore]
         s.bind(self.address)
         s.listen(4)
         s.settimeout(0.2)

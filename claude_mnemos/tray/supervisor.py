@@ -15,6 +15,7 @@ from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import TextIO
 
 import httpx
 import psutil
@@ -146,15 +147,15 @@ class Supervisor:
         self.state: SupervisorState | None = None
         self.daemon_pid: int | None = None
         self.limiter = RestartLimiter()
-        self._proc: subprocess.Popen | None = None
+        self._proc: subprocess.Popen[bytes] | None = None
         self._spawned: bool = False
-        self._log_fh = None
+        self._log_fh: TextIO | None = None
         self.last_health: HealthSnapshot | None = None
         self.health_url = _default_health_url()
         self._http: httpx.Client | None = None
         # Subprocess of the launcher window (if we spawned one). The tray
         # may also live without it; ``open_launcher`` lazily fills this in.
-        self.launcher_proc: subprocess.Popen | None = None
+        self.launcher_proc: subprocess.Popen[bytes] | None = None
 
     # ── liveness helper, mockable ───────────────────────────────
     def _is_existing_daemon_running(self) -> int | None:
@@ -171,7 +172,7 @@ class Supervisor:
         self._transition(SupervisorState.RUNNING)
 
     # ── subprocess lifecycle ────────────────────────────────────
-    def _spawn_daemon(self) -> subprocess.Popen:
+    def _spawn_daemon(self) -> subprocess.Popen[bytes]:
         from claude_mnemos import runtime
         # Frozen bundle has its own argparse — `-m` not a valid subcommand.
         # Source mode needs the explicit module path.
@@ -185,6 +186,8 @@ class Supervisor:
             # don't use DETACHED_PROCESS — we want stdout/stderr handles.
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
 
+        stdout: TextIO | int
+        stderr: TextIO | int
         if self.log_path:
             self.log_path.parent.mkdir(parents=True, exist_ok=True)
             self._log_fh = self.log_path.open("a", encoding="utf-8", buffering=1)

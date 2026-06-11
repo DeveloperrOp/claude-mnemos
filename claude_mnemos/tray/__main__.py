@@ -144,9 +144,10 @@ def _cmd_run() -> int:
             except Exception:
                 logging.exception("[tray] open_launcher failed")
 
-    ipc_srv: IpcServer | None = IpcServer(IPC_ADDRESS, on_message=_on_ipc)
+    srv = IpcServer(IPC_ADDRESS, on_message=_on_ipc)
+    ipc_srv: IpcServer | None = srv
     try:
-        ipc_srv.start()
+        srv.start()
     except Exception:
         logging.exception("[tray] IPC server failed to start; continuing without it")
         ipc_srv = None

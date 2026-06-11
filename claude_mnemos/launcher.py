@@ -21,6 +21,7 @@ import time
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 DAEMON_URL = "http://127.0.0.1:5757"
 HEALTH_URL = f"{DAEMON_URL}/api/health"
@@ -72,7 +73,7 @@ def _wait_daemon_ready(*, timeout_s: float = HEALTH_TIMEOUT_S, url: str = HEALTH
     return False
 
 
-def _make_on_closing(window) -> Callable[[], bool]:
+def _make_on_closing(window: Any) -> Callable[[], bool]:  # window: pywebview Window (untyped)
     """Build a window-closing handler that respects install_state.window_close_action.
 
     Return value semantics (matches pywebview window.events.closing):
@@ -103,7 +104,7 @@ def _make_on_closing(window) -> Callable[[], bool]:
     return _handler
 
 
-def _make_show_handler(window) -> Callable[[str], None]:
+def _make_show_handler(window: Any) -> Callable[[str], None]:  # window: pywebview Window (untyped)
     """IPC callback: 'show' messages → unhide + restore + focus the window.
 
     Tray supervisor sends 'show' to LAUNCHER_IPC_ADDRESS when the user
@@ -123,7 +124,9 @@ def _make_show_handler(window) -> Callable[[str], None]:
 
 def _open_window() -> int:
     """Open a pywebview window. Blocks until the user closes it."""
-    import webview
+    # pywebview is bundled in the frozen build but absent from the dev venv
+    # (import-not-found); if installed it ships no stubs (import-untyped).
+    import webview  # type: ignore[import-not-found, import-untyped, unused-ignore]
 
     from claude_mnemos.tray.ipc import IpcServer
 

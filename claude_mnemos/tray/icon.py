@@ -19,15 +19,17 @@ import webbrowser
 from pathlib import Path
 
 try:
-    import pystray  # type: ignore[import-not-found]
+    # pystray ships no py.typed (import-untyped when installed); on a venv
+    # without it the same line is import-not-found. Cover both.
+    import pystray  # type: ignore[import-untyped, import-not-found, unused-ignore]
 except Exception as _pystray_err:  # noqa: BLE001
-    pystray = None  # type: ignore[assignment]
+    pystray = None
     _PYSTRAY_IMPORT_ERROR: Exception | None = _pystray_err
 else:
     _PYSTRAY_IMPORT_ERROR = None
 
 try:
-    from PIL import Image  # type: ignore[import-not-found]
+    from PIL import Image
 except Exception:  # noqa: BLE001
     Image = None  # type: ignore[assignment]
 
@@ -159,7 +161,7 @@ class TrayApp:
         return self.supervisor is not None and self.supervisor._spawned
 
     def _build_menu(self) -> pystray.Menu:
-        def _daemon_status_label(_item) -> str:
+        def _daemon_status_label(_item: pystray.MenuItem) -> str:
             sv = self.supervisor
             if sv is None:
                 return "Daemon: no supervisor"
@@ -169,7 +171,7 @@ class TrayApp:
                 return "Daemon: Running"
             return "Daemon: Stopped"
 
-        def _toggle_label(_item) -> str:
+        def _toggle_label(_item: pystray.MenuItem) -> str:
             if self.supervisor is not None and getattr(self.supervisor, "daemon_paused", False):
                 return "Resume Daemon"
             return "Pause Daemon"

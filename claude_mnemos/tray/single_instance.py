@@ -28,7 +28,7 @@ class _Base:
 class WindowsSingleInstance(_Base):
     def __init__(self, name: str, lock_dir: Path | None = None) -> None:
         self.name = name
-        self._handle = None  # type: ignore[assignment]
+        self._handle: int | None = None
 
     def acquire(self) -> bool:
         import ctypes
@@ -57,7 +57,7 @@ class PosixSingleInstance(_Base):
     def __init__(self, name: str, lock_dir: Path | None = None) -> None:
         self.name = name
         self._lock_dir = lock_dir or (Path.home() / ".claude-mnemos")
-        self._fd = None  # type: ignore[assignment]
+        self._fd: int | None = None
         safe = name.replace("/", "_").replace("\\", "_").replace(":", "_")
         self._lock_path = self._lock_dir / f"{safe}.lock"
 
@@ -67,7 +67,9 @@ class PosixSingleInstance(_Base):
         self._lock_dir.mkdir(parents=True, exist_ok=True)
         self._fd = os.open(self._lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
-            fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # POSIX-only path (factory guards on sys.platform); fcntl attrs
+            # are invisible to mypy when analyzing on win32.
+            fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined, unused-ignore]
             return True
         except (BlockingIOError, OSError):
             os.close(self._fd)
@@ -79,7 +81,8 @@ class PosixSingleInstance(_Base):
             import fcntl
             import os
             with contextlib.suppress(OSError):
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
+                # POSIX-only path — see acquire() note about win32 analysis.
+                fcntl.flock(self._fd, fcntl.LOCK_UN)  # type: ignore[attr-defined, unused-ignore]
             os.close(self._fd)
             self._fd = None
 
