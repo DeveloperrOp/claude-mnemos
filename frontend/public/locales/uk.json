@@ -1119,7 +1119,8 @@
       "autostart_hint": "Daemon стартує автоматично при логіні. Сесії Claude Code збираються завжди.",
       "window_close_label": "Закриття вікна повністю вимикає програму",
       "window_close_hint": "Вимкнено: вікно згортається в трей, запис сесій триває.",
-      "window_close_saved": "Збережено"
+      "window_close_saved": "Збережено",
+      "window_close_error": "Не вдалося зберегти: {{message}}"
     },
     "saved_toast": "Збережено",
     "save_error_toast": "Помилка збереження: {{message}}"

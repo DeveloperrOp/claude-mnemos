@@ -31,6 +31,8 @@ else:
 try:
     from PIL import Image
 except Exception:  # noqa: BLE001
+    # Same pattern as pystray above: keep module import safe when Pillow is
+    # missing; ignore[assignment] because None replaces the module object.
     Image = None  # type: ignore[assignment]
 
 from claude_mnemos.runtime import tray_assets_dir as _runtime_tray_assets_dir

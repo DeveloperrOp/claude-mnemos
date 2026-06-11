@@ -20,7 +20,12 @@ export function useSetWindowCloseAction() {
       toast.success(t("settings.system.window_close_saved", "Сохранено"));
     },
     onError: (err: Error) => {
-      toast.error(err.message);
+      toast.error(
+        t("settings.system.window_close_error", {
+          message: err.message,
+          defaultValue: "Не удалось сохранить: {{message}}",
+        }),
+      );
     },
   });
 }

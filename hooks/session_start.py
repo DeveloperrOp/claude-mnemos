@@ -12,7 +12,8 @@ Output shape (Claude Code v1 contract):
 Skip conditions (exit 0, no stdout):
 - Recursion guard (``MNEMOS_INJECT_RUNNING=1``) — silent
 - Source field is ``resume``, ``compact``, or ``edit`` — silent
-- Invalid stdin payload — logged
+- Invalid stdin payload — parse failure is logged; a non-dict payload is
+  skipped silently
 - cwd missing (silent) or not in any project (logged to inject.log)
 - ``build_adaptive_context`` returns empty string — no stdout, but a
   ``mode="empty"`` metric event IS recorded so the dashboard can tell

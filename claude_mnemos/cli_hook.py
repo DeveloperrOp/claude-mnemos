@@ -22,7 +22,7 @@ EVENTS = ("session-start", "session-end", "pre-compact")
 def _import_session_start() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
-    import session_start  # type: ignore
+    import session_start  # type: ignore[import-not-found]
     main: Callable[[], int] = session_start.main
     return main
 
@@ -30,7 +30,7 @@ def _import_session_start() -> Callable[[], int]:
 def _import_session_end() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
-    import session_end  # type: ignore
+    import session_end  # type: ignore[import-not-found]
     main: Callable[[], int] = session_end.main
     return main
 
@@ -38,7 +38,7 @@ def _import_session_end() -> Callable[[], int]:
 def _import_pre_compact() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
-    import pre_compact  # type: ignore
+    import pre_compact  # type: ignore[import-not-found]
     main: Callable[[], int] = pre_compact.main
     return main
 

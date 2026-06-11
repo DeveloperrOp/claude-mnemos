@@ -19,6 +19,7 @@ function AutostartToggle() {
     <label className="flex items-start gap-3 py-2 cursor-pointer">
       <input
         type="checkbox"
+        aria-label={t("settings.system.autostart_label", "Start with Windows")}
         checked={q.data.enabled}
         onChange={(e) => m.mutate(e.target.checked)}
         disabled={m.isPending}
