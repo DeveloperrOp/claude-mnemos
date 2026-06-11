@@ -1,0 +1,55 @@
+name: CI
+
+# Lightweight static gate on every push/PR. Full pytest is intentionally
+# NOT run here (GitHub Actions budget) — release.yml runs the smoke suite.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint & Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # ruff/mypy pinned to the exact versions in the local dev venv so CI
+      # never drifts from what passes on the workstation.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" "ruff==0.15.12" "mypy==1.20.2"
+
+      - name: ruff
+        run: python -m ruff check claude_mnemos
+
+      - name: mypy
+        run: python -m mypy claude_mnemos
+
+  frontend:
+    name: Frontend types & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: tsc
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: vitest
+        working-directory: frontend
+        run: npm test
