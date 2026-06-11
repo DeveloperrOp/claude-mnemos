@@ -42,16 +42,24 @@ def _silent_init() -> list[str]:
         errors.append(msg)
 
     try:
-        from claude_mnemos.tray.__main__ import _cmd_install as _tray_install_impl
-        # spawn_tray=False: this runs DURING app entry (`tray run` itself, or
-        # the launcher which spawns its own tray) — a second spawned `tray
-        # run` would race the host process for the single-instance mutex.
-        rc = _tray_install_impl(spawn_tray=False)
-        if rc == 0:
-            state = load_install_state()
-            if state.autostart_decision is None:
-                state.autostart_decision = "accepted"
-                state.save()
+        state = load_install_state()
+        if state.autostart_decision == "declined":
+            # The installer (the "Start when I sign in" checkbox unticked) or
+            # the user themselves previously disabled autostart — first-run
+            # must not force it back on. It can be re-enabled in
+            # Settings → System.
+            logger.info("postinstall: autostart declined earlier; skipping")
+        else:
+            from claude_mnemos.tray.__main__ import _cmd_install as _tray_install_impl
+            # spawn_tray=False: this runs DURING app entry (`tray run` itself, or
+            # the launcher which spawns its own tray) — a second spawned `tray
+            # run` would race the host process for the single-instance mutex.
+            rc = _tray_install_impl(spawn_tray=False)
+            if rc == 0:
+                state = load_install_state()
+                if state.autostart_decision is None:
+                    state.autostart_decision = "accepted"
+                    state.save()
     except Exception as exc:  # noqa: BLE001
         msg = f"tray autostart install failed: {exc!r}"
         logger.exception("postinstall: %s", msg)

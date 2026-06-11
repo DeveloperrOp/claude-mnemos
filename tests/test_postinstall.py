@@ -86,6 +86,32 @@ def test_silent_init_does_not_open_browser_or_wait_for_daemon(state_path: Path, 
     assert hook_calls["n"] == 1
 
 
+def test_silent_init_skips_autostart_when_declined(state_path: Path, monkeypatch) -> None:
+    """If the installer recorded autostart_decision='declined' (the "Start
+    when I sign in" checkbox was unticked), first-run must NOT install
+    autostart. Hooks are still installed as before."""
+    from claude_mnemos.state.install_state import load_install_state
+
+    state = load_install_state()
+    state.autostart_decision = "declined"
+    state.save()
+
+    calls = []
+    monkeypatch.setattr(
+        "claude_mnemos.cli_hooks.install", lambda: calls.append("hooks"))
+    monkeypatch.setattr(
+        "claude_mnemos.tray.__main__._cmd_install",
+        lambda spawn_tray: calls.append("tray") or 0)
+
+    from claude_mnemos import postinstall
+    errors = postinstall._silent_init()
+
+    assert errors == []
+    assert "hooks" in calls          # hooks are always installed
+    assert "tray" not in calls       # autostart is not
+    assert load_install_state().autostart_decision == "declined"  # not overwritten
+
+
 def test_main_only_runs_postinstall_for_tray_run(monkeypatch) -> None:
     """cli.main() must NOT call maybe_run_first_time_init for diagnostic
     subcommands (doctor, hook, hooks status, ingest, etc) — only for the
