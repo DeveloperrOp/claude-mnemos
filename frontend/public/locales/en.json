@@ -261,8 +261,8 @@
     "no_data": "No data yet"
   },
   "usage_widget": {
-    "tooltip_tokens": "Total input + output tokens across all sessions in vault",
-    "tooltip_sessions": "Sessions ingested in vault",
+    "tooltip_tokens": "Total input + output tokens across sessions ingested in last 30 days",
+    "tooltip_sessions": "Sessions ingested in last 30 days",
     "tooltip_tokens_per_byte": "Tokens per byte of raw transcript (compression efficiency)",
     "tooltip_inject_events": "SessionStart hook injections in last 30 days",
     "tooltip_avg_compression": "Average context-budget compression ratio"

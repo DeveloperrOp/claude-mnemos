@@ -47,6 +47,27 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("UsageWidget", () => {
+  it("queries the 30d period so tooltips tell the truth", async () => {
+    const spy = vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: {
+        period: "30d",
+        period_days: 30,
+        sessions_covered: 1,
+        tokens_input: 100,
+        tokens_output: 200,
+        tokens_injected: 300,
+        raw_bytes_total: 1024,
+        tokens_per_byte: 0.293,
+      },
+    });
+    render(wrap(<UsageWidget />));
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith("/metrics/usage", {
+        params: { period: "30d" },
+      }),
+    );
+  });
+
   it("formats tokens injected and sessions covered", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({
       data: {

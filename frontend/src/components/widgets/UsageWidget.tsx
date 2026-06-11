@@ -35,7 +35,7 @@ function Metric({ tip, children }: MetricProps) {
 
 export function UsageWidget() {
   const { t } = useTranslation();
-  const { data, isLoading, isError } = useUsage("1d");
+  const { data, isLoading, isError } = useUsage("30d");
 
   if (isLoading || isError || !data) return null;
 
