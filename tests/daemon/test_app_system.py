@@ -88,3 +88,16 @@ def test_set_window_close_action_persists_quit(client):
 def test_set_window_close_action_rejects_invalid(client):
     r = client.post("/api/system/window-close-action", json={"action": "bogus"})
     assert r.status_code == 400
+
+
+def test_get_window_close_action_defaults_to_hide(client):
+    r = client.get("/api/system/window-close-action")
+    assert r.status_code == 200
+    assert r.json() == {"action": "hide"}
+
+
+def test_get_window_close_action_roundtrip(client):
+    r = client.post("/api/system/window-close-action", json={"action": "quit"})
+    assert r.status_code == 200
+    r = client.get("/api/system/window-close-action")
+    assert r.json() == {"action": "quit"}

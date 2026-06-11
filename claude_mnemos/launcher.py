@@ -78,8 +78,10 @@ def _make_on_closing(window) -> Callable[[], bool]:
     - True  → allow window to close (quit launcher process).
     - False → cancel the close (we hide window instead).
 
-    Default behavior: hide window (Discord/Slack convention). User can opt-out
-    in Settings → System → "Close window quits the app" toggle.
+    Default behavior: hide window (Discord/Slack convention). The setting
+    lives in install-state (window_close_action) and is exposed via
+    GET/POST /api/system/window-close-action — the dashboard's global
+    settings page has the "Closing the window quits the app" toggle.
 
     Earlier versions tried to ask via window.evaluate_js("confirm(...)") on
     first close. That deadlocked the GUI thread because evaluate_js blocks

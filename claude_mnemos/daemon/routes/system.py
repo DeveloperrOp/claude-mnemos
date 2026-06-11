@@ -57,6 +57,12 @@ def set_autostart(payload: dict = Body(...)) -> dict[str, Any]:
     return {"ok": True, "enabled": enabled}
 
 
+@router.get("/system/window-close-action")
+def get_window_close_action() -> dict[str, Any]:
+    state = load_install_state()
+    return {"action": state.window_close_action or "hide"}
+
+
 @router.post("/system/window-close-action")
 def set_window_close_action(payload: dict = Body(...)) -> dict[str, Any]:
     action = payload.get("action")
