@@ -167,6 +167,55 @@ def test_hook_writes_inject_event(tmp_path: Path, register_project) -> None:
     assert evt.tokens_full >= evt.tokens_actual
 
 
+def test_empty_context_still_writes_metric_event(tmp_path: Path, register_project) -> None:
+    """Контекст пуст → stdout пуст (инъекции нет), но событие mode='empty'
+    записано в <vault>/.inject-metrics.json (раньше: никакого следа)."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    cwd = tmp_path / "code" / "alpha"
+    cwd.mkdir(parents=True)
+    register_project("alpha", vault, cwd_patterns=[str(cwd)])
+    # No manifest / no wiki pages → build_adaptive_context_with_stats
+    # returns ("", mode="empty").
+
+    payload = {"cwd": str(cwd), "session_id": "empty-sess", "source": "startup"}
+    rc, stdout, _ = _run_hook(payload)
+    assert rc == 0
+    assert stdout == ""  # Claude Code must NOT receive an empty inject
+
+    assert (vault / ".inject-metrics.json").exists()
+    log = InjectMetricsLog.load(vault)
+    assert len(log.events) == 1
+    evt = log.events[-1]
+    assert evt.mode == "empty"
+    assert evt.session_id == "empty-sess"
+    assert evt.operation == "session_start"
+    assert evt.tokens_actual == 0
+
+
+def test_unmatched_cwd_logs_to_inject_log(tmp_path: Path, register_project) -> None:
+    """resolve_by_cwd -> None → в ~/.claude-mnemos/inject.log строка
+    'cwd not in any project' (раньше: молчаливый return). stdout пуст, exit 0."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    matched_cwd = tmp_path / "code" / "alpha"
+    matched_cwd.mkdir(parents=True)
+    register_project("alpha", vault, cwd_patterns=[str(matched_cwd)])
+
+    unmatched = tmp_path / "elsewhere"
+    unmatched.mkdir()
+    payload = {"cwd": str(unmatched), "source": "startup"}
+    rc, stdout, _ = _run_hook(payload)
+    assert rc == 0
+    assert stdout == ""
+
+    log_path = tmp_path / ".claude-mnemos" / "inject.log"
+    assert log_path.exists()
+    content = log_path.read_text(encoding="utf-8")
+    assert "cwd not in any project" in content
+    assert str(unmatched) in content
+
+
 def test_hook_does_not_write_event_on_skip(tmp_path: Path, register_project) -> None:
     vault = tmp_path / "vault"
     vault.mkdir()

@@ -9,12 +9,14 @@ Output shape (Claude Code v1 contract):
     {"hookSpecificOutput": {"hookEventName": "SessionStart",
                             "additionalContext": "<markdown>"}}
 
-Skip conditions (silent, exit 0, no stdout):
-- Recursion guard (``MNEMOS_INJECT_RUNNING=1``)
-- Source field is ``resume``, ``compact``, or ``edit``
-- Invalid stdin payload
-- cwd missing or not in any project
-- ``build_adaptive_context`` returns empty string
+Skip conditions (exit 0, no stdout):
+- Recursion guard (``MNEMOS_INJECT_RUNNING=1``) — silent
+- Source field is ``resume``, ``compact``, or ``edit`` — silent
+- Invalid stdin payload — logged
+- cwd missing (silent) or not in any project (logged to inject.log)
+- ``build_adaptive_context`` returns empty string — no stdout, but a
+  ``mode="empty"`` metric event IS recorded so the dashboard can tell
+  "0 injects" apart from "hook never ran"
 - Any exception during build (logged to ``~/.claude-mnemos/inject.log``)
 
 Hook never blocks: returns 0 unconditionally.
@@ -110,6 +112,7 @@ def main() -> int:
         return 0
 
     if project is None:
+        _log(f"cwd not in any project: {cwd}")
         return 0
 
     try:
@@ -122,10 +125,9 @@ def main() -> int:
         _log(f"build failed: {exc}")
         return 0
 
-    if not context:
-        return 0
-
-    # Best-effort metric write — failure does not block the inject.
+    # Best-effort metric write — failure does not block the inject. Writes
+    # ALSO when context is empty (mode="empty"): без этого «0 инъекций» в
+    # дашборде неотличим от «хук вообще не звался».
     try:
         from datetime import UTC, datetime
         from uuid import uuid4
@@ -148,6 +150,9 @@ def main() -> int:
         InjectMetricsLog.append_to_vault(Path(project.vault_root), event)
     except Exception as exc:  # noqa: BLE001
         _log(f"metric write failed: {exc}")
+
+    if not context:
+        return 0
 
     output = {
         "hookSpecificOutput": {
