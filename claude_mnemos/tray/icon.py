@@ -31,11 +31,10 @@ try:
 except Exception:  # noqa: BLE001
     Image = None  # type: ignore[assignment]
 
+from claude_mnemos.runtime import tray_assets_dir as _runtime_tray_assets_dir
 from claude_mnemos.tray.supervisor import Supervisor, SupervisorState
 
 logger = logging.getLogger(__name__)
-
-from claude_mnemos.runtime import tray_assets_dir as _runtime_tray_assets_dir
 
 ASSETS = _runtime_tray_assets_dir()
 

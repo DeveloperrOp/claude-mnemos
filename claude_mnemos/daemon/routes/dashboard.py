@@ -157,7 +157,9 @@ async def dashboard_snapshot(request: Request) -> dict[str, Any]:
                 m = Manifest.load(rt.vault_root)
                 per_project_counts[rt.name] = len(m.ingested)
             except Exception as exc:
-                log.debug("per_project_session_counts manifest read failed for %s: %s", rt.name, exc)
+                log.debug(
+                    "per_project_session_counts manifest read failed for %s: %s", rt.name, exc
+                )
                 per_project_counts[rt.name] = 0
     except Exception as exc:
         log.warning("per_project_session_counts aggregator failed: %s", exc)

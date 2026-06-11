@@ -53,7 +53,7 @@ def set_autostart(payload: dict = Body(...)) -> dict[str, Any]:
         else:
             _uninstall_autostart()
     except Exception as exc:
-        raise HTTPException(500, f"autostart toggle failed: {exc}")
+        raise HTTPException(500, f"autostart toggle failed: {exc}") from exc
     return {"ok": True, "enabled": enabled}
 
 

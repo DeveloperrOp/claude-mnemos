@@ -6,13 +6,12 @@ import asyncio
 import threading
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any, Generic, TypeVar
+from typing import Any
 
-T = TypeVar("T")
 _MISSING: Any = object()
 
 
-class TTLCache(Generic[T]):
+class TTLCache[T]:
     """Thread-safe TTL cache with asyncio anti-stampede via inflight futures.
 
     When multiple concurrent callers invoke get_or_compute() while a compute
@@ -59,9 +58,12 @@ class TTLCache(Generic[T]):
 
         async with self._lock:
             # Check if we have a valid cached value
-            if self._value is not _MISSING and self._expires_at is not None:
-                if time.monotonic() < self._expires_at:
-                    return self._value
+            if (
+                self._value is not _MISSING
+                and self._expires_at is not None
+                and time.monotonic() < self._expires_at
+            ):
+                return self._value
 
             # Check if compute is already in flight
             if self._inflight is None:

@@ -7,6 +7,7 @@ Mac/Linux: Unix domain socket (`~/.claude-mnemos/tray.sock`).
 
 from __future__ import annotations
 
+import contextlib
 import socket
 import sys
 import threading
@@ -31,10 +32,8 @@ class IpcServer:
 
     def _start_posix(self) -> None:
         from os import unlink
-        try:
+        with contextlib.suppress(FileNotFoundError):
             unlink(self.address)
-        except FileNotFoundError:
-            pass
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.bind(self.address)
         s.listen(4)
@@ -99,10 +98,9 @@ class IpcServer:
                     err = ctypes.get_last_error()
                     if err == 535:  # ERROR_PIPE_CONNECTED — already connected, OK
                         ok = True
-                if ok:
-                    if kernel32.ReadFile(h, buf, 1024, ctypes.byref(read), None):
-                        msg = buf.raw[:read.value].decode("utf-8", errors="replace").strip()
-                        self.on_message(msg)
+                if ok and kernel32.ReadFile(h, buf, 1024, ctypes.byref(read), None):
+                    msg = buf.raw[:read.value].decode("utf-8", errors="replace").strip()
+                    self.on_message(msg)
                 kernel32.DisconnectNamedPipe(h)
 
         self._thread = threading.Thread(target=loop, daemon=True)
@@ -132,17 +130,13 @@ class IpcServer:
                 )
                 if wake != INVALID_HANDLE_VALUE and wake != 0:
                     kernel32.CloseHandle(wake)
-                try:
+                with contextlib.suppress(Exception):
                     kernel32.CloseHandle(self._win_handle)
-                except Exception:
-                    pass
                 self._win_handle = None
         else:
             if self._sock:
-                try:
+                with contextlib.suppress(Exception):
                     self._sock.close()
-                except Exception:
-                    pass
                 self._sock = None
         if self._thread:
             self._thread.join(timeout=1.0)

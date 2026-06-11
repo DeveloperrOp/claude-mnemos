@@ -19,24 +19,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-# Atomic-save marker that Obsidian / VSCode / many other text editors
-# use: `note.md.{hex32}.tmp` first, then rename to `note.md`. We treat
-# this exact pattern as an editor save, not as an alert-worthy external
-# rename. The hex character set is deliberately strict so a real user
-# rename can't accidentally match.
-_EDITOR_TMP_SUFFIX_RE = re.compile(r"\.[a-f0-9]{6,}\.tmp$", re.IGNORECASE)
-
-
-def _looks_like_editor_atomic_save(src: Path, dst: Path) -> bool:
-    """Return True if src/dst look like a text editor's atomic save."""
-    s = str(src)
-    m = _EDITOR_TMP_SUFFIX_RE.search(s)
-    if m is None:
-        return False
-    # Strip the `.{hex}.tmp` suffix from src and compare to dst.
-    stripped = s[: m.start()]
-    return stripped == str(dst)
-
 from watchdog.events import (
     FileMovedEvent,
     FileSystemEvent,
@@ -57,6 +39,25 @@ from claude_mnemos.state.activity import (
     ActivityEntry,
     ActivityLog,
 )
+
+# Atomic-save marker that Obsidian / VSCode / many other text editors
+# use: `note.md.{hex32}.tmp` first, then rename to `note.md`. We treat
+# this exact pattern as an editor save, not as an alert-worthy external
+# rename. The hex character set is deliberately strict so a real user
+# rename can't accidentally match.
+_EDITOR_TMP_SUFFIX_RE = re.compile(r"\.[a-f0-9]{6,}\.tmp$", re.IGNORECASE)
+
+
+def _looks_like_editor_atomic_save(src: Path, dst: Path) -> bool:
+    """Return True if src/dst look like a text editor's atomic save."""
+    s = str(src)
+    m = _EDITOR_TMP_SUFFIX_RE.search(s)
+    if m is None:
+        return False
+    # Strip the `.{hex}.tmp` suffix from src and compare to dst.
+    stripped = s[: m.start()]
+    return stripped == str(dst)
+
 
 logger = logging.getLogger(__name__)
 

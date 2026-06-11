@@ -14,6 +14,7 @@ without showing a window, exits 0.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 import threading
 import time
@@ -95,10 +96,8 @@ def _make_on_closing(window) -> Callable[[], bool]:
         if state.window_close_action == "quit":
             return True
         # Default and "hide" both → hide window, keep tray + daemon alive.
-        try:
+        with contextlib.suppress(Exception):
             window.hide()
-        except Exception:
-            pass
         return False
 
     return _handler
@@ -114,14 +113,10 @@ def _make_show_handler(window) -> Callable[[str], None]:
     def _on_msg(msg: str) -> None:
         if msg != "show":
             return
-        try:
+        with contextlib.suppress(Exception):
             window.show()
-        except Exception:
-            pass
-        try:
+        with contextlib.suppress(Exception):
             window.restore()
-        except Exception:
-            pass
 
     return _on_msg
 
@@ -142,11 +137,9 @@ def _open_window() -> int:
 
     # Wire window-close handler
     handler = _make_on_closing(window)
-    try:
+    with contextlib.suppress(Exception):
         # pywebview ≥4 has `window.events.closing` Event
         window.events.closing += handler
-    except Exception:
-        pass
 
     # IPC server for "show" messages from supervisor (re-click shortcut while
     # window is hidden).
@@ -159,10 +152,8 @@ def _open_window() -> int:
 
     def _navigate_when_ready() -> None:
         if _wait_daemon_ready():
-            try:
+            with contextlib.suppress(Exception):
                 window.load_url(DAEMON_URL)
-            except Exception:
-                pass
         # else: leave splash; user can close manually.
 
     t = threading.Thread(target=_navigate_when_ready, daemon=True)
@@ -172,10 +163,8 @@ def _open_window() -> int:
         webview.start()
     finally:
         if ipc_srv is not None:
-            try:
+            with contextlib.suppress(Exception):
                 ipc_srv.stop()
-            except Exception:
-                pass
     return 0
 
 
@@ -184,7 +173,8 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-window", action="store_true",
                         help="Initialise pywebview without showing a window. CI smoke test.")
     parser.add_argument("--no-spawn-tray", action="store_true",
-                        help="Do NOT auto-spawn the tray supervisor. Used when supervisor is calling us.")
+                        help="Do NOT auto-spawn the tray supervisor. "
+                             "Used when supervisor is calling us.")
     args = parser.parse_args(argv)
 
     if args.no_window:

@@ -56,14 +56,14 @@ def _validate_transcript_path(transcript_path: str) -> Path:
     candidate = Path(transcript_path).resolve()
     try:
         candidate.relative_to(root)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "transcript_outside_root",
                 "detail": f"transcript_path must be under {root}",
             },
-        )
+        ) from exc
     return candidate
 
 
@@ -329,7 +329,10 @@ async def import_selection_route(
     if not isinstance(raw_ids, list) or not all(isinstance(x, str) and x for x in raw_ids):
         raise HTTPException(
             status_code=422,
-            detail={"error": "invalid_session_ids", "detail": "session_ids must be a non-empty list of strings"},
+            detail={
+                "error": "invalid_session_ids",
+                "detail": "session_ids must be a non-empty list of strings",
+            },
         )
     if not raw_ids:
         raise HTTPException(

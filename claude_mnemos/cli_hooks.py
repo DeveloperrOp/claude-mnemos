@@ -86,7 +86,7 @@ def _load_settings() -> dict:
         raise SystemExit(
             f"Refusing to touch {CLAUDE_SETTINGS}: invalid JSON ({e}).\n"
             "Repair the file manually first."
-        )
+        ) from e
 
 
 def _save_settings(data: dict) -> None:
@@ -271,13 +271,19 @@ def add_hooks_subparser(parent: argparse._SubParsersAction) -> None:
     p = parent.add_parser("hooks", help="Manage Claude Code hook registration")
     sub = p.add_subparsers(dest="hooks_cmd", required=True)
 
-    install_p = sub.add_parser("install", help="Install or refresh mnemos hooks in ~/.claude/settings.json")
+    install_p = sub.add_parser(
+        "install", help="Install or refresh mnemos hooks in ~/.claude/settings.json"
+    )
     install_p.set_defaults(func=_cmd_install)
 
-    uninstall_p = sub.add_parser("uninstall", help="Remove mnemos hooks from ~/.claude/settings.json")
+    uninstall_p = sub.add_parser(
+        "uninstall", help="Remove mnemos hooks from ~/.claude/settings.json"
+    )
     uninstall_p.set_defaults(func=_cmd_uninstall)
 
-    status_p = sub.add_parser("status", help="Show current SessionStart/SessionEnd/PreCompact hook configuration")
+    status_p = sub.add_parser(
+        "status", help="Show current SessionStart/SessionEnd/PreCompact hook configuration"
+    )
     status_p.set_defaults(func=_cmd_status)
 
 

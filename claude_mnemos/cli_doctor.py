@@ -47,7 +47,10 @@ def _local_setup_status() -> dict[str, Any]:
             if hooks is None
             else {"status": hooks.severity, "message": hooks.message}
         ),
-        "vaults": {"status": "warning", "message": "Daemon offline; cannot check vault writability."},
+        "vaults": {
+            "status": "warning",
+            "message": "Daemon offline; cannot check vault writability.",
+        },
         "projects": {"status": "warning", "message": "Daemon offline; cannot count projects."},
     }
     return {

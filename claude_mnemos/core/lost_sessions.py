@@ -30,6 +30,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from claude_mnemos.core.atomic import atomic_write
+from claude_mnemos.core.transcript_helpers import (
+    _SYSTEM_PREVIEW_PREFIXES,
+)
+from claude_mnemos.state.manifest import Manifest
+
 # Sub-agent transcripts are produced by Claude Code's Task tool — every spawn
 # of a child agent creates its own jsonl with a filename prefixed ``agent-``
 # (or ``agent-acompact-`` for the compaction sub-agent). They are pieces of a
@@ -42,14 +50,6 @@ SUBAGENT_FILENAME_PREFIX = "agent-"
 # auto-dump; surfacing it as lost would tempt users to import a half-written
 # transcript. Matches ``active_sessions.COOLING_THRESHOLD_HOURS``.
 LOST_SESSION_MIN_AGE_HOURS = 24
-
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
-from claude_mnemos.core.atomic import atomic_write
-from claude_mnemos.core.transcript_helpers import (
-    _SYSTEM_PREVIEW_PREFIXES,
-)
-from claude_mnemos.state.manifest import Manifest
 
 LOST_SESSIONS_IGNORE_FILENAME = ".lost-sessions-ignore.json"
 

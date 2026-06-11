@@ -87,9 +87,9 @@ async def hooks_install() -> dict[str, Any]:
     try:
         result = cli_hooks.install()
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"settings.json unwritable: {e}")
+        raise HTTPException(status_code=500, detail=f"settings.json unwritable: {e}") from e
 
     settings = cli_hooks._load_settings()
     hooks_section = settings.get("hooks", {})

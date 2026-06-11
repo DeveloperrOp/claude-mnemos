@@ -10,6 +10,7 @@ Mac/Linux: `fcntl.flock(LOCK_EX | LOCK_NB)` on a regular file.
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from pathlib import Path
 
@@ -77,10 +78,8 @@ class PosixSingleInstance(_Base):
         if self._fd is not None:
             import fcntl
             import os
-            try:
+            with contextlib.suppress(OSError):
                 fcntl.flock(self._fd, fcntl.LOCK_UN)
-            except OSError:
-                pass
             os.close(self._fd)
             self._fd = None
 

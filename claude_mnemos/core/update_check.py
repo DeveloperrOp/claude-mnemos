@@ -13,6 +13,7 @@ release page in the browser.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.error
 import urllib.request
@@ -139,10 +140,8 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
         )
 
     if cached and cached.get("dismissed_until"):
-        try:
+        with contextlib.suppress(ValueError):
             status.dismissed_until = datetime.fromisoformat(cached["dismissed_until"])
-        except ValueError:
-            pass
 
     _save_cache(
         {

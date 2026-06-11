@@ -68,7 +68,7 @@ For "duplicate" or "merge":
 
 For "distinct": only "reason" is required.
 
-Always include "reason" — one to two sentences explaining the verdict."""
+Always include "reason" — one to two sentences explaining the verdict."""  # noqa: E501 — LLM prompt; rewrapping would change the prompt content
 
 
 _TOOL_NAME = "submit_ontology_verdict"
@@ -107,11 +107,10 @@ def _validate_payload(payload: dict[str, Any]) -> None:
       apply pipeline falls back to title-cased slug — but log it).
     """
     verdict = payload.get("verdict")
-    if verdict in (VerdictKind.MERGE, VerdictKind.DUPLICATE):
-        if not payload.get("target_slug"):
-            raise LLMExtractionError(
-                f"verdict={verdict!r} requires target_slug; got payload={payload}"
-            )
+    if verdict in (VerdictKind.MERGE, VerdictKind.DUPLICATE) and not payload.get("target_slug"):
+        raise LLMExtractionError(
+            f"verdict={verdict!r} requires target_slug; got payload={payload}"
+        )
 
 
 class OntologyLLMValidator:

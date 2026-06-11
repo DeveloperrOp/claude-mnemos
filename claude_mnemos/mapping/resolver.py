@@ -139,7 +139,11 @@ class ProjectResolver:
                 elif base.endswith(("\\*", "/*")):
                     base = base[:-2]
                 if base != pat_norm:  # had a trailing wildcard
-                    if cwd_norm == base or cwd_norm.startswith(base + "\\") or cwd_norm.startswith(base + "/"):
+                    if (
+                        cwd_norm == base
+                        or cwd_norm.startswith(base + "\\")
+                        or cwd_norm.startswith(base + "/")
+                    ):
                         candidates.append((entry, pattern, len(pat_norm)))
                 elif fnmatch.fnmatchcase(cwd_norm, pat_norm):
                     candidates.append((entry, pattern, len(pat_norm)))
