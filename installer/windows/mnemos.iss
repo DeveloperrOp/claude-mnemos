@@ -70,6 +70,11 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameter
 ; Install Edge WebView2 Runtime if missing (required by pywebview).
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; Check: not WebView2RuntimeInstalled; StatusMsg: "Installing Edge WebView2 Runtime..."
 
+; Consume the "autostart" task (v0.0.48): unchecked -> remove the Startup
+; shortcut AND record autostart_decision="declined" so first-run postinstall
+; doesn't re-install it. Checked -> RewriteAutostartLnk in [Code] writes the lnk.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "tray uninstall"; Tasks: not autostart; Flags: runhidden
+
 Filename: "{app}\{#MyAppExeName}"; Parameters: "launcher"; Description: "Start claude-mnemos now"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
@@ -193,9 +198,11 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// Autostart shortcut repair (2026-06-10 incident).
+// Autostart shortcut handling (v0.0.48: the [Tasks] "autostart" checkbox is
+// authoritative — it was a placebo since v0.0.5).
 //
-// The Startup-folder Mnemos.lnk can go stale two ways:
+// Background (2026-06-10 incident): the Startup-folder Mnemos.lnk can go
+// stale two ways:
 //   1. It points at a DIFFERENT install (dev venv pythonw.exe, an old install
 //      dir). At sign-in that stale tray grabs the single-instance mutex and
 //      the freshly installed exe exits silently — "переустановил, ничего не
@@ -203,14 +210,18 @@ end;
 //   2. The uninstall-old-version step above removes it (its [UninstallRun]
 //      includes `tray uninstall`), silently dropping autostart on upgrades.
 //
-// Strategy: remember whether the user HAD an autostart shortcut before any
-// uninstall runs; after files land, rewrite it from scratch to point at the
-// just-installed exe. No shortcut beforehand → user never had / declined
-// autostart → leave it that way (first-run postinstall handles fresh installs).
+// Strategy: the "autostart" task decides, in both directions.
+//   Checked   -> CurStepChanged(ssPostInstall) rewrites the .lnk from scratch
+//                to point at the just-installed exe. Covers fresh installs,
+//                upgrades AND stale-shortcut repair — this subsumes the old
+//                "restore the .lnk only if it existed before the uninstall"
+//                snapshot, because checkedonce makes Inno remember the user's
+//                prior choice between installs.
+//   Unchecked -> the [Run] `tray uninstall` entry removes the .lnk and
+//                records autostart_decision="declined", which the exe's
+//                first-run postinstall respects (it skips autostart install
+//                when declined) and won't silently re-add it.
 // ---------------------------------------------------------------------------
-
-var
-  HadAutostartLnk: Boolean;
 
 function AutostartLnkPath: String;
 begin
@@ -241,7 +252,11 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if (CurStep = ssPostInstall) and HadAutostartLnk then
+  // The "autostart" task is authoritative (v0.0.48): checked -> write a fresh
+  // shortcut pointing at the just-installed exe (covers both fresh installs
+  // and upgrades, and repairs stale dev-venv shortcuts); unchecked -> the
+  // [Run] "tray uninstall" entry removes it and records the decline.
+  if (CurStep = ssPostInstall) and WizardIsTaskSelected('autostart') then
     RewriteAutostartLnk();
 end;
 
@@ -250,9 +265,6 @@ var
   Response: Integer;
 begin
   Result := True;
-
-  // Snapshot BEFORE the old version's uninstaller (below) deletes the .lnk.
-  HadAutostartLnk := FileExists(AutostartLnkPath());
 
   // Always run the kill sweep before anything else — handles both fresh and
   // upgrade installs. Fresh installs are no-ops (no processes to kill);
