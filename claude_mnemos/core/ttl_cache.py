@@ -6,7 +6,7 @@ import asyncio
 import threading
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 _MISSING: Any = object()
 
@@ -63,7 +63,9 @@ class TTLCache[T]:
                 and self._expires_at is not None
                 and time.monotonic() < self._expires_at
             ):
-                return self._value
+                # _value is declared Any to allow the _MISSING sentinel; the
+                # sentinel check above guarantees it holds a computed T here.
+                return cast(T, self._value)
 
             # Check if compute is already in flight
             if self._inflight is None:

@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 _SHA_CHUNK_SIZE = 64 * 1024
 
@@ -70,7 +71,7 @@ def _extract_text_from_content(content: object) -> str | None:
     return None
 
 
-def _user_text_from_event(event: dict) -> str | None:
+def _user_text_from_event(event: dict[str, Any]) -> str | None:
     """Extract user-typed text from a JSONL event, supporting both shapes:
 
     * ``{"type":"user","content":...}`` (synthetic / generic shape used in our tests

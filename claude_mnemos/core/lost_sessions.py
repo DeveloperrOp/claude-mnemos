@@ -28,7 +28,7 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -243,7 +243,7 @@ class TranscriptMessage(BaseModel):
     timestamp: str | None = None
 
 
-def _classify_event(event: dict) -> tuple[str, str]:
+def _classify_event(event: dict[str, Any]) -> tuple[str, str]:
     """Classify event → (role, content_str). Returns ("", "") if no content."""
     etype = event.get("type", "")
     if etype not in ("user", "assistant"):

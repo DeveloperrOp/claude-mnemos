@@ -20,6 +20,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from claude_mnemos import __version__
 
@@ -45,7 +46,7 @@ def _current_version() -> str:
     return __version__
 
 
-def _fetch_latest_release() -> dict:
+def _fetch_latest_release() -> dict[str, Any]:
     req = urllib.request.Request(
         _GITHUB_LATEST_RELEASE,
         headers={
@@ -54,7 +55,8 @@ def _fetch_latest_release() -> dict:
         },
     )
     with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310 — fixed URL
-        return json.loads(resp.read().decode("utf-8"))
+        data: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+        return data
 
 
 def _parse_version(v: str) -> tuple[int, ...]:
@@ -68,16 +70,17 @@ def _parse_version(v: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _load_cache() -> dict | None:
+def _load_cache() -> dict[str, Any] | None:
     if not _CACHE_PATH.exists():
         return None
     try:
-        return json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+        cached: dict[str, Any] = json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+        return cached
     except (OSError, json.JSONDecodeError):
         return None
 
 
-def _save_cache(data: dict) -> None:
+def _save_cache(data: dict[str, Any]) -> None:
     _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     _CACHE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
 

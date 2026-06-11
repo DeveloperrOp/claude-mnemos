@@ -31,6 +31,7 @@ import sys
 import traceback as tb_module
 from datetime import UTC, datetime
 from pathlib import Path
+from types import TracebackType
 from typing import Any
 
 MAX_LINES = 200
@@ -126,7 +127,11 @@ def install_excepthook(hook_name: str) -> None:
     """
     original = sys.excepthook
 
-    def _hook(exc_type, exc_value, tb):
+    def _hook(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        tb: TracebackType | None,
+    ) -> None:
         try:
             record(
                 hook=hook_name,
