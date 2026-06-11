@@ -215,12 +215,21 @@ end;
 //                to point at the just-installed exe. Covers fresh installs,
 //                upgrades AND stale-shortcut repair — this subsumes the old
 //                "restore the .lnk only if it existed before the uninstall"
-//                snapshot, because checkedonce makes Inno remember the user's
-//                prior choice between installs.
+//                snapshot.
 //   Unchecked -> the [Run] `tray uninstall` entry removes the .lnk and
 //                records autostart_decision="declined", which the exe's
 //                first-run postinstall respects (it skips autostart install
 //                when declined) and won't silently re-add it.
+//
+// Task memory: checkedonce remembers the user's previous selection ONLY on
+// the in-place (IDNO) upgrade path. Inno keeps prior task selections in the
+// {AppId}_is1 registry key, and the recommended IDYES path runs the OLD
+// uninstaller (UnInstallOldVersion in InitializeSetup) which deletes that key
+// BEFORE the wizard reads it — the checkbox would silently revert to checked
+// and a user who declined autostart would get it back with a blind "Next".
+// InitializeWizard below therefore re-reads the decline persisted in
+// %USERPROFILE%\.claude-mnemos\install-state.json (which survives uninstalls)
+// and pre-unchecks the task.
 // ---------------------------------------------------------------------------
 
 function AutostartLnkPath: String;
@@ -258,6 +267,39 @@ begin
   // [Run] "tray uninstall" entry removes it and records the decline.
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('autostart') then
     RewriteAutostartLnk();
+end;
+
+function AutostartPreviouslyDeclined: Boolean;
+var
+  StatePath: String;
+  S: AnsiString;
+  T: String;
+begin
+  Result := False;
+  StatePath := ExpandConstant('{%USERPROFILE}\.claude-mnemos\install-state.json');
+  if not FileExists(StatePath) then
+    Exit;
+  if not LoadStringFromFile(StatePath, S) then
+    Exit;
+  T := String(S);
+  // install-state.json is pydantic model_dump_json output. Probe both the
+  // indented ('": "') and compact ('":"') separators with a plain substring
+  // search — ASCII patterns are BOM/UTF-8 safe, and a full JSON parse is
+  // overkill in Pascal script. tests/installer/test_iss_autostart_repair.py
+  // cross-checks these literals against the real serializer output.
+  Result := (Pos('"autostart_decision": "declined"', T) > 0) or
+            (Pos('"autostart_decision":"declined"', T) > 0);
+end;
+
+procedure InitializeWizard;
+begin
+  // Runs after the wizard form (and its tasks list) is created — the earliest
+  // point where WizardSelectTasks is valid. '!name' deselects; the parameter
+  // is processed like /MERGETASKS, so the desktopicon task keeps its state.
+  if AutostartPreviouslyDeclined() then begin
+    WizardSelectTasks('!autostart');
+    Log('autostart task pre-unchecked: install-state.json records a prior decline');
+  end;
 end;
 
 function InitializeSetup(): Boolean;

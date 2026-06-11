@@ -62,3 +62,34 @@ def test_iss_rewrite_failure_deletes_stale_lnk() -> None:
     body = rewrite[: rewrite.index("procedure CurStepChanged")]
     assert "except" in body
     assert "DeleteFile" in body
+
+
+def test_iss_initialize_wizard_pre_unchecks_persisted_decline() -> None:
+    """checkedonce task memory lives in the {AppId}_is1 registry key, which the
+    recommended IDYES upgrade path wipes — UnInstallOldVersion runs the old
+    uninstaller from InitializeSetup, BEFORE the wizard reads prior selections.
+    InitializeWizard must therefore re-read the decline persisted in
+    install-state.json and deselect the autostart task, otherwise a user who
+    declined autostart silently gets it back on every recommended upgrade."""
+    text = _text()
+    assert "function AutostartPreviouslyDeclined" in text
+    assert r"\.claude-mnemos\install-state.json" in text
+    body = text[text.index("procedure InitializeWizard"):]
+    body = body[: body.index("function InitializeSetup")]
+    assert "AutostartPreviouslyDeclined" in body
+    assert "WizardSelectTasks('!autostart')" in body
+
+
+def test_iss_decline_probe_matches_real_serialization() -> None:
+    """AutostartPreviouslyDeclined probes install-state.json with plain Pos()
+    substring literals — pin them to what InstallState.save() actually writes
+    (pydantic model_dump_json), so a serializer change (separator, key rename,
+    enum value) can't silently disarm the pre-uncheck."""
+    from claude_mnemos.state.install_state import InstallState
+
+    serialized = InstallState(autostart_decision="declined").model_dump_json(indent=2)
+    patterns = re.findall(r"Pos\('([^']*autostart_decision[^']*)'", _text())
+    assert patterns, "AutostartPreviouslyDeclined must probe autostart_decision via Pos()"
+    assert any(p in serialized for p in patterns), (
+        f"no .iss Pos() literal matches the real serializer output:\n{serialized}"
+    )
