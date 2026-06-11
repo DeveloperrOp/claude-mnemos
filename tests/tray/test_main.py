@@ -24,15 +24,27 @@ def test_main_run_subcommand_starts_supervisor_and_tray() -> None:
     fake_si.release.assert_called_once()
 
 
-def test_main_install_subcommand_calls_autostart() -> None:
+def test_main_install_subcommand_calls_autostart(monkeypatch, tmp_path) -> None:
     from claude_mnemos.tray import __main__ as tray_main
 
+    # _cmd_install(spawn_tray=True) Popens a detached `tray run` when no live
+    # tray.pid is found. Unmocked, every pytest run spawned a REAL tray process
+    # that survived pytest exit. Pin TRAY_PID_FILE to a non-existent tmp file
+    # (the module-level constant binds Path.home() at import time) so the
+    # spawn branch is taken deterministically, and mock Popen to assert the
+    # spawn args instead of launching anything.
+    monkeypatch.setattr(tray_main, "TRAY_PID_FILE", tmp_path / "tray.pid")
     fake_mgr = MagicMock()
     with patch.object(tray_main, "get_autostart_manager", return_value=fake_mgr), \
+         patch.object(tray_main.subprocess, "Popen") as fake_popen, \
          patch.object(sys, "argv", ["mnemos-tray", "install"]):
         rc = tray_main.main()
     assert rc == 0
     fake_mgr.install.assert_called_once()
+    fake_popen.assert_called_once()
+    assert fake_popen.call_args[0][0] == [
+        sys.executable, "-m", "claude_mnemos.tray", "run",
+    ]
 
 
 def test_main_uninstall_subcommand_calls_autostart(monkeypatch, tmp_path) -> None:

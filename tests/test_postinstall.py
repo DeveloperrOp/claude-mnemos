@@ -56,13 +56,18 @@ def test_skipped_in_source_mode(state_path: Path, monkeypatch) -> None:
     assert calls["init"] == 0
 
 
-def test_silent_init_does_not_open_browser_or_wait_for_daemon(state_path: Path, monkeypatch) -> None:
+def test_silent_init_does_not_open_browser_or_wait_for_daemon(
+    state_path: Path, monkeypatch
+) -> None:
     """Regression: the old impl called cli_init_run which spent up to 30s
     waiting for daemon health and then opened a browser. _silent_init must
     NOT do either — launcher's splash window handles both.
     """
     # Stub the two installs to no-ops — we only care whether the forbidden
-    # side-effects fire.
+    # side-effects fire. Stubbing _cmd_install is MANDATORY, not an
+    # optimization: the real one reaches WindowsAutostart.install(), which
+    # rewrites the user's REAL Startup\Mnemos.lnk to the current python on
+    # every pytest run (the "dev-venv hijack" incident).
     hook_calls = {"n": 0}
 
     def _hook_install():
@@ -70,6 +75,14 @@ def test_silent_init_does_not_open_browser_or_wait_for_daemon(state_path: Path, 
         return {"installed": []}
 
     monkeypatch.setattr("claude_mnemos.cli_hooks.install", _hook_install)
+
+    tray_calls: list[bool] = []
+
+    def _tray_install(*, spawn_tray: bool = True) -> int:
+        tray_calls.append(spawn_tray)
+        return 0
+
+    monkeypatch.setattr("claude_mnemos.tray.__main__._cmd_install", _tray_install)
 
     # These must NOT be reached.
     def _boom_browser(*a, **kw):
@@ -84,6 +97,9 @@ def test_silent_init_does_not_open_browser_or_wait_for_daemon(state_path: Path, 
     from claude_mnemos.postinstall import _silent_init
     _silent_init()
     assert hook_calls["n"] == 1
+    # Autostart was attempted (fresh state ⇒ not declined) — via the stub,
+    # never the real Startup folder — and without spawning a second tray.
+    assert tray_calls == [False]
 
 
 def test_silent_init_skips_autostart_when_declined(state_path: Path, monkeypatch) -> None:

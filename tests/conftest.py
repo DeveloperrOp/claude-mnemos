@@ -12,6 +12,13 @@ def isolate_cli_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Isolate every test from real user state.
 
     - HOME/USERPROFILE → tmp_path so Path.home() doesn't read ~/.claude-mnemos.
+    - APPDATA → tmp_path so WindowsAutostart._startup_folder() (read from
+      os.environ at call time) can never point at the REAL Startup folder.
+      Before this guard, any test that reached an unmocked
+      WindowsAutostart.install() rewrote the user's real Mnemos.lnk to the
+      current python — the recurring "dev-venv hijack" incident. The Startup
+      subdirs are NOT pre-created: an unmocked install() now fails loudly
+      (powershell Save() error) instead of silently polluting the machine.
     - MNEMOS_DAEMON_URL → dead URL so CLI write commands skip the daemon-first
       branch (which on dev machines hits the running daemon and pollutes the
       real project map). Tests that need a real-daemon transport use ASGI
@@ -20,6 +27,7 @@ def isolate_cli_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "AppData" / "Roaming"))
     monkeypatch.setenv("MNEMOS_DAEMON_URL", "http://127.0.0.1:1")
     monkeypatch.delenv("MNEMOS_VAULT_ROOT", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
