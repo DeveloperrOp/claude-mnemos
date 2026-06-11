@@ -181,7 +181,7 @@ def _ceil_div(n: int, divisor: int) -> int:
 
 
 def _seeds_from_manifest(vault: Path, *, recent: int) -> set[str]:
-    """Collect slugs from the last ``recent`` ingest records' ``created_pages``.
+    """Collect slugs from the last ``recent`` ingest records that HAVE wiki pages.
 
     ``created_pages`` entries are stored as paths like ``wiki/concepts/foo.md``;
     we strip the ``wiki/`` prefix and ``.md`` suffix to match graph slugs.
@@ -193,14 +193,26 @@ def _seeds_from_manifest(vault: Path, *, recent: int) -> set[str]:
     records = list(manifest.ingested.values())
     records.sort(key=lambda r: r.ingested_at, reverse=True)
     seeds: set[str] = set()
-    for rec in records[:recent]:
+    # Raw-only records (manual-default ingest without extraction) contribute no
+    # wiki slugs; skip them WITHOUT spending the `recent` budget — otherwise ten
+    # raw ingests in a row permanently starve the inject seeds (v0.0.48 fix).
+    wiki_records = 0
+    for rec in records:
+        if wiki_records >= recent:
+            break
+        slugs: set[str] = set()
         for page_ref in rec.created_pages:
             ref = page_ref.replace("\\", "/")
-            if ref.startswith("wiki/"):
-                ref = ref[len("wiki/"):]
+            if not ref.startswith("wiki/"):
+                continue
+            ref = ref[len("wiki/"):]
             if ref.endswith(".md"):
                 ref = ref[:-3]
-            seeds.add(ref)
+            slugs.add(ref)
+        if not slugs:
+            continue
+        wiki_records += 1
+        seeds.update(slugs)
     return seeds
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from claude_mnemos.core.atomic import atomic_write
@@ -9,6 +9,7 @@ from claude_mnemos.core.page_io import ParsedPage, slug_from_page_path
 from claude_mnemos.core.session_start import (
     FLAVOR_WEIGHTS,
     InjectStats,
+    _seeds_from_manifest,
     build_adaptive_context,
     build_adaptive_context_with_stats,
     page_summary,
@@ -326,3 +327,69 @@ def test_build_adaptive_context_with_stats_empty_pages_ranked_when_empty(tmp_pat
         tmp_path, cwd=tmp_path, max_chars=1000,
     )
     assert stats.pages_ranked == ()
+
+
+def _seed_manifest_timed(
+    vault: Path, *, sessions: list[tuple[str, datetime, list[str]]],
+) -> None:
+    """Seed vault/.manifest.json with ingest records carrying explicit timestamps.
+
+    Each tuple is ``(session_id, ingested_at, created_pages)``.
+    """
+    records: dict[str, IngestRecord] = {}
+    for sid, ingested_at, pages in sessions:
+        records[sid] = IngestRecord(
+            session_id=sid,
+            ingested_at=ingested_at,
+            raw_path=f"raw/{sid}.md",
+            source_path=None,
+            created_pages=pages,
+            skipped_collisions=[],
+            model=None,
+            input_tokens=None,
+            output_tokens=None,
+        )
+    manifest = Manifest(ingested=records)
+    atomic_write(vault / ".manifest.json", manifest.serialize_to_string())
+
+
+def test_seeds_skip_raw_only_records_and_reach_older_wiki_records(tmp_path: Path) -> None:
+    """10 свежих raw-only записей + более старая запись с wiki/concepts/foo.md →
+    seeds содержат "concepts/foo" (раньше: пустые seeds, инъекции мертвы),
+    и ни один raw/-путь не превратился в seed."""
+    base = datetime(2026, 6, 1, tzinfo=UTC)
+    sessions: list[tuple[str, datetime, list[str]]] = [
+        ("old-wiki", base, ["wiki/concepts/foo.md"]),
+    ]
+    for i in range(10):
+        sessions.append(
+            (f"raw{i}", base + timedelta(hours=1, minutes=i), [f"raw/chats/x{i}.md"]),
+        )
+    _seed_manifest_timed(tmp_path, sessions=sessions)
+
+    seeds = _seeds_from_manifest(tmp_path, recent=10)
+
+    assert "concepts/foo" in seeds
+    assert not any(s.startswith("raw") for s in seeds)
+
+
+def test_seeds_recent_budget_counts_wiki_records_only(tmp_path: Path) -> None:
+    """Бюджет ``recent`` расходуется только записями с wiki-страницами:
+    12 старых wiki-записей + 5 raw-only сверху → seeds = слаги ровно 10
+    самых свежих wiki-записей (две старейшие не попали)."""
+    base = datetime(2026, 6, 1, tzinfo=UTC)
+    sessions: list[tuple[str, datetime, list[str]]] = []
+    for i in range(12):
+        sessions.append(
+            (f"wiki{i}", base + timedelta(minutes=i), [f"wiki/concepts/w{i}.md"]),
+        )
+    for i in range(5):
+        sessions.append(
+            (f"raw{i}", base + timedelta(hours=1, minutes=i), [f"raw/chats/x{i}.md"]),
+        )
+    _seed_manifest_timed(tmp_path, sessions=sessions)
+
+    seeds = _seeds_from_manifest(tmp_path, recent=10)
+
+    # The 10 freshest wiki records are w2..w11; w0 and w1 are out of budget.
+    assert seeds == {f"concepts/w{i}" for i in range(2, 12)}
