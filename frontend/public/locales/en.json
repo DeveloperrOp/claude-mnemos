@@ -675,7 +675,8 @@
       "browse": "Browse…",
       "tracked": "Watching: {{pattern}}",
       "name_taken": "Name already taken — change it.",
-      "import_failed": "Brain created, but session import failed: {{error}}. Import them manually from the list below."
+      "import_failed": "Brain created, but session import failed: {{error}}. Click the button again to retry just the import, or import the sessions manually from the list below.",
+      "partial_import": "Imported {{queued}} of {{total}}: {{skipped}} skipped, {{missing}} not found. The rest can be imported manually from the list below."
     }
   },
   "suggestions": {

@@ -141,6 +141,70 @@ describe("CreateBrainDialog", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
+  it("partial import (skipped>0): shows warning, keeps dialog open, onDone not called", async () => {
+    vi.mocked(projectsApi.createProject).mockResolvedValue({
+      name: "my-project",
+      display_name: "My Project",
+      vault_root: "D:/code/my-project/.mnemos",
+      cwd_patterns: ["D:/code/my-project/**"],
+    });
+    // 2xx but only half the sessions actually queued — must NOT look like success.
+    vi.mocked(lostApi.importLostSessionsSelection).mockResolvedValue({
+      queued: 1,
+      skipped: 1,
+      missing: [],
+      session_ids: ["a"],
+    });
+    const user = userEvent.setup();
+    const { onDone, onOpenChange } = renderDialog();
+
+    await user.click(screen.getByTestId("create-brain-submit"));
+
+    expect(await screen.findByTestId("create-brain-warning")).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    // Dialog stays open so the user reads the warning and closes it themselves.
+    expect(screen.getByTestId("create-brain-name")).toBeInTheDocument();
+  });
+
+  it("retry after import failure: skips createProject, re-runs only the import", async () => {
+    vi.mocked(projectsApi.createProject).mockResolvedValue({
+      name: "my-project",
+      display_name: "My Project",
+      vault_root: "D:/code/my-project/.mnemos",
+      cwd_patterns: ["D:/code/my-project/**"],
+    });
+    vi.mocked(lostApi.importLostSessionsSelection)
+      .mockRejectedValueOnce(new Error("boom-import"))
+      .mockResolvedValueOnce({
+        queued: 2,
+        skipped: 0,
+        missing: [],
+        session_ids: ["a", "b"],
+      });
+    const user = userEvent.setup();
+    const { onDone } = renderDialog();
+
+    await user.click(screen.getByTestId("create-brain-submit"));
+    await screen.findByTestId("create-brain-error");
+    // Project exists now — name/vault are locked so the slug cannot drift.
+    expect(screen.getByTestId("create-brain-name")).toBeDisabled();
+    expect(screen.getByTestId("create-brain-vault")).toBeDisabled();
+
+    await user.click(screen.getByTestId("create-brain-submit"));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    // No second createProject — that would 409 and push the user into
+    // renaming + creating a duplicate project without sessions.
+    expect(projectsApi.createProject).toHaveBeenCalledTimes(1);
+    expect(lostApi.importLostSessionsSelection).toHaveBeenCalledTimes(2);
+    expect(lostApi.importLostSessionsSelection).toHaveBeenLastCalledWith({
+      project_name: "my-project",
+      session_ids: ["a", "b"],
+      extract: false,
+    });
+  });
+
   it("re-prefills fields when reopened with another group", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const props = { onOpenChange: vi.fn(), onDone: vi.fn() };
