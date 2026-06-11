@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from claude_mnemos.state.inject_metrics import (
     LOCK_FILENAME,
     MAX_EVENTS,
     RETENTION_DAYS,
+    STALE_LOCK_SECONDS,
     InjectMetricEvent,
     InjectMetricsCorruptError,
     InjectMetricsLog,
@@ -184,3 +186,48 @@ def test_append_drops_event_when_lock_unobtainable(
     log = InjectMetricsLog.load(tmp_path)
     assert [e.id for e in log.events] == ["evt-000001"], "dropped event must not corrupt the file"
     assert any("dropping event" in r.message for r in caplog.records)
+
+
+def test_append_breaks_stale_lock(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Лок старше STALE_LOCK_SECONDS (упавший писатель) ломается, событие пишется.
+
+    A healthy writer holds the lock for milliseconds; one older than
+    STALE_LOCK_SECONDS is from a crashed process and would otherwise make
+    every future append wait out the timeout and drop its event forever."""
+    lock_path = tmp_path / LOCK_FILENAME
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
+    stale_mtime = time.time() - (STALE_LOCK_SECONDS * 2)  # well past the threshold
+    os.utime(lock_path, (stale_mtime, stale_mtime))
+
+    with caplog.at_level("WARNING", logger="claude_mnemos.state.inject_metrics"):
+        InjectMetricsLog.append_to_vault(tmp_path, _make_event(idx=1))
+
+    log = InjectMetricsLog.load(tmp_path)
+    assert [e.id for e in log.events] == ["evt-000001"], "event must be written"
+    assert not lock_path.exists(), "stale lock must be gone after the append"
+    assert any("stale" in r.message for r in caplog.records)
+
+
+def test_append_does_not_break_fresh_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """СВЕЖИЙ чужой лок (mtime=now) НЕ ломается — поведение прежнее: poll → drop."""
+    lock_path = tmp_path / LOCK_FILENAME
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
+    # Shrink the timeout so the test is fast.
+    monkeypatch.setattr("claude_mnemos.state.inject_metrics.LOCK_TIMEOUT_SECONDS", 0.2)
+    try:
+        with caplog.at_level("WARNING", logger="claude_mnemos.state.inject_metrics"):
+            InjectMetricsLog.append_to_vault(tmp_path, _make_event(idx=1))
+
+        assert lock_path.exists(), "fresh lock (live writer) must NOT be broken"
+        log = InjectMetricsLog.load(tmp_path)
+        assert log.events == [], "event must be dropped, not written lock-free"
+        assert any("dropping event" in r.message for r in caplog.records)
+        assert not any("stale" in r.message for r in caplog.records)
+    finally:
+        lock_path.unlink(missing_ok=True)

@@ -37,6 +37,9 @@ MAX_EVENTS = 10_000
 LOCK_FILENAME = ".inject-metrics.lock"
 LOCK_TIMEOUT_SECONDS = 5.0
 LOCK_POLL_INTERVAL = 0.05
+# A healthy writer holds the lock for milliseconds, so a lock this old can
+# only be the leftover of a crashed writer and is safe to break.
+STALE_LOCK_SECONDS = 60.0
 
 
 InjectMode = Literal["full", "trimmed", "empty"]
@@ -116,14 +119,37 @@ class InjectMetricsLog(BaseModel):
         concurrent writers.
 
         The lock is a vault-local file created with ``O_EXCL``. Other writers
-        poll up to ``LOCK_TIMEOUT_SECONDS``. If the timeout expires (e.g. a
-        stale lock from a crashed writer), the event is DROPPED with a warning
-        rather than written without the lock: a lock-free read-modify-write
-        races every other writer and silently loses their events (corrupting
-        the whole file), whereas these metrics are cosmetic (usage stats), so
-        dropping one is strictly better than losing many.
+        poll up to ``LOCK_TIMEOUT_SECONDS``. If the timeout expires, the event
+        is DROPPED with a warning rather than written without the lock: a
+        lock-free read-modify-write races every other writer and silently
+        loses their events (corrupting the whole file), whereas these metrics
+        are cosmetic (usage stats), so dropping one is strictly better than
+        losing many.
+
+        A lock older than ``STALE_LOCK_SECONDS`` (a healthy writer holds it
+        for milliseconds) is the leftover of a crashed writer and is broken
+        before polling — otherwise every future append would wait out the
+        timeout and drop its event forever, until manual cleanup.
         """
         lock_path = vault_root / LOCK_FILENAME
+
+        # Break a stale lock from a crashed writer (checked once, before the
+        # poll loop: if the lock turns stale mid-poll, the next hook breaks it).
+        try:
+            lock_age = time.time() - lock_path.stat().st_mtime
+        except OSError:
+            lock_age = None  # no lock file (or it vanished) — nothing to break
+        if lock_age is not None and lock_age > STALE_LOCK_SECONDS:
+            _LOG.warning(
+                "breaking stale inject-metrics lock at %s (age %.0fs > %.0fs) "
+                "left behind by a crashed writer",
+                lock_path,
+                lock_age,
+                STALE_LOCK_SECONDS,
+            )
+            with contextlib.suppress(OSError):
+                lock_path.unlink(missing_ok=True)
+
         acquired = False
         deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
