@@ -26,6 +26,8 @@ interface ConfirmDialogProps {
    * footer. Used by Snapshot restore to show a file-diff preview before the
    * user commits to the destructive action. */
   extraContent?: ReactNode;
+  /** Optional data-testid forwarded to the confirm button. */
+  confirmTestId?: string;
 }
 
 export function ConfirmDialog({
@@ -36,6 +38,7 @@ export function ConfirmDialog({
   onConfirm,
   isPending = false,
   extraContent,
+  confirmTestId,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   return (
@@ -53,6 +56,7 @@ export function ConfirmDialog({
             {cancelLabel ?? t("confirm.cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
+            data-testid={confirmTestId}
             onClick={onConfirm}
             disabled={isPending}
             className={cn(destructive && "bg-danger text-white hover:bg-danger")}
