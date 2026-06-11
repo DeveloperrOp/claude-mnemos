@@ -12,6 +12,7 @@ import {
   useTrashRestore,
 } from "@/hooks/useSnapshotTrash";
 import { formatDateTime } from "@/lib/datetime";
+import { formatBytes } from "@/lib/formatBytes";
 import type { SnapshotInfo, SnapshotKind } from "@/types/Snapshot";
 
 const KIND_TONE: Record<SnapshotKind, KindTone> = {
@@ -19,13 +20,6 @@ const KIND_TONE: Record<SnapshotKind, KindTone> = {
   daily: "blue",
   manual: "emerald",
 };
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
 
 function TrashRow({
   snapshot: s,

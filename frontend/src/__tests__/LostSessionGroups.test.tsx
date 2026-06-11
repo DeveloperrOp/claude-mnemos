@@ -59,8 +59,19 @@ describe("groupUnassigned", () => {
 
   it("aggregates totalBytes and lastMtime per group", () => {
     const groups = groupUnassigned([
-      mk({ session_id: "a", size_bytes: 100, mtime: "2026-06-01T00:00:00Z" }),
-      mk({ session_id: "b", sha: "sha-b", size_bytes: 250, mtime: "2026-06-03T00:00:00Z" }),
+      mk({
+        session_id: "a",
+        group_root: "D:/code/proj",
+        size_bytes: 100,
+        mtime: "2026-06-01T00:00:00Z",
+      }),
+      mk({
+        session_id: "b",
+        sha: "sha-b",
+        group_root: "D:/code/proj",
+        size_bytes: 250,
+        mtime: "2026-06-03T00:00:00Z",
+      }),
     ]);
     expect(groups[0].totalBytes).toBe(350);
     expect(groups[0].lastMtime).toBe("2026-06-03T00:00:00Z");

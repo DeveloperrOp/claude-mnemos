@@ -17,15 +17,9 @@ import { useLostSessionImport } from "@/hooks/useLostSessionImport";
 import { useLostSessionIgnore } from "@/hooks/useLostSessionIgnore";
 import { useProjects } from "@/hooks/useProjects";
 import { formatDateTime } from "@/lib/datetime";
+import { formatBytes } from "@/lib/formatBytes";
 import { getProjectDisplayName } from "@/lib/projectDisplayName";
 import type { LostSession } from "@/types/LostSession";
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
 
 interface LostSessionRowProps {
   session: LostSession;

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatBytes } from "@/lib/formatBytes";
 import { isUnassigned } from "@/lib/lostSessionsConst";
 import type { LostSession } from "@/types/LostSession";
 
@@ -28,15 +29,9 @@ export function groupUnassigned(sessions: LostSession[]): LostGroup[] {
       root,
       sessions: ss,
       totalBytes: ss.reduce((n, s) => n + s.size_bytes, 0),
-      lastMtime: ss.reduce((mx, s) => (s.mtime > mx ? s.mtime : mx), ss[0].mtime),
+      lastMtime: ss.reduce((mx, s) => (s.mtime > mx ? s.mtime : mx), ""),
     }))
     .sort((a, b) => b.sessions.length - a.sessions.length);
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface Props {
