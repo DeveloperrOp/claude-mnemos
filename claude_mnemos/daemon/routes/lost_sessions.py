@@ -107,16 +107,18 @@ def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
                     pass
             d = item.model_dump(mode="json")
             d["project_name"] = assigned
-            # Ключ группировки для UI «создать мозг из папки»: корень
-            # git-репозитория схлопывает подпапки одного проекта в одну
-            # группу; вне репо группой служит сам cwd.
+            # Grouping key for the "create brain from folder" UI: the git
+            # toplevel collapses subdirectories of one repo into a single
+            # group; outside a repo the cwd itself is the group.
+            # .resolve() canonicalises trailing slashes / case so the
+            # lru_cache on _git_toplevel doesn't miss on equivalent paths.
             group: Path | None = None
             if item.cwd:
                 try:
-                    group = _git_toplevel(Path(item.cwd))
+                    group = _git_toplevel(Path(item.cwd).resolve())
                 except OSError:
                     group = None
-            d["group_root"] = str(group) if group else item.cwd
+            d["group_root"] = str(group) if group is not None else (item.cwd or None)
             out.append(d)
     return out
 

@@ -481,6 +481,32 @@ class TestGroupRoot:
         assert got.get("sess-sub-a") == str(repo)
         assert got.get("sess-sub-b") == str(repo)
 
+    def test_group_root_falls_back_to_cwd_on_git_error(
+        self,
+        daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """_git_toplevel raising OSError → group_root falls back to cwd."""
+        _daemon, client, _va, _vb = daemon_with_two
+        work = tmp_path / "broken" / "workdir"
+        work.mkdir(parents=True)
+        _make_shared_transcripts(tmp_path, monkeypatch, "sess-gr-err", cwd=str(work))
+
+        def _boom(_cwd: Path) -> None:
+            raise OSError("git exploded")
+
+        monkeypatch.setattr(
+            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            _boom,
+        )
+        client.post("/api/lost-sessions/scan")
+        r = client.get("/api/lost-sessions")
+        assert r.status_code == 200
+        items = [s for s in r.json()["sessions"] if s["session_id"] == "sess-gr-err"]
+        assert items, r.json()
+        assert items[0]["group_root"] == str(work)
+
     def test_group_root_is_null_without_cwd(
         self,
         daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
