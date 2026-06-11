@@ -18,7 +18,7 @@ from claude_mnemos.hooks import errors as hook_errors
 router = APIRouter()
 
 
-def _summarize_event(event: str, hooks_section: dict) -> dict[str, Any]:
+def _summarize_event(event: str, hooks_section: dict[str, Any]) -> dict[str, Any]:
     blocks = hooks_section.get(event, [])
     cmds = [
         h.get("command", "")

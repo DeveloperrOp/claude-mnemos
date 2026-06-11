@@ -35,7 +35,9 @@ def _resolve_store(request: Request) -> AlertsStore:
     out-of-daemon caller working without changes.
     """
     daemon = getattr(request.app.state, "daemon", None)
-    store = getattr(daemon, "alerts_store", None) if daemon is not None else None
+    store: AlertsStore | None = (
+        getattr(daemon, "alerts_store", None) if daemon is not None else None
+    )
     if store is None:
         return AlertsStore.load()
     return store

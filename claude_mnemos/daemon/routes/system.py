@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Body, HTTPException
 
 from claude_mnemos.state.install_state import load_install_state
 
+if TYPE_CHECKING:
+    from claude_mnemos.tray.platform import AutostartManager
+
 router = APIRouter()
 
 
-def _resolve_target():
+def _resolve_target() -> tuple[str, list[str]]:
     from claude_mnemos.tray.__main__ import _resolve_target as r
     return r()
 
 
-def _autostart_manager():
+def _autostart_manager() -> AutostartManager:
     from claude_mnemos.tray.platform import get_autostart_manager
     target_exe, target_args = _resolve_target()
     return get_autostart_manager(target_exe=target_exe, target_args=target_args)
@@ -45,7 +48,7 @@ def get_autostart() -> dict[str, Any]:
 
 
 @router.post("/system/autostart")
-def set_autostart(payload: dict = Body(...)) -> dict[str, Any]:
+def set_autostart(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     enabled = bool(payload.get("enabled"))
     try:
         if enabled:
@@ -64,7 +67,7 @@ def get_window_close_action() -> dict[str, Any]:
 
 
 @router.post("/system/window-close-action")
-def set_window_close_action(payload: dict = Body(...)) -> dict[str, Any]:
+def set_window_close_action(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     action = payload.get("action")
     if action not in ("hide", "quit"):
         raise HTTPException(400, "action must be 'hide' or 'quit'")

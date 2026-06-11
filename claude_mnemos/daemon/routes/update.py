@@ -33,7 +33,7 @@ def update_status_route() -> dict[str, Any]:
 
 
 @router.post("/update-status/dismiss")
-def dismiss_route(payload: dict = Body(default={})) -> dict[str, Any]:
+def dismiss_route(payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     days = int(payload.get("days", 7))
     days = max(1, min(days, 30))
     dismiss_for_days(days)

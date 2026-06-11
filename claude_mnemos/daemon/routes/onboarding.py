@@ -6,6 +6,7 @@ GET /api/onboarding/setup-status   → 4-row install/operational health summary
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -45,7 +46,7 @@ def _project_count(request: Request) -> int:
     return len(daemon.runtimes)
 
 
-def _vault_roots(request: Request) -> list:
+def _vault_roots(request: Request) -> list[Path]:
     daemon = request.app.state.daemon
     if daemon is None:
         return []
