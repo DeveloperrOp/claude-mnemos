@@ -659,7 +659,22 @@
       "confirm_import_title_other": "Import {{n}} sessions?"
     },
     "view_ignored": "View ignored",
-    "scan_error": "Scan failed: {{message}}"
+    "scan_error": "Scan failed: {{message}}",
+    "groups": {
+      "heading": "Folders without a brain",
+      "hint": "These sessions happened in folders mnemos isn't watching. Create a brain — the sessions will be imported into it.",
+      "stats": "{{n}} sessions · {{size}}",
+      "create_brain": "Create a brain from this folder",
+      "dialog_title": "Create a brain from a folder",
+      "dialog_desc": "The new brain will watch {{root}} and receive all sessions from this group.",
+      "submit": "Create and import {{n}} sessions",
+      "name_label": "Brain name",
+      "vault_label": "Knowledge files folder",
+      "browse": "Browse…",
+      "tracked": "Watching: {{pattern}}",
+      "name_taken": "Name already taken — change it.",
+      "import_failed": "Brain created, but session import failed: {{error}}. Import them manually from the list below."
+    }
   },
   "suggestions": {
     "title": "Suggestions",

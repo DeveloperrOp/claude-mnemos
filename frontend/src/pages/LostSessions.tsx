@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { EyeOff, RefreshCw } from "lucide-react";
@@ -6,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLostSessions } from "@/hooks/useLostSessions";
 import { useLostSessionsScan } from "@/hooks/useLostSessionsScan";
 import { LostSessionsManager } from "@/components/widgets/LostSessionsManager";
+import { LostSessionGroups, type LostGroup } from "@/components/widgets/LostSessionGroups";
+import { CreateBrainDialog } from "@/components/widgets/CreateBrainDialog";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { EyebrowBreadcrumb } from "@/components/EyebrowBreadcrumb";
 
@@ -14,6 +17,7 @@ export function LostSessions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const lostQuery = useLostSessions();
   const scan = useLostSessionsScan();
+  const [brainGroup, setBrainGroup] = useState<LostGroup | null>(null);
 
   const projectFilter = searchParams.get("project") ?? "";
   const search = searchParams.get("q") ?? "";
@@ -74,6 +78,20 @@ export function LostSessions() {
           {t("lost_sessions.title")}
         </h1>
       </header>
+
+      <LostSessionGroups sessions={sessions} onCreateBrain={setBrainGroup} />
+      {/* Mounted only while a group is chosen — per CreateBrainDialog's parent
+          contract the group may change only while the dialog is closed. */}
+      {brainGroup && (
+        <CreateBrainDialog
+          open={brainGroup !== null}
+          group={brainGroup}
+          onOpenChange={(o) => {
+            if (!o) setBrainGroup(null);
+          }}
+          onDone={() => setBrainGroup(null)}
+        />
+      )}
 
       <LostSessionsManager
         sessions={sessions}

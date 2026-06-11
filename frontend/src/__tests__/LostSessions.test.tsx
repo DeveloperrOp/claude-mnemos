@@ -76,4 +76,38 @@ describe("LostSessions", () => {
     render(wrap(<LostSessions />));
     await waitFor(() => expect(screen.getByText(/all accounted for/i)).toBeInTheDocument());
   });
+
+  const unassignedResponse = {
+    data: {
+      sessions: [
+        {
+          session_id: "orphan-session-id-1",
+          transcript_path: "/t/orphan.jsonl",
+          sha: "feedfacecafe",
+          size_bytes: 2048,
+          mtime: "2026-06-10T12:00:00Z",
+          project_name: "__unassigned__",
+          cwd: "D:/code/orphan-proj",
+          group_root: "D:/code/orphan-proj",
+        },
+      ],
+      total: 1,
+    },
+  };
+
+  it("renders folder groups block when unassigned sessions exist", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue(unassignedResponse);
+    render(wrap(<LostSessions />));
+    // The group root also appears as the session row's cwd — assert at least one match.
+    expect((await screen.findAllByText(/orphan-proj/)).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("create-brain")).toBeInTheDocument();
+  });
+
+  it("clicking create-brain opens the CreateBrainDialog", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue(unassignedResponse);
+    const user = userEvent.setup();
+    render(wrap(<LostSessions />));
+    await user.click(await screen.findByTestId("create-brain"));
+    expect(await screen.findByTestId("create-brain-submit")).toBeInTheDocument();
+  });
 });
