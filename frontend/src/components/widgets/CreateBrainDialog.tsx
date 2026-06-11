@@ -31,6 +31,14 @@ function isConflict(err: unknown): boolean {
  *
  * extract: false — жёстко: экстракция знаний запускается только вручную или
  * настройкой мозга, не при первичном импорте.
+ *
+ * Parent contract:
+ * - Do not force `open=false` while a submit is pending. User-driven closes are
+ *   blocked by handleOpenChange, but dropping `open` directly from the parent
+ *   unmounts the dialog visuals mid-flight and inline errors are lost.
+ * - Switch `group` only while the dialog is closed: the prefill effect keys on
+ *   [open, group.root], so swapping the group on an open dialog re-prefills
+ *   over the user's edits.
  */
 export function CreateBrainDialog({ open, group, onOpenChange, onDone }: Props) {
   const { t } = useTranslation();
@@ -73,7 +81,7 @@ export function CreateBrainDialog({ open, group, onOpenChange, onDone }: Props) 
     try {
       await createProject({
         name: slug,
-        display_name: display,
+        display_name: display || null,
         vault_root: vault,
         cwd_patterns: patterns,
       });

@@ -137,6 +137,37 @@ describe("CreateBrainDialog", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
+  it("re-prefills fields when reopened with another group", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const props = { onOpenChange: vi.fn(), onDone: vi.fn() };
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <CreateBrainDialog open group={GROUP} {...props} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("create-brain-name")).toHaveValue("My Project");
+
+    const another: LostGroup = {
+      ...GROUP,
+      root: "D:/code/another-proj",
+      sessions: [mkSession({ session_id: "c", sha: "sha-c", cwd: "D:/code/another-proj", group_root: "D:/code/another-proj" })],
+    };
+    rerender(
+      <QueryClientProvider client={qc}>
+        <CreateBrainDialog open={false} group={GROUP} {...props} />
+      </QueryClientProvider>,
+    );
+    rerender(
+      <QueryClientProvider client={qc}>
+        <CreateBrainDialog open group={another} {...props} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("create-brain-name")).toHaveValue("Another Proj");
+    expect(screen.getByTestId("create-brain-vault")).toHaveValue(
+      "D:/code/another-proj/.mnemos",
+    );
+  });
+
   it("double submit: second click while pending does not call createProject twice", async () => {
     let resolveCreate!: (v: projectsApi.CreateProjectBody & { name: string }) => void;
     vi.mocked(projectsApi.createProject).mockImplementation(
