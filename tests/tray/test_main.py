@@ -35,9 +35,17 @@ def test_main_install_subcommand_calls_autostart() -> None:
     fake_mgr.install.assert_called_once()
 
 
-def test_main_uninstall_subcommand_calls_autostart() -> None:
+def test_main_uninstall_subcommand_calls_autostart(monkeypatch, tmp_path) -> None:
     from claude_mnemos.tray import __main__ as tray_main
 
+    # _cmd_uninstall persists autostart_decision="declined". Without this
+    # patch the test writes to the REAL ~/.claude-mnemos/install-state.json
+    # (module-level _STATE_PATH binds Path.home() at import/collection time,
+    # so conftest's HOME/USERPROFILE env patch does NOT protect it).
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
     fake_mgr = MagicMock()
     with patch.object(tray_main, "get_autostart_manager", return_value=fake_mgr), \
          patch.object(sys, "argv", ["mnemos-tray", "uninstall"]):

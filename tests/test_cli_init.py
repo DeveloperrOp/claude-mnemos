@@ -3,6 +3,19 @@ from unittest.mock import MagicMock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _isolated_install_state(tmp_path, monkeypatch):
+    """cli_init.run() persists autostart_decision="accepted" after a successful
+    tray-autostart step. Without this patch the happy-path tests write to the
+    REAL ~/.claude-mnemos/install-state.json (module-level _STATE_PATH binds
+    Path.home() at import/collection time, so conftest's HOME/USERPROFILE env
+    patch does NOT protect it)."""
+    monkeypatch.setattr(
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
+    )
+
+
 def _patch_init(monkeypatch, *, hooks_ok=True, tray_ok=True, daemon_ok=True, browser=True):
     """Patch all external side-effects of cli_init.run()."""
     calls = {"hooks": 0, "tray_install": 0, "tray_run_started": 0, "browser": 0, "wait_health": 0}

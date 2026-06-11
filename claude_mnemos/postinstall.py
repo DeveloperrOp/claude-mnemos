@@ -43,7 +43,15 @@ def _silent_init() -> list[str]:
 
     try:
         state = load_install_state()
-        if state.autostart_decision == "declined":
+    except Exception as exc:  # noqa: BLE001
+        # Unreadable state must not be disguised as "tray autostart install
+        # failed" below — log it honestly and continue with state=None (the
+        # autostart install itself still proceeds), so it is deliberately
+        # NOT appended to errors.
+        logger.exception("postinstall: cannot read install state: %r", exc)
+        state = None
+    try:
+        if state is not None and state.autostart_decision == "declined":
             # The installer (the "Start when I sign in" checkbox unticked) or
             # the user themselves previously disabled autostart — first-run
             # must not force it back on. It can be re-enabled in
@@ -55,11 +63,9 @@ def _silent_init() -> list[str]:
             # the launcher which spawns its own tray) — a second spawned `tray
             # run` would race the host process for the single-instance mutex.
             rc = _tray_install_impl(spawn_tray=False)
-            if rc == 0:
-                state = load_install_state()
-                if state.autostart_decision is None:
-                    state.autostart_decision = "accepted"
-                    state.save()
+            if rc == 0 and state is not None and state.autostart_decision is None:
+                state.autostart_decision = "accepted"
+                state.save()
     except Exception as exc:  # noqa: BLE001
         msg = f"tray autostart install failed: {exc!r}"
         logger.exception("postinstall: %s", msg)
