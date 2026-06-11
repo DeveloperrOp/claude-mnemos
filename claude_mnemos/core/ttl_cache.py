@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 _MISSING: Any = object()

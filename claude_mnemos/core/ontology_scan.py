@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -42,7 +42,6 @@ from claude_mnemos.core.ontology_similarity import (
 )
 from claude_mnemos.core.ontology_validator import (
     OntologyLLMValidator,
-    ValidationVerdict,
     VerdictKind,
 )
 from claude_mnemos.core.page_io import PageParseError, read_page

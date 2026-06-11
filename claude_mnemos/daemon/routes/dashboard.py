@@ -14,9 +14,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from claude_mnemos.core.active_sessions import scan_active_sessions
-from claude_mnemos.state.manifest import Manifest
 from claude_mnemos.core.transcript_scanner import invalidate_transcripts_cache
 from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
+from claude_mnemos.state.manifest import Manifest
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -85,6 +85,7 @@ async def _compute_lost_total(runtimes: list[Any]) -> int:
     (mirror of list_lost_route).
     """
     import asyncio
+
     from claude_mnemos.daemon.routes.lost_sessions import collect_lost_sessions
     return len(await asyncio.to_thread(collect_lost_sessions, runtimes))
 

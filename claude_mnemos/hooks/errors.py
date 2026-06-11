@@ -29,7 +29,7 @@ import json
 import os
 import sys
 import traceback as tb_module
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +53,7 @@ def record(
 ) -> None:
     """Append a single record to the log. Tolerates I/O failure silently."""
     entry = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "hook": hook,
         "kind": kind,
         "message": message,

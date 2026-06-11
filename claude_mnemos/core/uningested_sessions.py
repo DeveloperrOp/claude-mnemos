@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from claude_mnemos.daemon.vault_runtime import VaultRuntime
 
 
-def global_ingested_shas(runtimes: list["VaultRuntime"]) -> set[str]:
+def global_ingested_shas(runtimes: list[VaultRuntime]) -> set[str]:
     """Union of ingested SHAs across every mounted vault.
 
     A SHA present in ANY vault's manifest is considered globally

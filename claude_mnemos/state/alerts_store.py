@@ -76,7 +76,7 @@ class AlertsStore(BaseModel):
     _lock: threading.RLock = PrivateAttr(default_factory=threading.RLock)
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "AlertsStore":
+    def load(cls, path: Path | None = None) -> AlertsStore:
         target = path if path is not None else home_alerts_path()
         if not target.exists():
             inst = cls()
@@ -93,7 +93,7 @@ class AlertsStore(BaseModel):
         return inst
 
     @classmethod
-    def load_from_disk(cls, path: Path | None = None) -> "AlertsStore":
+    def load_from_disk(cls, path: Path | None = None) -> AlertsStore:
         """Load the singleton-style instance for the daemon process.
 
         Identical to ``load()`` but additionally runs ``purge_old()`` so the

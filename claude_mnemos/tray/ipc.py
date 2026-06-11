@@ -11,7 +11,7 @@ import socket
 import sys
 import threading
 import time
-from typing import Callable
+from collections.abc import Callable
 
 
 class IpcServer:
@@ -45,7 +45,7 @@ class IpcServer:
             while not self._stop.is_set():
                 try:
                     conn, _ = s.accept()
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 except OSError:
                     break
@@ -190,7 +190,7 @@ def ipc_send(address: str, message: str, *, timeout: float = 2.0) -> bool:
             s.connect(address)
             s.sendall(message.encode("utf-8"))
             return True
-        except (FileNotFoundError, ConnectionRefusedError, socket.timeout, OSError):
+        except (TimeoutError, FileNotFoundError, ConnectionRefusedError, OSError):
             pass
         finally:
             s.close()

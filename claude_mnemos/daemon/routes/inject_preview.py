@@ -40,7 +40,7 @@ _MAX_CACHED_PROJECTS = 50
 # atomic, and invalidate_project_cache() is reachable from unmount/remount
 # which may run off the event-loop thread — guard every mutation with a
 # lock so a concurrent _cache_for() can't corrupt the ordering or KeyError.
-_PROJECT_CACHES: "OrderedDict[str, TTLCache[dict[str, Any]]]" = OrderedDict()
+_PROJECT_CACHES: OrderedDict[str, TTLCache[dict[str, Any]]] = OrderedDict()
 _PROJECT_CACHES_LOCK = threading.Lock()
 
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import io
 import sys
-from typing import Callable
+from collections.abc import Callable
 
 EVENTS = ("session-start", "session-end", "pre-compact")
 

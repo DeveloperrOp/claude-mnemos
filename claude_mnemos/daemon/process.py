@@ -15,10 +15,10 @@ import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 
+from claude_mnemos.core.auto_dump import auto_dump_stale
 from claude_mnemos.daemon.alerts import Alerts
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.config import DaemonConfig
-from claude_mnemos.core.auto_dump import auto_dump_stale
 from claude_mnemos.daemon.lockfile import cleanup_pid_file, write_pid_file
 from claude_mnemos.daemon.scheduler import build_empty_scheduler
 from claude_mnemos.daemon.schemas import SchedulerJobInfo

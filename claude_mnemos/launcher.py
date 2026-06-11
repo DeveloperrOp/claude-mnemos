@@ -18,8 +18,8 @@ import sys
 import threading
 import time
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 DAEMON_URL = "http://127.0.0.1:5757"
 HEALTH_URL = f"{DAEMON_URL}/api/health"
@@ -129,6 +129,7 @@ def _make_show_handler(window) -> Callable[[str], None]:
 def _open_window() -> int:
     """Open a pywebview window. Blocks until the user closes it."""
     import webview
+
     from claude_mnemos.tray.ipc import IpcServer
 
     window = webview.create_window(

@@ -53,7 +53,7 @@ MAX_PER_RUN = 50
 
 
 async def auto_dump_stale(
-    runtimes: dict[str, "VaultRuntime"],
+    runtimes: dict[str, VaultRuntime],
     *,
     stale_threshold_hours: int = DEFAULT_STALE_THRESHOLD_HOURS,
     max_per_run: int = MAX_PER_RUN,
@@ -136,6 +136,6 @@ async def auto_dump_stale(
     return queued
 
 
-def _path(cwd: str) -> "Path":
+def _path(cwd: str) -> Path:
     from pathlib import Path
     return Path(cwd)

@@ -40,7 +40,7 @@ class ActiveSession(BaseModel):
 
 
 async def scan_active_sessions(
-    runtimes: list["VaultRuntime"],
+    runtimes: list[VaultRuntime],
     *,
     cooling_threshold_hours: int = COOLING_THRESHOLD_HOURS,
     transcripts_root: Path | None = None,

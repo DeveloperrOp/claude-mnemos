@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from claude_mnemos.core.clock import utcnow
 from claude_mnemos.state.alerts_store import StoredAlert

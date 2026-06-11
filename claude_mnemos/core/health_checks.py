@@ -65,7 +65,7 @@ def _make(
 
 
 def check_auto_dump_overdue(
-    scheduler: "AsyncIOScheduler",
+    scheduler: AsyncIOScheduler,
     *,
     now: datetime | None = None,
 ) -> StoredAlert | None:
@@ -113,7 +113,7 @@ def check_auto_dump_overdue(
 
 
 def check_ingest_failure_streak(
-    runtimes: dict[str, "VaultRuntime"],
+    runtimes: dict[str, VaultRuntime],
     *,
     now: datetime | None = None,
 ) -> StoredAlert | None:
@@ -169,7 +169,7 @@ def check_ingest_failure_streak(
 
 
 def check_runaway_jobs(
-    runtimes: dict[str, "VaultRuntime"],
+    runtimes: dict[str, VaultRuntime],
     *,
     now: datetime | None = None,
 ) -> StoredAlert | None:
@@ -228,7 +228,7 @@ def _claude_projects_dir() -> Path:
 
 
 def check_hook_silence(
-    runtimes: dict[str, "VaultRuntime"],
+    runtimes: dict[str, VaultRuntime],
     *,
     now: datetime | None = None,
     projects_dir: Path | None = None,
@@ -316,7 +316,7 @@ def check_hook_silence(
 
 
 async def check_disk_low(
-    runtimes: dict[str, "VaultRuntime"],
+    runtimes: dict[str, VaultRuntime],
     *,
     now: datetime | None = None,
     threshold: float = 0.05,
@@ -398,7 +398,7 @@ def check_project_map_broken(*, now: datetime | None = None) -> StoredAlert | No
 
 
 def check_daemon_uptime_warning(
-    daemon: "MnemosDaemon",
+    daemon: MnemosDaemon,
     *,
     now: datetime | None = None,
     threshold_seconds: float = 60.0,
@@ -434,9 +434,9 @@ def check_daemon_uptime_warning(
 
 async def run_all_checks(
     *,
-    daemon: "MnemosDaemon",
-    scheduler: "AsyncIOScheduler",
-    runtimes: dict[str, "VaultRuntime"],
+    daemon: MnemosDaemon,
+    scheduler: AsyncIOScheduler,
+    runtimes: dict[str, VaultRuntime],
     now: datetime | None = None,
 ) -> list[StoredAlert]:
     """Run all 7 detectors. Each is wrapped in try/except so one bad detector

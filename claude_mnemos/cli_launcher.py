@@ -15,9 +15,9 @@ import sys
 import time
 from pathlib import Path
 
+from claude_mnemos.launcher import run as launcher_run
 from claude_mnemos.tray.ipc import ipc_send
 from claude_mnemos.tray.single_instance import get_single_instance
-from claude_mnemos.launcher import run as launcher_run
 
 if sys.platform == "win32":
     IPC_ADDRESS = r"\\.\pipe\claude-mnemos-tray"
