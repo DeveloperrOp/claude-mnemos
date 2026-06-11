@@ -20,6 +20,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 from claude_mnemos import runtime
 from claude_mnemos.core.atomic import atomic_write
@@ -67,21 +68,22 @@ def _detect_hook_scripts() -> tuple[str, str, str]:
         here.parent / "hooks",
     ]
     for d in candidates:
-        ss = d / "session_start.py"
-        se = d / "session_end.py"
-        pc = d / "pre_compact.py"
-        if ss.exists() and se.exists() and pc.exists():
-            return f'{py} "{ss}"', f'{py} "{se}"', f'{py} "{pc}"'
+        ss_path = d / "session_start.py"
+        se_path = d / "session_end.py"
+        pc_path = d / "pre_compact.py"
+        if ss_path.exists() and se_path.exists() and pc_path.exists():
+            return f'{py} "{ss_path}"', f'{py} "{se_path}"', f'{py} "{pc_path}"'
     raise FileNotFoundError(
         f"Could not locate mnemos hook scripts. Tried: {[str(c) for c in candidates]}"
     )
 
 
-def _load_settings() -> dict:
+def _load_settings() -> dict[str, Any]:
     if not CLAUDE_SETTINGS.exists():
         return {}
     try:
-        return json.loads(CLAUDE_SETTINGS.read_text(encoding="utf-8"))
+        settings: dict[str, Any] = json.loads(CLAUDE_SETTINGS.read_text(encoding="utf-8"))
+        return settings
     except json.JSONDecodeError as e:
         raise SystemExit(
             f"Refusing to touch {CLAUDE_SETTINGS}: invalid JSON ({e}).\n"
@@ -89,7 +91,7 @@ def _load_settings() -> dict:
         ) from e
 
 
-def _save_settings(data: dict) -> None:
+def _save_settings(data: dict[str, Any]) -> None:
     CLAUDE_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(CLAUDE_SETTINGS, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
@@ -98,7 +100,7 @@ def _is_mnemos_command(cmd: str) -> bool:
     return MNEMOS_TOKEN in cmd or MNEMOS_DASHED in cmd
 
 
-def _build_hook_block(command: str) -> dict:
+def _build_hook_block(command: str) -> dict[str, Any]:
     return {
         "hooks": [
             {"type": "command", "command": command, "timeout": 15}
@@ -114,7 +116,7 @@ def _backup_settings() -> Path | None:
     return backup
 
 
-def install(*, dry_run: bool = False) -> dict:
+def install(*, dry_run: bool = False) -> dict[str, Any]:
     """Install (or refresh) mnemos hooks in ~/.claude/settings.json.
 
     Returns a result dict::
@@ -266,7 +268,7 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     return 0 if (ss_installed and se_installed and pc_installed) else 1
 
 
-def add_hooks_subparser(parent: argparse._SubParsersAction) -> None:
+def add_hooks_subparser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     """Register the `hooks` subgroup on the given parser."""
     p = parent.add_parser("hooks", help="Manage Claude Code hook registration")
     sub = p.add_subparsers(dest="hooks_cmd", required=True)
@@ -289,4 +291,5 @@ def add_hooks_subparser(parent: argparse._SubParsersAction) -> None:
 
 def handle(args: argparse.Namespace) -> int:
     """Dispatch entry point, matching the cli_project / cli_settings convention."""
-    return args.func(args)
+    rc: int = args.func(args)
+    return rc

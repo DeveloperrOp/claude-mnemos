@@ -12,6 +12,7 @@ import sys
 import time
 import urllib.request
 import webbrowser
+from typing import Any
 
 from claude_mnemos.cli_hooks import install as _hooks_install_impl
 
@@ -32,7 +33,7 @@ def _print(symbol: str, text: str) -> None:
     sys.stdout.flush()
 
 
-def _install_hooks_safe() -> dict | None:
+def _install_hooks_safe() -> dict[str, Any] | None:
     """Wrapper isolating hook-install for monkeypatching in tests."""
     return _hooks_install_impl()
 
@@ -116,7 +117,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     return run(open_browser=not args.no_browser)
 
 
-def add_init_subparser(parent: argparse._SubParsersAction) -> None:
+def add_init_subparser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     p = parent.add_parser("init", help="One-command setup: hooks + autostart + dashboard")
     p.add_argument("--no-browser", action="store_true", help="Do not auto-open the dashboard")
     p.set_defaults(func=_cmd_init)

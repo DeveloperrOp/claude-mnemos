@@ -27,7 +27,8 @@ def _fetch_setup_status() -> dict[str, Any] | None:
     """Try the daemon first; return None on any error."""
     try:
         with urllib.request.urlopen(DAEMON_STATUS_URL, timeout=2) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            status: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+            return status
     except (urllib.error.URLError, OSError, json.JSONDecodeError):
         return None
 
@@ -87,6 +88,6 @@ def _cmd_doctor(_args: argparse.Namespace) -> int:
     return run()
 
 
-def add_doctor_subparser(parent: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def add_doctor_subparser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     p = parent.add_parser("doctor", help="Print install + operational health check")
     p.set_defaults(func=_cmd_doctor)

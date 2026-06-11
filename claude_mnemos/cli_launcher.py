@@ -103,7 +103,7 @@ def _cmd_launcher(args: argparse.Namespace) -> int:
     return run(extra)
 
 
-def add_launcher_subparser(parent: argparse._SubParsersAction) -> None:
+def add_launcher_subparser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     p = parent.add_parser("launcher", help="Open the desktop launcher window")
     p.add_argument("--no-spawn-tray", action="store_true",
                    help="Do not spawn tray supervisor; open window directly.")

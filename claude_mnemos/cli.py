@@ -10,7 +10,7 @@ import time
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -625,15 +625,19 @@ def main(argv: list[str] | None = None) -> int:
         from claude_mnemos.cli_hooks import handle as hooks_handle
         return hooks_handle(args)
     if args.command == "init":
-        return args.func(args)
+        # args.func is set via set_defaults() and typed Any on Namespace.
+        return cast(int, args.func(args))
     if args.command == "doctor":
-        return args.func(args)
+        # args.func is set via set_defaults() and typed Any on Namespace.
+        return cast(int, args.func(args))
     if args.command == "tokenizer-probe":
         return _cmd_tokenizer_probe(args)
     if args.command == "hook":
-        return args.func(args)
+        # args.func is set via set_defaults() and typed Any on Namespace.
+        return cast(int, args.func(args))
     if args.command == "launcher":
-        return args.func(args)
+        # args.func is set via set_defaults() and typed Any on Namespace.
+        return cast(int, args.func(args))
 
     if not args.jsonl.exists():
         print(f"error: jsonl not found: {args.jsonl}", file=sys.stderr)

@@ -23,21 +23,24 @@ def _import_session_start() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
     import session_start  # type: ignore
-    return session_start.main
+    main: Callable[[], int] = session_start.main
+    return main
 
 
 def _import_session_end() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
     import session_end  # type: ignore
-    return session_end.main
+    main: Callable[[], int] = session_end.main
+    return main
 
 
 def _import_pre_compact() -> Callable[[], int]:
     from claude_mnemos.runtime import hooks_dir
     sys.path.insert(0, str(hooks_dir()))
     import pre_compact  # type: ignore
-    return pre_compact.main
+    main: Callable[[], int] = pre_compact.main
+    return main
 
 
 _DISPATCH: dict[str, str] = {
@@ -75,7 +78,7 @@ def _cmd_hook(args: argparse.Namespace) -> int:
     return run([args.event])
 
 
-def add_hook_subparser(parent: argparse._SubParsersAction) -> None:
+def add_hook_subparser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     p = parent.add_parser("hook", help="Run a Claude Code hook (internal — invoked by Claude Code)")
     p.add_argument("event", choices=EVENTS, help="Hook event name")
     p.set_defaults(func=_cmd_hook)
