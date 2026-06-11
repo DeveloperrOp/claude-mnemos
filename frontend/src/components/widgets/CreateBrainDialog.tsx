@@ -137,9 +137,8 @@ export function CreateBrainDialog({ open, group, onOpenChange, onDone }: Props) 
             "Новый мозг будет следить за {{root}} и получит все сессии этой группы.",
         })}
         confirmLabel={t("lost_sessions.groups.submit", {
-          n: group.sessions.length,
           count: group.sessions.length,
-          defaultValue: "Создать и импортировать {{n}} сессий",
+          defaultValue: "Создать и импортировать {{count}} сессий",
         })}
         confirmTestId="create-brain-submit"
         onConfirm={() => void submit()}

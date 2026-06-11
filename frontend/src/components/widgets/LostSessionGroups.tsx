@@ -66,9 +66,9 @@ export function LostSessionGroups({ sessions, onCreateBrain }: Props) {
               </div>
               <div className="text-xs text-muted-foreground">
                 {t("lost_sessions.groups.stats", {
-                  n: g.sessions.length,
+                  count: g.sessions.length,
                   size: formatBytes(g.totalBytes),
-                  defaultValue: "{{n}} сессий · {{size}}",
+                  defaultValue: "{{count}} сессий · {{size}}",
                 })}
               </div>
             </div>

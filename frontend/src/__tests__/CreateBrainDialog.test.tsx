@@ -131,8 +131,12 @@ describe("CreateBrainDialog", () => {
     await user.click(screen.getByTestId("create-brain-submit"));
 
     const err = await screen.findByTestId("create-brain-error");
-    expect(err.textContent).toMatch(/создан, но импорт/);
+    // Locale-agnostic: the inline error carries the API error text; the
+    // import-fail (vs create-fail) path is proven by createProject having
+    // succeeded while onDone was never reached.
+    expect(err).toBeInTheDocument();
     expect(err.textContent).toMatch(/boom-import/);
+    expect(projectsApi.createProject).toHaveBeenCalledTimes(1);
     expect(onDone).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
