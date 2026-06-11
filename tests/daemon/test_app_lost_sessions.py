@@ -15,7 +15,11 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
-from claude_mnemos.core.lost_sessions import LOST_SESSIONS_IGNORE_FILENAME, LostSessionsIgnore
+from claude_mnemos.core.lost_sessions import (
+    LOST_SESSIONS_IGNORE_FILENAME,
+    LostSessionsCache,
+    LostSessionsIgnore,
+)
 from claude_mnemos.daemon.app import create_app
 from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
@@ -347,6 +351,57 @@ async def test_post_import_selection_unknown_project_returns_404(client):
     )
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "unknown_project"
+
+
+async def test_post_import_selection_cold_cache_fresh_vault(
+    tmp_path: Path,
+    transcripts_root: Path,
+    fake_runtime_factory,
+    fake_daemon_factory,
+):
+    """Regression (v0.0.48 P1): freshly mounted vault → LostSessionsCache is
+    cold and never warmed by a prior GET. import-selection must run the scan
+    itself (now via asyncio.to_thread, off the event loop) and still find the
+    sessions. The module-level fixtures use ``lost_sessions_cache=None`` so
+    they never exercise the real cold-cache ``get_or_scan`` path — this test
+    does."""
+    vault = tmp_path / "fresh-vault"
+    vault.mkdir()
+    (transcripts_root / "s1.jsonl").write_text("one", encoding="utf-8")
+    (transcripts_root / "s2.jsonl").write_text("two", encoding="utf-8")
+
+    job_store = JobStore(vault / JOBS_DB_FILENAME)
+    try:
+        runtime = fake_runtime_factory(
+            vault,
+            name="fresh-vault",
+            tracker=OurWritesTracker(ttl_s=60.0),
+            job_store=job_store,
+            job_worker=None,
+            lost_sessions_cache=LostSessionsCache(),  # cold: no prior scan
+        )
+        app = create_app(daemon=fake_daemon_factory(runtime))
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as c:
+            r = await c.post(
+                "/api/lost-sessions/import-selection",
+                json={
+                    "project_name": "fresh-vault",
+                    "session_ids": ["s1", "s2"],
+                },
+            )
+        assert r.status_code == 202
+        body = r.json()
+        assert body["queued"] == 2
+        assert body["skipped"] == 0
+        assert body["missing"] == []
+        assert set(body["session_ids"]) == {"s1", "s2"}
+        counts = job_store.count_by_status()
+        assert sum(counts.values()) == 2
+    finally:
+        job_store.close()
 
 
 # ---------------------------------------------------------------------------

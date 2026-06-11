@@ -133,6 +133,20 @@ def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
     return collect_lost_sessions(list(all_runtimes(request)))
 
 
+def _scan_vault_sync(runtime: Any) -> list[core_lost_sessions.LostSession]:
+    """Blocking single-vault scan (cache-aware).
+
+    On a cold cache this walks the transcripts root and sha256-hashes every
+    JSONL file — seconds of CPU/IO on a freshly mounted vault. Async routes
+    MUST call it via ``await asyncio.to_thread(_scan_vault_sync, runtime)``
+    so the event loop stays responsive (same pattern as list_lost_route).
+    """
+    cache: core_lost_sessions.LostSessionsCache | None = runtime.lost_sessions_cache
+    if cache is not None:
+        return cache.get_or_scan(runtime.vault_root)
+    return core_lost_sessions.scan_lost_sessions(runtime.vault_root)
+
+
 @router.get("/lost-sessions")
 async def list_lost_route(request: Request) -> dict[str, Any]:
     # Cross-vault scan walks JSONL files on disk; offload to a worker
@@ -176,14 +190,10 @@ async def read_transcript_route(
     capped = max(1, min(limit, 500))
     transcript_path: str | None = None
 
-    # Tier 1: lost-sessions cache (post-filter set).
+    # Tier 1: lost-sessions cache (post-filter set). Cold-cache scans are
+    # blocking (sha256 over the transcripts root) — run off the event loop.
     for runtime in all_runtimes(request):
-        cache = runtime.lost_sessions_cache
-        items = (
-            cache.get_or_scan(runtime.vault_root)
-            if cache is not None
-            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
-        )
+        items = await asyncio.to_thread(_scan_vault_sync, runtime)
         match = next((i for i in items if i.session_id == session_id), None)
         if match is not None:
             transcript_path = match.transcript_path
@@ -194,7 +204,7 @@ async def read_transcript_route(
     # agent-* sessions that Lost Sessions filters out.
     if transcript_path is None:
         from claude_mnemos.core.transcript_scanner import _scan_sync
-        for entry in _scan_sync(None):
+        for entry in await asyncio.to_thread(_scan_sync, None):
             if entry.session_id == session_id:
                 transcript_path = entry.transcript_path
                 break
@@ -204,7 +214,8 @@ async def read_transcript_route(
             status_code=404,
             detail={"error": "lost_session_not_found", "session_id": session_id},
         )
-    messages, total, truncated_overall = core_lost_sessions.read_transcript_messages(
+    messages, total, truncated_overall = await asyncio.to_thread(
+        core_lost_sessions.read_transcript_messages,
         Path(transcript_path), limit=capped,
     )
     return {
@@ -270,12 +281,10 @@ async def import_bulk_route(
         limit = BULK_IMPORT_DEFAULT_LIMIT
     extract = bool(body.get("extract", False))
 
-    cache = runtime.lost_sessions_cache
-    items = (
-        cache.get_or_scan(runtime.vault_root)
-        if cache is not None
-        else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
-    )
+    # Cold-cache scan blocks for seconds (sha256 over transcripts root) —
+    # run it off the event loop. job_store.create stays in the loop: it is
+    # a fast sqlite INSERT, same as every other async route in the repo.
+    items = await asyncio.to_thread(_scan_vault_sync, runtime)
 
     queued = 0
     skipped = 0
@@ -349,12 +358,11 @@ async def import_selection_route(
     # v0.0.10: extract defaults to False (raw dump only). UI must opt-in.
     extract = bool(body.get("extract", False))
 
-    cache = runtime.lost_sessions_cache
-    items = (
-        cache.get_or_scan(runtime.vault_root)
-        if cache is not None
-        else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
-    )
+    # Hot path of the "create brain" flow: the vault was just mounted, so
+    # the cache is cold and get_or_scan walks + sha256-hashes the whole
+    # transcripts root. Run it in a worker thread (same as list_lost_route);
+    # the job_store.create INSERTs below are fast and stay in the loop.
+    items = await asyncio.to_thread(_scan_vault_sync, runtime)
     by_id = {i.session_id: i for i in items}
 
     queued = 0
@@ -466,13 +474,9 @@ async def import_route(
 
     transcript_path = body.get("transcript_path")
     if not isinstance(transcript_path, str) or not transcript_path:
-        # Resolve via the target vault's cache / scan.
-        cache = runtime.lost_sessions_cache
-        items = (
-            cache.get_or_scan(runtime.vault_root)
-            if cache is not None
-            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
-        )
+        # Resolve via the target vault's cache / scan — off the event loop,
+        # a cold cache blocks for seconds on large transcripts roots.
+        items = await asyncio.to_thread(_scan_vault_sync, runtime)
         match = next((i for i in items if i.session_id == session_id), None)
         if match is None:
             raise HTTPException(
@@ -535,12 +539,8 @@ async def ignore_route(
 
     sha = body.get("sha")
     if not isinstance(sha, str) or not sha:
-        cache = runtime.lost_sessions_cache
-        items = (
-            cache.get_or_scan(runtime.vault_root)
-            if cache is not None
-            else core_lost_sessions.scan_lost_sessions(runtime.vault_root)
-        )
+        # Off the event loop — cold cache means a full transcripts-root scan.
+        items = await asyncio.to_thread(_scan_vault_sync, runtime)
         match = next((i for i in items if i.session_id == session_id), None)
         if match is None:
             raise HTTPException(
