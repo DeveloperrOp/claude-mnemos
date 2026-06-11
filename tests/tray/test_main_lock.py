@@ -196,7 +196,7 @@ def test_cmd_install_spawn_tray_false_does_not_spawn(monkeypatch):
     assert not spawned
 
 
-def test_postinstall_silent_init_does_not_spawn_tray(monkeypatch):
+def test_postinstall_silent_init_does_not_spawn_tray(monkeypatch, tmp_path):
     """_silent_init must call _cmd_install with spawn_tray=False."""
     import claude_mnemos.postinstall as pi
 
@@ -213,15 +213,13 @@ def test_postinstall_silent_init_does_not_spawn_tray(monkeypatch):
     monkeypatch.setattr(
         "claude_mnemos.tray.__main__._cmd_install", fake_install
     )
-    # install_state writes must not touch the real home dir
-    class FakeState:
-        autostart_decision = "accepted"
-
-        def save(self):
-            pass
-
+    # Redirect install-state to tmp so reads/writes never touch the real
+    # home dir. NOTE: postinstall.py binds load_install_state at import
+    # time, so patching the function on its source module is dead — patch
+    # the state path instead (same pattern as tests/test_postinstall.py).
     monkeypatch.setattr(
-        "claude_mnemos.state.install_state.load_install_state", lambda: FakeState()
+        "claude_mnemos.state.install_state._STATE_PATH",
+        tmp_path / "install-state.json",
     )
 
     errors = pi._silent_init()
