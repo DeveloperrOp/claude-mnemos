@@ -21,6 +21,7 @@ from claude_mnemos.ingest.llm import (
     ExtractionRaw,
     LLMExtractionError,
     ModelNotFoundError,
+    TranscriptTooLargeError,
 )
 from claude_mnemos.ingest.llm.auth import find_claude_binary
 from claude_mnemos.ingest.llm.model_fallback import looks_like_model_not_found
@@ -73,6 +74,19 @@ class CliLLMClient:
         tool: dict[str, Any],
         validate: Callable[[dict[str, Any]], Any] | None = None,
     ) -> ExtractionRaw:
+        # Pre-count BEFORE any subprocess work. The CLI itself has no input-size
+        # guard, so without this a too-big session just blocks until the 600s
+        # subprocess timeout instead of failing fast with a structured error.
+        # Counts are approximate (cl100k proxy) — same proxy used for metrics.
+        est = count_tokens_local(system) + count_tokens_local(user)
+        if est > self.cfg.max_input_tokens:
+            raise TranscriptTooLargeError(
+                f"prompt would be ~{est} tokens; "
+                f"max_input_tokens={self.cfg.max_input_tokens}",
+                input_tokens=est,
+                max_input_tokens=self.cfg.max_input_tokens,
+            )
+
         binary = find_claude_binary()
         if binary is None:
             raise LLMExtractionError(

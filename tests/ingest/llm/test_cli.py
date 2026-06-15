@@ -11,6 +11,7 @@ from claude_mnemos.ingest.llm import (
     ExtractionRaw,
     LLMExtractionError,
     ModelNotFoundError,
+    TranscriptTooLargeError,
 )
 from claude_mnemos.ingest.llm.cli import CliLLMClient
 from claude_mnemos.ingest.llm.rate_limit import RateLimitError
@@ -308,3 +309,53 @@ def test_extract_raises_when_structured_output_missing(cfg: Config) -> None:
         run.return_value = _stub_completed(0, stdout=json.dumps({"result": "x"}))
         with pytest.raises(LLMExtractionError, match="structured_output"):
             CliLLMClient(cfg).extract(system="S", user="U", tool=_TOOL_SCHEMA)
+
+
+def test_extract_precounts_and_raises_before_subprocess() -> None:
+    """An oversized prompt must raise TranscriptTooLargeError BEFORE any
+    subprocess work — the user's default subscription path previously had no
+    limit check and a too-big session just timed out at 600s."""
+    small_cfg = Config(
+        api_key=None,
+        model="claude-sonnet-4-5",
+        language_hint="auto",
+        max_input_tokens=10,
+        lock_timeout=30.0,
+    )
+    big_user = "word " * 5000  # far above a 10-token budget
+    with (
+        patch("claude_mnemos.ingest.llm.cli.subprocess.run") as run,
+        patch(
+            "claude_mnemos.ingest.llm.cli.find_claude_binary",
+            return_value=__import__("pathlib").Path("/x/claude"),
+        ),
+        pytest.raises(TranscriptTooLargeError) as ei,
+    ):
+        CliLLMClient(small_cfg).extract(
+            system="S", user=big_user, tool=_TOOL_SCHEMA,
+        )
+
+    err = ei.value
+    assert err.max_input_tokens == small_cfg.max_input_tokens == 10
+    assert err.input_tokens > err.max_input_tokens
+    # The whole point: the paid/blocking subprocess must NOT run.
+    run.assert_not_called()
+
+
+def test_extract_within_budget_does_not_raise_and_runs_subprocess(cfg: Config) -> None:
+    """A within-budget prompt must NOT trip the pre-count guard and DOES invoke
+    the subprocess (cfg.max_input_tokens default 180000 is generous)."""
+    payload = {"pages": []}
+    with (
+        patch("claude_mnemos.ingest.llm.cli.subprocess.run") as run,
+        patch(
+            "claude_mnemos.ingest.llm.cli.find_claude_binary",
+            return_value=__import__("pathlib").Path("/x/claude"),
+        ),
+    ):
+        run.return_value = _stub_completed(0, stdout=_ok_envelope(payload))
+        result = CliLLMClient(cfg).extract(
+            system="short system", user="short user", tool=_TOOL_SCHEMA,
+        )
+    assert result.payload == payload
+    run.assert_called_once()

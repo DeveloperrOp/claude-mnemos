@@ -77,6 +77,21 @@ def test_transcript_too_large_raises():
     inner.messages.create.assert_not_called()
 
 
+def test_transcript_too_large_carries_structured_token_counts():
+    cfg = _cfg(max_input_tokens=1000)
+    inner = MagicMock()
+    inner.messages.count_tokens.return_value = _make_token_count(2000)
+
+    client = ApiLLMClient(cfg, _client=inner)
+    with pytest.raises(TranscriptTooLargeError) as ei:
+        client.extract(system="sys", user="usr", tool=_dummy_tool())
+
+    err = ei.value
+    assert err.input_tokens == 2000
+    assert err.max_input_tokens == cfg.max_input_tokens == 1000
+    assert err.input_tokens > err.max_input_tokens
+
+
 def test_successful_extract_returns_payload_and_usage():
     cfg = _cfg()
     inner = MagicMock()

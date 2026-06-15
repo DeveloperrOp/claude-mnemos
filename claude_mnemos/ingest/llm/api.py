@@ -21,7 +21,20 @@ class MissingApiKeyError(RuntimeError):
 
 
 class TranscriptTooLargeError(RuntimeError):
-    """Raised when prompt token count exceeds configured max_input_tokens."""
+    """Raised when prompt token count exceeds configured max_input_tokens.
+
+    Carries the structured counts so callers (CLI exit codes, job handlers,
+    the dashboard) can show "~N tokens vs limit M" instead of parsing a string.
+    ``input_tokens`` is exact for ApiLLMClient (SDK count_tokens) and
+    approximate (cl100k proxy) for CliLLMClient's pre-count guard.
+    """
+
+    def __init__(
+        self, message: str, *, input_tokens: int, max_input_tokens: int
+    ) -> None:
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.max_input_tokens = max_input_tokens
 
 
 class LLMExtractionError(RuntimeError):
@@ -111,7 +124,9 @@ class ApiLLMClient:
         if input_tokens > self.cfg.max_input_tokens:
             raise TranscriptTooLargeError(
                 f"prompt would be {input_tokens} tokens; "
-                f"max_input_tokens={self.cfg.max_input_tokens}"
+                f"max_input_tokens={self.cfg.max_input_tokens}",
+                input_tokens=input_tokens,
+                max_input_tokens=self.cfg.max_input_tokens,
             )
 
         payload = self._call_with_model_fallback(system_blocks, user_messages, tool)
