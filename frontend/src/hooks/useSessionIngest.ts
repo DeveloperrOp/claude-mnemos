@@ -10,6 +10,10 @@ interface IngestArgs {
   transcript_path: string;
   /** Run LLM extraction in addition to raw dump. */
   extract?: boolean;
+  /** Override the per-extract input-token cap. */
+  maxInputTokens?: number;
+  /** Split a large transcript into chunks for extraction. */
+  chunked?: boolean;
 }
 
 export function useSessionIngest() {
@@ -21,8 +25,13 @@ export function useSessionIngest() {
       session_id,
       transcript_path,
       extract = false,
+      maxInputTokens,
+      chunked,
     }: IngestArgs) =>
-      ingestSession(project, session_id, transcript_path, extract),
+      ingestSession(project, session_id, transcript_path, extract, {
+        maxInputTokens,
+        chunked,
+      }),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["session", vars.project, vars.session_id] });
       void qc.invalidateQueries({ queryKey: ["sessions", vars.project] });

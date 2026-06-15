@@ -35,15 +35,35 @@ export async function getSession(
   return SessionViewSchema.parse(r.data);
 }
 
+export interface IngestOptions {
+  /** Override the per-extract input-token cap (forwarded as max_input_tokens). */
+  maxInputTokens?: number;
+  /** Split a large transcript into chunks for extraction (chunk_extract). */
+  chunked?: boolean;
+}
+
 export async function ingestSession(
   project: string,
   session_id: string,
   transcript_path: string,
   extract = false,
+  opts: IngestOptions = {},
 ): Promise<Job> {
+  const body: {
+    transcript_path: string;
+    extract: boolean;
+    max_input_tokens?: number;
+    chunk_extract?: boolean;
+  } = { transcript_path, extract };
+  if (typeof opts.maxInputTokens === "number") {
+    body.max_input_tokens = opts.maxInputTokens;
+  }
+  if (opts.chunked) {
+    body.chunk_extract = true;
+  }
   const r = await apiClient.post(
     `/sessions/${encodeURIComponent(project)}/${encodeURIComponent(session_id)}/ingest`,
-    { transcript_path, extract },
+    body,
   );
   return r.data as Job;
 }
