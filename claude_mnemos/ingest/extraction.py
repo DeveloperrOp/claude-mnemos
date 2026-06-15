@@ -12,12 +12,64 @@ from claude_mnemos.core.models import (
     WikiPageFrontmatter,
     save_wiki_pages_tool_schema,
 )
+from claude_mnemos.core.ontology_similarity import body_hash
 from claude_mnemos.core.slug import make_slug
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.prompts import format_user, load_system
 from claude_mnemos.ingest.transcript import TranscriptMessage
 
 _FOLDER_BY_TYPE = {"entity": "entities", "concept": "concepts"}
+
+
+def _merge_payloads(payloads: list[ExtractionPayload]) -> ExtractionPayload:
+    """Deterministically merge per-chunk extraction payloads into one.
+
+    Pure (no I/O, no LLM). Pages are deduped by their slug
+    (``make_slug(slug_hint or title)``). For a slug seen more than once:
+
+    - if the two bodies are identical after normalization
+      (``body_hash``) → keep the first occurrence (content is the same);
+    - otherwise → keep the page with the higher ``confidence``
+      (ties keep the first occurrence).
+
+    Regardless of which page is kept, ``related`` links from all occurrences
+    are unioned (order-preserving, deduped) onto the kept page.
+
+    ``summary`` is the non-empty per-payload summaries joined by a blank line.
+    ``skipped_reason`` is ``None`` when any page survives; otherwise the first
+    payload's ``skipped_reason`` (or ``"no pages"`` when there are no payloads).
+    """
+    by_slug: dict[str, ExtractedPage] = {}
+    for payload in payloads:
+        for page in payload.pages:
+            key = make_slug(page.slug_hint or page.title)
+            existing = by_slug.get(key)
+            if existing is None:
+                by_slug[key] = page
+                continue
+            if body_hash(existing.body) == body_hash(page.body):
+                kept = existing
+            elif page.confidence > existing.confidence:
+                kept = page
+            else:
+                kept = existing
+            related = list(dict.fromkeys([*existing.related, *page.related]))
+            by_slug[key] = kept.model_copy(update={"related": related})
+
+    summaries = [p.summary for p in payloads if p.summary]
+    has_pages = bool(by_slug)
+    if has_pages:
+        skipped_reason: str | None = None
+    elif payloads:
+        skipped_reason = payloads[0].skipped_reason
+    else:
+        skipped_reason = "no pages"
+
+    return ExtractionPayload(
+        summary="\n\n".join(summaries),
+        skipped_reason=skipped_reason,
+        pages=list(by_slug.values()),
+    )
 
 
 @dataclass(frozen=True)
