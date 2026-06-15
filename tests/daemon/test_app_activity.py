@@ -77,7 +77,7 @@ def _cfg() -> Config:
 
 
 def _stub_extractor():
-    def _extract(*, messages, cfg, llm_client, today):  # noqa: ARG001
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
         fm = WikiPageFrontmatter(
             title="FastAPI",
             type="entity",

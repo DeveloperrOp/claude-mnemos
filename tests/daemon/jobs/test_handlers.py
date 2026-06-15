@@ -241,3 +241,99 @@ async def test_ingest_handler_downgrades_extract_when_no_llm(tmp_path: Path):
     # Payload requests extract=True, but llm is None → downgrade
     await handler.run(_job({"transcript_path": "/x.jsonl", "extract": True}))
     assert seen["extract"] is False
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_applies_max_input_tokens_and_chunk_extract(tmp_path: Path):
+    """Task 9: payload max_input_tokens override reaches cfg, chunk_extract reaches ingest()."""
+    seen: dict = {}
+
+    class _Cfg:
+        def __init__(self):
+            self.max_input_tokens = 200_000
+            self.overridden_to = None
+
+        def with_overrides(self, *, max_input_tokens=None, **_kwargs):
+            self.overridden_to = max_input_tokens
+            self.max_input_tokens = max_input_tokens
+            return self
+
+    cfg = _Cfg()
+
+    def fake_ingest(
+        jsonl_path,
+        vault_root,
+        *,
+        cfg,
+        llm_client,
+        extract,
+        dry_run,
+        today,
+        raw_filename_suffix="",
+        chunk_extract=False,
+        **kwargs,
+    ):
+        seen["cfg_max_input_tokens"] = cfg.max_input_tokens
+        seen["chunk_extract"] = chunk_extract
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: cfg,
+        llm_factory=lambda c: object(),
+        ingest_fn=fake_ingest,
+    )
+    await handler.run(
+        _job(
+            {
+                "transcript_path": "/x.jsonl",
+                "extract": True,
+                "max_input_tokens": 1_200_000,
+                "chunk_extract": True,
+            }
+        )
+    )
+    assert cfg.overridden_to == 1_200_000
+    assert seen["cfg_max_input_tokens"] == 1_200_000
+    assert seen["chunk_extract"] is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_no_override_passes_chunk_extract_false(tmp_path: Path):
+    """Task 9: without the new payload keys, no override is applied and chunk_extract=False."""
+    seen: dict = {}
+
+    class _Cfg:
+        def __init__(self) -> None:
+            self.max_input_tokens = 200_000
+            self.override_called = False
+
+        def with_overrides(self, **_kwargs):  # pragma: no cover - must NOT be called
+            self.override_called = True
+            return self
+
+    cfg = _Cfg()
+
+    def fake_ingest(
+        jsonl_path,
+        vault_root,
+        *,
+        cfg,
+        llm_client,
+        extract,
+        dry_run,
+        today,
+        raw_filename_suffix="",
+        chunk_extract=False,
+        **kwargs,
+    ):
+        seen["chunk_extract"] = chunk_extract
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: cfg,
+        llm_factory=lambda c: object(),
+        ingest_fn=fake_ingest,
+    )
+    await handler.run(_job({"transcript_path": "/x.jsonl", "extract": True}))
+    assert cfg.override_called is False
+    assert seen["chunk_extract"] is False

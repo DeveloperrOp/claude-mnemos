@@ -54,7 +54,7 @@ def _stub_extraction(today: date) -> ExtractionResult:
 
 def _stub_extractor():
     """Returns a callable matching extract_wiki_pages signature."""
-    def _extract(*, messages, cfg, llm_client, today):  # noqa: ARG001
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
         return _stub_extraction(today)
     return _extract
 
@@ -584,3 +584,44 @@ def test_ingest_promote_failure_no_activity_entry(tmp_path: Path, monkeypatch):
 
     assert (vault / "preexisting.md").read_text(encoding="utf-8") == "survives"
     assert not (vault / ACTIVITY_FILENAME).exists()
+
+
+def test_ingest_forwards_chunk_extract_to_extractor(tmp_path: Path):
+    """``chunk_extract`` must be forwarded into the extractor call (Task 9)."""
+    vault = tmp_path / "vault"
+    seen: dict = {}
+
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+        seen["chunk_extract"] = chunk_extract
+        return _stub_extraction(today)
+
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_extract,
+        today=FIXED_TODAY,
+        chunk_extract=True,
+    )
+    assert seen["chunk_extract"] is True
+
+
+def test_ingest_defaults_chunk_extract_false(tmp_path: Path):
+    """Default forwards chunk_extract=False — backward compatible (Task 9)."""
+    vault = tmp_path / "vault"
+    seen: dict = {}
+
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+        seen["chunk_extract"] = chunk_extract
+        return _stub_extraction(today)
+
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_extract,
+        today=FIXED_TODAY,
+    )
+    assert seen["chunk_extract"] is False

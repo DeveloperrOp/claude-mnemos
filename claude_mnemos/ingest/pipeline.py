@@ -56,6 +56,7 @@ def ingest(
     dry_run: bool = False,
     today: date,
     raw_filename_suffix: str = "",
+    chunk_extract: bool = False,
     tracker: OurWritesTracker | None = None,
 ) -> IngestResult:
     """Full ingest pipeline. All vault writes go through StagingTransaction.
@@ -175,7 +176,13 @@ def ingest(
             if llm_client is None:
                 raise ValueError("llm_client cannot be None when extract=True")
 
-            extraction = extractor(messages=messages, cfg=cfg, llm_client=llm_client, today=today)
+            extraction = extractor(
+                messages=messages,
+                cfg=cfg,
+                llm_client=llm_client,
+                today=today,
+                chunk_extract=chunk_extract,
+            )
 
             source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
             source_page = _build_source_page(

@@ -69,8 +69,14 @@ class IngestHandler:
         extract_requested = bool(job.payload.get("extract", True))
         dry_run = bool(job.payload.get("dry_run", False))
         raw_filename_suffix = str(job.payload.get("raw_filename_suffix", ""))
+        chunk_extract = bool(job.payload.get("chunk_extract", False))
+        max_input_tokens = job.payload.get("max_input_tokens")
 
         cfg = self._cfg_factory()
+        # Per-session override (Task 9): raise the model's input budget for one
+        # oversized session without touching project-wide config.
+        if max_input_tokens is not None:
+            cfg = cfg.with_overrides(max_input_tokens=int(max_input_tokens))
         llm = self._llm_factory(cfg) if extract_requested else None
         # If extract was requested but no LLM client available (e.g. no API
         # key), downgrade to raw_only ingest. Avoids dead_letter spam for
@@ -92,6 +98,7 @@ class IngestHandler:
                 # could file its source page under the wrong day.
                 today=datetime.now(UTC).date(),
                 raw_filename_suffix=raw_filename_suffix,
+                chunk_extract=chunk_extract,
                 tracker=self._tracker,
             )
         except EmptyTranscriptError:

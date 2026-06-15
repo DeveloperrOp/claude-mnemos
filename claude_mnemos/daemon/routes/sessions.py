@@ -131,11 +131,37 @@ async def ingest_session_route(
     # worker — silently spending LLM tokens. Callers (UI buttons, scripts)
     # must opt in by passing ``extract: true`` if they want extraction.
     extract = bool(body.get("extract", False))
+    # Task 9: per-session ingest controls.
+    #   max_input_tokens — raise the model's input budget for one oversized
+    #     session (>= 1024; a tinier budget extracts nothing).
+    #   chunk_extract — split-and-merge an over-budget transcript instead of
+    #     dead-lettering it.
+    # Both are threaded into the job payload only when provided, so callers
+    # that omit them keep the pre-Task-9 payload shape.
+    payload: dict[str, Any] = {"transcript_path": transcript_path, "extract": extract}
+    max_input_tokens = body.get("max_input_tokens")
+    if max_input_tokens is not None:
+        if not isinstance(max_input_tokens, int) or isinstance(max_input_tokens, bool):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_max_input_tokens",
+                    "message": "max_input_tokens должен быть целым числом >= 1024.",
+                },
+            )
+        if max_input_tokens < 1024:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_max_input_tokens",
+                    "message": "max_input_tokens слишком мал (минимум 1024).",
+                },
+            )
+        payload["max_input_tokens"] = max_input_tokens
+    if bool(body.get("chunk_extract", False)):
+        payload["chunk_extract"] = True
     store: JobStore = runtime.job_store
-    job = store.create(
-        kind="ingest",
-        payload={"transcript_path": transcript_path, "extract": extract},
-    )
+    job = store.create(kind="ingest", payload=payload)
     if runtime.job_worker is not None:
         runtime.job_worker.signal_wakeup()
     dumped: dict[str, Any] = job.model_dump(mode="json")

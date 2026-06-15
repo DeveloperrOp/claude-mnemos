@@ -216,3 +216,59 @@ async def test_post_ingest_rejects_path_outside_transcripts_root(
     )
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "transcript_outside_root"
+
+
+async def test_post_ingest_accepts_max_input_tokens_and_chunk_extract(
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 9: per-session controls land in the job payload verbatim."""
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
+    transcript = tmp_path / "ctl.jsonl"
+    transcript.write_text("[]", encoding="utf-8")
+    r = await client.post(
+        "/api/sessions/alpha/ctl/ingest",
+        json={
+            "transcript_path": str(transcript),
+            "extract": True,
+            "max_input_tokens": 1_200_000,
+            "chunk_extract": True,
+        },
+    )
+    assert r.status_code == 201
+    payload = r.json()["payload"]
+    assert payload["transcript_path"] == str(transcript)
+    assert payload["extract"] is True
+    assert payload["max_input_tokens"] == 1_200_000
+    assert payload["chunk_extract"] is True
+
+
+async def test_post_ingest_rejects_max_input_tokens_below_floor(
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 9: max_input_tokens < 1024 → 400 (a tiny budget extracts nothing)."""
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
+    transcript = tmp_path / "small.jsonl"
+    transcript.write_text("[]", encoding="utf-8")
+    r = await client.post(
+        "/api/sessions/alpha/small/ingest",
+        json={"transcript_path": str(transcript), "max_input_tokens": 500},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "invalid_max_input_tokens"
+
+
+async def test_post_ingest_without_new_fields_omits_them(
+    client: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 9: callers not sending the new fields get the unchanged payload shape."""
+    monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(tmp_path))
+    transcript = tmp_path / "plain.jsonl"
+    transcript.write_text("[]", encoding="utf-8")
+    r = await client.post(
+        "/api/sessions/alpha/plain/ingest",
+        json={"transcript_path": str(transcript)},
+    )
+    assert r.status_code == 201
+    payload = r.json()["payload"]
+    assert "max_input_tokens" not in payload
+    assert payload.get("chunk_extract", False) is False
