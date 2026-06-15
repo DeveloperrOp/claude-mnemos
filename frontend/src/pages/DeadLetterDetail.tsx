@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectBadge } from "@/components/widgets/ProjectBadge";
 import { ConfirmDialog } from "@/components/widgets/ConfirmDialog";
+import { DeadLetterReextractButtons } from "@/components/widgets/DeadLetterReextractButtons";
 import { useDeadLetterEntry } from "@/hooks/useDeadLetterEntry";
 import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
 import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
@@ -78,6 +79,7 @@ export function DeadLetterDetail() {
           <X className="mr-1 h-3 w-3" />
           {t("dead_letter.dismiss_button")}
         </Button>
+        <DeadLetterReextractButtons job={j} />
       </div>
 
       <div className="rounded-md border border-border/60 bg-card/40 p-4">

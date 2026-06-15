@@ -5,6 +5,7 @@ import { ChevronRight, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProjectBadge } from "./ProjectBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DeadLetterReextractButtons } from "./DeadLetterReextractButtons";
 import { useDeadLetterRetry } from "@/hooks/useDeadLetterRetry";
 import { useDeadLetterDismiss } from "@/hooks/useDeadLetterDismiss";
 import { formatDateTime } from "@/lib/datetime";
@@ -69,6 +70,7 @@ export function DeadLetterRow({ job: j }: { job: Job }) {
           <X className="mr-1 h-3 w-3" />
           {t("dead_letter.dismiss_button")}
         </Button>
+        <DeadLetterReextractButtons job={j} />
       </div>
 
       <ConfirmDialog
