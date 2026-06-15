@@ -7,6 +7,7 @@ import { useSession } from "@/hooks/useSession";
 import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
 import {
+  canTryWhole,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -48,6 +49,8 @@ export function SessionDetail() {
   const tooLargeRec = tooLarge
     ? recommendMode(tooLarge.needs, tooLarge.max)
     : null;
+  // A whole shot above the single-shot ceiling is doomed — never offer it.
+  const allowWhole = tooLarge ? canTryWhole(tooLarge.needs) : false;
   return (
     <article className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
@@ -58,28 +61,31 @@ export function SessionDetail() {
           {tooLarge ? (
             <>
               {/* Oversized transcript: whole-vs-chunked retry. Recommended
-                  mode is rendered first and highlighted as the primary. */}
-              <Button
-                size="sm"
-                variant={tooLargeRec === "whole" ? "default" : "outline"}
-                disabled={ingest.isPending || !s.transcript_path}
-                onClick={() => {
-                  if (project && sid && s.transcript_path) {
-                    ingest.mutate({
-                      project,
-                      session_id: sid,
-                      transcript_path: s.transcript_path,
-                      extract: true,
-                      maxInputTokens: wholeBudget(tooLarge.needs),
-                    });
-                  }
-                }}
-              >
-                <Sparkles className="mr-1 h-3 w-3" />
-                {ingest.isPending
-                  ? t("sessions.ingesting")
-                  : t("sessions.extract_whole_button")}
-              </Button>
+                  mode is rendered first and highlighted as the primary. The
+                  whole-shot button is hidden when it can't possibly fit. */}
+              {allowWhole && (
+                <Button
+                  size="sm"
+                  variant={tooLargeRec === "whole" ? "default" : "outline"}
+                  disabled={ingest.isPending || !s.transcript_path}
+                  onClick={() => {
+                    if (project && sid && s.transcript_path) {
+                      ingest.mutate({
+                        project,
+                        session_id: sid,
+                        transcript_path: s.transcript_path,
+                        extract: true,
+                        maxInputTokens: wholeBudget(tooLarge.needs),
+                      });
+                    }
+                  }}
+                >
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  {ingest.isPending
+                    ? t("sessions.ingesting")
+                    : t("sessions.extract_whole_button")}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant={tooLargeRec === "chunked" ? "default" : "outline"}

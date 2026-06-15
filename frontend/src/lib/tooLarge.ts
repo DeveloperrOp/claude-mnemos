@@ -17,9 +17,29 @@ export function parseTooLarge(error?: string | null): TooLargeInfo | null {
 
 export type ExtractMode = "whole" | "chunked";
 
+// Hard ceiling on what a single extraction pass can realistically hold.
+// Claude models cap at ~1,000,000 input tokens; we reserve headroom under
+// that for the system prompt, tool schema, and the model's own output, so a
+// one-shot "whole" extraction must stay at or below ~900k input tokens.
+// Above this, a "whole" retry is doomed — it clears the local pre-count guard
+// but fails at `claude -p`'s real 1M limit, dead-lettering with a generic
+// subprocess error (not a clean too_large code). So we never recommend or even
+// offer "whole" past this point.
+export const WHOLE_SHOT_CEILING = 900_000;
+
+/** Whether a whole-shot extraction can possibly fit one pass. The UI uses this
+ * to HIDE the "Try whole" button entirely for sessions that can't fit. */
+export function canTryWhole(needs: number): boolean {
+  return needs <= WHOLE_SHOT_CEILING;
+}
+
 export function recommendMode(needs: number, max: number): ExtractMode {
-  // slightly over → one shot on a bigger budget; way over → chunks
-  return needs <= max * 1.5 ? "whole" : "chunked";
+  // Recommend a single "whole" pass only when it can actually fit: it must
+  // stay within the hard single-shot ceiling AND be only modestly over the
+  // server-reported max (≤1.5×). Otherwise chunk it.
+  return needs <= WHOLE_SHOT_CEILING && needs <= max * 1.5
+    ? "whole"
+    : "chunked";
 }
 
 /** Budget to request for a "whole" retry: comfortably above what's needed. */

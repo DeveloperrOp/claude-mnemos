@@ -90,6 +90,34 @@ describe("SessionCard — too-large session", () => {
     expect(screen.queryByRole("button", { name: /^Retry$/ })).toBeNull();
   });
 
+  it("hides «Try whole» when needs exceeds the single-shot ceiling", () => {
+    wrap(
+      <SessionCard
+        project="alpha"
+        session={makeSession({ error: "too_large:needs=1200000:max=800000" })}
+      />,
+    );
+    // Doomed whole-shot must not be offered at all.
+    expect(screen.queryByRole("button", { name: /Try whole/ })).toBeNull();
+    // Only the chunked path remains.
+    expect(
+      screen.getByRole("button", { name: /Process in chunks/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows both buttons when needs fits a single shot (700k)", () => {
+    wrap(
+      <SessionCard
+        project="alpha"
+        session={makeSession({ error: "too_large:needs=700000:max=800000" })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Try whole/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Process in chunks/ }),
+    ).toBeInTheDocument();
+  });
+
   it("clicking «Process in chunks» ingests with chunked:true", async () => {
     const spy = vi
       .spyOn(sessionsApi, "ingestSession")

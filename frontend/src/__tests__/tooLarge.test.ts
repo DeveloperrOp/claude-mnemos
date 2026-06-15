@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canTryWhole,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -42,11 +43,34 @@ describe("recommendMode", () => {
     expect(recommendMode(5_000_000, 800000)).toBe("chunked");
   });
 
-  it("treats exactly 1.5x as whole (inclusive boundary)", () => {
-    // 800000 * 1.5 === 1200000 → needs <= max*1.5 → whole
-    expect(recommendMode(1_200_000, 800000)).toBe("whole");
-    // one token past the boundary → chunked
-    expect(recommendMode(1_200_001, 800000)).toBe("chunked");
+  it("recommends whole below the single-shot ceiling", () => {
+    expect(recommendMode(700000, 800000)).toBe("whole");
+  });
+
+  it("recommends chunked above the ceiling even when under 1.5x max", () => {
+    // 950k < 1.5 × 800k = 1.2M (old rule said whole), but it exceeds the
+    // 900k single-shot ceiling, so a whole pass can't fit → chunked.
+    expect(recommendMode(950000, 800000)).toBe("chunked");
+    // 1.2M is well over the ceiling → chunked (never the doomed whole).
+    expect(recommendMode(1_200_000, 800000)).toBe("chunked");
+  });
+
+  it("treats exactly the ceiling as whole (inclusive boundary)", () => {
+    expect(recommendMode(900000, 800000)).toBe("whole");
+    // one token past the ceiling → chunked
+    expect(recommendMode(900001, 800000)).toBe("chunked");
+  });
+});
+
+describe("canTryWhole", () => {
+  it("allows a whole shot at or below the ceiling", () => {
+    expect(canTryWhole(900000)).toBe(true);
+    expect(canTryWhole(700000)).toBe(true);
+  });
+
+  it("forbids a whole shot above the ceiling", () => {
+    expect(canTryWhole(900001)).toBe(false);
+    expect(canTryWhole(1_200_000)).toBe(false);
   });
 });
 

@@ -2,7 +2,12 @@ import { useTranslation } from "react-i18next";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useReingestSession } from "@/hooks/useReingestSession";
-import { parseTooLarge, recommendMode, wholeBudget } from "@/lib/tooLarge";
+import {
+  canTryWhole,
+  parseTooLarge,
+  recommendMode,
+  wholeBudget,
+} from "@/lib/tooLarge";
 import type { Job } from "@/types/Job";
 
 /** Derive the session_id from a transcript path's stem (basename minus the
@@ -34,6 +39,8 @@ export function DeadLetterReextractButtons({ job }: { job: Job }) {
   const project = job.project_name;
   const sessionId = sessionIdFromTranscript(transcriptPath);
   const rec = recommendMode(tl.needs, tl.max);
+  // A whole shot above the single-shot ceiling is doomed — never offer it.
+  const allowWhole = canTryWhole(tl.needs);
 
   const whole = (
     <Button
@@ -81,6 +88,8 @@ export function DeadLetterReextractButtons({ job }: { job: Job }) {
     </Button>
   );
 
-  // Render the recommended one first.
+  // When the session can't fit one shot, offer only the chunked path.
+  if (!allowWhole) return <>{chunked}</>;
+  // Otherwise render the recommended one first.
   return <>{rec === "chunked" ? [chunked, whole] : [whole, chunked]}</>;
 }

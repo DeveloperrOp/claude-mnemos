@@ -15,6 +15,7 @@ import { useReingestSession } from "@/hooks/useReingestSession";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
 import {
+  canTryWhole,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -231,6 +232,9 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
                   recommendMode is the primary (default) button. */}
               {(() => {
                 const rec = recommendMode(tooLarge.needs, tooLarge.max);
+                // A whole shot above the single-shot ceiling is doomed —
+                // never offer it; show only the chunked path.
+                const allowWhole = canTryWhole(tooLarge.needs);
                 const whole = (
                   <Button
                     key="whole"
@@ -279,7 +283,9 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
                       : t("sessions.extract_chunked_button")}
                   </Button>
                 );
-                // Render the recommended one first.
+                // When a single shot can't fit, offer only chunked.
+                if (!allowWhole) return chunked;
+                // Otherwise render the recommended one first.
                 return rec === "chunked" ? [chunked, whole] : [whole, chunked];
               })()}
             </>

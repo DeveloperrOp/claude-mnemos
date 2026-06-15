@@ -96,6 +96,16 @@ describe("DeadLetterRow re-extraction", () => {
     ).toBeInTheDocument();
   });
 
+  it("hides «Try whole» when needs exceeds the single-shot ceiling", () => {
+    wrapRow(mkJob({ error: "too_large:needs=1200000:max=800000" }));
+    expect(
+      screen.queryByRole("button", { name: /Try whole/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Process in chunks/i }),
+    ).toBeInTheDocument();
+  });
+
   it("clicking 'Process in chunks' ingests with chunked:true for the derived session", async () => {
     const spy = vi
       .spyOn(sessionsApi, "ingestSession")
