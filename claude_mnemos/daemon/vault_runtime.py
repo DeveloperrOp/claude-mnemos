@@ -245,7 +245,10 @@ class VaultRuntime:
         in the dashboard) on top via ``with_overrides``.
         """
         cfg = Config.from_env()
-        if os.environ.get("MNEMOS_MAX_INPUT_TOKENS") is None:
+        # Falsy/whitespace-aware (not ``is None``): an empty or blank env var is
+        # treated as unset here too, matching ``Config.from_env()``, so the UI
+        # override still applies instead of being silently skipped.
+        if not (os.environ.get("MNEMOS_MAX_INPUT_TOKENS") or "").strip():
             global_settings = self._settings_store.get_global()
             cfg = cfg.with_overrides(
                 max_input_tokens=global_settings.default_max_input_tokens

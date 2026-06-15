@@ -501,3 +501,23 @@ def test_cfg_factory_env_overrides_global_max_input_tokens(tmp_path: Path, monke
         assert cfg.max_input_tokens == 222_222
     finally:
         rt.job_store.close()
+
+
+def test_cfg_factory_empty_env_applies_global(tmp_path: Path, monkeypatch) -> None:
+    """An *empty* MNEMOS_MAX_INPUT_TOKENS (exported but blank) must be treated
+    as unset: the UI/global value flows in, and _make_cfg() does not crash on
+    int("")."""
+    monkeypatch.setenv("MNEMOS_MAX_INPUT_TOKENS", "")
+    store = SettingsStore(root=tmp_path / "cfgroot_empty")
+    store.patch_global({"default_max_input_tokens": 500_000})
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "cfg_empty"),
+        settings=ProjectSettings(),
+        settings_store=store,
+    )
+    try:
+        cfg = rt._make_cfg()
+        assert cfg.max_input_tokens == 500_000
+    finally:
+        rt.job_store.close()

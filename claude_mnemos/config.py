@@ -82,11 +82,14 @@ class Config:
             )
 
         max_tokens_raw = os.environ.get("MNEMOS_MAX_INPUT_TOKENS")
-        if max_tokens_raw is None:
+        # An empty/whitespace string (var exported but blank) is treated as
+        # unset, not as a parse error — otherwise int("") blows up and fails
+        # every ingest job. A genuinely non-integer value still raises below.
+        if max_tokens_raw is None or not max_tokens_raw.strip():
             max_tokens = DEFAULT_MAX_INPUT_TOKENS
         else:
             try:
-                max_tokens = int(max_tokens_raw)
+                max_tokens = int(max_tokens_raw.strip())
             except ValueError as exc:
                 raise ValueError(
                     f"MNEMOS_MAX_INPUT_TOKENS={max_tokens_raw!r}: expected integer"

@@ -95,6 +95,21 @@ def test_invalid_max_input_tokens_raises(monkeypatch):
         Config.from_env()
 
 
+def test_from_env_empty_string_falls_back_to_default(monkeypatch):
+    # An *empty* (or whitespace) MNEMOS_MAX_INPUT_TOKENS is treated as unset,
+    # not as a parse error. os.environ.get returns "" (not None) when a var is
+    # exported empty, which used to blow up int("") and fail every ingest job.
+    monkeypatch.setenv("MNEMOS_MAX_INPUT_TOKENS", "")
+    cfg = Config.from_env()
+    assert cfg.max_input_tokens == DEFAULT_MAX_INPUT_TOKENS
+
+
+def test_from_env_whitespace_string_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("MNEMOS_MAX_INPUT_TOKENS", "   ")
+    cfg = Config.from_env()
+    assert cfg.max_input_tokens == DEFAULT_MAX_INPUT_TOKENS
+
+
 def test_with_overrides_invalid_language_hint_raises():
     cfg = Config(
         api_key=None,
