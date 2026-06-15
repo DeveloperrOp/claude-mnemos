@@ -22,6 +22,12 @@ from claude_mnemos.state.settings import (
 )
 
 
+def test_global_settings_default_max_input_tokens_is_800k():
+    # Synced with claude_mnemos.config.DEFAULT_MAX_INPUT_TOKENS: 1M context
+    # window means the old 150k cap was overcautious.
+    assert GlobalSettings().default_max_input_tokens == 800_000
+
+
 def test_project_settings_defaults():
     s = ProjectSettings()
     assert s.version == 1

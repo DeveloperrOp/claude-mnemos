@@ -9,7 +9,7 @@ IngestProvider = Literal["cli", "api"]
 _VALID_PROVIDERS: set[str] = {"cli", "api"}
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
-DEFAULT_MAX_INPUT_TOKENS = 150_000
+DEFAULT_MAX_INPUT_TOKENS = 800_000
 DEFAULT_LOCK_TIMEOUT = 60.0
 DEFAULT_LANGUAGE_HINT: LanguageHint = "auto"
 

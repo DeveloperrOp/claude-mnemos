@@ -10,6 +10,13 @@ from claude_mnemos.config import (
 )
 
 
+def test_default_max_input_tokens_is_800k():
+    # Claude models support a 1M context window; the historical 150k cap was
+    # overcautious. Bumped to 800k. Saved settings keep their explicit value;
+    # the default only affects users without the field set.
+    assert DEFAULT_MAX_INPUT_TOKENS == 800_000
+
+
 def test_default_config(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("MNEMOS_MODEL", raising=False)

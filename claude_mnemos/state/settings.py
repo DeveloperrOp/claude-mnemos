@@ -140,7 +140,7 @@ class GlobalSettings(BaseModel):
     daemon_port: int = Field(default=5757, ge=1, le=65535)
     default_model: str = "claude-sonnet-4-6"
     default_language_hint: Literal["auto", "uk", "ru", "en"] = "auto"
-    default_max_input_tokens: int = Field(default=150_000, ge=1024)
+    default_max_input_tokens: int = Field(default=800_000, ge=1024)
     default_retention_days: int = Field(default=180, ge=1)
     # primary_project removed in β2.
     # v0.0.10: defaults for ProjectSettings.auto_ingest. All three are

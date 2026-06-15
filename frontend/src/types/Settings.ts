@@ -57,7 +57,7 @@ export const GlobalSettingsSchema = z.object({
   daemon_port: z.number().int().min(1).max(65535).default(5757),
   default_model: z.string().default("claude-sonnet-4-6"),
   default_language_hint: z.enum(["auto", "uk", "ru", "en"]).default("auto"),
-  default_max_input_tokens: z.number().int().min(1024).default(150000),
+  default_max_input_tokens: z.number().int().min(1024).default(800_000),
   default_retention_days: z.number().int().min(1).default(180),
   auto_ingest_defaults: AutoIngestDefaultsSchema.default({
     dump_on_session_end: true,

@@ -15,7 +15,7 @@ export function GlobalDefaultsSection() {
 
   const [model, setModel] = useState("");
   const [langHint, setLangHint] = useState<LangHint>("auto");
-  const [maxInputTokens, setMaxInputTokens] = useState(150000);
+  const [maxInputTokens, setMaxInputTokens] = useState(800_000);
   const [retentionDays, setRetentionDays] = useState(180);
 
   useEffect(() => {
