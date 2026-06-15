@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -20,6 +21,8 @@ from claude_mnemos.ingest.llm.tokens import count_tokens_local
 from claude_mnemos.ingest.prompts import format_user, load_system
 from claude_mnemos.ingest.transcript import TranscriptMessage
 
+logger = logging.getLogger(__name__)
+
 _FOLDER_BY_TYPE = {"entity": "entities", "concept": "concepts"}
 
 # Fraction of ``max_input_tokens`` reserved for the rendered transcript when
@@ -37,9 +40,13 @@ def _merge_payloads(payloads: list[ExtractionPayload]) -> ExtractionPayload:
     (``make_slug(slug_hint or title)``). For a slug seen more than once:
 
     - if the two bodies are identical after normalization
-      (``body_hash``) → keep the first occurrence (content is the same);
-    - otherwise → keep the page with the higher ``confidence``
-      (ties keep the first occurrence).
+      (``body_hash``) → keep the first occurrence's body, but raise its
+      ``confidence`` to ``max(existing, page)`` (identical content found twice
+      is more trustworthy);
+    - otherwise (different bodies, same slug) → keep the higher-``confidence``
+      page as the base and APPEND the lower-confidence page's body to it under a
+      separator heading, so no knowledge is silently lost. The post-hoc ontology
+      scan can later merge/clean the duplicated section. A warning is logged.
 
     Regardless of which page is kept, ``related`` links from all occurrences
     are unioned (order-preserving, deduped) onto the kept page.
@@ -56,14 +63,35 @@ def _merge_payloads(payloads: list[ExtractionPayload]) -> ExtractionPayload:
             if existing is None:
                 by_slug[key] = page
                 continue
-            if body_hash(existing.body) == body_hash(page.body):
-                kept = existing
-            elif page.confidence > existing.confidence:
-                kept = page
-            else:
-                kept = existing
             related = list(dict.fromkeys([*existing.related, *page.related]))
-            by_slug[key] = kept.model_copy(update={"related": related})
+            if body_hash(existing.body) == body_hash(page.body):
+                # Identical content found twice: keep the body, take the higher
+                # confidence (Finding 2).
+                update = {
+                    "related": related,
+                    "confidence": max(existing.confidence, page.confidence),
+                }
+                by_slug[key] = existing.model_copy(update=update)
+                continue
+            # Different bodies under the same slug: keep the higher-confidence
+            # page as the base and append the dropped body so nothing is lost
+            # (Finding 1).
+            if page.confidence > existing.confidence:
+                kept, dropped = page, existing
+            else:
+                kept, dropped = existing, page
+            logger.warning(
+                "merge: slug collision %r vs %r -> %s; appended lower-confidence body",
+                existing.title,
+                page.title,
+                key,
+            )
+            merged_body = (
+                kept.body + "\n\n---\n\n## (другой фрагмент)\n\n" + dropped.body
+            )
+            by_slug[key] = kept.model_copy(
+                update={"related": related, "body": merged_body}
+            )
 
     summaries = [p.summary for p in payloads if p.summary]
     has_pages = bool(by_slug)
@@ -111,6 +139,16 @@ def extract_wiki_pages(
     """
     full = _render_transcript(messages)
     budget = int(cfg.max_input_tokens * _BUDGET_FRACTION)
+
+    if chunk_extract and full and count_tokens_local(full) == 0:
+        # tiktoken degraded to 0 (cold/offline BPE cache): the fits-check below
+        # is always True so chunking silently never triggers even for a huge
+        # transcript. Keep control flow unchanged — just surface the blind spot
+        # (Finding 3).
+        logger.warning(
+            "merge/chunk: token estimate degraded to 0; chunking may not "
+            "trigger for a large transcript"
+        )
 
     if not chunk_extract or count_tokens_local(full) <= budget:
         raw = _extract_one(llm_client, user=_format_user(cfg, full))

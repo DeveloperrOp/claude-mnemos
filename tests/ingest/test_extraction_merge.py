@@ -50,8 +50,11 @@ def test_merge_dedups_same_slug_keeps_higher_confidence() -> None:
 
     assert len(merged.pages) == 1
     kept = merged.pages[0]
+    # Higher-confidence page is the base; the lower-confidence body is appended
+    # (not dropped) so nothing is lost.
     assert kept.confidence == 0.9
-    assert kept.body == "High-confidence body."
+    assert kept.body.startswith("High-confidence body.")
+    assert "Low-confidence body." in kept.body
 
 
 def test_merge_identical_body_collapses_to_one() -> None:
@@ -62,9 +65,10 @@ def test_merge_identical_body_collapses_to_one() -> None:
     merged = _merge_payloads([_payload(a), _payload(b)])
 
     assert len(merged.pages) == 1
-    # Identical content => keep the existing (first), ignoring confidence.
+    # Identical content => keep the existing (first) body verbatim...
     assert merged.pages[0].body == "Same body."
-    assert merged.pages[0].confidence == 0.3
+    # ...but take the higher of the two confidences (Finding 2).
+    assert merged.pages[0].confidence == 0.9
 
 
 def test_merge_unions_related_links() -> None:
@@ -108,3 +112,38 @@ def test_merge_empty_payloads() -> None:
     assert merged.pages == []
     assert merged.summary == ""
     assert merged.skipped_reason == "no pages"
+
+
+def test_merge_slug_collision_different_body_appends_not_drops() -> None:
+    # Same make_slug key (same title), DIFFERENT bodies, different confidence.
+    low = _page(title="FastAPI", body="Low-confidence unique body.", confidence=0.3)
+    high = _page(title="FastAPI", body="High-confidence unique body.", confidence=0.9)
+
+    merged = _merge_payloads([_payload(low), _payload(high)])
+
+    assert len(merged.pages) == 1
+    kept = merged.pages[0]
+    # Higher-confidence page is the base; its confidence is preserved.
+    assert kept.confidence == 0.9
+    # Nothing is lost: BOTH bodies are present in the merged body.
+    assert "High-confidence unique body." in kept.body
+    assert "Low-confidence unique body." in kept.body
+    # The base (higher-confidence) body comes first, dropped body appended after it.
+    assert kept.body.index("High-confidence unique body.") < kept.body.index(
+        "Low-confidence unique body."
+    )
+
+
+def test_merge_identical_body_takes_max_confidence() -> None:
+    p1 = _page(title="FastAPI", body="Same body.", confidence=0.3)
+    # Identical content after normalization, higher confidence on the second page.
+    p2 = _page(title="FastAPI", body="  SAME   body.  ", confidence=0.9)
+
+    merged = _merge_payloads([_payload(p1), _payload(p2)])
+
+    assert len(merged.pages) == 1
+    kept = merged.pages[0]
+    # Body unchanged (the existing/first body is kept verbatim).
+    assert kept.body == "Same body."
+    # Higher confidence wins when content is identical.
+    assert kept.confidence == 0.9

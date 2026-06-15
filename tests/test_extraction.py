@@ -315,9 +315,14 @@ def test_oversized_transcript_chunks_and_merges():
     assert Path("wiki/entities/fastapi.md") in paths
     assert Path("wiki/entities/flask.md") in paths
     assert len(result.pages) == 2
-    # Higher-confidence FastAPI body wins the merge.
+    # Different-body slug collision: higher-confidence body is the base, the
+    # lower-confidence body is APPENDED (no silent loss), not dropped.
     fastapi = next(p for p in result.pages if p.relative_path.name == "fastapi.md")
-    assert fastapi.body == "FastAPI body v2 better."
+    assert "FastAPI body v2 better." in fastapi.body
+    assert "FastAPI body v1." in fastapi.body
+    assert fastapi.body.index("FastAPI body v2 better.") < fastapi.body.index(
+        "FastAPI body v1."
+    )
     # Token totals are summed across chunks.
     assert result.input_tokens == 250
     assert result.output_tokens == 95
@@ -346,6 +351,33 @@ def test_chunked_extract_passes_chunk_note_in_user_prompt():
 
     user_args = [c.kwargs["user"] for c in fake_client.extract.call_args_list]
     assert any("част" in u.lower() or "part" in u.lower() for u in user_args)
+
+
+def test_token_estimate_degrade_logs_warning(monkeypatch, caplog):
+    """Finding 3: tiktoken degrade (count==0) with chunk_extract logs a warning."""
+    import logging
+
+    from claude_mnemos.ingest import extraction as extraction_mod
+
+    payload = _load("single_entity.json")
+    fake_client = MagicMock()
+    fake_client.extract.return_value = ExtractionRaw(
+        payload=payload, input_tokens=1, output_tokens=1
+    )
+
+    # Simulate tiktoken degrade: token counter always returns 0.
+    monkeypatch.setattr(extraction_mod, "count_tokens_local", lambda _text: 0)
+
+    with caplog.at_level(logging.WARNING, logger=extraction_mod.logger.name):
+        extract_wiki_pages(
+            messages=_messages(),
+            cfg=_cfg(),
+            llm_client=fake_client,
+            today=date(2026, 4, 26),
+            chunk_extract=True,
+        )
+
+    assert any("degraded to 0" in r.getMessage() for r in caplog.records)
 
 
 def test_chunk_note_empty_for_single_chunk():
