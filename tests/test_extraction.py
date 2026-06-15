@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from claude_mnemos.config import Config
+from claude_mnemos.core.models import ExtractedPage, ExtractionPayload, ProvenanceCounts
 from claude_mnemos.ingest.extraction import ExtractionResult, extract_wiki_pages
 from claude_mnemos.ingest.llm import ExtractionRaw
 from claude_mnemos.ingest.transcript import TranscriptMessage
@@ -198,3 +199,163 @@ def test_extract_unknown_page_type_raises_key_error(monkeypatch):
             llm_client=fake_client,
             today=date(2026, 4, 26),
         )
+
+
+# --- chunked extraction (Task 8) -------------------------------------------
+
+_PROV = ProvenanceCounts(extracted_pct=100, inferred_pct=0, ambiguous_pct=0)
+
+
+def _extracted_page(
+    *,
+    title: str,
+    body: str,
+    confidence: float = 0.7,
+    slug_hint: str | None = None,
+) -> ExtractedPage:
+    return ExtractedPage(
+        type="entity",
+        title=title,
+        slug_hint=slug_hint,
+        confidence=confidence,
+        provenance=_PROV,
+        body=body,
+    )
+
+
+def _raw_for(*pages: ExtractedPage, input_tokens: int, output_tokens: int) -> ExtractionRaw:
+    payload = ExtractionPayload(summary="part", skipped_reason=None, pages=list(pages))
+    return ExtractionRaw(
+        payload=payload.model_dump(mode="json"),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
+def test_small_transcript_calls_extract_once():
+    """REGRESSION: a small transcript with chunk_extract defaulted is one extract call."""
+    payload = _load("single_entity.json")
+    fake_client = MagicMock()
+    fake_client.extract.return_value = ExtractionRaw(
+        payload=payload, input_tokens=1000, output_tokens=200
+    )
+
+    result = extract_wiki_pages(
+        messages=_messages(),
+        cfg=_cfg(),
+        llm_client=fake_client,
+        today=date(2026, 4, 26),
+    )
+
+    assert fake_client.extract.call_count == 1
+    assert len(result.pages) == 1
+
+
+def test_small_transcript_with_chunk_extract_still_one_call():
+    """chunk_extract=True but transcript fits the budget → still a single call."""
+    payload = _load("single_entity.json")
+    fake_client = MagicMock()
+    fake_client.extract.return_value = ExtractionRaw(
+        payload=payload, input_tokens=1000, output_tokens=200
+    )
+
+    extract_wiki_pages(
+        messages=_messages(),
+        cfg=_cfg(),  # 150k budget — tiny transcript fits
+        llm_client=fake_client,
+        today=date(2026, 4, 26),
+        chunk_extract=True,
+    )
+
+    assert fake_client.extract.call_count == 1
+
+
+def test_oversized_transcript_chunks_and_merges():
+    """Oversized transcript + chunk_extract → split, per-chunk extract, merged result."""
+    # Many sizable messages so the rendered transcript blows past a tiny budget.
+    messages = [
+        TranscriptMessage(role="user", text=f"Message number {i}: " + ("lorem ipsum " * 40))
+        for i in range(12)
+    ]
+    # budget = 800 * 0.75 = 600 → packs ~6 of these ~94-token messages per chunk
+    # → exactly two chunks for twelve messages.
+    cfg = _cfg().with_overrides(max_input_tokens=800)
+
+    # Two chunks share the FastAPI slug (deduped on merge); chunk 2 adds Flask.
+    chunk1 = _raw_for(
+        _extracted_page(title="FastAPI", body="FastAPI body v1.", confidence=0.6),
+        input_tokens=120,
+        output_tokens=40,
+    )
+    chunk2 = _raw_for(
+        _extracted_page(title="FastAPI", body="FastAPI body v2 better.", confidence=0.9),
+        _extracted_page(title="Flask", body="Flask body."),
+        input_tokens=130,
+        output_tokens=55,
+    )
+    fake_client = MagicMock()
+    fake_client.extract.side_effect = [chunk1, chunk2]
+
+    from claude_mnemos.ingest.chunking import split_messages_for_budget
+
+    expected_chunks = split_messages_for_budget(messages, budget_tokens=int(800 * 0.75))
+    assert len(expected_chunks) == 2  # guard: the fixture splits into exactly two
+
+    result = extract_wiki_pages(
+        messages=messages,
+        cfg=cfg,
+        llm_client=fake_client,
+        today=date(2026, 4, 26),
+        chunk_extract=True,
+    )
+
+    assert fake_client.extract.call_count == len(expected_chunks)
+    # FastAPI deduped across the two chunks, Flask survives → 2 unique pages.
+    paths = {p.relative_path for p in result.pages}
+    assert Path("wiki/entities/fastapi.md") in paths
+    assert Path("wiki/entities/flask.md") in paths
+    assert len(result.pages) == 2
+    # Higher-confidence FastAPI body wins the merge.
+    fastapi = next(p for p in result.pages if p.relative_path.name == "fastapi.md")
+    assert fastapi.body == "FastAPI body v2 better."
+    # Token totals are summed across chunks.
+    assert result.input_tokens == 250
+    assert result.output_tokens == 95
+
+
+def test_chunked_extract_passes_chunk_note_in_user_prompt():
+    """Each chunked call carries a 'part N of M' note in the user prompt."""
+    messages = [
+        TranscriptMessage(role="user", text=f"Msg {i}: " + ("alpha beta gamma " * 40))
+        for i in range(10)
+    ]
+    cfg = _cfg().with_overrides(max_input_tokens=200)
+    raw = _raw_for(
+        _extracted_page(title="Topic", body="Body."), input_tokens=10, output_tokens=5
+    )
+    fake_client = MagicMock()
+    fake_client.extract.return_value = raw
+
+    extract_wiki_pages(
+        messages=messages,
+        cfg=cfg,
+        llm_client=fake_client,
+        today=date(2026, 4, 26),
+        chunk_extract=True,
+    )
+
+    user_args = [c.kwargs["user"] for c in fake_client.extract.call_args_list]
+    assert any("част" in u.lower() or "part" in u.lower() for u in user_args)
+
+
+def test_chunk_note_empty_for_single_chunk():
+    """format_user without chunk_note is byte-identical to the chunk_note='' call."""
+    from claude_mnemos.ingest.prompts import format_user
+
+    base = format_user(transcript="T", language_hint="auto")
+    empty = format_user(transcript="T", language_hint="auto", chunk_note="")
+    assert base == empty
+    # And a non-empty note actually changes the prompt.
+    noted = format_user(transcript="T", language_hint="auto", chunk_note="(часть 1 из 2)")
+    assert noted != base
+    assert "часть 1 из 2" in noted

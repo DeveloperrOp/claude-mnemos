@@ -50,3 +50,7 @@ Markdown only. Do not include YAML frontmatter — we add it. Use H2 (`##`) for 
 - Call `save_wiki_pages` exactly once.
 - Empty `pages` array is valid; pair it with `skipped_reason`.
 - Do not produce any text response outside the tool call.
+
+# Long transcripts split into parts
+
+If the user message says the transcript arrives in parts (e.g. "this is part 2 of 3"), extract only from the part you are given and call `save_wiki_pages` once for it. Do not refuse or wait for other parts. Pages describing the same entity across parts are merged automatically afterwards, so it is fine if a later part covers a thing already seen earlier.

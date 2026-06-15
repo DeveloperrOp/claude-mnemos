@@ -14,11 +14,20 @@ from claude_mnemos.core.models import (
 )
 from claude_mnemos.core.ontology_similarity import body_hash
 from claude_mnemos.core.slug import make_slug
-from claude_mnemos.ingest.llm import LLMClient
+from claude_mnemos.ingest.chunking import split_messages_for_budget
+from claude_mnemos.ingest.llm import ExtractionRaw, LLMClient
+from claude_mnemos.ingest.llm.tokens import count_tokens_local
 from claude_mnemos.ingest.prompts import format_user, load_system
 from claude_mnemos.ingest.transcript import TranscriptMessage
 
 _FOLDER_BY_TYPE = {"entity": "entities", "concept": "concepts"}
+
+# Fraction of ``max_input_tokens`` reserved for the rendered transcript when
+# chunking. The remaining ~25% is headroom for the system prompt, user-prompt
+# scaffolding and the tool schema. The same fraction decides whether a
+# transcript fits in a single call (so a transcript classed as "fits" is exactly
+# one that would not be chunked).
+_BUDGET_FRACTION = 0.75
 
 
 def _merge_payloads(payloads: list[ExtractionPayload]) -> ExtractionPayload:
@@ -87,32 +96,74 @@ def extract_wiki_pages(
     cfg: Config,
     llm_client: LLMClient,
     today: date,
+    chunk_extract: bool = False,
 ) -> ExtractionResult:
     """Run the LLM extraction over a parsed transcript and return wiki pages.
 
     `today` is injected for testability (deterministic created/updated).
-    """
-    transcript_text = _render_transcript(messages)
-    system = load_system()
-    user = format_user(transcript=transcript_text, language_hint=cfg.language_hint)
 
-    raw = llm_client.extract(
-        system=system,
+    When ``chunk_extract`` is true and the rendered transcript would not fit a
+    single request (``> max_input_tokens * _BUDGET_FRACTION``), the transcript is
+    split on whole-message boundaries, each chunk is extracted independently with
+    a "part N of M" note, and the per-chunk payloads are merged deterministically
+    (see :func:`_merge_payloads`). Otherwise — including every small transcript —
+    the single-call path runs unchanged: exactly one ``llm_client.extract`` call.
+    """
+    full = _render_transcript(messages)
+    budget = int(cfg.max_input_tokens * _BUDGET_FRACTION)
+
+    if not chunk_extract or count_tokens_local(full) <= budget:
+        raw = _extract_one(llm_client, user=_format_user(cfg, full))
+        payload = ExtractionPayload.model_validate(raw.payload)
+        pages = [_render_page(p, today) for p in payload.pages]
+        return ExtractionResult(
+            summary=payload.summary,
+            skipped_reason=payload.skipped_reason,
+            pages=pages,
+            input_tokens=raw.input_tokens,
+            output_tokens=raw.output_tokens,
+        )
+
+    chunks = split_messages_for_budget(messages, budget_tokens=budget)
+    total = len(chunks)
+    payloads: list[ExtractionPayload] = []
+    sum_in = 0
+    sum_out = 0
+    for i, chunk in enumerate(chunks, start=1):
+        note = f"(Это часть {i} из {total} большого транскрипта.)"
+        raw = _extract_one(
+            llm_client,
+            user=_format_user(cfg, _render_transcript(chunk), chunk_note=note),
+        )
+        payloads.append(ExtractionPayload.model_validate(raw.payload))
+        sum_in += raw.input_tokens
+        sum_out += raw.output_tokens
+
+    merged = _merge_payloads(payloads)
+    pages = [_render_page(p, today) for p in merged.pages]
+    return ExtractionResult(
+        summary=merged.summary,
+        skipped_reason=merged.skipped_reason,
+        pages=pages,
+        input_tokens=sum_in,
+        output_tokens=sum_out,
+    )
+
+
+def _format_user(cfg: Config, transcript: str, *, chunk_note: str = "") -> str:
+    return format_user(
+        transcript=transcript,
+        language_hint=cfg.language_hint,
+        chunk_note=chunk_note,
+    )
+
+
+def _extract_one(llm_client: LLMClient, *, user: str) -> ExtractionRaw:
+    return llm_client.extract(
+        system=load_system(),
         user=user,
         tool=save_wiki_pages_tool_schema(),
         validate=_validate_payload,
-    )
-
-    payload = ExtractionPayload.model_validate(raw.payload)
-
-    pages = [_render_page(p, today) for p in payload.pages]
-
-    return ExtractionResult(
-        summary=payload.summary,
-        skipped_reason=payload.skipped_reason,
-        pages=pages,
-        input_tokens=raw.input_tokens,
-        output_tokens=raw.output_tokens,
     )
 
 

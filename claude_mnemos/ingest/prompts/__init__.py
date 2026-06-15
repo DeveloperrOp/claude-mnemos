@@ -17,6 +17,13 @@ def _load_user_template() -> str:
     return (_PROMPTS_DIR / "extract_user.md").read_text(encoding="utf-8")
 
 
-def format_user(*, transcript: str, language_hint: str) -> str:
+def format_user(*, transcript: str, language_hint: str, chunk_note: str = "") -> str:
     template = _load_user_template()
+    # When there is no chunk note (the single-chunk case), drop the whole
+    # placeholder line so the rendered prompt is identical to the pre-chunking
+    # template — zero behaviour change for existing callers.
+    if chunk_note:
+        template = template.replace("{chunk_note}", chunk_note)
+    else:
+        template = template.replace("\n{chunk_note}", "").replace("{chunk_note}", "")
     return template.replace("{language_hint}", language_hint).replace("{transcript}", transcript)
