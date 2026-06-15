@@ -14,6 +14,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useReingestSession } from "@/hooks/useReingestSession";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
+import {
+  parseTooLarge,
+  recommendMode,
+  wholeBudget,
+} from "@/lib/tooLarge";
 import type { SessionStatus, SessionView } from "@/types/Session";
 
 // Brain-presence buckets. A session goes through two stages:
@@ -82,6 +87,10 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
   const liveBusy = activeJob === "queued" || activeJob === "running";
   const state = liveBusy ? "in_progress" : brainState(s);
   const extractedCount = s.created_pages.filter((p) => !isRawDumpPage(p)).length;
+  // Oversized transcript: backend marked the ingest job terminally with
+  // "too_large:needs=N:max=M". Offer a whole-vs-chunked retry instead of the
+  // lone extract button (which would just fail the same way).
+  const tooLarge = !liveBusy ? parseTooLarge(s.error) : null;
   const StateIcon = {
     extracted: BrainCircuit,
     raw_only: Brain,
@@ -187,10 +196,25 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
               {t("sessions.ingested_at")}: {formatDateTime(s.ingested_at, i18n.language)}
             </div>
           )}
-          {s.error && (
-            <div className="rounded bg-danger/10 px-2 py-1 text-danger">
-              {s.error}
+          {tooLarge ? (
+            <div className="space-y-1 rounded bg-warning/10 px-2 py-1.5 text-warning">
+              <div className="flex items-center gap-1.5 font-medium">
+                <CircleAlert className="h-3 w-3 shrink-0" />
+                {t("sessions.too_large_badge")}
+              </div>
+              <div className="text-[11px] opacity-90">
+                {t("sessions.too_large_hint", {
+                  needs: tooLarge.needs,
+                  max: tooLarge.max,
+                })}
+              </div>
             </div>
+          ) : (
+            s.error && (
+              <div className="rounded bg-danger/10 px-2 py-1 text-danger">
+                {s.error}
+              </div>
+            )
           )}
         </CardContent>
       </Link>
@@ -201,6 +225,64 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("sessions.brain.in_progress")}…
             </span>
+          ) : tooLarge ? (
+            <>
+              {/* Oversized transcript: whole-vs-chunked retry. The mode from
+                  recommendMode is the primary (default) button. */}
+              {(() => {
+                const rec = recommendMode(tooLarge.needs, tooLarge.max);
+                const whole = (
+                  <Button
+                    key="whole"
+                    size="sm"
+                    variant={rec === "whole" ? "default" : "outline"}
+                    disabled={reingest.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      reingest.mutate({
+                        project,
+                        session_id: s.session_id,
+                        transcript_path: s.transcript_path!,
+                        extract: true,
+                        maxInputTokens: wholeBudget(tooLarge.needs),
+                      });
+                    }}
+                  >
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {reingest.isPending
+                      ? t("sessions.ingesting")
+                      : t("sessions.extract_whole_button")}
+                  </Button>
+                );
+                const chunked = (
+                  <Button
+                    key="chunked"
+                    size="sm"
+                    variant={rec === "chunked" ? "default" : "outline"}
+                    disabled={reingest.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      reingest.mutate({
+                        project,
+                        session_id: s.session_id,
+                        transcript_path: s.transcript_path!,
+                        extract: true,
+                        chunked: true,
+                      });
+                    }}
+                  >
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {reingest.isPending
+                      ? t("sessions.ingesting")
+                      : t("sessions.extract_chunked_button")}
+                  </Button>
+                );
+                // Render the recommended one first.
+                return rec === "chunked" ? [chunked, whole] : [whole, chunked];
+              })()}
+            </>
           ) : (
             <>
               {/* Primary "extract" CTA when extraction would actually

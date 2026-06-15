@@ -408,6 +408,10 @@
     },
     "extract_button": "Зберегти як знання",
     "extract_hint": "Claude прочитає чат і створить Markdown-сторінки знань. Використовує ліміт твоєї підписки Claude.",
+    "too_large_badge": "Завелика для одного заходу",
+    "too_large_hint": "Потрібно ~{{needs}} токенів, поточний ліміт {{max}}",
+    "extract_whole_button": "Спробувати цілком",
+    "extract_chunked_button": "Обробити частинами",
     "not_found_title": "Сесію не знайдено",
     "not_found_hint": "Повернутись назад",
     "bulk_import": {

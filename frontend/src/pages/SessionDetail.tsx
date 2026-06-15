@@ -1,11 +1,16 @@
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { CircleAlert, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/useSession";
 import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
+import {
+  parseTooLarge,
+  recommendMode,
+  wholeBudget,
+} from "@/lib/tooLarge";
 import { pageHref } from "@/lib/pageHref";
 import { formatDateTime } from "@/lib/datetime";
 import type { SessionStatus } from "@/types/Session";
@@ -39,6 +44,10 @@ export function SessionDetail() {
   }
 
   const s = sessionQuery.data!;
+  const tooLarge = parseTooLarge(s.error);
+  const tooLargeRec = tooLarge
+    ? recommendMode(tooLarge.needs, tooLarge.max)
+    : null;
   return (
     <article className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
@@ -46,51 +55,102 @@ export function SessionDetail() {
           ← {t("navigation.sessions")}
         </Link>
         <div className="flex gap-2">
-          {/* Primary: run LLM extraction (creates real knowledge pages).
-              The previous lone "Ingest" button posted extract=false, so it
-              only wrote a raw transcript copy — confused users who expected
-              knowledge to land in the brain. */}
-          <Button
-            size="sm"
-            variant="default"
-            disabled={ingest.isPending || !s.transcript_path}
-            onClick={() => {
-              if (project && sid && s.transcript_path) {
-                ingest.mutate({
-                  project,
-                  session_id: sid,
-                  transcript_path: s.transcript_path,
-                  extract: true,
-                });
-              }
-            }}
-            title={t("sessions.extract_hint")}
-          >
-            <Sparkles className="mr-1 h-3 w-3" />
-            {ingest.isPending
-              ? t("sessions.ingesting")
-              : t("sessions.extract_button")}
-          </Button>
-          {/* Secondary: re-dump transcript without LLM tokens. */}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={ingest.isPending || !s.transcript_path}
-            onClick={() => {
-              if (project && sid && s.transcript_path) {
-                ingest.mutate({
-                  project,
-                  session_id: sid,
-                  transcript_path: s.transcript_path,
-                  extract: false,
-                });
-              }
-            }}
-            title={t("sessions.reingest_hint")}
-          >
-            <RotateCcw className="mr-1 h-3 w-3" />
-            {t("sessions.reingest_button")}
-          </Button>
+          {tooLarge ? (
+            <>
+              {/* Oversized transcript: whole-vs-chunked retry. Recommended
+                  mode is rendered first and highlighted as the primary. */}
+              <Button
+                size="sm"
+                variant={tooLargeRec === "whole" ? "default" : "outline"}
+                disabled={ingest.isPending || !s.transcript_path}
+                onClick={() => {
+                  if (project && sid && s.transcript_path) {
+                    ingest.mutate({
+                      project,
+                      session_id: sid,
+                      transcript_path: s.transcript_path,
+                      extract: true,
+                      maxInputTokens: wholeBudget(tooLarge.needs),
+                    });
+                  }
+                }}
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                {ingest.isPending
+                  ? t("sessions.ingesting")
+                  : t("sessions.extract_whole_button")}
+              </Button>
+              <Button
+                size="sm"
+                variant={tooLargeRec === "chunked" ? "default" : "outline"}
+                disabled={ingest.isPending || !s.transcript_path}
+                onClick={() => {
+                  if (project && sid && s.transcript_path) {
+                    ingest.mutate({
+                      project,
+                      session_id: sid,
+                      transcript_path: s.transcript_path,
+                      extract: true,
+                      chunked: true,
+                    });
+                  }
+                }}
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                {ingest.isPending
+                  ? t("sessions.ingesting")
+                  : t("sessions.extract_chunked_button")}
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* Primary: run LLM extraction (creates real knowledge pages).
+                  The previous lone "Ingest" button posted extract=false, so it
+                  only wrote a raw transcript copy — confused users who expected
+                  knowledge to land in the brain. */}
+              <Button
+                size="sm"
+                variant="default"
+                disabled={ingest.isPending || !s.transcript_path}
+                onClick={() => {
+                  if (project && sid && s.transcript_path) {
+                    ingest.mutate({
+                      project,
+                      session_id: sid,
+                      transcript_path: s.transcript_path,
+                      extract: true,
+                    });
+                  }
+                }}
+                title={t("sessions.extract_hint")}
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                {ingest.isPending
+                  ? t("sessions.ingesting")
+                  : t("sessions.extract_button")}
+              </Button>
+              {/* Secondary: re-dump transcript without LLM tokens. */}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={ingest.isPending || !s.transcript_path}
+                onClick={() => {
+                  if (project && sid && s.transcript_path) {
+                    ingest.mutate({
+                      project,
+                      session_id: sid,
+                      transcript_path: s.transcript_path,
+                      extract: false,
+                    });
+                  }
+                }}
+                title={t("sessions.reingest_hint")}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" />
+                {t("sessions.reingest_button")}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -179,13 +239,28 @@ export function SessionDetail() {
         )}
       </section>
 
-      {s.error && (
-        <section className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
-          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-destructive mb-2">
-            {t("sessions.error", "Error")}
+      {tooLarge ? (
+        <section className="rounded-md border border-warning/40 bg-warning/5 p-4">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-warning">
+            <CircleAlert className="h-3.5 w-3.5" />
+            {t("sessions.too_large_badge")}
           </div>
-          <p className="text-sm text-destructive/90 font-mono">{s.error}</p>
+          <p className="text-sm text-warning/90">
+            {t("sessions.too_large_hint", {
+              needs: tooLarge.needs,
+              max: tooLarge.max,
+            })}
+          </p>
         </section>
+      ) : (
+        s.error && (
+          <section className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+            <div className="font-mono text-xs font-semibold uppercase tracking-wider text-destructive mb-2">
+              {t("sessions.error", "Error")}
+            </div>
+            <p className="text-sm text-destructive/90 font-mono">{s.error}</p>
+          </section>
+        )
       )}
     </article>
   );

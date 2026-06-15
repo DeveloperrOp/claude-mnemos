@@ -414,6 +414,10 @@
     },
     "extract_button": "Save as knowledge",
     "extract_hint": "Claude reads the chat and creates Markdown knowledge pages. Uses your Claude subscription quota.",
+    "too_large_badge": "Too large for one pass",
+    "too_large_hint": "Needs ~{{needs}} tokens, current limit {{max}}",
+    "extract_whole_button": "Try whole",
+    "extract_chunked_button": "Process in chunks",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back",
     "bulk_import": {
