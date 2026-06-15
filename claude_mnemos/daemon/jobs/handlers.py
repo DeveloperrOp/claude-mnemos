@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from claude_mnemos.config import Config
-from claude_mnemos.ingest.llm import LLMClient
+from claude_mnemos.ingest.llm import LLMClient, TranscriptTooLargeError
 from claude_mnemos.ingest.llm.rate_limit import RateLimitError
 from claude_mnemos.ingest.pipeline import ingest as default_ingest
 from claude_mnemos.ingest.transcript import EmptyTranscriptError
@@ -24,6 +24,20 @@ _LOG = logging.getLogger(__name__)
 CfgFactory = Callable[[], Config]
 LLMFactory = Callable[[Config], LLMClient | None]
 IngestFn = Callable[..., Any]
+
+
+class JobDeadLetterError(Exception):
+    """Terminal signal: dead-letter this job NOW, skipping the retry ladder.
+
+    Handlers raise this when a failure is *deterministic* — retrying with the
+    same input cannot succeed (e.g. a transcript too large for the model's
+    context window). The worker recognises it and routes the job straight to
+    dead_letter in one step instead of burning MAX_ATTEMPTS retries (and the
+    30s/120s/1200s backoff between them) on a guaranteed-to-fail job.
+
+    The message carries a machine-readable error code the dashboard parses to
+    offer the user a choice (e.g. ``too_large:needs=<N>:max=<M>``).
+    """
 
 
 class JobHandler(Protocol):
@@ -92,6 +106,24 @@ class IngestHandler:
                 transcript_path,
             )
             return
+        except TranscriptTooLargeError as exc:
+            # Deterministic failure: the transcript exceeds the model's input
+            # budget, so every retry would fail identically. FAIL FAST — raise
+            # the terminal signal so the worker dead-letters the job in one
+            # step with a machine-readable code, instead of burning 4 retries
+            # (30s/120s/1200s backoff) before dead-lettering with a cryptic
+            # message. The dashboard parses this code to offer the user a
+            # choice (split/skip/raise the limit).
+            _LOG.warning(
+                "ingest: %s too large (%s tokens vs limit %s) — "
+                "dead-lettering immediately (no retry)",
+                transcript_path,
+                exc.input_tokens,
+                exc.max_input_tokens,
+            )
+            raise JobDeadLetterError(
+                f"too_large:needs={exc.input_tokens}:max={exc.max_input_tokens}"
+            ) from exc
         except RateLimitError as exc:
             # Pause the queue so worker stops dequeuing until reset_at.
             # Re-raise so the job is retried (not dead-lettered immediately —

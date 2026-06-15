@@ -4,17 +4,26 @@ from pathlib import Path
 
 import pytest
 
+from claude_mnemos.daemon.jobs.handlers import JobDeadLetterError
 from claude_mnemos.daemon.jobs.worker import JobWorker
-from claude_mnemos.state.jobs import JOBS_DB_FILENAME, Job, JobStore
+from claude_mnemos.state.jobs import (
+    JOBS_DB_FILENAME,
+    MAX_ATTEMPTS,
+    Job,
+    JobStore,
+)
 
 
 class _FakeHandler:
     def __init__(self):
         self.runs: list[Job] = []
         self.boom_on_id: str | None = None
+        self.dead_letter_on_id: str | None = None
 
     async def run(self, job: Job) -> None:
         self.runs.append(job)
+        if job.id == self.dead_letter_on_id:
+            raise JobDeadLetterError("too_large:needs=900000:max=800000")
         if job.id == self.boom_on_id:
             raise RuntimeError("boom")
 
@@ -79,6 +88,44 @@ async def test_worker_marks_failed_with_retry_on_handler_exception(tmp_path: Pat
     # Either still queued (waiting backoff) or moved on, but error recorded
     assert final.error is not None
     assert "boom" in final.error
+
+
+@pytest.mark.asyncio
+async def test_worker_dead_letters_immediately_on_terminal_signal(tmp_path: Path):
+    """JobDeadLetterError must route STRAIGHT to dead_letter in one step —
+    attempt jumps to MAX_ATTEMPTS, no 30s/120s/1200s retry backoff is scheduled,
+    and the machine-readable error code is preserved verbatim for the UI."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    handler = _FakeHandler()
+    job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+    handler.dead_letter_on_id = job.id
+
+    worker = JobWorker(
+        store=store,
+        handlers={"ingest": handler},
+        scheduler=None,
+        poll_interval_s=0.1,
+    )
+
+    await worker.start()
+    try:
+        for _ in range(40):
+            current = store.get_by_id(job.id)
+            if current and current.status == "dead_letter":
+                break
+            await asyncio.sleep(0.1)
+    finally:
+        await worker.stop(timeout=5.0)
+        store.close()
+
+    final = JobStore(tmp_path / JOBS_DB_FILENAME).get_by_id(job.id)
+    assert final is not None
+    # One-step terminal: dead_letter, attempt at MAX (never re-queued for retry).
+    assert final.status == "dead_letter"
+    assert final.attempt == MAX_ATTEMPTS
+    assert final.error == "too_large:needs=900000:max=800000"
+    # Handler ran exactly once — proof it did NOT burn 4 retries.
+    assert len(handler.runs) == 1
 
 
 @pytest.mark.asyncio

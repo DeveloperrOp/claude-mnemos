@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from claude_mnemos.daemon.jobs.handlers import IngestHandler
+from claude_mnemos.daemon.jobs.handlers import IngestHandler, JobDeadLetterError
+from claude_mnemos.ingest.llm import TranscriptTooLargeError
 from claude_mnemos.ingest.transcript import (
     CorruptTranscriptError,
     EmptyTranscriptError,
@@ -114,6 +115,34 @@ async def test_ingest_handler_propagates_corrupt_transcript(tmp_path: Path):
     )
     with pytest.raises(CorruptTranscriptError):
         await handler.run(_job({"transcript_path": "/x.jsonl"}))
+
+
+@pytest.mark.asyncio
+async def test_ingest_handler_too_large_raises_terminal_signal(tmp_path: Path):
+    """An oversized session must FAIL FAST: the handler converts
+    TranscriptTooLargeError into a JobDeadLetterError so the worker dead-letters
+    it in one step (machine-readable code), instead of burning 4 retries
+    (30s/120s/1200s backoff) and dead-lettering with a cryptic message."""
+
+    def too_large(*args, **kwargs):
+        raise TranscriptTooLargeError(
+            "transcript too large",
+            input_tokens=900000,
+            max_input_tokens=800000,
+        )
+
+    fake_llm = object()
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: fake_llm,
+        ingest_fn=too_large,
+    )
+    with pytest.raises(JobDeadLetterError) as excinfo:
+        await handler.run(_job({"transcript_path": "/x.jsonl"}))
+
+    # Machine-readable code the UI parses: too_large:needs=<input>:max=<limit>
+    assert str(excinfo.value) == "too_large:needs=900000:max=800000"
 
 
 @pytest.mark.asyncio

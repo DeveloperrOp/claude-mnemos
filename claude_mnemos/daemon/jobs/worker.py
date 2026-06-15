@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from apscheduler.triggers.date import DateTrigger
 
-from claude_mnemos.daemon.jobs.handlers import JobHandler
+from claude_mnemos.daemon.jobs.handlers import JobDeadLetterError, JobHandler
 from claude_mnemos.state.jobs import Job, JobKind, JobStore
 
 if TYPE_CHECKING:
@@ -140,6 +140,18 @@ class JobWorker:
             return
         try:
             await handler.run(job)
+        except JobDeadLetterError as exc:
+            # Terminal signal from the handler: a deterministic failure that no
+            # retry can fix (e.g. transcript too large). Dead-letter in ONE step
+            # with the machine-readable code — do NOT go through the retry ladder
+            # and do NOT schedule a retry wakeup.
+            self._store.mark_dead_letter(
+                job.id,
+                error=str(exc),
+                traceback=traceback.format_exc(),
+                finished_at=datetime.now(UTC),
+            )
+            return
         except Exception as exc:
             tb = traceback.format_exc()
             updated = self._store.mark_failed_with_retry(

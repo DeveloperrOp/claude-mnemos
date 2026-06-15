@@ -350,6 +350,55 @@ class JobStore:
             (_ts(finished_at), job_id),
         )
 
+    def mark_dead_letter(
+        self,
+        job_id: str,
+        *,
+        error: str,
+        traceback: str = "",
+        finished_at: datetime,
+    ) -> Job:
+        """Terminally dead-letter a job in one step, bypassing the retry ladder.
+
+        Used for *deterministic* failures (e.g. a transcript too large for the
+        model context) where retrying with the same input cannot succeed.
+        Sets status='dead_letter' and attempt=MAX_ATTEMPTS so the job is never
+        re-queued. ``error`` is stored verbatim (machine-readable code for the
+        dashboard). Does NOT pause the queue — that is rate-limit-only.
+        """
+        with self._tx_lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._conn.execute(
+                    "SELECT id FROM jobs WHERE id=?", (job_id,)
+                ).fetchone()
+                if row is None:
+                    self._conn.execute("COMMIT")
+                    raise KeyError(job_id)
+                self._conn.execute(
+                    """
+                    UPDATE jobs
+                    SET status='dead_letter', attempt=?, finished_at=?,
+                        error=?, error_traceback=?
+                    WHERE id=?
+                    """,
+                    (
+                        MAX_ATTEMPTS,
+                        _ts(finished_at),
+                        error,
+                        traceback,
+                        job_id,
+                    ),
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+
+        result = self.get_by_id(job_id)
+        assert result is not None
+        return result
+
     def mark_failed_with_retry(
         self,
         job_id: str,
