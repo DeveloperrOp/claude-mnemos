@@ -353,6 +353,100 @@ def test_lock_key_stable_across_root_creation(tmp_path: Path):
     assert s_after._lock is lock_before
 
 
+# ---------------------------------------------------------------------------
+# v0.0.49: one-time migration of the stale placebo `default_max_input_tokens`.
+# Before this release the field did NOTHING (extraction read the env-default
+# 800k). Task 2 made the field really control the cut, and Task 1 raised the
+# default 150000→800000. Existing users still have the OLD placebo literal
+# 150000 on disk — which NOBODY deliberately chose, since the field was inert.
+# On their next restart extraction would silently regress to a 150k cut. The
+# migration bumps exactly-150000 legacy files to 800000, gated by a one-time
+# marker so a user who LATER sets 150000 on purpose keeps it.
+# ---------------------------------------------------------------------------
+
+
+def test_migrates_legacy_150k_to_800k(tmp_path: Path):
+    store = SettingsStore(root=tmp_path)
+    path = store.global_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # A legacy file: the placebo default 150000 and NO migration marker.
+    path.write_text(
+        json.dumps({"version": 1, "default_max_input_tokens": 150000}),
+        encoding="utf-8",
+    )
+    g = store.get_global()
+    # Loaded value is migrated to the new default.
+    assert g.default_max_input_tokens == 800_000
+    # Persisted to disk (true one-time migration, not just an in-memory bump).
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["default_max_input_tokens"] == 800_000
+    assert data["default_max_input_tokens_migrated"] is True
+
+
+def test_does_not_touch_deliberate_value(tmp_path: Path):
+    """Once the marker is set, a deliberate 150000 survives — the migration
+    has already run and must not re-fire."""
+    store = SettingsStore(root=tmp_path)
+    path = store.global_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Marker already True: the user deliberately set 150000 AFTER migration.
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "default_max_input_tokens": 150000,
+                "default_max_input_tokens_migrated": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    g = store.get_global()
+    assert g.default_max_input_tokens == 150000  # untouched
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["default_max_input_tokens"] == 150000
+
+
+def test_leaves_other_values_alone(tmp_path: Path):
+    store = SettingsStore(root=tmp_path)
+    path = store.global_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Legacy file (no marker) but a value other than the placebo 150000.
+    path.write_text(
+        json.dumps({"version": 1, "default_max_input_tokens": 300000}),
+        encoding="utf-8",
+    )
+    g = store.get_global()
+    assert g.default_max_input_tokens == 300000
+
+
+def test_missing_field_uses_new_default(tmp_path: Path):
+    store = SettingsStore(root=tmp_path)
+    path = store.global_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Legacy file with no default_max_input_tokens at all → new default.
+    path.write_text(json.dumps({"version": 1, "locale": "en"}), encoding="utf-8")
+    g = store.get_global()
+    assert g.default_max_input_tokens == 800_000
+
+
+def test_migration_does_not_refire_for_deliberate_150k_after_load(tmp_path: Path):
+    """End-to-end one-time gate: a legacy 150000 migrates to 800000 and stamps
+    the marker; if the user then deliberately patches it back to 150000, a
+    subsequent load keeps 150000 (marker present → no re-fire)."""
+    store = SettingsStore(root=tmp_path)
+    path = store.global_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"version": 1, "default_max_input_tokens": 150000}),
+        encoding="utf-8",
+    )
+    assert store.get_global().default_max_input_tokens == 800_000
+    # User deliberately sets it back to 150000 via patch.
+    store.patch_global({"default_max_input_tokens": 150000})
+    # Reload: marker is set, so the deliberate 150000 is preserved.
+    assert store.get_global().default_max_input_tokens == 150000
+
+
 def test_global_settings_ignores_unknown_fields(tmp_path, monkeypatch):
     """extra='ignore' must silently absorb β1-written files that contain primary_project."""
     monkeypatch.setenv("HOME", str(tmp_path))

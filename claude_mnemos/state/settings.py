@@ -9,6 +9,7 @@ through ``SettingsStore``; daemon owns writes (single-owner per spec
 
 from __future__ import annotations
 
+import contextlib
 import json
 import threading
 from copy import deepcopy
@@ -24,6 +25,18 @@ from claude_mnemos.state.projects import (
 )
 
 GLOBAL_SETTINGS_FILENAME = "global-settings.json"
+
+# v0.0.49 one-time migration. Before this release
+# ``GlobalSettings.default_max_input_tokens`` was a *placebo* — extraction
+# always read the 800k env-default and ignored this field entirely. Task 1
+# raised the default 150000→800000 AND Task 2 made the field really control
+# the cut. Existing users still carry the OLD placebo literal 150000 on disk,
+# which NOBODY deliberately chose (the field did nothing). On their next
+# restart extraction would silently regress to a 150k cut. ``get_global()``
+# bumps exactly-this value to the new default the first time it loads a file
+# that predates the marker below.
+_LEGACY_DEFAULT_MAX_INPUT_TOKENS = 150_000
+_NEW_DEFAULT_MAX_INPUT_TOKENS = 800_000
 
 
 def global_settings_path() -> Path:
@@ -142,6 +155,15 @@ class GlobalSettings(BaseModel):
     default_language_hint: Literal["auto", "uk", "ru", "en"] = "auto"
     default_max_input_tokens: int = Field(default=800_000, ge=1024)
     default_retention_days: int = Field(default=180, ge=1)
+    # v0.0.49 one-time-migration gate (see _LEGACY_DEFAULT_MAX_INPUT_TOKENS
+    # at module top). Defaults True so a fresh install / in-memory default is
+    # already "migrated" — only a legacy on-disk file that lacks this key (and
+    # still holds the placebo 150000) triggers the bump in get_global(). Once
+    # stamped True the migration never re-fires, so a user who LATER sets
+    # 150000 on purpose keeps it. Not a schema `version` bump because version
+    # is serialized in the settings response and the frontend pins it to
+    # literal 1; an extra boolean key is silently stripped by the frontend.
+    default_max_input_tokens_migrated: bool = True
     # primary_project removed in β2.
     # v0.0.10: defaults for ProjectSettings.auto_ingest. All three are
     # opt-in (default OFF) so a fresh install never copies transcripts into
@@ -306,15 +328,46 @@ class SettingsStore:
                 f"global settings at {self._global_path} unreadable: {exc}"
             ) from exc
         try:
-            return GlobalSettings.model_validate_json(raw)
+            data = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise SettingsCorruptError(
                 f"global settings at {self._global_path} not valid JSON: {exc}"
             ) from exc
+
+        # One-time v0.0.49 migration: a legacy file (no migration marker yet)
+        # that still carries the placebo 150000 gets bumped to the new
+        # default. We inspect the RAW dict — after validation the marker would
+        # already read True (its model default), erasing the "legacy" signal.
+        migrated = False
+        if not isinstance(data, dict):
+            # Validation below will produce a clean schema error.
+            pass
+        elif not data.get("default_max_input_tokens_migrated", False):
+            if data.get("default_max_input_tokens") == _LEGACY_DEFAULT_MAX_INPUT_TOKENS:
+                data["default_max_input_tokens"] = _NEW_DEFAULT_MAX_INPUT_TOKENS
+            # Stamp the marker regardless of the value so the (cheap) check
+            # runs exactly once per pre-v0.0.49 file, never re-firing.
+            data["default_max_input_tokens_migrated"] = True
+            migrated = True
+
+        try:
+            settings = GlobalSettings.model_validate(data)
         except ValidationError as exc:
             raise SettingsCorruptError(
                 f"global settings at {self._global_path} fail schema: {exc}"
             ) from exc
+
+        if migrated:
+            # Persist so it's a true one-time migration, not re-applied each
+            # load. Best-effort: a write failure (e.g. read-only FS) must not
+            # block reading settings — the in-memory value is already correct.
+            with contextlib.suppress(OSError):
+                self._global_path.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write(
+                    self._global_path,
+                    json.dumps(settings.model_dump(mode="json"), indent=2) + "\n",
+                )
+        return settings
 
     def patch_global(self, partial: dict[str, Any]) -> GlobalSettings:
         with self._lock:
