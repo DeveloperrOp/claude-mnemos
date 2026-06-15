@@ -13,7 +13,7 @@ from claude_mnemos.daemon.vault_runtime import (
     VaultRuntime,
 )
 from claude_mnemos.state.projects import ProjectMapEntry
-from claude_mnemos.state.settings import ProjectSettings
+from claude_mnemos.state.settings import ProjectSettings, SettingsStore
 
 
 def _entry(tmp_path: Path, name: str = "demo") -> ProjectMapEntry:
@@ -462,3 +462,42 @@ def test_reload_settings_when_not_mounted_just_replaces(tmp_path: Path) -> None:
     rt.reload_settings(new)
     assert rt.settings.snapshots.retention_days == 7
     rt.job_store.close()
+
+
+def test_cfg_factory_applies_global_max_input_tokens(tmp_path: Path, monkeypatch) -> None:
+    """When MNEMOS_MAX_INPUT_TOKENS is unset, the UI value
+    (GlobalSettings.default_max_input_tokens) must flow into cfg — was a
+    placebo before (cfg came from env only)."""
+    monkeypatch.delenv("MNEMOS_MAX_INPUT_TOKENS", raising=False)
+    store = SettingsStore(root=tmp_path / "cfgroot")
+    store.patch_global({"default_max_input_tokens": 500_000})
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "cfg1"),
+        settings=ProjectSettings(),
+        settings_store=store,
+    )
+    try:
+        cfg = rt._make_cfg()
+        assert cfg.max_input_tokens == 500_000
+    finally:
+        rt.job_store.close()
+
+
+def test_cfg_factory_env_overrides_global_max_input_tokens(tmp_path: Path, monkeypatch) -> None:
+    """The env var stays the higher-priority developer escape hatch: when set,
+    it wins over the UI/global value."""
+    monkeypatch.setenv("MNEMOS_MAX_INPUT_TOKENS", "222222")
+    store = SettingsStore(root=tmp_path / "cfgroot2")
+    store.patch_global({"default_max_input_tokens": 500_000})
+
+    rt = VaultRuntime(
+        project=_entry(tmp_path, "cfg2"),
+        settings=ProjectSettings(),
+        settings_store=store,
+    )
+    try:
+        cfg = rt._make_cfg()
+        assert cfg.max_input_tokens == 222_222
+    finally:
+        rt.job_store.close()

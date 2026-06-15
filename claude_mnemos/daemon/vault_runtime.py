@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -44,7 +45,7 @@ from claude_mnemos.daemon.watchdog_observer import VaultObserver
 from claude_mnemos.ingest.llm import LLMClient, MissingApiKeyError, make_llm_client
 from claude_mnemos.state.jobs import JOBS_DB_FILENAME, JobStore
 from claude_mnemos.state.projects import ProjectMapEntry
-from claude_mnemos.state.settings import ProjectSettings
+from claude_mnemos.state.settings import ProjectSettings, SettingsStore
 
 if TYPE_CHECKING:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -117,10 +118,15 @@ class VaultRuntime:
         *,
         project: ProjectMapEntry,
         settings: ProjectSettings,
+        settings_store: SettingsStore | None = None,
     ) -> None:
         self.project = project
         self.settings = settings
         self.vault_root: Path = project.vault_root
+        # Used by _make_cfg() to read GlobalSettings.default_max_input_tokens
+        # (the UI value) into ingest Config. Defaults to the standard store
+        # (~/.claude-mnemos/global-settings.json); injectable for tests.
+        self._settings_store = settings_store or SettingsStore()
 
         self.tracker = OurWritesTracker()
         self.lost_sessions_cache = LostSessionsCache()
@@ -227,6 +233,25 @@ class VaultRuntime:
             await self._rollback_mount(error=str(exc))
             raise VaultMountError(f"failed to mount vault {self.name!r}: {exc}") from exc
 
+    def _make_cfg(self) -> Config:
+        """Build the ingest Config for this vault.
+
+        Env stays the highest-priority developer escape hatch:
+        ``Config.from_env()`` already reads ``MNEMOS_MAX_INPUT_TOKENS`` when
+        set. When it's *unset*, ``max_input_tokens`` would silently fall back
+        to ``DEFAULT_MAX_INPUT_TOKENS`` and ignore the UI value — that was the
+        placebo. So in the no-env case we layer
+        ``GlobalSettings.default_max_input_tokens`` (the value the user edits
+        in the dashboard) on top via ``with_overrides``.
+        """
+        cfg = Config.from_env()
+        if os.environ.get("MNEMOS_MAX_INPUT_TOKENS") is None:
+            global_settings = self._settings_store.get_global()
+            cfg = cfg.with_overrides(
+                max_input_tokens=global_settings.default_max_input_tokens
+            )
+        return cfg
+
     def _build_job_worker(self) -> JobWorker:
         """Construct (not start) the JobWorker for this vault.
 
@@ -239,7 +264,7 @@ class VaultRuntime:
         from claude_mnemos.state.jobs import JobKind
 
         def cfg_factory() -> Config:
-            return Config.from_env()
+            return self._make_cfg()
 
         def llm_factory(cfg: Config) -> LLMClient | None:
             """Resolve LLMClient via factory. Return None only if both provider
