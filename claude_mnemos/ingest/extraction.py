@@ -15,6 +15,7 @@ from claude_mnemos.core.models import (
 )
 from claude_mnemos.core.ontology_similarity import body_hash
 from claude_mnemos.core.slug import make_slug
+from claude_mnemos.ingest.chunk_cache import ChunkCache, hash_chunk_text
 from claude_mnemos.ingest.chunking import split_messages_for_budget
 from claude_mnemos.ingest.llm import ExtractionRaw, LLMClient
 from claude_mnemos.ingest.llm.tokens import count_tokens_local
@@ -125,6 +126,7 @@ def extract_wiki_pages(
     llm_client: LLMClient,
     today: date,
     chunk_extract: bool = False,
+    chunk_cache: ChunkCache | None = None,
 ) -> ExtractionResult:
     """Run the LLM extraction over a parsed transcript and return wiki pages.
 
@@ -168,12 +170,27 @@ def extract_wiki_pages(
     sum_in = 0
     sum_out = 0
     for i, chunk in enumerate(chunks, start=1):
+        rendered = _render_transcript(chunk)
+        # Content-address the chunk so a retry after a rate-limit on a LATER
+        # chunk can resume here instead of re-paying for this one.
+        h = hash_chunk_text(rendered)
+        if chunk_cache is not None:
+            cached = chunk_cache.get(h)
+            if cached is not None:
+                # Served from cache: spent no new tokens this run.
+                payloads.append(cached)
+                continue
         note = f"(Это часть {i} из {total} большого транскрипта.)"
         raw = _extract_one(
             llm_client,
-            user=_format_user(cfg, _render_transcript(chunk), chunk_note=note),
+            user=_format_user(cfg, rendered, chunk_note=note),
         )
-        payloads.append(ExtractionPayload.model_validate(raw.payload))
+        payload = ExtractionPayload.model_validate(raw.payload)
+        if chunk_cache is not None:
+            # Persist right after a successful extract so a rate-limit on a
+            # later chunk leaves this one cached for the retry.
+            chunk_cache.put(h, payload)
+        payloads.append(payload)
         sum_in += raw.input_tokens
         sum_out += raw.output_tokens
 

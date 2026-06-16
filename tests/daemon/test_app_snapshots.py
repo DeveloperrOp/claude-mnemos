@@ -197,7 +197,7 @@ async def test_restore_snapshot_writes_activity_entry(tmp_path: Path) -> None:
     )
 
     def _stub_extractor():
-        def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+        def _extract(*, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None):  # noqa: ARG001
             fm = WikiPageFrontmatter(
                 title="X",
                 type="entity",

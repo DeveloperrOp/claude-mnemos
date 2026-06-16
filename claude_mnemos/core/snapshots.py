@@ -21,7 +21,9 @@ SNAPSHOTS_DIRNAME = ".backups"
 META_FILENAME = ".meta.json"
 TRASH_PREFIX = "_trash-"  # delete_snapshot() renames here (soft-delete)
 
-_EXCLUDED_DIRS = {".staging", ".backups", ".trash"}
+# .chunk-cache holds transient per-chunk extraction payloads for rate-limit
+# resume — it must never ride into a backup.
+_EXCLUDED_DIRS = {".staging", ".backups", ".trash", ".chunk-cache"}
 _EXCLUDED_FILES = {
     ".pipeline.lock",
     ".jobs.db",

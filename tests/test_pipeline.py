@@ -54,7 +54,9 @@ def _stub_extraction(today: date) -> ExtractionResult:
 
 def _stub_extractor():
     """Returns a callable matching extract_wiki_pages signature."""
-    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+    def _extract(  # noqa: ARG001
+        *, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None
+    ):
         return _stub_extraction(today)
     return _extract
 
@@ -591,8 +593,11 @@ def test_ingest_forwards_chunk_extract_to_extractor(tmp_path: Path):
     vault = tmp_path / "vault"
     seen: dict = {}
 
-    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+    def _extract(  # noqa: ARG001
+        *, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None
+    ):
         seen["chunk_extract"] = chunk_extract
+        seen["chunk_cache"] = chunk_cache
         return _stub_extraction(today)
 
     ingest(
@@ -605,6 +610,8 @@ def test_ingest_forwards_chunk_extract_to_extractor(tmp_path: Path):
         chunk_extract=True,
     )
     assert seen["chunk_extract"] is True
+    # chunk_extract=True => a ChunkCache is constructed and passed.
+    assert seen["chunk_cache"] is not None
 
 
 def test_ingest_defaults_chunk_extract_false(tmp_path: Path):
@@ -612,8 +619,11 @@ def test_ingest_defaults_chunk_extract_false(tmp_path: Path):
     vault = tmp_path / "vault"
     seen: dict = {}
 
-    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False):  # noqa: ARG001
+    def _extract(  # noqa: ARG001
+        *, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None
+    ):
         seen["chunk_extract"] = chunk_extract
+        seen["chunk_cache"] = chunk_cache
         return _stub_extraction(today)
 
     ingest(
@@ -625,3 +635,89 @@ def test_ingest_defaults_chunk_extract_false(tmp_path: Path):
         today=FIXED_TODAY,
     )
     assert seen["chunk_extract"] is False
+    # chunk_extract=False => no cache constructed.
+    assert seen["chunk_cache"] is None
+
+
+def test_ingest_chunk_extract_clears_cache_on_success(tmp_path: Path):
+    """On a successful chunk-extract, the .chunk-cache/<session_id> dir must be
+    gone (the cache is only kept across rate-limit retries)."""
+    from claude_mnemos.core.models import ExtractedPage, ExtractionPayload, ProvenanceCounts
+
+    vault = tmp_path / "vault"
+    prov = ProvenanceCounts(extracted_pct=100, inferred_pct=0, ambiguous_pct=0)
+
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None):  # noqa: ARG001
+        # Simulate a chunk having been extracted & cached during the run.
+        assert chunk_cache is not None
+        chunk_cache.put(
+            "deadbeef",
+            ExtractionPayload(
+                summary="s",
+                pages=[
+                    ExtractedPage(
+                        type="entity",
+                        title="X",
+                        confidence=0.8,
+                        provenance=prov,
+                        body="b",
+                    )
+                ],
+            ),
+        )
+        assert chunk_cache.dir.exists()
+        return _stub_extraction(today)
+
+    ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_extract,
+        today=FIXED_TODAY,
+        chunk_extract=True,
+    )
+    # Cache cleared on success.
+    assert not (vault / ".chunk-cache" / "abc-123").exists()
+
+
+def test_ingest_chunk_extract_keeps_cache_on_failure(tmp_path: Path):
+    """A mid-chunk failure must LEAVE the cache so the retry can resume."""
+    from claude_mnemos.core.models import ExtractedPage, ExtractionPayload, ProvenanceCounts
+
+    vault = tmp_path / "vault"
+    prov = ProvenanceCounts(extracted_pct=100, inferred_pct=0, ambiguous_pct=0)
+
+    def _extract(*, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None):  # noqa: ARG001
+        assert chunk_cache is not None
+        chunk_cache.put(
+            "cafef00d",
+            ExtractionPayload(
+                summary="s",
+                pages=[
+                    ExtractedPage(
+                        type="entity",
+                        title="X",
+                        confidence=0.8,
+                        provenance=prov,
+                        body="b",
+                    )
+                ],
+            ),
+        )
+        raise RuntimeError("rate limited on a later chunk")
+
+    with pytest.raises(RuntimeError):
+        ingest(
+            FIXTURE,
+            vault,
+            cfg=_cfg(),
+            llm_client=MagicMock(),
+            extractor=_extract,
+            today=FIXED_TODAY,
+            chunk_extract=True,
+        )
+    # Cache retained on failure (chunk-1 payload survives for the retry).
+    cache_dir = vault / ".chunk-cache" / "abc-123"
+    assert cache_dir.exists()
+    assert list(cache_dir.glob("*.json"))

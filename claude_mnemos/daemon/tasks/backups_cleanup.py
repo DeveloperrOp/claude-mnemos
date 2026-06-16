@@ -6,6 +6,7 @@ from pathlib import Path
 
 from claude_mnemos.core.locks import LockTimeoutError, pipeline_lock
 from claude_mnemos.core.snapshots import PruneResult, prune_old_backups
+from claude_mnemos.ingest.chunk_cache import ChunkCache
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,17 @@ def backups_cleanup_task(
             )
             for name, msg in result.errors:
                 logger.warning("backups_cleanup: failed to prune %s: %s", name, msg)
+            # Sweep stale per-session chunk-extract caches (rate-limit resume
+            # debris). This is the ONLY reaper of caches stranded by a failure
+            # that never succeeds (clear-on-success can't reach them), so don't
+            # "simplify" it away. Best-effort: a failure here must never break
+            # cleanup.
+            try:
+                swept = ChunkCache.sweep_stale(vault)
+                if swept > 0:
+                    logger.info("backups_cleanup: swept %d stale chunk-cache dir(s)", swept)
+            except Exception:
+                logger.exception("backups_cleanup: chunk-cache sweep failed")
             return result
     except LockTimeoutError:
         logger.warning("backups_cleanup: pipeline busy, skipping")

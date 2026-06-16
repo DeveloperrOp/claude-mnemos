@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from claude_mnemos.daemon.our_writes import OurWritesTracker
 from claude_mnemos.core.models import WikiPage, WikiPageFrontmatter
 from claude_mnemos.core.staging import StagingTransaction
+from claude_mnemos.ingest.chunk_cache import ChunkCache
 from claude_mnemos.ingest.extraction import ExtractionResult, extract_wiki_pages
 from claude_mnemos.ingest.llm import LLMClient
 from claude_mnemos.ingest.transcript import TranscriptMessage, parse_jsonl
@@ -176,12 +177,18 @@ def ingest(
             if llm_client is None:
                 raise ValueError("llm_client cannot be None when extract=True")
 
+            # Chunk-extract owns a per-session payload cache so a rate-limit on
+            # a later chunk doesn't re-pay for the earlier ones on retry. Built
+            # only for the chunked path; cleared on success, kept on failure.
+            chunk_cache = ChunkCache(vault_root, session_id) if chunk_extract else None
+
             extraction = extractor(
                 messages=messages,
                 cfg=cfg,
                 llm_client=llm_client,
                 today=today,
                 chunk_extract=chunk_extract,
+                chunk_cache=chunk_cache,
             )
 
             source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
@@ -258,6 +265,11 @@ def ingest(
 
             if dry_run:
                 txn.reject("dry-run (--extract)")
+                # Extract succeeded — the chunk cache is no longer needed.
+                # (Only ever cleared on a successful extract; a rate-limit
+                # leaves it so the retry can resume.)
+                if chunk_cache is not None:
+                    chunk_cache.clear()
                 return IngestResult(
                     status="dry_run",
                     session_id=session_id,
@@ -273,6 +285,10 @@ def ingest(
                 )
 
             promote = txn.promote_to_vault(tracker=tracker)
+
+            # Extract succeeded and was promoted — drop the chunk cache.
+            if chunk_cache is not None:
+                chunk_cache.clear()
 
             return IngestResult(
                 status="extracted",
