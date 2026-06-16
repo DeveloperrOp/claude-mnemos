@@ -15,7 +15,11 @@ from pathlib import Path
 from claude_mnemos.core.page_io import ParsedPage
 from claude_mnemos.core.wikilinks import extract_wikilinks
 from claude_mnemos.lint.models import LintFinding, LintFixKind, LintSeverity
-from claude_mnemos.lint.utils import build_slug_index, levenshtein_distance
+from claude_mnemos.lint.utils import (
+    build_resolvable_targets,
+    build_slug_index,
+    levenshtein_distance,
+)
 
 PageEntry = tuple[Path, ParsedPage | None]
 RuleFn = Callable[[Path, list[PageEntry]], list[LintFinding]]
@@ -26,7 +30,9 @@ INFERRED_PCT_THRESHOLD = 50
 AMBIGUOUS_PCT_THRESHOLD = 30
 RULE_VERSIONS = {
     "page_parse_failed": "v1",
-    "wikilinks_broken": "v1",
+    # v2: resolve path-form ([[dir/name]]) and raw/chats backlinks ([[uuid]])
+    # against every .md basename in the vault, not just wiki/* slugs.
+    "wikilinks_broken": "v2",
     "orphan_pages": "v1",
     "stale_pages": "v1",
     "duplicate_titles": "v1",
@@ -73,24 +79,62 @@ def page_parse_failed(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
 # ---------------------------------------------------------------- wikilinks
 
 
+def _normalize_link_target(target: str) -> str:
+    """Reduce a wikilink target to the basename Obsidian would resolve.
+
+    Strips a ``#heading`` anchor, any directory prefix (after the last `/` or
+    `\\`), and a trailing `.md` suffix (case-insensitive). We do NOT slugify —
+    Obsidian matches real filenames/headings, so a free-text title-form target
+    stays as-is and is correctly flagged broken when no file by that basename
+    exists. A pure same-page anchor (``[[#heading]]``) normalizes to ``""``.
+
+    Examples: "page#Section" -> "page"; "sources/2026-05-02-x" -> "2026-05-02-x";
+    "x.md" -> "x"; "x" -> "x".
+    """
+    # Drop a heading anchor first so [[page#heading]] resolves to page.md and is
+    # never fed to the typo autofix (which would silently delete the anchor).
+    base = target.split("#", 1)[0]
+    base = base.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    if base.lower().endswith(".md"):
+        base = base[: -len(".md")]
+    return base
+
+
 def wikilinks_broken(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
     out: list[LintFinding] = []
     slug_index = build_slug_index(vault)
     known = set(slug_index.keys())
+    # Obsidian-style resolution: a bare [[name]] or path-form [[dir/name]]
+    # resolves to any name.md anywhere in the vault (incl. raw/chats/).
+    resolvable = build_resolvable_targets(vault)
     for p, parsed in pages:
         if parsed is None:
             continue
         rel = _rel(vault, p)
         for link in extract_wikilinks(parsed.body):
             target = link.target
-            if target in known:
+            norm = _normalize_link_target(target)
+            # A pure same-page anchor ([[#heading]]) targets the current page —
+            # it always resolves and is never broken.
+            if norm == "":
                 continue
-            # Levenshtein lookup for typo candidates
-            candidates = [
-                s
-                for s in known
-                if levenshtein_distance(target, s) <= LEVENSHTEIN_TYPO_THRESHOLD
-            ]
+            # Fast back-compat path + Obsidian-style basename resolution.
+            if target in known or norm in resolvable:
+                continue
+            # A heading-anchored link ([[page#x]]) that didn't resolve must NOT
+            # be offered as a typo autofix: FIX_WIKILINK_TYPO rewrites
+            # [[target]] -> [[candidate]] and would silently drop the #anchor.
+            # Flag it broken-but-not-fixable instead.
+            allow_typo_fix = "#" not in target
+            candidates = (
+                [
+                    s
+                    for s in known
+                    if levenshtein_distance(norm, s) <= LEVENSHTEIN_TYPO_THRESHOLD
+                ]
+                if allow_typo_fix
+                else []
+            )
             unique_candidate = candidates[0] if len(candidates) == 1 else None
             if unique_candidate is not None:
                 msg = f"broken wikilink [[{target}]] (likely typo of [[{unique_candidate}]])"

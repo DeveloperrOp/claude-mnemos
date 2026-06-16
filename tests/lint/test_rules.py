@@ -1,9 +1,11 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from claude_mnemos.core.page_io import ParsedPage, read_page
 from claude_mnemos.lint.models import LintFixKind, LintSeverity
-from claude_mnemos.lint.rules import RULE_REGISTRY
+from claude_mnemos.lint.rules import RULE_REGISTRY, _normalize_link_target
 
 
 def _seed(vault: Path, rel: str, fm_overrides: dict | None = None, body: str = "body\n") -> Path:
@@ -67,6 +69,122 @@ def test_wikilinks_existing_no_finding(tmp_path: Path):
     _seed(tmp_path, "wiki/entities/bar.md", body="ok\n")
     findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
     assert findings == []
+
+
+def test_wikilinks_path_form_target_resolves(tmp_path: Path):
+    # Obsidian resolves [[sources/<stem>]] to wiki/sources/<stem>.md.
+    _seed(
+        tmp_path,
+        "wiki/entities/foo.md",
+        body="See [[sources/2026-05-02-ce160185]]\n",
+    )
+    _seed(
+        tmp_path,
+        "wiki/sources/2026-05-02-ce160185.md",
+        fm_overrides={"type": "source"},
+        body="recording\n",
+    )
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_wikilinks_raw_chats_backlink_resolves(tmp_path: Path):
+    # A bare [[<uuid>]] backlink resolves to raw/chats/<uuid>.md anywhere.
+    uuid = "00811ba3-b79f-417e-9ebe-6d518e91e481"
+    _seed(tmp_path, "wiki/sources/src.md", body=f"[[{uuid}|Open transcript]]\n")
+    raw = tmp_path / "raw" / "chats" / f"{uuid}.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("transcript\n", encoding="utf-8")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_wikilinks_dot_md_suffix_resolves(tmp_path: Path):
+    _seed(tmp_path, "wiki/entities/foo.md", body="See [[bar.md]]\n")
+    _seed(tmp_path, "wiki/entities/bar.md", body="ok\n")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_wikilinks_missing_basename_still_broken(tmp_path: Path):
+    # No file by this basename anywhere → genuinely broken, not fixable.
+    _seed(
+        tmp_path,
+        "wiki/entities/foo.md",
+        body="See [[POST /api/signup route (storefront)]]\n",
+    )
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    broken = [
+        f for f in findings if f.metadata.get("target") == "POST /api/signup route (storefront)"
+    ]
+    assert len(broken) == 1
+    assert broken[0].fixable is False
+    assert broken[0].fix_kind is None
+
+
+def test_wikilinks_path_form_missing_still_broken(tmp_path: Path):
+    # Path-form target whose basename has no file anywhere → still broken.
+    _seed(tmp_path, "wiki/entities/foo.md", body="See [[sources/does-not-exist]]\n")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    broken = [f for f in findings if f.metadata.get("target") == "sources/does-not-exist"]
+    assert len(broken) == 1
+    assert broken[0].fixable is False
+    # Original target (what the user wrote) is preserved in metadata + message.
+    assert "[[sources/does-not-exist]]" in broken[0].message
+
+
+def test_wikilinks_heading_anchor_to_existing_page_resolves(tmp_path: Path):
+    # [[page#heading]] points at an existing page.md → not broken (the anchor is
+    # stripped for resolution, matching Obsidian).
+    _seed(tmp_path, "wiki/entities/foo.md", body="See [[bar#Section Two]]\n")
+    _seed(tmp_path, "wiki/entities/bar.md", body="ok\n")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_wikilinks_pure_anchor_is_not_broken(tmp_path: Path):
+    # A same-page anchor [[#heading]] has no page target → never broken.
+    _seed(tmp_path, "wiki/entities/foo.md", body="Jump to [[#Summary]]\n")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_wikilinks_heading_anchor_broken_is_never_typo_fixable(tmp_path: Path):
+    # A heading-anchored link to a NON-existing page is flagged broken but must
+    # NEVER be offered as FIX_WIKILINK_TYPO: the autofix rewrites [[target]] ->
+    # [[candidate]] and would silently delete the #anchor (data loss). Here the
+    # base "ghos" is edit-distance 1 from existing "ghost" — a unique typo
+    # candidate that the '#' guard must suppress.
+    _seed(tmp_path, "wiki/entities/foo.md", body="See [[ghos#Section]]\n")
+    _seed(tmp_path, "wiki/entities/ghost.md", body="ok\n")
+    findings = RULE_REGISTRY["wikilinks_broken"](tmp_path, _parse_all(tmp_path))
+    broken = [f for f in findings if f.metadata.get("target") == "ghos#Section"]
+    assert len(broken) == 1
+    assert broken[0].fixable is False
+    assert broken[0].fix_kind is None
+
+
+# --- _normalize_link_target ---
+
+
+@pytest.mark.parametrize(
+    "target, expected",
+    [
+        ("sources/2026-05-02-x", "2026-05-02-x"),
+        ("x.md", "x"),
+        ("x", "x"),
+        ("x.MD", "x"),
+        ("a/b/c", "c"),
+        ("wiki\\entities\\foo", "foo"),
+        ("raw/chats/uuid.md", "uuid"),
+        ("page#Section", "page"),
+        ("dir/page#H", "page"),
+        ("#anchor-only", ""),
+        ("", ""),
+    ],
+)
+def test_normalize_link_target(target: str, expected: str):
+    assert _normalize_link_target(target) == expected
 
 
 # --- orphan_pages ---

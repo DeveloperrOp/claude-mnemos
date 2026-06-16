@@ -58,3 +58,34 @@ def build_slug_index(vault: Path) -> dict[str, Path]:
             if _TYPE_PRIORITY[type_dir] < _TYPE_PRIORITY.get(existing_type, 99):
                 index[slug] = p
     return index
+
+
+def build_resolvable_targets(vault: Path) -> set[str]:
+    """Collect every `.md` stem anywhere under `vault` (Obsidian-style resolution).
+
+    Obsidian resolves a bare `[[name]]` to any `name.md` file anywhere in the
+    vault, and a path-form `[[dir/name]]` to `dir/name.md`. To match that, we
+    walk ALL markdown files recursively and collect their basenames (stems).
+
+    Dot-prefixed parts (.staging, .backups, .trash, .chunk-cache, ...) are
+    skipped — same guard as `build_slug_index`. The check is on the path
+    relative to the vault, because the vault itself often lives under a dot-dir
+    (e.g. ~/.mnemos-dev) and the absolute path would otherwise exclude every
+    file.
+
+    Tradeoff (accepted): we key on the bare stem, so a path-form `[[dir/name]]`
+    resolves whenever *any* `name.md` exists, even under a different directory —
+    slightly more lenient than strict Obsidian path resolution. This is a
+    deliberate false-negative: it correctly resolves every real case (our
+    `[[sources/<stem>]]` links point at `wiki/sources/<stem>.md`, whose path is a
+    suffix of the link), and the residual edge (a path-form link whose basename
+    happens to exist under the wrong folder) is far rarer and less harmful than
+    the false-positive spam this rule used to emit before resolving path-form
+    targets at all.
+    """
+    targets: set[str] = set()
+    for p in vault.rglob("*.md"):
+        if any(part.startswith(".") for part in p.relative_to(vault).parts):
+            continue
+        targets.add(p.stem)
+    return targets
