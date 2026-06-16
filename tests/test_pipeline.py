@@ -61,6 +61,26 @@ def _stub_extractor():
     return _extract
 
 
+def _skip_extraction() -> ExtractionResult:
+    """Zero-knowledge extraction: LLM skipped this session (belongs elsewhere)."""
+    return ExtractionResult(
+        summary="This session belongs to another project.",
+        skipped_reason="belongs to another project",
+        pages=[],
+        input_tokens=123,
+        output_tokens=4,
+    )
+
+
+def _skip_extractor():
+    """Returns a callable that yields a zero-knowledge ExtractionResult."""
+    def _extract(  # noqa: ARG001
+        *, messages, cfg, llm_client, today, chunk_extract=False, chunk_cache=None
+    ):
+        return _skip_extraction()
+    return _extract
+
+
 def test_ingest_writes_plain_raw_chat(tmp_path: Path):
     vault = tmp_path / "vault"
     ingest(
@@ -721,3 +741,47 @@ def test_ingest_chunk_extract_keeps_cache_on_failure(tmp_path: Path):
     cache_dir = vault / ".chunk-cache" / "abc-123"
     assert cache_dir.exists()
     assert list(cache_dir.glob("*.json"))
+
+
+def test_ingest_skip_extraction_is_raw_only_no_source_page(tmp_path: Path):
+    """A zero-knowledge extraction (pages==[]) keeps the raw transcript but
+    writes NO wiki/sources page — otherwise the empty knowledge node + its
+    [[<id>|Open transcript]] backlink become orphaned broken links."""
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_skip_extractor(),
+        today=FIXED_TODAY,
+    )
+    assert res.status == "raw_only"
+    # Raw transcript exists
+    assert (vault / "raw" / "chats" / "abc-123.md").exists()
+    # No wiki/sources page written
+    assert not (vault / "wiki" / "sources").exists()
+
+    m = Manifest.load(vault)
+    sha = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    rec = m.ingested[sha]
+    assert rec.source_path is None
+    assert rec.created_pages == ["raw/chats/abc-123.md"]
+
+
+def test_ingest_skip_extraction_dry_run_writes_nothing(tmp_path: Path):
+    """A skip extraction with dry_run=True returns dry_run and writes nothing."""
+    vault = tmp_path / "vault"
+    res = ingest(
+        FIXTURE,
+        vault,
+        cfg=_cfg(),
+        llm_client=MagicMock(),
+        extractor=_skip_extractor(),
+        dry_run=True,
+        today=FIXED_TODAY,
+    )
+    assert res.status == "dry_run"
+    assert not (vault / "raw").exists()
+    assert not (vault / "wiki").exists()
+    assert not (vault / MANIFEST_FILENAME).exists()
