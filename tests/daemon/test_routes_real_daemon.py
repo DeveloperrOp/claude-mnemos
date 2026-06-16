@@ -177,8 +177,9 @@ def test_pages_patch_uses_tracker_from_runtime(
     tracker from the vault runtime (resolved via get_runtime, not via
     the removed primary_runtime attribute).
 
-    The tracker.writing() context manager is ephemeral — entries are removed
-    after the write completes — so we verify correctness by:
+    The tracker.writing() context manager registers paths with a TTL (and lets
+    them expire rather than removing them), so they aren't observable by the time
+    the request returns — so we verify correctness by:
       1. Confirming the request returns 200 (i.e. the apply_patch ran fully).
       2. Confirming the runtime's tracker is the real OurWritesTracker (not
          None), meaning the route wired it through correctly.
