@@ -20,6 +20,7 @@ from claude_mnemos.lint.utils import (
     build_slug_index,
     levenshtein_distance,
 )
+from claude_mnemos.state.manifest import Manifest, ManifestCorruptError
 
 PageEntry = tuple[Path, ParsedPage | None]
 RuleFn = Callable[[Path, list[PageEntry]], list[LintFinding]]
@@ -34,6 +35,7 @@ RULE_VERSIONS = {
     # against every .md basename in the vault, not just wiki/* slugs.
     "wikilinks_broken": "v2",
     "orphan_pages": "v1",
+    "manifest_drift": "v1",
     "stale_pages": "v1",
     "duplicate_titles": "v1",
     "provenance_inferred_high": "v1",
@@ -201,6 +203,45 @@ def orphan_pages(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
                 metadata={},
             )
         )
+    return out
+
+
+# ---------------------------------------------------------------- manifest_drift
+
+
+def manifest_drift(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
+    """Flag manifest entries whose referenced files no longer exist on disk.
+
+    Catches silent drift where the manifest claims a raw/source/created file
+    exists but it was deleted out-of-band — the manifest then lies and the
+    affected source pages keep dead [[Open transcript]] backlinks. Read-only;
+    a missing/corrupt manifest yields no findings (a separate concern).
+    """
+    out: list[LintFinding] = []
+    try:
+        manifest = Manifest.load(vault)
+    except ManifestCorruptError:
+        return out
+    for sha, rec in manifest.ingested.items():
+        refs = [rec.raw_path]
+        if rec.source_path:
+            refs.append(rec.source_path)
+        refs.extend(rec.created_pages)
+        for ref in dict.fromkeys(refs):  # dedupe, keep order
+            if not (vault / ref).is_file():
+                msg = f"manifest references missing file {ref} (session {rec.session_id})"
+                out.append(
+                    LintFinding(
+                        id=_finding_id("manifest_drift", ref, msg),
+                        rule_id="manifest_drift",
+                        severity=LintSeverity.ERROR,
+                        message=msg,
+                        page_path=ref,
+                        fixable=False,
+                        fix_kind=None,
+                        metadata={"session_id": rec.session_id, "sha": sha, "missing": ref},
+                    )
+                )
     return out
 
 
@@ -373,6 +414,7 @@ RULE_REGISTRY: dict[str, RuleFn] = {
     "page_parse_failed": page_parse_failed,
     "wikilinks_broken": wikilinks_broken,
     "orphan_pages": orphan_pages,
+    "manifest_drift": manifest_drift,
     "stale_pages": stale_pages,
     "duplicate_titles": duplicate_titles,
     "provenance_inferred_high": provenance_inferred_high,

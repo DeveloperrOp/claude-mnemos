@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from pathlib import Path
 
@@ -313,3 +314,49 @@ def test_page_parse_failed_detects_broken_yaml(tmp_path: Path):
     findings = RULE_REGISTRY["page_parse_failed"](tmp_path, _parse_all(tmp_path))
     assert len(findings) == 1
     assert findings[0].severity == LintSeverity.ERROR
+
+
+# --- manifest_drift ---
+
+
+def _write_manifest(vault: Path, records: dict) -> None:
+    (vault / ".manifest.json").write_text(
+        json.dumps({"version": 1, "ingested": records}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def test_manifest_drift_flags_missing_raw(tmp_path: Path):
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/gone.md", "source_path": None,
+            "created_pages": ["raw/chats/gone.md"], "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    missing = [f for f in findings if f.metadata.get("missing") == "raw/chats/gone.md"]
+    assert len(missing) == 1
+    assert missing[0].severity == LintSeverity.ERROR
+    assert missing[0].fixable is False
+
+
+def test_manifest_drift_clean_when_files_present(tmp_path: Path):
+    raw = tmp_path / "raw" / "chats" / "here.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("x", encoding="utf-8")
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/here.md", "source_path": None,
+            "created_pages": ["raw/chats/here.md"], "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_manifest_drift_no_manifest_is_noop(tmp_path: Path):
+    assert RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path)) == []
