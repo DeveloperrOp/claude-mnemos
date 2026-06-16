@@ -20,6 +20,7 @@ from claude_mnemos.lint.utils import (
     build_slug_index,
     levenshtein_distance,
 )
+from claude_mnemos.state.manifest import Manifest, ManifestCorruptError
 
 PageEntry = tuple[Path, ParsedPage | None]
 RuleFn = Callable[[Path, list[PageEntry]], list[LintFinding]]
@@ -34,6 +35,7 @@ RULE_VERSIONS = {
     # against every .md basename in the vault, not just wiki/* slugs.
     "wikilinks_broken": "v2",
     "orphan_pages": "v1",
+    "manifest_drift": "v1",
     "stale_pages": "v1",
     "duplicate_titles": "v1",
     "provenance_inferred_high": "v1",
@@ -199,6 +201,61 @@ def orphan_pages(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
                 fixable=False,
                 fix_kind=None,
                 metadata={},
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------- manifest_drift
+
+
+def manifest_drift(vault: Path, pages: list[PageEntry]) -> list[LintFinding]:
+    """Flag manifest entries whose RAW transcript file is missing on disk.
+
+    The manifest is an ingest ledger. Knowledge pages (``source_path`` /
+    ``created_pages``) are legitimately deleted, merged, renamed, or trashed by
+    curation WITHOUT rewriting the manifest — so a missing wiki page is expected,
+    not drift, and flagging it would spam ERRORs on any well-tended vault. But
+    ``raw/chats`` transcripts are append-only records that no normal operation
+    removes; a missing ``raw_path`` means the ledger silently lies (the bug that
+    left orphaned source pages with dead [[Open transcript]] backlinks). We flag
+    only that. The finding points at the still-present source page (the one
+    carrying the now-dead backlink) so the user can act on it. Read-only;
+    a missing/corrupt manifest yields no findings.
+    """
+    out: list[LintFinding] = []
+    try:
+        manifest = Manifest.load(vault)
+    except ManifestCorruptError:
+        return out
+    for sha, rec in manifest.ingested.items():
+        if (vault / rec.raw_path).is_file():
+            continue
+        # Anchor the finding to the orphaned source page (still on disk) so its
+        # link is actionable; fall back to the missing raw ref otherwise.
+        anchor = (
+            rec.source_path
+            if rec.source_path and (vault / rec.source_path).is_file()
+            else rec.raw_path
+        )
+        msg = (
+            f"manifest references missing raw transcript {rec.raw_path} "
+            f"(session {rec.session_id})"
+        )
+        out.append(
+            LintFinding(
+                id=_finding_id("manifest_drift", anchor, msg),
+                rule_id="manifest_drift",
+                severity=LintSeverity.WARNING,
+                message=msg,
+                page_path=anchor,
+                fixable=False,
+                fix_kind=None,
+                metadata={
+                    "session_id": rec.session_id,
+                    "sha": sha,
+                    "missing": rec.raw_path,
+                },
             )
         )
     return out
@@ -373,6 +430,7 @@ RULE_REGISTRY: dict[str, RuleFn] = {
     "page_parse_failed": page_parse_failed,
     "wikilinks_broken": wikilinks_broken,
     "orphan_pages": orphan_pages,
+    "manifest_drift": manifest_drift,
     "stale_pages": stale_pages,
     "duplicate_titles": duplicate_titles,
     "provenance_inferred_high": provenance_inferred_high,

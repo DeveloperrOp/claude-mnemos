@@ -86,6 +86,10 @@ def harness_with_cooldown(vault: Path):
 def test_external_modify_marks_page(vault: Path, harness):
     _, _, _ = harness
     page = _seed_page(vault, "wiki/entities/foo.md")
+    # The page was created after the handler started, so its first observed
+    # event only baselines the content signature (no flip). Let that settle so
+    # the next, genuinely-different write is recognized as a real content edit.
+    time.sleep(0.5)
 
     # External modify (preserve frontmatter, change body).
     text = page.read_text(encoding="utf-8")
@@ -129,6 +133,9 @@ def test_dotfile_change_ignored(vault: Path, harness):
 def test_paused_tracker_blocks_marking(vault: Path, harness):
     _, tracker, _ = harness
     page = _seed_page(vault, "wiki/entities/foo.md")
+    # Let the create/first-modify settle so the content signature is baselined
+    # before the real edits below (the gate skips the first-ever observation).
+    time.sleep(0.5)
 
     with tracker.paused():
         text = page.read_text(encoding="utf-8")

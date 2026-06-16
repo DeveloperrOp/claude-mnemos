@@ -21,6 +21,7 @@ them precisely without touching other vaults' jobs.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -169,8 +170,13 @@ class VaultRuntime:
             # 1. Recover zombies left by previous crash.
             self.job_store.recover_zombie_running()
 
-            # 2. Watchdog observer.
-            handler = VaultChangeHandler(self.vault_root, self.tracker, alerts)
+            # 2. Watchdog observer. Construct the handler OFF the event loop:
+            # its __init__ seeds a content signature per wiki page (reads +
+            # hashes every file), which would otherwise block the loop for the
+            # whole vault walk on mount.
+            handler = await asyncio.to_thread(
+                VaultChangeHandler, self.vault_root, self.tracker, alerts
+            )
             observer = VaultObserver(self.vault_root, handler)
             observer.start()
             self.observer = observer
@@ -197,10 +203,8 @@ class VaultRuntime:
                 # would create off-cadence snapshots and defeat the chosen
                 # frequency. Missing one weekly/monthly run is acceptable.
                 if self.settings.snapshots.schedule == "daily":
-                    import asyncio as _asyncio
-
-                    _asyncio.create_task(
-                        _asyncio.to_thread(daily_snapshot_task, self.vault_root),
+                    asyncio.create_task(
+                        asyncio.to_thread(daily_snapshot_task, self.vault_root),
                     )
             scheduler.add_job(
                 backups_cleanup_task,
@@ -309,7 +313,6 @@ class VaultRuntime:
         missing we do NOT reopen/restart — recreating an empty .jobs.db over the
         loss would mask it.
         """
-        import asyncio
 
         from claude_mnemos.core.snapshots import restore_from_snapshot
 
@@ -343,7 +346,10 @@ class VaultRuntime:
             self.job_store = JobStore(self.vault_root / JOBS_DB_FILENAME)
             self.job_store.recover_zombie_running()
             if self._alerts is not None:
-                handler = VaultChangeHandler(self.vault_root, self.tracker, self._alerts)
+                # Off the event loop: the handler seeds a signature per page.
+                handler = await asyncio.to_thread(
+                    VaultChangeHandler, self.vault_root, self.tracker, self._alerts
+                )
                 observer = VaultObserver(self.vault_root, handler)
                 observer.start()
                 self.observer = observer
@@ -359,6 +365,15 @@ class VaultRuntime:
                     detected_at=datetime.now(UTC),
                 )
         return result
+
+    def reseed_watchdog(self) -> None:
+        """Rebuild the watchdog's content-signature cache from current on-disk
+        bytes. Call after an in-place vault swap the observer SURVIVED (an
+        activity undo restores a snapshot without rebuilding the handler) so a
+        restored page isn't misread as a human edit on its next access."""
+        obs = self.observer
+        if obs is not None:
+            obs.handler.reseed_signatures()
 
     async def _rollback_mount(self, *, error: str) -> None:
         if self.job_worker is not None:

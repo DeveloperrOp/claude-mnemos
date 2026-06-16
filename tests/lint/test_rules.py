@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from pathlib import Path
 
@@ -313,3 +314,94 @@ def test_page_parse_failed_detects_broken_yaml(tmp_path: Path):
     findings = RULE_REGISTRY["page_parse_failed"](tmp_path, _parse_all(tmp_path))
     assert len(findings) == 1
     assert findings[0].severity == LintSeverity.ERROR
+
+
+# --- manifest_drift ---
+
+
+def _write_manifest(vault: Path, records: dict) -> None:
+    (vault / ".manifest.json").write_text(
+        json.dumps({"version": 1, "ingested": records}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def test_manifest_drift_flags_missing_raw(tmp_path: Path):
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/gone.md", "source_path": None,
+            "created_pages": ["raw/chats/gone.md"], "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    missing = [f for f in findings if f.metadata.get("missing") == "raw/chats/gone.md"]
+    assert len(missing) == 1
+    assert missing[0].severity == LintSeverity.WARNING
+    assert missing[0].fixable is False
+
+
+def test_manifest_drift_ignores_missing_wiki_page(tmp_path: Path):
+    # Raw present, but a knowledge page recorded in the manifest was deleted /
+    # merged / trashed by curation (which doesn't rewrite the manifest). That is
+    # NOT drift — the rule flags only a missing RAW transcript, so it stays
+    # silent here. Prevents false-ERROR spam on any well-tended vault.
+    raw = tmp_path / "raw" / "chats" / "here.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("x", encoding="utf-8")
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/here.md",
+            "source_path": "wiki/sources/2026-04-26-s1.md",  # deleted, not on disk
+            "created_pages": ["wiki/entities/gone.md", "raw/chats/here.md"],
+            "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_manifest_drift_anchors_to_existing_source_page(tmp_path: Path):
+    # Raw is GONE but the orphaned source page survives — the finding links to
+    # that page (actionable) and is a WARNING, not an ERROR.
+    src = tmp_path / "wiki" / "sources" / "2026-05-02-s1.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("orphaned source\n", encoding="utf-8")
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/gone.md",
+            "source_path": "wiki/sources/2026-05-02-s1.md",
+            "created_pages": ["wiki/sources/2026-05-02-s1.md"],
+            "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    assert len(findings) == 1
+    assert findings[0].severity == LintSeverity.WARNING
+    assert findings[0].page_path == "wiki/sources/2026-05-02-s1.md"
+    assert findings[0].metadata.get("missing") == "raw/chats/gone.md"
+
+
+def test_manifest_drift_clean_when_files_present(tmp_path: Path):
+    raw = tmp_path / "raw" / "chats" / "here.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("x", encoding="utf-8")
+    _write_manifest(tmp_path, {
+        "sha1": {
+            "session_id": "s1", "ingested_at": "2026-04-26T00:00:00Z",
+            "raw_path": "raw/chats/here.md", "source_path": None,
+            "created_pages": ["raw/chats/here.md"], "skipped_collisions": [],
+            "model": None, "input_tokens": None, "output_tokens": None,
+        }
+    })
+    findings = RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path))
+    assert findings == []
+
+
+def test_manifest_drift_no_manifest_is_noop(tmp_path: Path):
+    assert RULE_REGISTRY["manifest_drift"](tmp_path, _parse_all(tmp_path)) == []

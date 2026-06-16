@@ -191,6 +191,74 @@ def ingest(
                 chunk_cache=chunk_cache,
             )
 
+            if not extraction.pages:
+                # Zero-knowledge extraction (LLM skipped this session or found
+                # nothing for this vault). Keep the raw transcript but write NO
+                # wiki/sources page: an empty knowledge node whose
+                # [[<id>|Open transcript]] backlink + sources:[raw/chats/<id>.md]
+                # pointer become broken links once the raw is cleaned up. Record
+                # as raw_only instead.
+                manifest.add(
+                    sha,
+                    IngestRecord(
+                        session_id=session_id,
+                        ingested_at=datetime.now(UTC),
+                        raw_path=raw_relative.as_posix(),
+                        source_path=None,
+                        created_pages=[raw_relative.as_posix()],
+                        skipped_collisions=[],
+                        model=cfg.model,
+                        input_tokens=extraction.input_tokens,
+                        output_tokens=extraction.output_tokens,
+                        transcript_path=str(jsonl_path.resolve()),
+                        raw_transcript_bytes=len(raw_bytes),
+                    ),
+                )
+                txn.write(Path(".manifest.json"), manifest.serialize_to_string())
+                snapshot_target = txn.pre_promote_snapshot_path()
+                activity_id = uuid4().hex
+                activity.append(
+                    _build_activity_entry(
+                        op_type="ingest_raw_only",
+                        snapshot_target=snapshot_target,
+                        vault_root=vault_root,
+                        affected=[raw_relative.as_posix()],
+                        metadata={
+                            "session_id": session_id,
+                            "skipped_reason": extraction.skipped_reason,
+                            "model": cfg.model,
+                            "input_tokens": extraction.input_tokens,
+                            "output_tokens": extraction.output_tokens,
+                        },
+                        entry_id=activity_id,
+                    )
+                )
+                txn.write(Path(ACTIVITY_FILENAME), activity.serialize_to_string())
+                if dry_run:
+                    txn.reject("dry-run (--extract, no knowledge)")
+                    if chunk_cache is not None:
+                        chunk_cache.clear()
+                    return IngestResult(
+                        status="dry_run",
+                        session_id=session_id,
+                        raw_path=None,
+                        snapshot_path=None,
+                        activity_id=None,
+                    )
+                promote = txn.promote_to_vault(tracker=tracker)
+                if chunk_cache is not None:
+                    chunk_cache.clear()
+                return IngestResult(
+                    status="raw_only",
+                    session_id=session_id,
+                    raw_path=vault_root / raw_relative,
+                    input_tokens=extraction.input_tokens,
+                    output_tokens=extraction.output_tokens,
+                    model=cfg.model,
+                    snapshot_path=promote.snapshot,
+                    activity_id=activity_id,
+                )
+
             source_relative = Path("wiki/sources") / f"{today.isoformat()}-{session_id}.md"
             source_page = _build_source_page(
                 session_id=session_id,

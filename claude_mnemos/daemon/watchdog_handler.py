@@ -12,8 +12,10 @@ thread must never die from an uncaught exception.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -86,6 +88,57 @@ class VaultChangeHandler(FileSystemEventHandler):
         self.alerts = alerts
         self.clock = clock
         self.lock_timeout_s = lock_timeout_s
+        # Content-signature cache (sha256 hex, byte length) per page. Tells a
+        # real content edit from a metadata/atime touch — on Windows a mere read
+        # bumps last-access-time, which surfaces as a FileModifiedEvent
+        # indistinguishable from a write. Without this gate, reading/linting/
+        # opening the vault in Obsidian would falsely flip agent_written.
+        self._sigs: dict[Path, tuple[str, int]] = {}
+        self._sigs_lock = threading.Lock()
+        self._seed_signatures()
+
+    def _content_signature(self, path: Path) -> tuple[str, int] | None:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return None
+        return (hashlib.sha256(data).hexdigest(), len(data))
+
+    def _seed_signatures(self) -> None:
+        """Baseline every existing wiki page so the first event after start is
+        compared, not assumed. Best-effort."""
+        wiki = self.vault / "wiki"
+        if not wiki.is_dir():
+            return
+        for p in wiki.rglob("*.md"):
+            if any(part.startswith(".") for part in p.relative_to(self.vault).parts):
+                continue
+            sig = self._content_signature(p.resolve())
+            if sig is not None:
+                with self._sigs_lock:
+                    self._sigs[p.resolve()] = sig
+
+    def _rebaseline(self, path: Path) -> None:
+        sig = self._content_signature(path)
+        with self._sigs_lock:
+            if sig is None:
+                self._sigs.pop(path, None)
+            else:
+                self._sigs[path] = sig
+
+    def reseed_signatures(self) -> None:
+        """Drop and rebuild the whole signature cache from current on-disk bytes.
+
+        Call after a bulk vault swap that the observer SURVIVED — e.g. an
+        activity undo, which restores a snapshot in place without rebuilding the
+        handler. Without this, every restored page differs from its stale cached
+        signature, so the next event (even a read) reads as a content edit and
+        false-flips the restored page to human-edited. (The snapshot-restore
+        route rebuilds the handler instead, so it doesn't need this.)
+        """
+        with self._sigs_lock:
+            self._sigs.clear()
+        self._seed_signatures()
 
     # ------------------------------------------------------------------ events
 
@@ -110,6 +163,10 @@ class VaultChangeHandler(FileSystemEventHandler):
             if not self._is_watched(path):
                 return
             if self.tracker.contains(path):
+                # Daemon's own write (ingest/flip/etc). Re-baseline so the next
+                # external event compares against the freshly-written content
+                # instead of stale bytes (which would look like an edit).
+                self._rebaseline(path)
                 return
             if kind == "created":
                 self.alerts.add(
@@ -181,6 +238,30 @@ class VaultChangeHandler(FileSystemEventHandler):
             )
 
     def _mark_under_lock(self, path: Path) -> None:
+        # Gate on a real content change BEFORE parsing. A metadata/atime/attrib
+        # event (e.g. a read on a last-access-enabled volume) must produce NO
+        # side effects — not even a parse_failed alert on an already-broken
+        # page, which would re-flood Health with the same read-triggered noise
+        # this gate exists to kill.
+        cur_sig = self._content_signature(path)
+        with self._sigs_lock:
+            prev_sig = self._sigs.get(path)
+        if prev_sig is None:
+            # First time we see this page — baseline it and do NOT flip. Don't
+            # treat an unverifiable first observation as a human edit.
+            if cur_sig is not None:
+                with self._sigs_lock:
+                    self._sigs[path] = cur_sig
+            return
+        if cur_sig == prev_sig:
+            # Byte-identical: a metadata/atime/attrib event, not a content edit.
+            return
+
+        # Content genuinely changed. Re-baseline up front so that if the new
+        # content has broken frontmatter, later metadata events on the same
+        # broken bytes don't re-emit parse_failed — we alert once per change.
+        self._rebaseline(path)
+
         try:
             parsed = read_page(path)
         except PageParseError as exc:
@@ -208,6 +289,10 @@ class VaultChangeHandler(FileSystemEventHandler):
             atomic_write(path, serialize_page(new_parsed))
         finally:
             self.tracker.remove(path)
+
+        # Re-baseline to the post-flip bytes so the flip's own write event
+        # (the atomic_write above) won't be re-read as a fresh human edit.
+        self._rebaseline(path)
 
         # Activity append is best-effort: page mutation already succeeded, so
         # a failure here (e.g. ActivityCorruptError) must not propagate and

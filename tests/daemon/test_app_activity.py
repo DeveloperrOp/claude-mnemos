@@ -30,6 +30,13 @@ class _FakeRuntime:
         from claude_mnemos.daemon.our_writes import OurWritesTracker
 
         self.tracker = OurWritesTracker(ttl_s=60.0)
+        self.reseed_called = False
+
+    def reseed_watchdog(self) -> None:
+        # Real VaultRuntime reseeds the watchdog's signature cache after an undo;
+        # here we only record that the route invoked it (regression guard) since
+        # this shim has no observer.
+        self.reseed_called = True
 
 
 class _FakeDaemon:
@@ -310,6 +317,10 @@ async def test_undo_activity_success(tmp_path: Path) -> None:
     # Activity log has manual_restore appended
     log_after = ActivityLog.load(vault)
     assert any(e.operation_type == "manual_restore" for e in log_after.entries)
+    # The route reseeded the watchdog signature cache after the in-place restore
+    # (regression guard: dropping that call silently reintroduces post-undo
+    # false-flips of restored pages).
+    assert runtime.reseed_called is True
 
 
 async def test_undo_activity_already_undone_returns_409(tmp_path: Path) -> None:

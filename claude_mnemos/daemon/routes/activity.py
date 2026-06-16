@@ -57,6 +57,12 @@ def undo_activity(project: str, op_id: str, request: Request) -> UndoApiResult:
     result = undo(
         runtime.vault_root, op_id, tracker=runtime.tracker
     )  # raises UndoError / LockTimeoutError → handled in app
+    # The undo restored a snapshot IN PLACE — the observer survived, so its
+    # signature cache is now stale (pre-undo content). Reseed from disk or the
+    # next read of a restored page would be misread as a human edit and
+    # false-flip its provenance. (Sync route → runs in a threadpool, so the
+    # disk walk doesn't block the event loop.)
+    runtime.reseed_watchdog()
     return UndoApiResult(
         success=result.success,
         op_id=op_id,
