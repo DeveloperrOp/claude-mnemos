@@ -224,7 +224,7 @@ def test_move_after_finalize_raises(tmp_path: Path):
 
 
 def test_promote_registers_targets_with_tracker(tmp_path: Path):
-    """Each target path is in the tracker for the duration of shutil.move."""
+    """Each target path is registered with the tracker and kept via its TTL."""
     from claude_mnemos.daemon.our_writes import OurWritesTracker
 
     vault = tmp_path / "vault"
@@ -257,9 +257,11 @@ def test_promote_registers_targets_with_tracker(tmp_path: Path):
         (vault / "wiki/entities/another.md").resolve(),
     }
     assert expected_targets.issubset(set(add_calls))
-    assert expected_targets.issubset(set(remove_calls))
-    # All targets removed by exit time.
-    assert not any(tracker.contains(t) for t in expected_targets)
+    # writing() no longer explicitly removes on exit: the targets stay "ours"
+    # via the TTL so a delayed MODIFIED event for our OWN write (the OS can emit
+    # it after shutil.move returns) isn't misread as an external human edit.
+    assert not remove_calls
+    assert all(tracker.contains(t) for t in expected_targets)
 
 
 def test_promote_registers_move_endpoints_and_delete_sources(

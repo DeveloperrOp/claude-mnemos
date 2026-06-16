@@ -68,14 +68,15 @@ class OurWritesTracker:
 
     @contextmanager
     def writing(self, paths: Iterable[Path]) -> Iterator[None]:
-        normalized = [p.resolve() for p in paths]
-        for p in normalized:
+        # Add with the TTL but DO NOT explicitly remove on exit: the OS can emit
+        # the MODIFIED event for our own write with delay, well after the write
+        # call returns. An immediate remove defeated the TTL (whose stated
+        # purpose is exactly to absorb those delayed self-write events), letting
+        # a late echo of our own write be misread as an external human edit.
+        # Letting each path expire via its TTL keeps it "ours" long enough.
+        for p in paths:
             self.add(p)
-        try:
-            yield
-        finally:
-            for p in normalized:
-                self.remove(p)
+        yield
 
     @contextmanager
     def paused(self) -> Iterator[None]:

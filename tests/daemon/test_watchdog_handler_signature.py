@@ -66,6 +66,20 @@ def test_self_write_rebaselines_signature(tmp_path: Path) -> None:
     assert _agent_written(p) is True
 
 
+def test_reseed_signatures_rebaselines_after_in_place_restore(tmp_path: Path) -> None:
+    # Simulate an in-place restore the observer SURVIVED (an activity undo swaps
+    # the vault content without rebuilding the handler). The file content changes
+    # on disk but _sigs still holds the pre-undo signature. Without a reseed the
+    # next event sees cur != stale-prev and false-flips the restored page. After
+    # reseed_signatures() a metadata event on the restored content must NOT flip.
+    p = _seed_page(tmp_path)
+    h = _handler(tmp_path)  # seeds the original content
+    p.write_text(_FM.replace("body text", "restored older content"), encoding="utf-8")
+    h.reseed_signatures()
+    h.on_modified(FileModifiedEvent(str(p)))  # metadata event on restored content
+    assert _agent_written(p) is True
+
+
 def test_unseen_page_first_event_seeds_not_flips(tmp_path: Path) -> None:
     # A page created AFTER the handler was constructed (no baseline) must be
     # seeded on its first event, not flipped.

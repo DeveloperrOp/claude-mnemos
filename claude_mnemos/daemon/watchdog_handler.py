@@ -126,6 +126,20 @@ class VaultChangeHandler(FileSystemEventHandler):
             else:
                 self._sigs[path] = sig
 
+    def reseed_signatures(self) -> None:
+        """Drop and rebuild the whole signature cache from current on-disk bytes.
+
+        Call after a bulk vault swap that the observer SURVIVED — e.g. an
+        activity undo, which restores a snapshot in place without rebuilding the
+        handler. Without this, every restored page differs from its stale cached
+        signature, so the next event (even a read) reads as a content edit and
+        false-flips the restored page to human-edited. (The snapshot-restore
+        route rebuilds the handler instead, so it doesn't need this.)
+        """
+        with self._sigs_lock:
+            self._sigs.clear()
+        self._seed_signatures()
+
     # ------------------------------------------------------------------ events
 
     def on_modified(self, event: FileSystemEvent) -> None:

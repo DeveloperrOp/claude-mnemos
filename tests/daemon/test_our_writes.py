@@ -44,27 +44,41 @@ def test_ttl_expiration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert not tracker.contains(p)
 
 
-def test_writing_context_adds_and_removes(tmp_path: Path):
-    tracker = OurWritesTracker()
+def test_writing_context_keeps_path_via_ttl(tmp_path: Path):
+    # writing() adds each path with the TTL and does NOT explicitly remove on
+    # exit: a delayed self-write event after the block must still match
+    # contains() within the TTL window (the TTL's documented purpose — the OS
+    # can emit our own write's MODIFIED event late). The path expires via TTL.
+    tracker = OurWritesTracker(ttl_s=60.0)
     p1 = tmp_path / "a.md"
     p2 = tmp_path / "b.md"
-    p1.write_text("a", encoding="utf-8")
-    p2.write_text("b", encoding="utf-8")
 
     with tracker.writing([p1, p2]):
         assert tracker.contains(p1)
         assert tracker.contains(p2)
-    assert not tracker.contains(p1)
-    assert not tracker.contains(p2)
+    # Still ours within the TTL window (delayed-event grace), not removed.
+    assert tracker.contains(p1)
+    assert tracker.contains(p2)
 
 
-def test_writing_context_removes_on_exception(tmp_path: Path):
-    tracker = OurWritesTracker()
+def test_writing_context_keeps_path_on_exception(tmp_path: Path):
+    # An exception inside writing() leaves the path tracked (TTL) rather than
+    # explicitly removed, so a partial write's delayed events stay suppressed.
+    tracker = OurWritesTracker(ttl_s=60.0)
     p = tmp_path / "foo.md"
-    p.write_text("hi", encoding="utf-8")
     with pytest.raises(RuntimeError), tracker.writing([p]):
         assert tracker.contains(p)
         raise RuntimeError("boom")
+    assert tracker.contains(p)
+
+
+def test_writing_context_path_expires_after_ttl(tmp_path: Path):
+    # A negative TTL deadline is already in the past, so the path is GC'd out on
+    # the next contains() — proves writing() relies on TTL expiry, not remove().
+    tracker = OurWritesTracker(ttl_s=-1.0)
+    p = tmp_path / "a.md"
+    with tracker.writing([p]):
+        pass
     assert not tracker.contains(p)
 
 

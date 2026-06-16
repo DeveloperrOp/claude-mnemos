@@ -31,6 +31,11 @@ class _FakeRuntime:
 
         self.tracker = OurWritesTracker(ttl_s=60.0)
 
+    def reseed_watchdog(self) -> None:
+        # Real VaultRuntime reseeds the watchdog's signature cache after an undo;
+        # no observer in this shim, so a no-op.
+        pass
+
 
 class _FakeDaemon:
     def __init__(self, alpha_vault: Path) -> None:
