@@ -215,17 +215,34 @@ def test_already_human_edited_page_still_marked(tmp_path: Path):
 
 
 def test_modified_invalid_yaml_alerts_no_mutation(tmp_path: Path):
+    # A content edit that BREAKS the frontmatter alerts parse_failed and does
+    # not mutate. The page starts valid (seeded at construction); overwriting it
+    # with garbage is a real content change, so the signature gate lets it
+    # through to the parser, which then alerts.
     vault = tmp_path / "vault"
-    p = vault / "wiki/entities/broken.md"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("not a markdown page at all", encoding="utf-8")
-    _make_old(p)
+    p = _seed_page(vault, "wiki/entities/broken.md")
     h, _, alerts = _make_handler(vault)
+    p.write_text("not a markdown page at all", encoding="utf-8")
     h.on_modified(FileModifiedEvent(str(p)))
     assert p.read_text(encoding="utf-8") == "not a markdown page at all"
     items = alerts.list()
     assert len(items) == 1
     assert items[0].kind == "parse_failed"
+
+
+def test_metadata_event_on_prebroken_page_does_not_alert(tmp_path: Path):
+    # A page already broken BEFORE the handler started must not emit
+    # parse_failed on a mere read/metadata event (no content change). This is
+    # the read-triggered-noise class the content-signature gate kills: parse
+    # alerts fire only when content genuinely changes to a broken state.
+    vault = tmp_path / "vault"
+    p = vault / "wiki/entities/broken.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("not a markdown page at all", encoding="utf-8")
+    _make_old(p)
+    h, _, alerts = _make_handler(vault)  # seeds the (broken) bytes at construction
+    h.on_modified(FileModifiedEvent(str(p)))  # metadata event, content unchanged
+    assert alerts.list() == []
 
 
 def test_modified_pipeline_lock_timeout_alerts(
@@ -294,6 +311,10 @@ def test_handler_exception_inside_mark_logs_alert_only(
     p = _seed_page(vault, "wiki/entities/foo.md")
     _make_old(p)
     h, _, alerts = _make_handler(vault)
+    # Real content change so the signature gate lets the event through to
+    # read_page (where the injected failure fires). _human_edit uses raw
+    # read_text/write_text, not read_page, so it's unaffected by the monkeypatch.
+    _human_edit(p)
 
     def boom(_path: Path):  # noqa: ANN202
         raise RuntimeError("unexpected")

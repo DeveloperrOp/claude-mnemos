@@ -224,17 +224,11 @@ class VaultChangeHandler(FileSystemEventHandler):
             )
 
     def _mark_under_lock(self, path: Path) -> None:
-        try:
-            parsed = read_page(path)
-        except PageParseError as exc:
-            self.alerts.add(
-                kind="parse_failed",
-                path=str(path),
-                message=f"frontmatter invalid after edit: {exc}",
-                detected_at=self.clock(),
-            )
-            return
-
+        # Gate on a real content change BEFORE parsing. A metadata/atime/attrib
+        # event (e.g. a read on a last-access-enabled volume) must produce NO
+        # side effects — not even a parse_failed alert on an already-broken
+        # page, which would re-flood Health with the same read-triggered noise
+        # this gate exists to kill.
         cur_sig = self._content_signature(path)
         with self._sigs_lock:
             prev_sig = self._sigs.get(path)
@@ -247,6 +241,22 @@ class VaultChangeHandler(FileSystemEventHandler):
             return
         if cur_sig == prev_sig:
             # Byte-identical: a metadata/atime/attrib event, not a content edit.
+            return
+
+        # Content genuinely changed. Re-baseline up front so that if the new
+        # content has broken frontmatter, later metadata events on the same
+        # broken bytes don't re-emit parse_failed — we alert once per change.
+        self._rebaseline(path)
+
+        try:
+            parsed = read_page(path)
+        except PageParseError as exc:
+            self.alerts.add(
+                kind="parse_failed",
+                path=str(path),
+                message=f"frontmatter invalid after edit: {exc}",
+                detected_at=self.clock(),
+            )
             return
 
         new_fm = parsed.frontmatter.model_copy(
