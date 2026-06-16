@@ -49,3 +49,10 @@ export function wholeBudget(needs: number): number {
   // like 900000 yields exactly 990000 instead of spilling into the next 1k.
   return Math.ceil(Math.round(needs * 1.1) / 1000) * 1000;
 }
+
+/** Compact token count for human-facing hints: rounded to the nearest 1k with
+ * a "k" suffix (e.g. 990000 → "990k"). Used for the whole-shot budget tooltip
+ * and the too_large hint where exact digits add noise. */
+export function formatTokensK(n: number): string {
+  return `${Math.round(n / 1000)}k`;
+}

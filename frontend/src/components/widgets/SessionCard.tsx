@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
 import {
   canTryWhole,
+  formatTokensK,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -205,8 +206,8 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
               </div>
               <div className="text-[11px] opacity-90">
                 {t("sessions.too_large_hint", {
-                  needs: tooLarge.needs,
-                  max: tooLarge.max,
+                  needs: formatTokensK(tooLarge.needs),
+                  max: formatTokensK(tooLarge.max),
                 })}
               </div>
             </div>
@@ -235,12 +236,23 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
                 // A whole shot above the single-shot ceiling is doomed —
                 // never offer it; show only the chunked path.
                 const allowWhole = canTryWhole(tooLarge.needs);
+                const budget = wholeBudget(tooLarge.needs);
+                // The whole pass intentionally requests more than the applied
+                // limit for this one run; warn that it exceeds the setting.
+                const wholeTooltip =
+                  budget > tooLarge.max
+                    ? t("sessions.whole_budget_tooltip", {
+                        budget: formatTokensK(budget),
+                        max: formatTokensK(tooLarge.max),
+                      })
+                    : undefined;
                 const whole = (
                   <Button
                     key="whole"
                     size="sm"
                     variant={rec === "whole" ? "default" : "outline"}
                     disabled={reingest.isPending}
+                    title={wholeTooltip}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -249,7 +261,7 @@ export function SessionCard({ project, session: s, activeJob = null }: Props) {
                         session_id: s.session_id,
                         transcript_path: s.transcript_path!,
                         extract: true,
-                        maxInputTokens: wholeBudget(tooLarge.needs),
+                        maxInputTokens: budget,
                       });
                     }}
                   >

@@ -18,6 +18,12 @@ beforeAll(() => {
       ingested_toast: "Ingest queued",
       not_found_title: "Session not found",
       not_found_hint: "Back",
+      too_large_badge: "Too large for one pass",
+      too_large_hint: "Needs ~{{needs}} tokens, limit {{max}}",
+      extract_whole_button: "Try whole",
+      whole_budget_tooltip:
+        "A whole pass will request up to ~{{budget}} tokens (an over-estimate for Cyrillic text) — above your {{max}} limit.",
+      extract_chunked_button: "Process in chunks",
     },
     navigation: { sessions: "Sessions" },
   }, true, true);
@@ -64,5 +70,31 @@ describe("SessionDetail", () => {
     vi.spyOn(apiClient, "get").mockRejectedValue(new Error("404"));
     render(wrap(<SessionDetail />, "/project/alpha/sessions/missing"));
     await waitFor(() => expect(screen.getByText(/Session not found/i)).toBeInTheDocument());
+  });
+
+  it("tooltips «Try whole» with the raised budget vs the applied limit", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: {
+        session_id: "big",
+        status: "dead_letter",
+        transcript_path: "/x/raw/chats/big.md",
+        ingested_at: null,
+        model: null,
+        input_tokens: null,
+        output_tokens: null,
+        raw_transcript_bytes: null,
+        created_pages: [],
+        error: "too_large:needs=900000:max=800000",
+      },
+    });
+    render(wrap(<SessionDetail />, "/project/alpha/sessions/big"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Try whole/ })).toBeInTheDocument(),
+    );
+    // wholeBudget(900000) === 990000 → "990k"; max 800000 → "800k"
+    expect(screen.getByRole("button", { name: /Try whole/ })).toHaveAttribute(
+      "title",
+      "A whole pass will request up to ~990k tokens (an over-estimate for Cyrillic text) — above your 800k limit.",
+    );
   });
 });

@@ -417,6 +417,7 @@
     "too_large_badge": "Too large for one pass",
     "too_large_hint": "Needs ~{{needs}} tokens, current limit {{max}}",
     "extract_whole_button": "Try whole",
+    "whole_budget_tooltip": "A whole pass will request up to ~{{budget}} tokens (an over-estimate for Cyrillic text) — above your {{max}} limit.",
     "extract_chunked_button": "Process in chunks",
     "not_found_title": "Session not found",
     "not_found_hint": "Go back",

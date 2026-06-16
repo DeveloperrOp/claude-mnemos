@@ -19,6 +19,8 @@ beforeAll(() => {
         too_large_badge: "Too large for one pass",
         too_large_hint: "Needs ~{{needs}} tokens, limit {{max}}",
         extract_whole_button: "Try whole",
+        whole_budget_tooltip:
+          "A whole pass will request up to ~{{budget}} tokens (an over-estimate for Cyrillic text) — above your {{max}} limit.",
         extract_chunked_button: "Process in chunks",
         extract_button: "Save as knowledge",
         retry_button: "Retry",
@@ -80,7 +82,7 @@ describe("SessionCard — too-large session", () => {
     wrap(<SessionCard project="alpha" session={makeSession()} />);
     expect(screen.getByText("Too large for one pass")).toBeInTheDocument();
     expect(
-      screen.getByText(/Needs ~900000 tokens, limit 800000/),
+      screen.getByText(/Needs ~900k tokens, limit 800k/),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Try whole/ })).toBeInTheDocument();
     expect(
@@ -88,6 +90,16 @@ describe("SessionCard — too-large session", () => {
     ).toBeInTheDocument();
     // The single ordinary extract CTA must NOT be present.
     expect(screen.queryByRole("button", { name: /^Retry$/ })).toBeNull();
+  });
+
+  it("tooltips «Try whole» with the raised budget vs the applied limit", () => {
+    wrap(<SessionCard project="alpha" session={makeSession()} />);
+    // wholeBudget(900000) === 990000 → "990k"; max 800000 → "800k"
+    const whole = screen.getByRole("button", { name: /Try whole/ });
+    expect(whole).toHaveAttribute(
+      "title",
+      "A whole pass will request up to ~990k tokens (an over-estimate for Cyrillic text) — above your 800k limit.",
+    );
   });
 
   it("hides «Try whole» when needs exceeds the single-shot ceiling", () => {

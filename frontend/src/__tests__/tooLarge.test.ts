@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   canTryWhole,
+  formatTokensK,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -84,5 +85,26 @@ describe("wholeBudget", () => {
     expect(wholeBudget(850000)).toBe(935000);
     // 12345 * 1.1 = 13579.5 → ceil to nearest 1k → 14000
     expect(wholeBudget(12345)).toBe(14000);
+  });
+});
+
+describe("formatTokensK", () => {
+  it("renders a compact 'k' suffix rounded to the nearest 1k", () => {
+    expect(formatTokensK(990000)).toBe("990k");
+    expect(formatTokensK(800000)).toBe("800k");
+  });
+
+  it("rounds to the nearest 1k", () => {
+    // 935000 / 1000 = 935 → "935k"
+    expect(formatTokensK(935000)).toBe("935k");
+    // 12499 rounds down to 12, 12500 rounds up to 13
+    expect(formatTokensK(12499)).toBe("12k");
+    expect(formatTokensK(12500)).toBe("13k");
+  });
+
+  it("renders small counts under 1k as 0k or 1k", () => {
+    expect(formatTokensK(0)).toBe("0k");
+    expect(formatTokensK(499)).toBe("0k");
+    expect(formatTokensK(500)).toBe("1k");
   });
 });

@@ -31,6 +31,8 @@ beforeAll(() => {
       },
       sessions: {
         extract_whole_button: "Try whole",
+        whole_budget_tooltip:
+          "A whole pass will request up to ~{{budget}} tokens (an over-estimate for Cyrillic text) — above your {{max}} limit.",
         extract_chunked_button: "Process in chunks",
         ingesting: "Working…",
       },
@@ -94,6 +96,15 @@ describe("DeadLetterRow re-extraction", () => {
     expect(
       screen.getByRole("button", { name: /Process in chunks/i }),
     ).toBeInTheDocument();
+  });
+
+  it("tooltips «Try whole» with the raised budget vs the applied limit", () => {
+    wrapRow(mkJob());
+    // wholeBudget(900000) === 990000 → "990k"; max 800000 → "800k"
+    expect(screen.getByRole("button", { name: /Try whole/i })).toHaveAttribute(
+      "title",
+      "A whole pass will request up to ~990k tokens (an over-estimate for Cyrillic text) — above your 800k limit.",
+    );
   });
 
   it("hides «Try whole» when needs exceeds the single-shot ceiling", () => {

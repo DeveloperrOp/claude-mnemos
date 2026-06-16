@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useReingestSession } from "@/hooks/useReingestSession";
 import {
   canTryWhole,
+  formatTokensK,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -41,6 +42,16 @@ export function DeadLetterReextractButtons({ job }: { job: Job }) {
   const rec = recommendMode(tl.needs, tl.max);
   // A whole shot above the single-shot ceiling is doomed — never offer it.
   const allowWhole = canTryWhole(tl.needs);
+  const budget = wholeBudget(tl.needs);
+  // The whole pass intentionally requests more than the applied limit for this
+  // one run; warn that it exceeds the user's setting.
+  const wholeTooltip =
+    budget > tl.max
+      ? t("sessions.whole_budget_tooltip", {
+          budget: formatTokensK(budget),
+          max: formatTokensK(tl.max),
+        })
+      : undefined;
 
   const whole = (
     <Button
@@ -48,13 +59,14 @@ export function DeadLetterReextractButtons({ job }: { job: Job }) {
       size="sm"
       variant={rec === "whole" ? "default" : "outline"}
       disabled={reingest.isPending}
+      title={wholeTooltip}
       onClick={() =>
         reingest.mutate({
           project,
           session_id: sessionId,
           transcript_path: transcriptPath,
           extract: true,
-          maxInputTokens: wholeBudget(tl.needs),
+          maxInputTokens: budget,
         })
       }
     >

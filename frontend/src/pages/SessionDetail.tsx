@@ -8,6 +8,7 @@ import { useSessionIngest } from "@/hooks/useSessionIngest";
 import { cn } from "@/lib/utils";
 import {
   canTryWhole,
+  formatTokensK,
   parseTooLarge,
   recommendMode,
   wholeBudget,
@@ -51,6 +52,16 @@ export function SessionDetail() {
     : null;
   // A whole shot above the single-shot ceiling is doomed — never offer it.
   const allowWhole = tooLarge ? canTryWhole(tooLarge.needs) : false;
+  const wholeBudgetTokens = tooLarge ? wholeBudget(tooLarge.needs) : 0;
+  // The whole pass intentionally requests more than the applied limit for this
+  // one run; warn that it exceeds the user's setting.
+  const wholeTooltip =
+    tooLarge && wholeBudgetTokens > tooLarge.max
+      ? t("sessions.whole_budget_tooltip", {
+          budget: formatTokensK(wholeBudgetTokens),
+          max: formatTokensK(tooLarge.max),
+        })
+      : undefined;
   return (
     <article className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
@@ -68,6 +79,7 @@ export function SessionDetail() {
                   size="sm"
                   variant={tooLargeRec === "whole" ? "default" : "outline"}
                   disabled={ingest.isPending || !s.transcript_path}
+                  title={wholeTooltip}
                   onClick={() => {
                     if (project && sid && s.transcript_path) {
                       ingest.mutate({
@@ -75,7 +87,7 @@ export function SessionDetail() {
                         session_id: sid,
                         transcript_path: s.transcript_path,
                         extract: true,
-                        maxInputTokens: wholeBudget(tooLarge.needs),
+                        maxInputTokens: wholeBudgetTokens,
                       });
                     }
                   }}
@@ -253,8 +265,8 @@ export function SessionDetail() {
           </div>
           <p className="text-sm text-warning/90">
             {t("sessions.too_large_hint", {
-              needs: tooLarge.needs,
-              max: tooLarge.max,
+              needs: formatTokensK(tooLarge.needs),
+              max: formatTokensK(tooLarge.max),
             })}
           </p>
         </section>
