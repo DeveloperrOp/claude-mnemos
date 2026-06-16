@@ -76,6 +76,14 @@ def _make_old(path: Path) -> None:
     os.utime(path, (old, old))
 
 
+def _human_edit(path: Path) -> None:
+    """Simulate a real human content edit (append to the body) so the handler's
+    content-signature gate sees a genuine change versus its seeded baseline."""
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text + "\nhuman edit\n", encoding="utf-8")
+    _make_old(path)
+
+
 def test_skip_directory_event(tmp_path: Path):
     vault = tmp_path / "vault"
     vault.mkdir()
@@ -151,7 +159,8 @@ def test_modified_marks_human_edited(tmp_path: Path):
     vault = tmp_path / "vault"
     p = _seed_page(vault, "wiki/entities/foo.md")
     _make_old(p)
-    h, _, alerts = _make_handler(vault)
+    h, _, alerts = _make_handler(vault)  # seeds baseline at construction
+    _human_edit(p)  # real content change so the signature gate lets the flip through
     h.on_modified(FileModifiedEvent(str(p)))
     text = p.read_text(encoding="utf-8")
     assert "agent_written: false" in text
@@ -168,6 +177,7 @@ def test_modified_preserves_obsidian_extras(tmp_path: Path):
     )
     _make_old(p)
     h, _, _ = _make_handler(vault)
+    _human_edit(p)
     h.on_modified(FileModifiedEvent(str(p)))
     text = p.read_text(encoding="utf-8")
     assert "cssclass: my-class" in text
@@ -182,6 +192,7 @@ def test_modified_writes_activity_entry(tmp_path: Path):
     p = _seed_page(vault, "wiki/entities/foo.md")
     _make_old(p)
     h, _, _ = _make_handler(vault)
+    _human_edit(p)
     h.on_modified(FileModifiedEvent(str(p)))
     log = ActivityLog.load(vault)
     assert len(log.entries) == 1
@@ -315,6 +326,7 @@ def test_self_write_loop_prevention(tmp_path: Path):
     wh.atomic_write = spy_atomic_write  # type: ignore[assignment]
     try:
         h, _, _ = _make_handler(vault, tracker=tracker)
+        _human_edit(p)
         h.on_modified(FileModifiedEvent(str(p)))
     finally:
         wh.atomic_write = real_atomic_write  # type: ignore[assignment]
@@ -356,6 +368,7 @@ def test_activity_append_failure_is_isolated(
     monkeypatch.setattr(
         "claude_mnemos.state.activity.ActivityLog.save", boom
     )
+    _human_edit(p)
     h.on_modified(FileModifiedEvent(str(p)))
 
     # Page DID get marked despite activity append failing.
@@ -386,6 +399,7 @@ def test_activity_append_uses_single_clock_value(tmp_path: Path):
     h = VaultChangeHandler(
         vault, OurWritesTracker(ttl_s=60.0), Alerts(), clock=lambda: next(times)
     )
+    _human_edit(p)
     h.on_modified(FileModifiedEvent(str(p)))
 
     from claude_mnemos.state.activity import ActivityLog
@@ -406,6 +420,7 @@ def test_clock_is_used_for_last_human_edit(tmp_path: Path):
     h = VaultChangeHandler(
         vault, OurWritesTracker(ttl_s=60.0), Alerts(), clock=lambda: fixed
     )
+    _human_edit(p)
     h.on_modified(FileModifiedEvent(str(p)))
     text = p.read_text(encoding="utf-8")
     assert "2030-06-07T08:09:10" in text
