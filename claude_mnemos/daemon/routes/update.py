@@ -13,6 +13,7 @@ from claude_mnemos.core.update_apply import (
     can_apply,
     spawn_updater,
     stage_update,
+    update_in_progress,
 )
 from claude_mnemos.core.update_check import check_for_update, dismiss_for_days
 
@@ -65,6 +66,9 @@ def apply_update_route() -> dict[str, Any]:
             status_code=409,
             detail={"error": "cannot_apply", "reason": reason},
         )
+
+    if update_in_progress():
+        raise HTTPException(status_code=409, detail={"error": "in_progress"})
 
     s = check_for_update(force=True)
     if not s.has_update or not s.asset_url or not s.latest:
