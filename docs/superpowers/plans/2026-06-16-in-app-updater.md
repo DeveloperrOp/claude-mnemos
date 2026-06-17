@@ -90,3 +90,26 @@ Worst case at every step is a restore to the backed-up working install. The only
 - macOS/Linux auto-apply (keep release-page link).
 - Delta updates / background download.
 - Code-signing (Variant B / Squirrel-Sparkle) — separate EV-cert track.
+
+---
+
+## POST-REVIEW: v1 is NOT shippable — V2 redesign (pending Yarik's gate)
+
+Adversarial review of v1 (4 lenses + verify) found **16 confirmed issues, 6 HIGH**, including a FATAL one. v1 is held on the branch, NOT merged/released. Build V2 only after Yarik approves the approach (brick-risk feature).
+
+**Showstoppers in v1:**
+- **#7 FATAL:** the generated `updater.ps1` does not PARSE — `$TaskRun = "\"{exe}\" tray run"` uses `\"` which is invalid PowerShell (PS uses backtick `` `" ``). The update is dead-on-arrival.
+- **#1 brick:** the swap is a per-file `robocopy /E` over the live install incl. `_internal/*.pyd|*.dll`. A hard kill (power loss, AV quarantine of the unsigned exe, laptop sleep) mid-copy leaves a PyInstaller frankenbuild (new exe + old python DLL → "Failed to load Python DLL"). The `catch` never runs (process killed); the intact backup is never read on boot → unrecoverable brick.
+- **#10/#2/#8 relaunch:** the schtasks-as-user relaunch is fragile (minute-resolution `/ST`, `/Run` can no-op, `/RU /IT` reliability, exit codes unchecked).
+- **#11 restore:** rollback uses `/E` (no `/MIR`) → Frankenstein restore.
+- **#12 verify:** can't tell a transient relaunch hiccup from a broken build → rolls back good swaps.
+- **#5 verify false-pass; #9 `Get-Process` no wildcard (misses cli.exe); #4 no disk-space check / extract-after-kill; #6/#13/#14 failures invisible + no recovery path; #15/#16 UI no UAC pre-warning + in-memory state.**
+
+**V2 robust design (addresses all of the above):**
+1. **Do all the safe work in Python BEFORE anything is killed:** download → validate zip → `extractall` to `updates/<ver>/extract` → assert `claude-mnemos.exe` present → free-disk-space check (≥ install size + extract size on the install volume). Write a `swap.pending` JSON marker (`{version, install_dir, old_dir, started_at}`) BEFORE spawning. A bad download never touches the running app.
+2. **Atomic, rename-based swap (no per-file merge):** the elevated inner script does `taskkill /F /IM claude-mnemos.exe /T` + `claude-mnemos-cli.exe /T` → poll `Get-Process claude-mnemos*` (wildcard) until gone → `Rename-Item <install> <install>.old` → `Move-Item <extract> <install>` (same-volume = atomic rename; cross-volume profile = documented manual-recovery case). An interruption leaves whole-old, whole-new, or briefly install-absent — NEVER a frankenbuild. Restore = rename `<install>.old` back (inherently clean, no `/MIR` needed). Keep `.old` until the new build is verified healthy.
+3. **Two-process model, no schtasks (reliable relaunch):** the daemon spawns a NON-elevated OUTER powershell (detached, survives `/T`). It does `Start-Process -Verb RunAs -Wait` on the elevated INNER swap script (swap only, writes `result.txt`, NO relaunch). After it returns, the outer (running as the user) does a plain `Start-Process "<install>\claude-mnemos.exe" tray run` (non-elevated, correct user) and polls `/api/version` until the JSON `version == target` (≤60s); on success removes `<install>.old` + clears the marker; on failure leaves the marker for boot recovery.
+4. **Resume-on-boot recovery + surfaced outcome:** the frozen entry points scan `swap.pending` on startup — if the running `__version__ == target` → success (clear marker, remove `.old`); else record a "last update failed/incomplete" status. The daemon reads `result.txt`/marker and exposes `last_apply: {version, status, error}` on `/api/update-status`; the banner shows a red "Last update failed — previous version restored: <error>" state. Cleanup keeps only the most recent backup.
+5. **UI:** warn BEFORE the click ("this closes the app and asks for a Windows permission (UAC) to write to Program Files; if the dashboard doesn't return in ~1 min, relaunch from Start menu"). Persist the updating intent via the marker so the dead-SPA window is explainable.
+
+**Safety story (V2):** every failure leaves a *recoverable* state — old version running, new version running, a clean restore from `.old`, or (rare hard-kill mid-rename) an install-absent state with an intact `.old` backup + a documented one-line manual restore. Never a silent frankenbuild.
