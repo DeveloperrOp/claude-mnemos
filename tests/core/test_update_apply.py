@@ -1,14 +1,17 @@
-"""Tests for core.update_apply — the one-click portable-zip self-updater.
+"""Tests for core.update_apply (V2) — the one-click portable-zip self-updater.
 
-ALL mocked. We never download, never spawn powershell, never taskkill.
-The real end-to-end swap needs a live frozen install; here we assert on the
-generated PowerShell TEXT to prove the safety invariant (backup-before-swap,
-restore-on-failure) holds.
+ALL mocked. We never download, never spawn powershell, never taskkill. The real
+end-to-end swap needs a live frozen install; here we assert on the generated
+PowerShell TEXT to prove the safety design: validate+extract BEFORE any kill, an
+atomic rename-based swap (never a per-file merge), a rename-back restore on
+failure, a two-process model whose outer (non-elevated) relaunch + version-
+checked verify removes the backup + clears the marker only on success.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import zipfile
 from pathlib import Path
 
@@ -19,17 +22,14 @@ from claude_mnemos.core.update_apply import UpdateApplyError
 
 
 def _make_zip(names: list[str]) -> bytes:
-    """Build a real in-memory zip containing the given member names."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         for name in names:
-            zf.writestr(name, b"x")
+            zf.writestr(name, b"x" * 16)
     return buf.getvalue()
 
 
 class _FakeResponse:
-    """A minimal file-like + context-manager standing in for urlopen()."""
-
     def __init__(self, data: bytes) -> None:
         self._buf = io.BytesIO(data)
 
@@ -39,7 +39,6 @@ class _FakeResponse:
     def __exit__(self, *exc: object) -> None:
         self._buf.close()
 
-    # Some callers use the response directly without a with-block.
     def read(self, *a: object, **k: object) -> bytes:
         return self._buf.read(*a, **k)
 
@@ -57,179 +56,224 @@ def _opener_for(data: bytes):
 
 
 def test_can_apply_false_in_dev() -> None:
-    # Runs in the dev venv where runtime.is_frozen() is False.
     ok, reason = update_apply.can_apply()
     assert ok is False
-    assert reason  # non-empty human-readable reason
-    assert isinstance(reason, str)
+    assert isinstance(reason, str) and reason
 
 
 # --------------------------------------------------------------------------
-# download_and_stage
+# download_and_extract  (validate + extract BEFORE anything is killed)
 # --------------------------------------------------------------------------
 
 
-def test_download_and_stage_valid_zip(tmp_path: Path, monkeypatch) -> None:
+def test_download_and_extract_valid_zip(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    monkeypatch.setattr(update_apply, "current_install_dir", lambda: tmp_path / "Install")
     payload = _make_zip(["claude-mnemos.exe", "_internal/x"])
 
-    zip_path = update_apply.download_and_stage(
-        "https://example/portable.zip",
-        "0.9.0",
-        opener=_opener_for(payload),
+    work = update_apply.download_and_extract(
+        "https://example/portable.zip", "0.9.0", opener=_opener_for(payload)
     )
 
-    assert zip_path.exists()
-    assert zip_path.name == "portable.zip"
-    assert zipfile.is_zipfile(zip_path)
-    # Staged under updates_dir()/version/
-    assert zip_path.parent.name == "0.9.0"
+    assert work.is_dir() and work.name == "0.9.0"
+    assert (work / "portable.zip").exists()
+    # The new build is extracted + validated up front.
+    assert (work / "extract" / "claude-mnemos.exe").is_file()
 
 
-def test_download_and_stage_rejects_non_zip(tmp_path: Path, monkeypatch) -> None:
+def test_download_and_extract_rejects_non_zip(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    monkeypatch.setattr(update_apply, "current_install_dir", lambda: tmp_path / "Install")
     with pytest.raises(UpdateApplyError):
-        update_apply.download_and_stage(
-            "https://example/portable.zip",
-            "0.9.0",
-            opener=_opener_for(b"not a zip at all"),
+        update_apply.download_and_extract(
+            "https://example/portable.zip", "0.9.0", opener=_opener_for(b"nope")
         )
 
 
-def test_download_and_stage_rejects_zip_without_exe(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_download_and_extract_rejects_zip_without_exe(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    monkeypatch.setattr(update_apply, "current_install_dir", lambda: tmp_path / "Install")
     payload = _make_zip(["_internal/x", "readme.txt"])
     with pytest.raises(UpdateApplyError):
-        update_apply.download_and_stage(
-            "https://example/portable.zip",
-            "0.9.0",
-            opener=_opener_for(payload),
+        update_apply.download_and_extract(
+            "https://example/portable.zip", "0.9.0", opener=_opener_for(payload)
+        )
+
+
+def test_download_and_extract_rejects_low_disk(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    monkeypatch.setattr(update_apply, "current_install_dir", lambda: tmp_path / "Install")
+
+    class _Usage:
+        free = 1  # 1 byte free -> always insufficient
+
+    monkeypatch.setattr(update_apply.shutil, "disk_usage", lambda _p: _Usage())
+    payload = _make_zip(["claude-mnemos.exe", "_internal/x"])
+    with pytest.raises(UpdateApplyError):
+        update_apply.download_and_extract(
+            "https://example/portable.zip", "0.9.0", opener=_opener_for(payload)
         )
 
 
 # --------------------------------------------------------------------------
-# render_updater_script
+# write_pending_marker
+# --------------------------------------------------------------------------
+
+
+def test_write_pending_marker(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    marker = update_apply.write_pending_marker(
+        version="0.9.0",
+        install_dir=Path(r"C:\Install"),
+        old_dir=Path(r"C:\Install.old"),
+    )
+    data = json.loads(marker.read_text(encoding="utf-8"))
+    assert data["version"] == "0.9.0"
+    assert data["install_dir"] == r"C:\Install"
+    assert data["old_dir"] == r"C:\Install.old"
+    assert "started_at" in data
+
+
+# --------------------------------------------------------------------------
+# render_inner_script  (elevated: kill -> atomic rename swap -> restore-on-fail)
 # --------------------------------------------------------------------------
 
 
 @pytest.fixture
-def rendered_script() -> str:
-    return update_apply.render_updater_script(
+def inner() -> str:
+    return update_apply.render_inner_script(
         install_dir=Path(r"C:\Program Files\ClaudeMnemos"),
-        work_dir=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0"),
-        zip_path=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0\portable.zip"),
-        username="joe",
+        old_dir=Path(r"C:\Program Files\ClaudeMnemos.old"),
+        extract_dir=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0\extract"),
+        result_path=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0\result.txt"),
+        version="0.9.0",
+    )
+
+
+def test_inner_error_action_stop(inner: str) -> None:
+    assert '$ErrorActionPreference = "Stop"' in inner
+
+
+def test_inner_kills_both_exes_with_wildcard_poll(inner: str) -> None:
+    assert "taskkill /F /IM claude-mnemos.exe /T" in inner
+    assert "taskkill /F /IM claude-mnemos-cli.exe /T" in inner
+    # Wildcard poll matches BOTH claude-mnemos.exe and claude-mnemos-cli.exe.
+    assert "Get-Process claude-mnemos*" in inner
+
+
+def test_inner_atomic_rename_swap(inner: str) -> None:
+    # Move the live install aside, then move the new build into place — renames,
+    # not a per-file merge (so an interruption can't leave a frankenbuild).
+    assert (
+        'Move-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos" '
+        '-Destination "C:\\Program Files\\ClaudeMnemos.old"' in inner
+    )
+    assert (
+        'Move-Item -LiteralPath "C:\\Users\\joe\\.claude-mnemos\\updates\\0.9.0\\extract" '
+        '-Destination "C:\\Program Files\\ClaudeMnemos"' in inner
+    )
+    # No per-file copy tools for the swap.
+    assert "robocopy" not in inner
+    assert "/MIR" not in inner
+    assert "/E " not in inner
+
+
+def test_inner_sanity_gate(inner: str) -> None:
+    assert r'Test-Path -LiteralPath "C:\Program Files\ClaudeMnemos\claude-mnemos.exe"' in inner
+    assert "throw" in inner
+
+
+def test_inner_restore_in_catch_is_rename_back(inner: str) -> None:
+    assert "catch" in inner
+    # Restore = rename the backed-up old tree back over the install path.
+    assert (
+        'Move-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos.old" '
+        '-Destination "C:\\Program Files\\ClaudeMnemos"' in inner
+    )
+    assert "OK 0.9.0" in inner
+    assert "FAILED:" in inner
+    assert "result.txt" in inner
+
+
+def test_inner_has_no_scheduled_task(inner: str) -> None:
+    # The relaunch lives in the outer (non-elevated) script, never via schtasks.
+    assert "schtasks" not in inner
+
+
+# --------------------------------------------------------------------------
+# render_outer_script  (non-elevated: elevate+wait -> relaunch -> verify version)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def outer() -> str:
+    return update_apply.render_outer_script(
+        install_dir=Path(r"C:\Program Files\ClaudeMnemos"),
+        inner_path=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0\swap.ps1"),
+        old_dir=Path(r"C:\Program Files\ClaudeMnemos.old"),
+        marker_path=Path(r"C:\Users\joe\.claude-mnemos\updates\swap.pending"),
+        result_path=Path(r"C:\Users\joe\.claude-mnemos\updates\0.9.0\result.txt"),
         version="0.9.0",
         daemon_url="http://127.0.0.1:5757",
     )
 
 
-def test_script_kills_both_exes(rendered_script: str) -> None:
-    assert "taskkill /F /IM claude-mnemos.exe /T" in rendered_script
-    assert "taskkill /F /IM claude-mnemos-cli.exe /T" in rendered_script
+def test_outer_elevates_and_waits_for_inner(outer: str) -> None:
+    assert "Start-Process powershell -Verb RunAs -Wait" in outer
+    assert r"C:\Users\joe\.claude-mnemos\updates\0.9.0\swap.ps1" in outer
 
 
-def test_script_backup_before_swap(rendered_script: str) -> None:
-    # The backup robocopy must appear BEFORE the swap robocopy.
-    backup_idx = rendered_script.index(r"\backup")
-    extract_idx = rendered_script.index("Expand-Archive")
-    swap_idx = rendered_script.index(r"\extract")
-    assert backup_idx < extract_idx, "backup must precede extract/swap"
-    # robocopy backup target
-    assert r'robocopy "C:\Program Files\ClaudeMnemos"' in rendered_script
-    assert r'\backup" /E' in rendered_script
-    # The swap copies extract -> install dir
-    assert swap_idx > backup_idx
-
-
-def test_script_expand_archive(rendered_script: str) -> None:
-    assert "Expand-Archive" in rendered_script
-    assert r"portable.zip" in rendered_script
-    assert r"\extract" in rendered_script
-
-
-def test_script_sanity_gate(rendered_script: str) -> None:
-    assert r"Test-Path" in rendered_script
-    assert r"\extract\claude-mnemos.exe" in rendered_script
-    assert "throw" in rendered_script
-
-
-def test_script_swap_no_mirror(rendered_script: str) -> None:
-    # robocopy extract -> install (the swap). Must NOT purge with /MIR.
-    assert r'robocopy "C:\Users\joe\.claude-mnemos\updates\0.9.0\extract"' in rendered_script
-    assert r'"C:\Program Files\ClaudeMnemos"' in rendered_script
-    assert "/MIR" not in rendered_script
-
-
-def test_script_relaunch_as_user(rendered_script: str) -> None:
-    assert "schtasks /Create" in rendered_script
-    assert "ClaudeMnemosRelaunch" in rendered_script
-    assert "tray run" in rendered_script
-    # Relaunched as the interactive user, not elevated.
-    assert '/RU "joe"' in rendered_script
-    assert "schtasks /Run" in rendered_script
-    assert "schtasks /Delete" in rendered_script
-
-
-def test_script_verify_version_endpoint(rendered_script: str) -> None:
-    assert "Invoke-WebRequest" in rendered_script
-    assert "http://127.0.0.1:5757/api/version" in rendered_script
-
-
-def test_script_restore_in_catch(rendered_script: str) -> None:
-    # The catch block restores backup -> install dir (the safety invariant).
-    assert "catch" in rendered_script
-    # restore robocopy: backup -> install
-    assert r'robocopy "C:\Users\joe\.claude-mnemos\updates\0.9.0\backup"' in rendered_script
-    restore_marker = r'\updates\0.9.0\backup" "C:\Program Files\ClaudeMnemos"'
-    assert restore_marker in rendered_script
-    # result.txt written on both paths
-    assert "result.txt" in rendered_script
-    assert "FAILED:" in rendered_script
-    assert "OK 0.9.0" in rendered_script
-
-
-def test_script_error_action_stop(rendered_script: str) -> None:
-    assert '$ErrorActionPreference = "Stop"' in rendered_script
-
-
-def test_script_interpolates_install_dir_and_username(rendered_script: str) -> None:
-    assert r"C:\Program Files\ClaudeMnemos" in rendered_script
-    assert "joe" in rendered_script
-
-
-# --------------------------------------------------------------------------
-# stage_update — writes updater.ps1 next to the staged zip
-# --------------------------------------------------------------------------
-
-
-def test_stage_update_writes_script(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
-    monkeypatch.setattr(
-        update_apply, "current_install_dir", lambda: Path(r"C:\Install")
+def test_outer_relaunches_tray_as_user(outer: str) -> None:
+    # Plain Start-Process as THIS (non-elevated) user — array ArgumentList, no
+    # nested quoting, no scheduled task.
+    assert (
+        'Start-Process -FilePath "C:\\Program Files\\ClaudeMnemos\\claude-mnemos.exe" '
+        "-ArgumentList 'tray','run'" in outer
     )
+    assert "schtasks" not in outer
+
+
+def test_outer_verifies_target_version(outer: str) -> None:
+    assert "http://127.0.0.1:5757/api/version" in outer
+    assert "ConvertFrom-Json" in outer
+    assert '-eq "0.9.0"' in outer  # must match the TARGET version, not any 200
+
+
+def test_outer_cleans_up_only_on_success(outer: str) -> None:
+    # On success: drop the backup + clear the pending marker.
+    assert r'Remove-Item -LiteralPath "C:\Program Files\ClaudeMnemos.old"' in outer
+    assert r'Remove-Item -LiteralPath "C:\Users\joe\.claude-mnemos\updates\swap.pending"' in outer
+    # Guarded by the $ok flag.
+    assert "if ($ok)" in outer
+
+
+# --------------------------------------------------------------------------
+# stage_update  (writes marker + swap.ps1 + relaunch.ps1)
+# --------------------------------------------------------------------------
+
+
+def test_stage_update_writes_marker_and_both_scripts(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(update_apply, "updates_dir", lambda: tmp_path / "updates")
+    monkeypatch.setattr(update_apply, "current_install_dir", lambda: tmp_path / "Install")
     monkeypatch.setattr(update_apply, "current_username", lambda: "joe")
     payload = _make_zip(["claude-mnemos.exe", "_internal/x"])
     monkeypatch.setattr(
         update_apply,
-        "download_and_stage",
-        lambda url, ver, *, opener=None: _stage_real(
-            tmp_path, ver, payload
-        ),
+        "download_and_extract",
+        lambda url, ver, *, opener=None: _extract_real(tmp_path, ver, payload),
     )
 
     work = update_apply.stage_update("https://example/portable.zip", "0.9.0")
+
     assert work.is_dir()
-    script = (work / "updater.ps1").read_text(encoding="utf-8")
-    assert "Expand-Archive" in script
-    assert "joe" in script
+    assert (work / "swap.ps1").read_text(encoding="utf-8")
+    assert (work / "relaunch.ps1").read_text(encoding="utf-8")
+    assert update_apply.pending_marker_path().exists()
 
 
-def _stage_real(tmp_path: Path, version: str, payload: bytes) -> Path:
+def _extract_real(tmp_path: Path, version: str, payload: bytes) -> Path:
     work = tmp_path / "updates" / version
-    work.mkdir(parents=True, exist_ok=True)
-    zip_path = work / "portable.zip"
-    zip_path.write_bytes(payload)
-    return zip_path
+    (work / "extract").mkdir(parents=True, exist_ok=True)
+    (work / "portable.zip").write_bytes(payload)
+    (work / "extract" / "claude-mnemos.exe").write_bytes(b"x")
+    return work
