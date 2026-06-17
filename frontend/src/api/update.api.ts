@@ -33,6 +33,13 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
   return r.data;
 }
 
+export async function checkForUpdate(): Promise<UpdateStatus> {
+  // POST forces a live re-check (bypasses the 24h cache) — backs the
+  // Overview "check for updates" button.
+  const r = await apiClient.post<UpdateStatus>("/update-status/check");
+  return r.data;
+}
+
 export async function getVersionInfo(): Promise<VersionInfo> {
   const r = await apiClient.get<VersionInfo>("/version");
   return r.data;

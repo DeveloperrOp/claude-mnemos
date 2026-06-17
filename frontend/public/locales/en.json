@@ -152,7 +152,16 @@
       "applying": "Updating… the app will close and reopen. Windows may ask for permission (UAC).",
       "apply_error": "Couldn't update automatically — use the release link instead.",
       "apply_uac_hint": "This will close the app and ask Windows (UAC) for permission to write to Program Files. If the panel doesn't come back within ~1 min, launch claude-mnemos from the Start menu.",
-      "last_failed": "The last update attempt failed — your previous version was restored: {{error}}. Use the release link."
+      "last_failed": "The last update attempt failed — your previous version was restored: {{error}}. Use the release link.",
+      "apply_timeout": "The update didn't finish automatically. Launch claude-mnemos from the Start menu, or download the new version from the release link.",
+      "apply_retry": "Try again"
+    },
+    "version_status": {
+      "label": "Version {{version}}",
+      "check_button": "Check for updates",
+      "checking": "Checking…",
+      "up_to_date": "You're on the latest version",
+      "check_error": "Couldn't check for updates — no connection to GitHub"
     },
     "hooks_fix": {
       "label": "Re-install hooks",

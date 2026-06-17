@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -7,13 +8,38 @@ import {
   useVersionInfo,
 } from "@/hooks/useUpdateStatus";
 
-export function UpdateBanner() {
+// If the swap really runs, the daemon goes down and the page reconnects to the
+// new build within a few seconds. If it hasn't after this long the elevated
+// swap never fired (UAC declined, WDAC/WMI blocked the spawn, …) — stop
+// pretending and let the user retry or update manually.
+const APPLY_TIMEOUT_MS = 90_000;
+
+export function UpdateBanner({
+  applyTimeoutMs = APPLY_TIMEOUT_MS,
+}: {
+  /** Watchdog window before a stuck "updating" flips to the timeout state.
+   * Injectable so tests don't have to fake-timer the whole react-query tree. */
+  applyTimeoutMs?: number;
+} = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const q = useUpdateStatus();
   const version = useVersionInfo();
   const dismiss = useDismissUpdate();
   const apply = useApplyUpdate();
+
+  const updating = apply.isSuccess;
+  const [stuck, setStuck] = useState(false);
+
+  // Watchdog: once "updating" latches, arm a timeout. If we're still mounted
+  // and showing this banner when it fires, the swap never completed. ("stuck"
+  // only renders while updating, and the retry handler clears it, so it can't
+  // go stale-true across re-latches — no reset needed here.)
+  useEffect(() => {
+    if (!updating) return;
+    const id = setTimeout(() => setStuck(true), applyTimeoutMs);
+    return () => clearTimeout(id);
+  }, [updating, applyTimeoutMs]);
 
   if (q.isLoading || !q.data) return null;
   const {
@@ -24,10 +50,6 @@ export function UpdateBanner() {
     has_update,
     last_apply,
   } = q.data;
-
-  // Once apply succeeds the daemon is going down to swap binaries — freeze the
-  // banner in an "updating" state, stop polling and hide every other action.
-  const updating = apply.isSuccess;
 
   // A prior in-app update attempt that failed (and rolled back) is worth
   // surfacing even when no newer release is available right now — the user
@@ -71,9 +93,38 @@ export function UpdateBanner() {
         {t("overview.update.eyebrow")}
       </span>
 
-      {updating ? (
+      {updating && !stuck ? (
         <div className="flex-1 text-sm" data-testid="update-banner-updating">
           <span className="font-medium">{t("overview.update.applying")}</span>
+        </div>
+      ) : updating && stuck ? (
+        <div
+          className="flex flex-1 flex-wrap items-center gap-3 text-sm"
+          data-testid="update-banner-timeout"
+        >
+          <span className="font-medium text-destructive">
+            {t("overview.update.apply_timeout")}
+          </span>
+          {download_url && (
+            <a
+              href={download_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
+            >
+              {t("overview.update.download_button")}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              apply.reset();
+              setStuck(false);
+            }}
+            className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted/50"
+          >
+            {t("overview.update.apply_retry")}
+          </button>
         </div>
       ) : (
         <>

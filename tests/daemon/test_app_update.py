@@ -59,6 +59,38 @@ def test_update_status_includes_asset_url(client, monkeypatch):
     assert body["asset_url"] == "https://example/portable.zip"
 
 
+def test_check_now_forces_live_recheck(client, monkeypatch):
+    # GET caches for 24h; POST /check must bypass the cache (force=True) and
+    # hit the release feed every time.
+    calls = {"n": 0}
+
+    def fake_fetch():
+        calls["n"] += 1
+        return {"tag_name": "v0.9.0", "html_url": "https://example.com/v0.9.0"}
+
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release", fake_fetch
+    )
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._current_version", lambda: "0.0.1"
+    )
+
+    # Prime the cache via GET (1 fetch).
+    client.get("/api/update-status")
+    assert calls["n"] == 1
+    # A second GET is served from cache — no new fetch.
+    client.get("/api/update-status")
+    assert calls["n"] == 1
+    # POST /check forces a fresh fetch despite the warm cache.
+    r = client.post("/api/update-status/check")
+    assert r.status_code == 200
+    assert calls["n"] == 2
+    body = r.json()
+    assert body["has_update"] is True
+    assert body["latest"] == "0.9.0"
+    assert "last_apply" in body
+
+
 def test_dismiss_silences_banner(client, monkeypatch):
     monkeypatch.setattr(
         "claude_mnemos.core.update_check._fetch_latest_release",

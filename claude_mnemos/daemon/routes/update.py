@@ -20,9 +20,8 @@ from claude_mnemos.core.update_check import check_for_update, dismiss_for_days
 router = APIRouter()
 
 
-@router.get("/update-status")
-def update_status_route() -> dict[str, Any]:
-    s = check_for_update(force=False)
+def _serialize_status(force: bool) -> dict[str, Any]:
+    s = check_for_update(force=force)
     suppress = (
         s.dismissed_until is not None
         and s.dismissed_until > datetime.now(tz=UTC)
@@ -40,6 +39,21 @@ def update_status_route() -> dict[str, Any]:
         "error": s.error,
         "last_apply": update_recovery.read_last_apply(),
     }
+
+
+@router.get("/update-status")
+def update_status_route() -> dict[str, Any]:
+    return _serialize_status(force=False)
+
+
+@router.post("/update-status/check")
+def check_now_route() -> dict[str, Any]:
+    """Force a live re-check against the release feed (bypasses the 24h cache).
+
+    Backs the Overview "check for updates" button. Same response shape as
+    GET /update-status so the frontend can reuse one type.
+    """
+    return _serialize_status(force=True)
 
 
 @router.post("/update-status/dismiss")

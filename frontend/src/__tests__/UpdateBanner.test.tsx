@@ -27,6 +27,9 @@ beforeAll(() => {
             "This will close the app and ask Windows (UAC) for permission. If the panel doesn't come back, launch claude-mnemos from the Start menu.",
           last_failed:
             "The last update attempt failed — your previous version was restored: {{error}}. Use the release link.",
+          apply_timeout:
+            "The update didn't finish automatically. Launch claude-mnemos from the Start menu, or download the new version.",
+          apply_retry: "Try again",
         },
       },
     },

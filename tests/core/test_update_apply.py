@@ -268,24 +268,60 @@ def test_stage_update_refuses_when_in_progress(monkeypatch) -> None:
 
 
 def test_spawn_updater_uses_wmi(monkeypatch, tmp_path: Path) -> None:
-    captured: dict[str, Any] = {}
+    run_args: dict[str, Any] = {}
+    popen_calls: list[Any] = []
 
-    def _fake_popen(args, **kwargs):  # noqa: ANN001
-        captured["args"] = args
-        captured["kwargs"] = kwargs
+    class _Done:
+        returncode = 0
 
-        class _P:
-            pass
+    def _fake_run(args, **kwargs):  # noqa: ANN001
+        run_args["args"] = args
+        return _Done()
 
-        return _P()
+    monkeypatch.setattr(update_apply.subprocess, "run", _fake_run)
+    monkeypatch.setattr(
+        update_apply.subprocess,
+        "Popen",
+        lambda args, **kw: popen_calls.append(args),  # noqa: ANN001
+    )
 
-    monkeypatch.setattr(update_apply.subprocess, "Popen", _fake_popen)
     update_apply.spawn_updater(tmp_path)
-    cmd = " ".join(captured["args"])
-    # Spawned via WMI Win32_Process.Create so the outer is NOT a daemon child.
+
+    cmd = " ".join(run_args["args"])
+    # Primary path: WMI Win32_Process.Create — outer is NOT a daemon child.
     assert "Win32_Process" in cmd
     assert "Create" in cmd
     assert "relaunch.ps1" in cmd
+    # WMI confirmed (returncode 0) → no direct-spawn fallback.
+    assert popen_calls == []
+
+
+def test_spawn_updater_falls_back_to_direct_when_wmi_fails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # WDAC blocks Win32_Process.Create → the WMI probe exits non-zero. The
+    # updater must NOT silently give up; it falls back to a direct spawn so the
+    # elevated swap still runs.
+    class _Fail:
+        returncode = 1
+
+    monkeypatch.setattr(
+        update_apply.subprocess, "run", lambda args, **kw: _Fail()  # noqa: ANN001
+    )
+    popen_calls: list[Any] = []
+    monkeypatch.setattr(
+        update_apply.subprocess,
+        "Popen",
+        lambda args, **kw: popen_calls.append(args),  # noqa: ANN001
+    )
+
+    update_apply.spawn_updater(tmp_path)
+
+    assert len(popen_calls) == 1
+    direct = " ".join(popen_calls[0])
+    # Direct fallback runs the outer script straight (no WMI wrapper).
+    assert "relaunch.ps1" in direct
+    assert "Win32_Process" not in direct
 
 
 def _zip_real(updates: Path, version: str, payload: bytes) -> Path:

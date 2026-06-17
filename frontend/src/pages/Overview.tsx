@@ -8,6 +8,7 @@ import { ProjectCard } from "@/components/widgets/ProjectCard";
 import { DaemonDownAlert } from "@/components/widgets/DaemonDownAlert";
 import { HookStatusBanner } from "@/components/widgets/HookStatusBanner";
 import { UpdateBanner } from "@/components/widgets/dashboard/UpdateBanner";
+import { VersionStatus } from "@/components/widgets/dashboard/VersionStatus";
 import { HealthAlertsBar } from "@/components/widgets/dashboard/HealthAlertsBar";
 import { SetupChecklist } from "@/components/widgets/dashboard/SetupChecklist";
 import { NoProjectsCallout } from "@/components/widgets/NoProjectsCallout";
@@ -87,6 +88,8 @@ export function Overview() {
       </header>
 
       <UpdateBanner />
+
+      <VersionStatus />
 
       <HookStatusBanner />
 

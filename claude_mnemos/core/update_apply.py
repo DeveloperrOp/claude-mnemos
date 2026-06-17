@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import getpass
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -50,6 +51,8 @@ from pathlib import Path
 from typing import Any
 
 from claude_mnemos import runtime
+
+logger = logging.getLogger(__name__)
 
 WINDOWS_PORTABLE_ASSET = "claude-mnemos-portable-x64.zip"
 PENDING_MARKER = "swap.pending"
@@ -365,29 +368,64 @@ def stage_update(asset_url: str, version: str) -> Path:
     return work
 
 
-def spawn_updater(work_dir: Path) -> None:
-    """Spawn the outer script via WMI so it is NOT a child of the daemon.
+def _detached_creationflags() -> int:
+    if sys.platform != "win32":
+        return 0
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+        subprocess, "DETACHED_PROCESS", 0
+    )
 
-    The inner's ``taskkill /F /IM claude-mnemos.exe /T`` kills the daemon and its
-    whole process tree. If the outer were a direct child of the daemon it would
-    be killed too (defeating relaunch/verify/cleanup). Creating it through
-    ``Win32_Process.Create`` re-parents it under WMI, so the tree-kill can't
-    reach it. The created process runs in the same (non-elevated user) context.
+
+def _spawn_via_wmi(outer: str) -> bool:
+    """Spawn the outer through ``Win32_Process.Create`` and confirm it started.
+
+    WMI re-parents the outer under the WMI host so the inner's tree-kill of the
+    daemon can't reach it — the outer survives to relaunch+verify+cleanup. We
+    WAIT for the create call and check its ``ReturnValue`` (0 = ok) so a blocked
+    WMI (WDAC-locked machines refuse ``Win32_Process.Create``) is detected as a
+    failure rather than a silent no-op. Returns True only on a confirmed spawn.
     """
-    outer = str(work_dir / "relaunch.ps1")
     inner_cmd = (
         "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
         f'-File \\"{outer}\\"'
     )
     wmi_cmd = (
-        "Invoke-CimMethod -ClassName Win32_Process -MethodName Create "
-        f"-Arguments @{{CommandLine='{inner_cmd}'}} | Out-Null"
+        "try { $r = Invoke-CimMethod -ClassName Win32_Process -MethodName "
+        f"Create -Arguments @{{CommandLine='{inner_cmd}'}}; "
+        "if ($null -eq $r -or $r.ReturnValue -ne 0) { exit 1 } else { exit 0 } } "
+        "catch { exit 1 }"
     )
-    creationflags = 0
-    if sys.platform == "win32":
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
-            subprocess, "DETACHED_PROCESS", 0
+    try:
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                wmi_cmd,
+            ],
+            creationflags=_detached_creationflags(),
+            capture_output=True,
+            timeout=30,
         )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
+def _spawn_direct(outer: str) -> None:
+    """Fallback when WMI is unavailable (e.g. WDAC): launch the outer directly.
+
+    The outer is a child of the daemon here, so the inner's tree-kill will take
+    it down mid-flight — but the ELEVATED inner swap is re-parented by UAC and
+    completes the swap + writes ``result.txt`` regardless. The user relaunches
+    from the Start menu (the frontend timeout banner says so) and boot-time
+    recovery reconciles the marker. Degraded (no auto-relaunch) but the binary
+    is still updated, which beats a silently stuck "updating…".
+    """
     subprocess.Popen(  # noqa: S603 — fixed argv, no shell
         [
             "powershell",
@@ -396,8 +434,27 @@ def spawn_updater(work_dir: Path) -> None:
             "Bypass",
             "-WindowStyle",
             "Hidden",
-            "-Command",
-            wmi_cmd,
+            "-File",
+            outer,
         ],
-        creationflags=creationflags,
+        creationflags=_detached_creationflags()
+        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
     )
+
+
+def spawn_updater(work_dir: Path) -> None:
+    """Launch the outer updater script, re-parented away from the daemon.
+
+    Primary path is WMI ``Win32_Process.Create`` (the outer survives the inner's
+    tree-kill and auto-relaunches). If WMI is blocked — which happens on
+    WDAC-locked machines and used to leave the update silently stuck — fall back
+    to a direct detached spawn so the elevated swap still runs.
+    """
+    outer = str(work_dir / "relaunch.ps1")
+    if _spawn_via_wmi(outer):
+        logger.info("[update] outer spawned via WMI")
+        return
+    logger.warning(
+        "[update] WMI spawn failed (WDAC?) — falling back to direct detached spawn"
+    )
+    _spawn_direct(outer)

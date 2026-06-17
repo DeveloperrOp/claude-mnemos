@@ -4,7 +4,9 @@ import {
   dismissUpdate,
   getVersionInfo,
   applyUpdate,
+  checkForUpdate,
 } from "@/api/update.api";
+import type { UpdateStatus } from "@/api/update.api";
 
 export function useUpdateStatus() {
   return useQuery({
@@ -33,5 +35,17 @@ export function useDismissUpdate() {
 export function useApplyUpdate() {
   return useMutation({
     mutationFn: applyUpdate,
+  });
+}
+
+export function useCheckForUpdate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: checkForUpdate,
+    onSuccess: (data: UpdateStatus) => {
+      // Seed the cache with the fresh result so the UpdateBanner reacts
+      // immediately without waiting for the next interval refetch.
+      qc.setQueryData(["update-status"], data);
+    },
   });
 }
