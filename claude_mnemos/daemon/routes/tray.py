@@ -48,6 +48,7 @@ def _exec_tray(action: str) -> None:
         capture_output=True,
         text=True,
         check=False,
+        creationflags=runtime.windowless_creationflags(),
     )
     if result.returncode != 0:
         raise HTTPException(

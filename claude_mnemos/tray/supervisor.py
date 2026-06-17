@@ -184,7 +184,12 @@ class Supervisor:
         if sys.platform == "win32":
             # CREATE_NEW_PROCESS_GROUP so we can send CTRL_BREAK_EVENT later;
             # don't use DETACHED_PROCESS — we want stdout/stderr handles.
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            # CREATE_NO_WINDOW so a console-subsystem runner (the cli-flavoured
+            # exe) doesn't flash a window; harmless for the windowed exe.
+            creationflags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | runtime.windowless_creationflags()
+            )
 
         stdout: TextIO | int
         stderr: TextIO | int

@@ -27,6 +27,7 @@ from claude_mnemos.ingest.llm.auth import find_claude_binary
 from claude_mnemos.ingest.llm.model_fallback import looks_like_model_not_found
 from claude_mnemos.ingest.llm.rate_limit import parse_rate_limit_from_stderr
 from claude_mnemos.ingest.llm.tokens import count_tokens_local
+from claude_mnemos.runtime import windowless_creationflags
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,7 @@ class CliLLMClient:
                 timeout=DEFAULT_TIMEOUT_SEC,
                 check=False,
                 env=_build_env(),
+                creationflags=windowless_creationflags(),
             )
         except subprocess.TimeoutExpired as exc:
             raise LLMExtractionError(

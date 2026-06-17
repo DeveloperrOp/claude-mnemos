@@ -22,6 +22,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from claude_mnemos.runtime import windowless_creationflags
+
 
 @dataclass(frozen=True)
 class AuthStatus:
@@ -56,6 +58,7 @@ def check_claude_cli_auth() -> AuthStatus:
             text=True,
             timeout=10,
             check=False,
+            creationflags=windowless_creationflags(),
         )
     except (subprocess.TimeoutExpired, OSError):
         return AuthStatus(installed=False, authenticated=False, binary_path=str(binary))
@@ -72,6 +75,7 @@ def check_claude_cli_auth() -> AuthStatus:
             timeout=15,
             check=False,
             input="",  # avoid hang on stdin
+            creationflags=windowless_creationflags(),
         )
     except (subprocess.TimeoutExpired, OSError):
         return AuthStatus(installed=True, authenticated=False, binary_path=str(binary))

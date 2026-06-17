@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from claude_mnemos.runtime import windowless_creationflags
 from claude_mnemos.state.projects import (
     ProjectMapEntry,
     ProjectMapError,
@@ -52,6 +53,7 @@ def _git_toplevel(cwd: Path) -> Path | None:
             text=True,
             timeout=3,
             check=False,
+            creationflags=windowless_creationflags(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

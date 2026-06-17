@@ -11,8 +11,30 @@ the helpers below -- never compute paths from ``__file__`` directly.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
+
+
+def windowless_creationflags() -> int:
+    """Windows ``creationflags`` that suppress a console window.
+
+    The desktop exe (``claude-mnemos.exe``) is a windowed, console=False
+    PyInstaller bundle, so it has no console of its own. When the daemon
+    running inside it shells out to a *console* subprogram (the ``claude``
+    CLI, ``git``) via ``subprocess`` without this flag, Windows allocates a
+    brand-new console for the child — a conhost window flashes (and lingers)
+    on screen for every probe. ``CREATE_NO_WINDOW`` keeps stdout/stderr pipe
+    redirection intact while hiding the window.
+
+    Returns ``0`` on non-Windows platforms so callers can OR it in
+    unconditionally.
+    """
+    if sys.platform == "win32":
+        # getattr: CREATE_NO_WINDOW is a Windows-only attribute; guard so an
+        # imported-but-not-run path off-Windows never AttributeErrors.
+        return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return 0
 
 
 def is_frozen() -> bool:
