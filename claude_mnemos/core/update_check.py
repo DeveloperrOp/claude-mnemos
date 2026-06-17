@@ -113,7 +113,13 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
             checked_at = datetime.fromisoformat(cached["checked_at"])
             if now - checked_at < _CACHE_TTL:
                 latest = cached.get("latest")
-                current = cached["current"]
+                # ``current`` is the running binary's version — always compute
+                # it live, never trust the cached value. The cache may have been
+                # written by an older binary (e.g. before an in-place update);
+                # reusing its ``current`` would keep the "update available"
+                # banner up for the rest of the TTL after the user already
+                # updated.
+                current = _current_version()
                 has_update = bool(
                     latest and _parse_version(latest) > _parse_version(current)
                 )

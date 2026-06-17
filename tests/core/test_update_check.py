@@ -65,6 +65,42 @@ def test_check_uses_cache_when_recent(monkeypatch, cache_path: Path) -> None:
     assert result.latest == "0.0.7"
 
 
+def test_cache_hit_uses_live_current_version_not_cached(
+    monkeypatch, cache_path: Path
+) -> None:
+    """On a cache hit, ``current`` must reflect the running binary's version,
+    not the version that happened to be running when the cache was written.
+
+    Regression: after an in-place update 0.0.1 -> 0.0.7 the cache still held
+    current="0.0.1"/latest="0.0.7" for up to 24h, so the banner kept claiming
+    an update was available even though the user was already on it.
+    """
+    cache_path.write_text(
+        json.dumps({
+            "checked_at": datetime.now(tz=UTC).isoformat(),
+            "current": "0.0.1",
+            "latest": "0.0.7",
+            "download_url": "https://example.com/v0.0.7",
+            "dismissed_until": None,
+        }),
+        encoding="utf-8",
+    )
+    # The binary has since been updated to 0.0.7.
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._current_version", lambda: "0.0.7"
+    )
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: (_ for _ in ()).throw(AssertionError("must not fetch on cache hit")),
+    )
+
+    from claude_mnemos.core.update_check import check_for_update
+
+    result = check_for_update(force=False)
+    assert result.current == "0.0.7"
+    assert result.has_update is False
+
+
 def test_dismiss_records_until_timestamp(monkeypatch, cache_path: Path) -> None:
     monkeypatch.setattr(
         "claude_mnemos.core.update_check._fetch_latest_release",
