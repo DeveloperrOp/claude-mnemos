@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getUpdateStatus, dismissUpdate } from "@/api/update.api";
+import {
+  getUpdateStatus,
+  dismissUpdate,
+  getVersionInfo,
+  applyUpdate,
+} from "@/api/update.api";
 
 export function useUpdateStatus() {
   return useQuery({
@@ -9,10 +14,24 @@ export function useUpdateStatus() {
   });
 }
 
+export function useVersionInfo() {
+  return useQuery({
+    queryKey: ["version-info"],
+    queryFn: getVersionInfo,
+    staleTime: Infinity,
+  });
+}
+
 export function useDismissUpdate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: dismissUpdate,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["update-status"] }),
+  });
+}
+
+export function useApplyUpdate() {
+  return useMutation({
+    mutationFn: applyUpdate,
   });
 }

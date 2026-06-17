@@ -124,6 +124,12 @@ class MnemosDaemon:
         """
         write_pid_file(self.config.pid_file, os.getpid())
         self.started_at_monotonic = time.monotonic()
+        # Resume-on-boot: reconcile a swap interrupted/rolled-back before this
+        # process started, so its outcome surfaces instead of failing silently.
+        # Best-effort — reconcile_on_startup() never raises.
+        from claude_mnemos.core.update_recovery import reconcile_on_startup
+
+        reconcile_on_startup()
         try:
             await self._bootstrap_runtimes()
 

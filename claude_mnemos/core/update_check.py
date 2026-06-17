@@ -38,8 +38,21 @@ class UpdateStatus:
     download_url: str | None
     has_update: bool
     checked_at: datetime
+    asset_url: str | None = None
     dismissed_until: datetime | None = None
     error: str | None = None
+
+
+def _pick_asset_url(release: dict[str, Any], asset_name: str) -> str | None:
+    """Return the ``browser_download_url`` of the asset named ``asset_name``.
+
+    Returns ``None`` when no asset with that exact name is present.
+    """
+    for asset in release.get("assets", []):
+        if asset.get("name") == asset_name:
+            url: str | None = asset.get("browser_download_url")
+            return url
+    return None
 
 
 def _current_version() -> str:
@@ -110,6 +123,7 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
                     download_url=cached.get("download_url"),
                     has_update=has_update,
                     checked_at=checked_at,
+                    asset_url=cached.get("asset_url"),
                     dismissed_until=(
                         datetime.fromisoformat(cached["dismissed_until"])
                         if cached.get("dismissed_until")
@@ -124,6 +138,7 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
         release = _fetch_latest_release()
         latest = release.get("tag_name", "").lstrip("v")
         download_url = release.get("html_url")
+        asset_url = _pick_asset_url(release, "claude-mnemos-portable-x64.zip")
         has_update = bool(latest) and _parse_version(latest) > _parse_version(current)
         status = UpdateStatus(
             current=current,
@@ -131,6 +146,7 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
             download_url=download_url,
             has_update=has_update,
             checked_at=now,
+            asset_url=asset_url,
         )
     except (OSError, ValueError, urllib.error.URLError) as exc:
         status = UpdateStatus(
@@ -152,6 +168,7 @@ def check_for_update(*, force: bool = False) -> UpdateStatus:
             "current": status.current,
             "latest": status.latest,
             "download_url": status.download_url,
+            "asset_url": status.asset_url,
             "dismissed_until": (
                 status.dismissed_until.isoformat() if status.dismissed_until else None
             ),
