@@ -144,6 +144,27 @@ class AlertsStore(BaseModel):
             self.purge_old()
             return alert
 
+    def reconcile(self, active: list[StoredAlert]) -> None:
+        """Make the store reflect the detectors' current truth.
+
+        The cron runs ALL detectors every tick, so ``active`` is the COMPLETE
+        set of currently-firing alerts. This upserts each (preserving
+        ``first_seen`` / ``dismissed`` / ``silenced_until`` on still-active
+        ones) and DROPS any stored alert whose condition has cleared — i.e. is
+        no longer in ``active``. Without this, a one-off alert (e.g. a transient
+        project-map corruption that was fixed minutes later) lingers as a
+        phantom forever, since plain ``upsert`` only ever adds/updates.
+        """
+        with self._lock:
+            active_ids = {a.id for a in active}
+            # Drop resolved alerts (their detector no longer fires).
+            self.alerts = [a for a in self.alerts if a.id in active_ids]
+            # Merge in the current truth; upsert keeps user state (dismissed /
+            # silenced) and the original first_seen on alerts that survived.
+            for alert in active:
+                self.upsert(alert)
+            self.purge_old()
+
     def silence(self, alert_id: str, duration: timedelta) -> StoredAlert | None:
         with self._lock:
             for i, a in enumerate(self.alerts):

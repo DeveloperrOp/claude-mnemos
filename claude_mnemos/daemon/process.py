@@ -257,8 +257,11 @@ class MnemosDaemon:
                 new_alerts = await run_all_checks(
                     daemon=self, scheduler=self.scheduler, runtimes=self.runtimes
                 )
-                for alert in new_alerts:
-                    self.alerts_store.upsert(alert)
+                # reconcile (not just upsert): the cron runs all detectors every
+                # tick, so new_alerts is the complete active set — alerts whose
+                # condition has cleared must be dropped, else they linger forever
+                # (e.g. a transient project-map corruption stuck for a week).
+                self.alerts_store.reconcile(new_alerts)
                 self.alerts_store.save()
             except Exception:
                 logger.exception("health_checks_task failed")

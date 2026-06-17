@@ -80,6 +80,71 @@ def test_upsert_refreshes_i18n_fields_on_redetection():
     assert store.alerts[0].message == "7 sessions, no ingest"
 
 
+def _alert(id_: str, *, dismissed: bool = False) -> StoredAlert:
+    return StoredAlert(
+        id=id_,
+        detector=id_,
+        severity="critical",
+        message=id_,
+        first_seen=datetime(2026, 6, 10, tzinfo=UTC),
+        last_seen=datetime(2026, 6, 10, tzinfo=UTC),
+        dismissed=dismissed,
+    )
+
+
+def test_reconcile_drops_cleared_alerts():
+    """An alert whose condition has cleared (not in the active set) must be
+    removed, not lingered forever. Regression: project_map_broken stuck for a
+    week after a transient corruption because the cron only ever upserted."""
+    store = AlertsStore()
+    store.upsert(_alert("project_map_broken"))
+    store.upsert(_alert("hook_silence"))
+    assert len(store.alerts) == 2
+
+    # Next tick: only hook_silence still fires.
+    store.reconcile([_alert("hook_silence")])
+
+    ids = {a.id for a in store.alerts}
+    assert ids == {"hook_silence"}
+
+
+def test_reconcile_preserves_first_seen_and_dismissed_on_survivors():
+    store = AlertsStore()
+    original = StoredAlert(
+        id="hook_silence",
+        detector="hook_silence",
+        severity="warning",
+        message="old",
+        first_seen=datetime(2026, 6, 1, tzinfo=UTC),
+        last_seen=datetime(2026, 6, 1, tzinfo=UTC),
+        dismissed=True,
+    )
+    store.upsert(original)
+
+    # Re-detected this tick with a fresh last_seen/message.
+    redetected = original.model_copy(
+        update={
+            "message": "new",
+            "last_seen": datetime(2026, 6, 17, tzinfo=UTC),
+        }
+    )
+    store.reconcile([redetected])
+
+    assert len(store.alerts) == 1
+    survivor = store.alerts[0]
+    assert survivor.first_seen == datetime(2026, 6, 1, tzinfo=UTC)  # preserved
+    assert survivor.dismissed is True  # user state preserved
+    assert survivor.message == "new"  # detector data refreshed
+
+
+def test_reconcile_with_empty_active_clears_all():
+    store = AlertsStore()
+    store.upsert(_alert("project_map_broken"))
+    store.upsert(_alert("runaway_jobs"))
+    store.reconcile([])
+    assert store.alerts == []
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
