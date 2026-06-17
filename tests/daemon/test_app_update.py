@@ -34,6 +34,29 @@ def test_update_status_returns_has_update(client, monkeypatch):
     assert body["latest"] == "0.9.0"
 
 
+def test_update_status_includes_asset_url(client, monkeypatch):
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._fetch_latest_release",
+        lambda: {
+            "tag_name": "v0.9.0",
+            "html_url": "https://example.com/v0.9.0",
+            "assets": [
+                {
+                    "name": "claude-mnemos-portable-x64.zip",
+                    "browser_download_url": "https://example/portable.zip",
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "claude_mnemos.core.update_check._current_version", lambda: "0.0.1"
+    )
+    r = client.get("/api/update-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["asset_url"] == "https://example/portable.zip"
+
+
 def test_dismiss_silences_banner(client, monkeypatch):
     monkeypatch.setattr(
         "claude_mnemos.core.update_check._fetch_latest_release",

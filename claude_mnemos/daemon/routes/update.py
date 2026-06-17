@@ -23,6 +23,7 @@ def update_status_route() -> dict[str, Any]:
         "current": s.current,
         "latest": s.latest,
         "download_url": s.download_url,
+        "asset_url": s.asset_url,
         "has_update": s.has_update and not suppress,
         "checked_at": s.checked_at.isoformat(),
         "dismissed_until": (
