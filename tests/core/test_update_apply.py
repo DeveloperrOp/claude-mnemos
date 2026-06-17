@@ -161,8 +161,12 @@ def inner() -> str:
 
 def test_inner_error_action_stop_and_wildcard_kill(inner: str) -> None:
     assert '$ErrorActionPreference = "Stop"' in inner
-    assert "taskkill /F /IM claude-mnemos.exe /T" in inner
-    assert "taskkill /F /IM claude-mnemos-cli.exe /T" in inner
+    # No /T: the tree-kill would take down the interactively-spawned outer
+    # (a child of the daemon) mid-swap. /IM alone still kills supervisor +
+    # daemon + launcher (all claude-mnemos.exe).
+    assert "taskkill /F /IM claude-mnemos.exe }" in inner
+    assert "taskkill /F /IM claude-mnemos-cli.exe }" in inner
+    assert "taskkill /F /IM claude-mnemos.exe /T" not in inner
     assert "Get-Process claude-mnemos*" in inner
 
 
@@ -267,61 +271,32 @@ def test_stage_update_refuses_when_in_progress(monkeypatch) -> None:
         update_apply.stage_update("https://example/portable.zip", "0.9.0")
 
 
-def test_spawn_updater_uses_wmi(monkeypatch, tmp_path: Path) -> None:
-    run_args: dict[str, Any] = {}
+def test_spawn_updater_direct_interactive(monkeypatch, tmp_path: Path) -> None:
     popen_calls: list[Any] = []
+    run_calls: list[Any] = []
 
-    class _Done:
-        returncode = 0
-
-    def _fake_run(args, **kwargs):  # noqa: ANN001
-        run_args["args"] = args
-        return _Done()
-
-    monkeypatch.setattr(update_apply.subprocess, "run", _fake_run)
     monkeypatch.setattr(
         update_apply.subprocess,
         "Popen",
-        lambda args, **kw: popen_calls.append(args),  # noqa: ANN001
+        lambda args, **kw: popen_calls.append((args, kw)),  # noqa: ANN001
+    )
+    monkeypatch.setattr(
+        update_apply.subprocess,
+        "run",
+        lambda args, **kw: run_calls.append(args),  # noqa: ANN001
     )
 
     update_apply.spawn_updater(tmp_path)
 
-    cmd = " ".join(run_args["args"])
-    # Primary path: WMI Win32_Process.Create — outer is NOT a daemon child.
-    assert "Win32_Process" in cmd
-    assert "Create" in cmd
-    assert "relaunch.ps1" in cmd
-    # WMI confirmed (returncode 0) → no direct-spawn fallback.
-    assert popen_calls == []
-
-
-def test_spawn_updater_falls_back_to_direct_when_wmi_fails(
-    monkeypatch, tmp_path: Path
-) -> None:
-    # WDAC blocks Win32_Process.Create → the WMI probe exits non-zero. The
-    # updater must NOT silently give up; it falls back to a direct spawn so the
-    # elevated swap still runs.
-    class _Fail:
-        returncode = 1
-
-    monkeypatch.setattr(
-        update_apply.subprocess, "run", lambda args, **kw: _Fail()  # noqa: ANN001
-    )
-    popen_calls: list[Any] = []
-    monkeypatch.setattr(
-        update_apply.subprocess,
-        "Popen",
-        lambda args, **kw: popen_calls.append(args),  # noqa: ANN001
-    )
-
-    update_apply.spawn_updater(tmp_path)
-
+    # Single direct child Popen of relaunch.ps1 — interactive session so the
+    # outer's UAC prompt is visible. No WMI Win32_Process.Create wrapper.
     assert len(popen_calls) == 1
-    direct = " ".join(popen_calls[0])
-    # Direct fallback runs the outer script straight (no WMI wrapper).
-    assert "relaunch.ps1" in direct
-    assert "Win32_Process" not in direct
+    args, _kw = popen_calls[0]
+    cmd = " ".join(args)
+    assert "relaunch.ps1" in cmd
+    assert "-File" in args
+    assert "Win32_Process" not in cmd
+    assert run_calls == []
 
 
 def _zip_real(updates: Path, version: str, payload: bytes) -> Path:

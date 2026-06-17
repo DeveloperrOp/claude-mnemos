@@ -210,8 +210,12 @@ def render_inner_script(
 $ErrorActionPreference = "Stop"
 try {{
     Start-Sleep 2
-    try {{ taskkill /F /IM claude-mnemos.exe /T }} catch {{ }}
-    try {{ taskkill /F /IM claude-mnemos-cli.exe /T }} catch {{ }}
+    # No /T: kill only the named exes, NOT their child tree — the
+    # (interactively-spawned) outer relaunch.ps1 is a child of the daemon, and
+    # /T would take it down mid-swap, killing relaunch+verify+cleanup. /IM alone
+    # still gets the supervisor + daemon + launcher (all claude-mnemos.exe).
+    try {{ taskkill /F /IM claude-mnemos.exe }} catch {{ }}
+    try {{ taskkill /F /IM claude-mnemos-cli.exe }} catch {{ }}
     $deadline = (Get-Date).AddSeconds(20)
     while ((Get-Date) -lt $deadline) {{
         if (-not (Get-Process claude-mnemos* -ErrorAction SilentlyContinue)) {{ break }}
@@ -295,22 +299,27 @@ if (-not (Test-Path -LiteralPath "{result}")) {{
     return
 }}
 
-# 3. Relaunch the tray as THIS (non-elevated) user (array args, no quoting).
-Start-Process -FilePath "{exe}" -ArgumentList 'tray','run'
-
-# 4. Verify the NEW build answers with the TARGET version (a lingering old
-#    process answering :5757 must not false-pass).
+# 3. Relaunch the tray as THIS (non-elevated) user (array args, no quoting),
+#    then verify the NEW build answers with the TARGET version. Retry the
+#    launch a few times: the first `tray run` can lose the single-instance
+#    race against a not-quite-dead old process and exit silently, which used
+#    to leave the daemon down after a successful swap.
 $ok = $false
-$deadline = (Get-Date).AddSeconds(60)
-while ((Get-Date) -lt $deadline) {{
-    try {{
-        $r = Invoke-WebRequest "{url}/api/version" -UseBasicParsing -TimeoutSec 5
-        if ($r.StatusCode -eq 200) {{
-            $v = ($r.Content | ConvertFrom-Json).version
-            if ($v -eq "{version}") {{ $ok = $true; break }}
-        }}
-    }} catch {{ }}
-    Start-Sleep 2
+$attempt = 0
+while ($attempt -lt 3 -and -not $ok) {{
+    $attempt++
+    Start-Process -FilePath "{exe}" -ArgumentList 'tray','run'
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $deadline) {{
+        try {{
+            $r = Invoke-WebRequest "{url}/api/version" -UseBasicParsing -TimeoutSec 5
+            if ($r.StatusCode -eq 200) {{
+                $v = ($r.Content | ConvertFrom-Json).version
+                if ($v -eq "{version}") {{ $ok = $true; break }}
+            }}
+        }} catch {{ }}
+        Start-Sleep 2
+    }}
 }}
 
 if ($ok) {{
@@ -368,64 +377,29 @@ def stage_update(asset_url: str, version: str) -> Path:
     return work
 
 
-def _detached_creationflags() -> int:
-    if sys.platform != "win32":
-        return 0
-    return getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
-        subprocess, "DETACHED_PROCESS", 0
-    )
+def spawn_updater(work_dir: Path) -> None:
+    """Launch the outer updater script in the user's INTERACTIVE session.
 
+    A plain child ``Popen`` from the daemon inherits the interactive window
+    station, so the outer's ``Start-Process -Verb RunAs`` raises a UAC prompt
+    the user actually SEES. (The old WMI ``Win32_Process.Create`` path ran the
+    outer under the WMI host's non-interactive station, so the prompt never
+    surfaced — and WDAC blocks ``Win32_Process.Create`` outright.)
 
-def _spawn_via_wmi(outer: str) -> bool:
-    """Spawn the outer through ``Win32_Process.Create`` and confirm it started.
-
-    WMI re-parents the outer under the WMI host so the inner's tree-kill of the
-    daemon can't reach it — the outer survives to relaunch+verify+cleanup. We
-    WAIT for the create call and check its ``ReturnValue`` (0 = ok) so a blocked
-    WMI (WDAC-locked machines refuse ``Win32_Process.Create``) is detected as a
-    failure rather than a silent no-op. Returns True only on a confirmed spawn.
+    The outer is a child of the daemon, but the inner swap kills the daemon
+    WITHOUT ``/T``, so this powershell survives to relaunch + verify + cleanup.
+    ``DETACHED_PROCESS`` detaches only the console (not the window station), so
+    UAC visibility is unaffected; ``CREATE_NO_WINDOW`` keeps a console from
+    flashing.
     """
-    inner_cmd = (
-        "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
-        f'-File \\"{outer}\\"'
-    )
-    wmi_cmd = (
-        "try { $r = Invoke-CimMethod -ClassName Win32_Process -MethodName "
-        f"Create -Arguments @{{CommandLine='{inner_cmd}'}}; "
-        "if ($null -eq $r -or $r.ReturnValue -ne 0) { exit 1 } else { exit 0 } } "
-        "catch { exit 1 }"
-    )
-    try:
-        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
-            [
-                "powershell",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-WindowStyle",
-                "Hidden",
-                "-Command",
-                wmi_cmd,
-            ],
-            creationflags=_detached_creationflags(),
-            capture_output=True,
-            timeout=30,
+    outer = str(work_dir / "relaunch.ps1")
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = (
+            getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return proc.returncode == 0
-
-
-def _spawn_direct(outer: str) -> None:
-    """Fallback when WMI is unavailable (e.g. WDAC): launch the outer directly.
-
-    The outer is a child of the daemon here, so the inner's tree-kill will take
-    it down mid-flight — but the ELEVATED inner swap is re-parented by UAC and
-    completes the swap + writes ``result.txt`` regardless. The user relaunches
-    from the Start menu (the frontend timeout banner says so) and boot-time
-    recovery reconciles the marker. Degraded (no auto-relaunch) but the binary
-    is still updated, which beats a silently stuck "updating…".
-    """
     subprocess.Popen(  # noqa: S603 — fixed argv, no shell
         [
             "powershell",
@@ -437,24 +411,6 @@ def _spawn_direct(outer: str) -> None:
             "-File",
             outer,
         ],
-        creationflags=_detached_creationflags()
-        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        creationflags=creationflags,
     )
-
-
-def spawn_updater(work_dir: Path) -> None:
-    """Launch the outer updater script, re-parented away from the daemon.
-
-    Primary path is WMI ``Win32_Process.Create`` (the outer survives the inner's
-    tree-kill and auto-relaunches). If WMI is blocked — which happens on
-    WDAC-locked machines and used to leave the update silently stuck — fall back
-    to a direct detached spawn so the elevated swap still runs.
-    """
-    outer = str(work_dir / "relaunch.ps1")
-    if _spawn_via_wmi(outer):
-        logger.info("[update] outer spawned via WMI")
-        return
-    logger.warning(
-        "[update] WMI spawn failed (WDAC?) — falling back to direct detached spawn"
-    )
-    _spawn_direct(outer)
+    logger.info("[update] outer relaunch.ps1 spawned (interactive)")
