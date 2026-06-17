@@ -147,7 +147,10 @@
       "available": "v{{version}} is available",
       "current_version": "(you have {{current}})",
       "download_button": "Download",
-      "later_button": "Later"
+      "later_button": "Later",
+      "apply_button": "Update now",
+      "applying": "Updating… the app will close and reopen. Windows may ask for permission (UAC).",
+      "apply_error": "Couldn't update automatically — use the release link instead."
     },
     "hooks_fix": {
       "label": "Re-install hooks",
