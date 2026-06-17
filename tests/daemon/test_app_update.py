@@ -32,6 +32,8 @@ def test_update_status_returns_has_update(client, monkeypatch):
     body = r.json()
     assert body["has_update"] is True
     assert body["latest"] == "0.9.0"
+    # Resume-on-boot outcome is always surfaced (None when no swap pending).
+    assert "last_apply" in body
 
 
 def test_update_status_includes_asset_url(client, monkeypatch):

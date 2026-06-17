@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
 
+from claude_mnemos.core import update_recovery
 from claude_mnemos.core.update_apply import (
     UpdateApplyError,
     can_apply,
@@ -36,6 +37,7 @@ def update_status_route() -> dict[str, Any]:
             s.dismissed_until.isoformat() if s.dismissed_until else None
         ),
         "error": s.error,
+        "last_apply": update_recovery.read_last_apply(),
     }
 
 
