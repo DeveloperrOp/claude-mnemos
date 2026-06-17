@@ -9,6 +9,12 @@ export interface UpdateStatus {
   checked_at: string;
   dismissed_until: string | null;
   error: string | null;
+  last_apply?: {
+    version: string;
+    status: "ok" | "failed";
+    error: string | null;
+    at: string;
+  } | null;
 }
 
 export interface VersionInfo {

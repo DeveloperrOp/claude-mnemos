@@ -23,6 +23,10 @@ beforeAll(() => {
           apply_button: "Update now",
           applying: "Updating… the app will close and reopen.",
           apply_error: "Couldn't update automatically — use the release link.",
+          apply_uac_hint:
+            "This will close the app and ask Windows (UAC) for permission. If the panel doesn't come back, launch claude-mnemos from the Start menu.",
+          last_failed:
+            "The last update attempt failed — your previous version was restored: {{error}}. Use the release link.",
         },
       },
     },
@@ -166,5 +170,93 @@ describe("UpdateBanner", () => {
     ).toBeInTheDocument();
     // The release link remains as the always-available fallback.
     expect(screen.getByRole("link", { name: /download/i })).toBeInTheDocument();
+  });
+
+  it("shows the UAC pre-warning hint when the 'Update now' button is shown", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue(baseStatus);
+    renderBanner();
+    // The button is present (Windows + asset_url + has_update)…
+    expect(
+      await screen.findByRole("button", { name: /update now/i }),
+    ).toBeInTheDocument();
+    // …and the UAC hint is shown BEFORE any click.
+    expect(
+      screen.getByTestId("update-banner-uac-hint"),
+    ).toHaveTextContent(/UAC/i);
+  });
+
+  it("does not show the UAC hint when 'Update now' is hidden (non-Windows)", async () => {
+    vi.mocked(api.getVersionInfo).mockResolvedValue(MAC_VERSION);
+    vi.mocked(api.getUpdateStatus).mockResolvedValue(baseStatus);
+    renderBanner();
+    expect(
+      await screen.findByRole("link", { name: /download/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("update-banner-uac-hint")).toBeNull();
+  });
+
+  it("shows the failure state + keeps the release link when last_apply failed", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      ...baseStatus,
+      last_apply: {
+        version: "0.1.0",
+        status: "failed",
+        error: "checksum mismatch",
+        at: new Date().toISOString(),
+      },
+    });
+    renderBanner();
+    const failed = await screen.findByTestId("update-banner-last-failed");
+    expect(failed).toBeInTheDocument();
+    // The interpolated error is rendered.
+    expect(failed).toHaveTextContent(/checksum mismatch/i);
+    // The release link stays visible.
+    expect(
+      screen.getByRole("link", { name: /download/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the failure state even when no newer update is available", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      ...baseStatus,
+      latest: "0.0.1",
+      download_url: null,
+      asset_url: null,
+      has_update: false,
+      last_apply: {
+        version: "0.1.0",
+        status: "failed",
+        error: "network error",
+        at: new Date().toISOString(),
+      },
+    });
+    renderBanner();
+    const failed = await screen.findByTestId("update-banner-last-failed");
+    expect(failed).toHaveTextContent(/network error/i);
+  });
+
+  it("does not show the failure line when last_apply is null", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      ...baseStatus,
+      last_apply: null,
+    });
+    renderBanner();
+    expect(await screen.findByRole("link", { name: /download/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("update-banner-last-failed")).toBeNull();
+  });
+
+  it("does not show the failure line when last_apply succeeded (status ok)", async () => {
+    vi.mocked(api.getUpdateStatus).mockResolvedValue({
+      ...baseStatus,
+      last_apply: {
+        version: "0.1.0",
+        status: "ok",
+        error: null,
+        at: new Date().toISOString(),
+      },
+    });
+    renderBanner();
+    expect(await screen.findByRole("link", { name: /download/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("update-banner-last-failed")).toBeNull();
   });
 });
