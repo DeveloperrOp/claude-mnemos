@@ -27,6 +27,7 @@ export const JobSchema = z.object({
   finished_at: z.string().nullable(),
   error: z.string().nullable(),
   error_traceback: z.string().nullable(),
+  warning: z.string().nullable().optional(),
   project_name: z.string(),
 });
 export type Job = z.infer<typeof JobSchema>;

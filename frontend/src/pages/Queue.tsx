@@ -54,7 +54,7 @@ function useElapsedSeconds(startedAt: string | null): number {
   return Math.max(0, (now - start) / 1000);
 }
 
-function JobRow({ job }: { job: Job }) {
+export function JobRow({ job }: { job: Job }) {
   const { t, i18n } = useTranslation();
   const [tracebackOpen, setTracebackOpen] = useState(false);
   const cancel = useCancelJob();
@@ -136,6 +136,14 @@ function JobRow({ job }: { job: Job }) {
         </div>
         {job.error && (
           <div className="rounded bg-danger/10 px-2 py-1 text-danger">{job.error}</div>
+        )}
+        {job.warning && (
+          <div
+            data-testid="job-warning"
+            className="rounded bg-amber-500/10 px-2 py-1 text-amber-600 dark:text-amber-400"
+          >
+            {job.warning}
+          </div>
         )}
         {showTraceback && job.error_traceback && (
           <div>
