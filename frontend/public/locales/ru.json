@@ -87,6 +87,9 @@
         "daemon_uptime_warning": "Daemon недавно перезапустился."
       },
       "dismiss": "Закрыть",
+      "reinstall_hooks": "Переустановить хуки",
+      "reinstall_success": "Хуки переустановлены",
+      "reinstall_error": "Не удалось переустановить хуки: {{message}}",
       "severity": {
         "critical": "критично",
         "info": "инфо",

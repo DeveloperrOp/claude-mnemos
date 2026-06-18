@@ -126,6 +126,9 @@
       "snooze_24h": "Snooze 24h",
       "snooze_forever": "Forever",
       "dismiss": "Dismiss",
+      "reinstall_hooks": "Reinstall hooks",
+      "reinstall_success": "Hooks reinstalled",
+      "reinstall_error": "Couldn't reinstall hooks: {{message}}",
       "show_more": "Show {{count}} more",
       "show_less": "Show less",
       "detectors": {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "../../i18n";
 import { HealthAlertsBar } from "../../components/widgets/dashboard/HealthAlertsBar";
@@ -19,11 +19,12 @@ beforeAll(() => {
           snooze_24h: "Snooze 24h",
           snooze_forever: "Forever",
           dismiss: "Dismiss",
+          reinstall_hooks: "Reinstall hooks",
           show_more: "Show {{count}} more",
           show_less: "Show less",
           detectors: {
             hook_silence:
-              "{{count}} recent Claude Code session(s) detected, but no ingest job has succeeded in the last 6h. Check that hooks are installed.",
+              "{{count}} recent Claude Code session(s) detected but mnemos hooks aren't installed, so nothing is being saved. Reinstall the hooks.",
           },
         },
       },
@@ -49,6 +50,11 @@ vi.mock("../../hooks/dashboard/useDismissHealthAlert", () => ({
 
 vi.mock("../../hooks/dashboard/useSilenceHealthAlert", () => ({
   useSilenceHealthAlert: () => ({ mutate: vi.fn() }),
+}));
+
+const installMutate = vi.fn();
+vi.mock("../../hooks/useInstallHooks", () => ({
+  useInstallHooks: () => ({ mutate: installMutate, isPending: false }),
 }));
 
 function wrap(ui: React.ReactNode) {
@@ -125,6 +131,28 @@ describe("HealthAlertsBar", () => {
     };
     render(wrap(<HealthAlertsBar />));
     expect(screen.getByText("Dismiss")).toBeDefined();
+  });
+
+  it("shows a Reinstall hooks button on a hook_silence alert and calls install on click", () => {
+    installMutate.mockClear();
+    mockData = {
+      alerts: [makeAlert("a1", { detector: "hook_silence" })],
+      silenced: [],
+    };
+    render(wrap(<HealthAlertsBar />));
+    const btn = screen.getByTestId("hook-reinstall");
+    expect(btn).toBeDefined();
+    fireEvent.click(btn);
+    expect(installMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a Reinstall hooks button on non-hook alerts", () => {
+    mockData = {
+      alerts: [makeAlert("a1", { detector: "disk_low", severity: "critical" })],
+      silenced: [],
+    };
+    render(wrap(<HealthAlertsBar />));
+    expect(screen.queryByTestId("hook-reinstall")).toBeNull();
   });
 
   it("renders alert text via i18n_key when present", () => {

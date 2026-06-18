@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +13,7 @@ import {
 import { useHealthAlerts } from "@/hooks/dashboard/useHealthAlerts";
 import { useDismissHealthAlert } from "@/hooks/dashboard/useDismissHealthAlert";
 import { useSilenceHealthAlert } from "@/hooks/dashboard/useSilenceHealthAlert";
+import { useInstallHooks } from "@/hooks/useInstallHooks";
 import type {
   HealthAlert,
   HealthAlertSeverity,
@@ -33,8 +36,28 @@ const FOREVER_HOURS = 24 * 365 * 10; // ~10 years — effectively forever
 
 function HealthAlertRow({ alert }: { alert: HealthAlert }) {
   const { t } = useTranslation();
+  const qc = useQueryClient();
   const silence = useSilenceHealthAlert();
   const dismiss = useDismissHealthAlert();
+  const installHooks = useInstallHooks();
+
+  const isHookSilence = alert.detector === "hook_silence";
+
+  function handleReinstallHooks() {
+    installHooks.mutate(undefined, {
+      onSuccess: () => {
+        // The alert auto-resolves on the next cron tick now that hooks are
+        // installed; refetch so it disappears promptly.
+        void qc.invalidateQueries({ queryKey: ["health-alerts"] });
+        toast.success(t("overview.health_alerts.reinstall_success"));
+      },
+      onError: (err: Error) => {
+        toast.error(
+          t("overview.health_alerts.reinstall_error", { message: err.message }),
+        );
+      },
+    });
+  }
 
   return (
     <div
@@ -56,6 +79,17 @@ function HealthAlertRow({ alert }: { alert: HealthAlert }) {
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {isHookSilence && (
+          <Button
+            data-testid="hook-reinstall"
+            size="sm"
+            variant="default"
+            disabled={installHooks.isPending}
+            onClick={handleReinstallHooks}
+          >
+            {t("overview.health_alerts.reinstall_hooks")}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline">
