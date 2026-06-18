@@ -40,6 +40,7 @@ import getpass
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -65,6 +66,22 @@ _DEFAULT_DAEMON_URL = "http://127.0.0.1:5757"
 
 class UpdateApplyError(Exception):
     """Raised when staging the update fails (download / validation / in-progress)."""
+
+
+_VERSION_RE = re.compile(r"^[0-9][0-9A-Za-z.\-]{0,30}$")
+
+
+def _validate_version(version: str) -> str:
+    """Return a filesystem-safe version string or raise UpdateApplyError.
+
+    Strips a leading 'v', then enforces a strict allowlist so a hostile
+    release tag can't traverse out of the updates dir or inject into the
+    generated PowerShell paths.
+    """
+    cleaned = version.lstrip("v").strip()
+    if not _VERSION_RE.match(cleaned) or ".." in cleaned:
+        raise UpdateApplyError(f"unsafe update version: {version!r}")
+    return cleaned
 
 
 def can_apply() -> tuple[bool, str]:
@@ -337,6 +354,7 @@ def stage_update(asset_url: str, version: str) -> Path:
 
     Raises :class:`UpdateApplyError` if a fresh update is already in progress.
     """
+    version = _validate_version(version)
     if update_in_progress():
         raise UpdateApplyError("an update is already in progress")
 

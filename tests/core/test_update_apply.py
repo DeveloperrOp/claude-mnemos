@@ -305,3 +305,20 @@ def _zip_real(updates: Path, version: str, payload: bytes) -> Path:
     zip_path = work / "portable.zip"
     zip_path.write_bytes(payload)
     return zip_path
+
+
+# --------------------------------------------------------------------------
+# _validate_version  (path-traversal hardening of the release tag)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["../evil", "a/b", "..\\x", "a b", "1.2/../3", ""])
+def test_stage_update_rejects_unsafe_version(bad: str) -> None:
+    with pytest.raises(update_apply.UpdateApplyError):
+        update_apply._validate_version(bad)
+
+
+@pytest.mark.parametrize("ok", ["0.0.56", "1.2.3", "0.0.56-rc1", "v0.0.1"])
+def test_validate_version_accepts_normal_tags(ok: str) -> None:
+    out = update_apply._validate_version(ok)
+    assert out and "/" not in out and "\\" not in out and ".." not in out
