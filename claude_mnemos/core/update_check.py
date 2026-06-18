@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from claude_mnemos import __version__
+from claude_mnemos.core.atomic import atomic_write
 
 _GITHUB_LATEST_RELEASE = (
     "https://api.github.com/repos/DeveloperrOp/claude-mnemos/releases/latest"
@@ -95,7 +96,7 @@ def _load_cache() -> dict[str, Any] | None:
 
 def _save_cache(data: dict[str, Any]) -> None:
     _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _CACHE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    atomic_write(_CACHE_PATH, json.dumps(data, indent=2))
 
 
 def check_for_update(*, force: bool = False) -> UpdateStatus:

@@ -117,6 +117,14 @@ def test_dismiss_records_until_timestamp(monkeypatch, cache_path: Path) -> None:
     assert data["dismissed_until"] is not None
 
 
+def test_save_cache_uses_atomic_write(monkeypatch, cache_path) -> None:
+    import claude_mnemos.core.update_check as uc
+    calls: list = []
+    monkeypatch.setattr(uc, "atomic_write", lambda path, data: calls.append((path, data)))
+    uc._save_cache({"checked_at": "x", "current": "0.0.1", "latest": None})
+    assert calls, "_save_cache must route through atomic_write"
+
+
 def test_check_returns_no_update_on_network_error(monkeypatch, cache_path: Path) -> None:
     def fake_fetch():
         raise OSError("offline")
