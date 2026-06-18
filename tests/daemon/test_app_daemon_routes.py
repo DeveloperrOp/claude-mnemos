@@ -26,6 +26,10 @@ class _FakeRuntime:
 class _FakeDaemon:
     def __init__(self, vault: Path) -> None:
         self.runtimes = {"alpha": _FakeRuntime(vault)}
+        self.shutdown_requested = False
+
+    def _request_shutdown(self) -> None:
+        self.shutdown_requested = True
 
 
 @pytest.fixture
@@ -95,3 +99,35 @@ async def test_pause_route_503_when_no_daemon_bound() -> None:
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.post("/api/daemon/pause")
     assert r.status_code == 503
+
+
+async def test_restart_requests_graceful_shutdown(
+    client, fake_daemon: _FakeDaemon, monkeypatch
+) -> None:
+    """Restart must ask uvicorn to exit gracefully (so run()'s finally cleans up
+    the pid file, observers and job store) rather than hard os._exit(0), which
+    skips that cleanup and risks .jobs.db WAL damage / pid residue.
+
+    Happy path: graceful shutdown is requested and the hard os._exit fallback
+    does NOT fire. The fallback is armed only when there is a live uvicorn
+    server still serving after the grace period; the fake daemon has no server
+    (``_server`` absent), so the fallback is correctly skipped here.
+    """
+    import os as _os
+
+    from claude_mnemos.daemon.routes import daemon as daemon_route
+
+    # Zero the sleeps so the background task does not really wait 0.5s + 5s.
+    monkeypatch.setattr(daemon_route, "_RESPONSE_FLUSH_SLEEP", 0.0)
+    monkeypatch.setattr(daemon_route, "_GRACEFUL_FALLBACK_SLEEP", 0.0)
+    hard_exit: dict[str, int] = {}
+    monkeypatch.setattr(_os, "_exit", lambda code: hard_exit.setdefault("code", code))
+
+    r = await client.post("/api/daemon/restart")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    # ASGITransport awaits BackgroundTasks before returning the response, so the
+    # background task has run to completion by now.
+    assert fake_daemon.shutdown_requested is True  # graceful path chosen
+    assert "code" not in hard_exit  # no hard os._exit on the happy path

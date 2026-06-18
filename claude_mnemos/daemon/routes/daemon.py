@@ -6,7 +6,13 @@ worker already honours (``is_paused``), so the pause actually stops work
 instead of flipping a flag nobody read. (The old ``daemon.paused`` flag was
 a placebo — set by these routes, read by nothing.)
 
-Restart works by exiting cleanly (`os._exit(0)`) after responding — the
+Restart works by asking uvicorn to shut down gracefully after responding
+(``daemon._request_shutdown()`` flips ``server.should_exit``), so
+``MnemosDaemon.run()``'s ``finally`` block runs its cleanup (pid-file
+removal, runtime unmount, scheduler/job-store flush) before the process
+exits — a hard ``os._exit(0)`` would skip that and risk pid residue and
+``.jobs.db`` WAL damage on repeated UI restarts. A bounded ``os._exit(0)``
+remains only as a last-resort fallback if graceful shutdown wedges. The
 tray supervisor's main loop notices the exit and respawns the daemon
 process. On macOS / Linux where no tray supervisor is running the UI
 will simply lose connection; in that case the user must relaunch the
@@ -24,6 +30,11 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 router = APIRouter()
+
+# Restart shutdown timings (module-level so tests can monkeypatch them to 0
+# instead of really sleeping for 5.5s in the background task).
+_RESPONSE_FLUSH_SLEEP = 0.5  # let the HTTP response flush over loopback first
+_GRACEFUL_FALLBACK_SLEEP = 5.0  # grace window before the last-resort os._exit
 
 # "Pause indefinitely" sentinel — the queue stays paused until an explicit
 # /daemon/resume (or a rate-limit pause with an earlier reset). is_paused()
@@ -89,12 +100,23 @@ async def restart_route(request: Request, background: BackgroundTasks) -> dict[s
     supervised = _is_supervised()
 
     async def _shutdown_after_response() -> None:
-        # Give the HTTP response 0.5s to flush over the loopback socket
-        # before we tear the process down. os._exit (not sys.exit) so
-        # FastAPI's lifespan shutdown handlers don't deadlock on the
-        # event loop we're still on.
-        await asyncio.sleep(0.5)
-        os._exit(0)
+        # Give the HTTP response time to flush over the loopback socket, then ask
+        # uvicorn to exit gracefully so run()'s finally cleans up the pid file,
+        # observers and job store (avoids the .jobs.db WAL damage / pid residue
+        # that a hard os._exit causes). _request_shutdown only flips
+        # server.should_exit (no await), so there is no event-loop deadlock —
+        # await self._server.serve() returns and the process exits naturally
+        # (the tray supervisor respawns it). os._exit is kept ONLY as a bounded
+        # last-resort fallback if graceful shutdown wedges with the server still
+        # up, so a restart still happens regardless.
+        await asyncio.sleep(_RESPONSE_FLUSH_SLEEP)
+        daemon._request_shutdown()
+        await asyncio.sleep(_GRACEFUL_FALLBACK_SLEEP)
+        # Only force-exit if a live server is still serving (graceful wedged).
+        # When serve() already returned, run()'s finally has cleaned up and the
+        # loop is torn down — this point is normally unreachable in production.
+        if getattr(daemon, "_server", None) is not None:
+            os._exit(0)
 
     background.add_task(_shutdown_after_response)
     return {"ok": True, "supervised": supervised}
