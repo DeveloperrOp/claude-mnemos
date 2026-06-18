@@ -236,25 +236,30 @@ class SpaStaticFiles(StaticFiles):
     # Static-asset file extensions that always 404 at any path depth (real
     # missing-resource error). Application route segments may legitimately
     # contain dots (".md" page paths) — those fall through to index.html.
-    _ASSET_EXTENSIONS = (
-        ".js",
-        ".css",
-        ".map",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".svg",
-        ".webp",
-        ".ico",
-        ".woff",
-        ".woff2",
-        ".ttf",
-        ".eot",
-        ".json",
-        ".webmanifest",
-        ".xml",
-        ".txt",
+    # A frozenset (not a tuple) because it is queried as a single-extension
+    # membership test (`ext in _ASSET_EXTENSIONS`) — O(1) lookup and the type
+    # self-documents the intent (an unordered set of allowed extensions).
+    _ASSET_EXTENSIONS = frozenset(
+        {
+            ".js",
+            ".css",
+            ".map",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".svg",
+            ".webp",
+            ".ico",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".eot",
+            ".json",
+            ".webmanifest",
+            ".xml",
+            ".txt",
+        }
     )
 
     async def get_response(self, path: str, scope: Any) -> Any:

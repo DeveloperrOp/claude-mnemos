@@ -78,6 +78,45 @@ async def test_spa_fallback_for_dotted_app_routes(tmp_path: Path) -> None:
     assert r_missing_asset.status_code == 404
 
 
+async def test_spa_route_not_treated_as_asset(tmp_path: Path) -> None:
+    """A real SPA route (no file extension) must fall through to index.html
+    (200), not be 404'd as a missing asset. Guards the _ASSET_EXTENSIONS
+    membership check — a route segment with no known asset extension is an
+    application route, never a static asset.
+    """
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text(
+        "<!doctype html><html><body>spa</body></html>", encoding="utf-8"
+    )
+
+    app = create_app(static_dir=static_dir)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get("/project/foo/lost-sessions")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+    assert "spa" in r.text
+
+
+async def test_real_missing_asset_404s(tmp_path: Path) -> None:
+    """A top-level path whose extension IS in _ASSET_EXTENSIONS (e.g. a
+    missing .js bundle) must 404 via the extension check rather than fall
+    through to the SPA shell. This exercises the membership branch directly
+    (not the assets/ prefix branch)."""
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text(
+        "<!doctype html><html><body>spa</body></html>", encoding="utf-8"
+    )
+
+    app = create_app(static_dir=static_dir)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get("/does-not-exist-12345.js")
+    assert r.status_code == 404
+
+
 async def test_no_cache_on_root_and_spa_fallback(tmp_path: Path) -> None:
     """index.html must carry no-cache wherever it is served from: the literal
     /index.html, the ROOT '/', and SPA-fallback routes (/lost-sessions). Those
