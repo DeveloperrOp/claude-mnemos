@@ -31,7 +31,7 @@ def _normalize(p: str | Path) -> str:
 
 
 @functools.lru_cache(maxsize=512)
-def _git_toplevel(cwd: Path) -> Path | None:
+def git_toplevel(cwd: Path) -> Path | None:
     """Return the git working-tree root for *cwd*, or None if not a repo / git
     unavailable. Used as a fallback when a session's cwd matches no project
     pattern: the repo root often DOES (you registered the project at the repo
@@ -70,6 +70,12 @@ def _git_toplevel(cwd: Path) -> Path | None:
         return Path(top)
     except (ValueError, OSError):
         return None
+
+
+# Backward-compat alias for the historical private name. Same lru_cache'd
+# object — ``.cache_clear()`` / ``.cache_info()`` work through either name.
+# New code should import the public ``git_toplevel``.
+_git_toplevel = git_toplevel
 
 
 class ProjectResolver:
@@ -118,7 +124,7 @@ class ProjectResolver:
         direct = self._match_cwd(cwd)
         if direct is not None or not git_fallback:
             return direct
-        top = _git_toplevel(cwd)
+        top = git_toplevel(cwd)
         if top is None or _normalize(top) == _normalize(cwd):
             return None
         return self._match_cwd(top)

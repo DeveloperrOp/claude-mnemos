@@ -29,6 +29,11 @@ def _isolate_home(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
 
+def test_git_toplevel_is_public():
+    from claude_mnemos.mapping import resolver
+    assert hasattr(resolver, "git_toplevel")
+
+
 def test_resolve_by_name_hit(tmp_path: Path):
     _seed_map(tmp_path, [
         ProjectMapEntry(name="x", vault_root=tmp_path / "vx", cwd_patterns=[]),
@@ -169,14 +174,14 @@ def test_resolve_by_cwd_handles_corrupt_via_exception(tmp_path: Path):
 
 def test_git_fallback_off_by_default(tmp_path: Path, monkeypatch):
     """Without git_fallback the pure pattern semantics are unchanged: a cwd
-    that matches nothing returns None and _git_toplevel is never consulted."""
+    that matches nothing returns None and git_toplevel is never consulted."""
     _seed_map(tmp_path, [
         ProjectMapEntry(name="x", vault_root=tmp_path / "vx",
                         cwd_patterns=[str(tmp_path / "repo")]),  # bare path, no wildcard
     ])
     called = {"git": False}
     monkeypatch.setattr(
-        "claude_mnemos.mapping.resolver._git_toplevel",
+        "claude_mnemos.mapping.resolver.git_toplevel",
         lambda cwd: called.__setitem__("git", True) or None,
     )
     r = ProjectResolver()
@@ -197,7 +202,7 @@ def test_git_fallback_attributes_via_repo_root(tmp_path: Path, monkeypatch):
     ])
     # The subdir does not match the bare-root pattern; git toplevel does.
     monkeypatch.setattr(
-        "claude_mnemos.mapping.resolver._git_toplevel",
+        "claude_mnemos.mapping.resolver.git_toplevel",
         lambda cwd: repo,
     )
     r = ProjectResolver()
@@ -207,12 +212,12 @@ def test_git_fallback_attributes_via_repo_root(tmp_path: Path, monkeypatch):
 
 
 def test_git_toplevel_is_cached(tmp_path: Path, monkeypatch):
-    """_git_toplevel must cache per-cwd: a lost-sessions scan resolves the same
+    """git_toplevel must cache per-cwd: a lost-sessions scan resolves the same
     repo for dozens of unassigned sessions — without the cache that's dozens of
     git subprocesses, each blocking up to the timeout on a dead path."""
     from claude_mnemos.mapping import resolver as _resolver
 
-    _resolver._git_toplevel.cache_clear()
+    _resolver.git_toplevel.cache_clear()
     calls = {"n": 0}
 
     def fake_run(*args, **kwargs):
@@ -228,20 +233,20 @@ def test_git_toplevel_is_cached(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(_resolver.subprocess, "run", fake_run)
 
     cwd = tmp_path / "repo" / "sub"
-    _resolver._git_toplevel(cwd)
-    _resolver._git_toplevel(cwd)
-    _resolver._git_toplevel(cwd)
+    _resolver.git_toplevel(cwd)
+    _resolver.git_toplevel(cwd)
+    _resolver.git_toplevel(cwd)
     assert calls["n"] == 1, "git was invoked more than once for the same cwd"
-    _resolver._git_toplevel.cache_clear()
+    _resolver.git_toplevel.cache_clear()
 
 
 def test_git_toplevel_tolerates_none_stdout(tmp_path: Path, monkeypatch):
     """Frozen windowed exe: subprocess.run can return stdout=None even with
-    capture_output=True. _git_toplevel must not crash (it 500'd the whole
+    capture_output=True. git_toplevel must not crash (it 500'd the whole
     lost-sessions scan on v0.0.45)."""
     from claude_mnemos.mapping import resolver as _resolver
 
-    _resolver._git_toplevel.cache_clear()
+    _resolver.git_toplevel.cache_clear()
 
     class _R:
         returncode = 0
@@ -249,8 +254,8 @@ def test_git_toplevel_tolerates_none_stdout(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(_resolver.shutil, "which", lambda name: "git")
     monkeypatch.setattr(_resolver.subprocess, "run", lambda *a, **k: _R())
-    assert _resolver._git_toplevel(tmp_path / "x") is None  # no AttributeError
-    _resolver._git_toplevel.cache_clear()
+    assert _resolver.git_toplevel(tmp_path / "x") is None  # no AttributeError
+    _resolver.git_toplevel.cache_clear()
 
 
 def test_git_fallback_returns_none_when_not_a_repo(tmp_path: Path, monkeypatch):
@@ -259,7 +264,7 @@ def test_git_fallback_returns_none_when_not_a_repo(tmp_path: Path, monkeypatch):
                         cwd_patterns=[str(tmp_path / "repo")]),
     ])
     monkeypatch.setattr(
-        "claude_mnemos.mapping.resolver._git_toplevel", lambda cwd: None
+        "claude_mnemos.mapping.resolver.git_toplevel", lambda cwd: None
     )
     r = ProjectResolver()
     assert r.resolve_by_cwd(tmp_path / "elsewhere", git_fallback=True) is None
@@ -273,7 +278,7 @@ def test_git_fallback_no_infinite_when_toplevel_equals_cwd(tmp_path: Path, monke
     ])
     elsewhere = tmp_path / "elsewhere"
     monkeypatch.setattr(
-        "claude_mnemos.mapping.resolver._git_toplevel", lambda cwd: elsewhere
+        "claude_mnemos.mapping.resolver.git_toplevel", lambda cwd: elsewhere
     )
     r = ProjectResolver()
     assert r.resolve_by_cwd(elsewhere, git_fallback=True) is None

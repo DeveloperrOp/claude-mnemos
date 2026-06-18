@@ -28,7 +28,7 @@ from claude_mnemos.daemon.routes._helpers import all_runtimes, get_runtime
 from claude_mnemos.mapping.resolver import (
     ProjectResolver,
     ResolverAmbiguityError,
-    _git_toplevel,
+    git_toplevel,
 )
 from claude_mnemos.state.jobs import JobStore
 
@@ -111,11 +111,11 @@ def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
             # toplevel collapses subdirectories of one repo into a single
             # group; outside a repo the cwd itself is the group.
             # .resolve() canonicalises trailing slashes / case so the
-            # lru_cache on _git_toplevel doesn't miss on equivalent paths.
+            # lru_cache on git_toplevel doesn't miss on equivalent paths.
             group: Path | None = None
             if item.cwd:
                 try:
-                    group = _git_toplevel(Path(item.cwd).resolve())
+                    group = git_toplevel(Path(item.cwd).resolve())
                 except OSError:
                     group = None
             d["group_root"] = str(group) if group is not None else (item.cwd or None)
@@ -123,14 +123,20 @@ def collect_lost_sessions(runtimes: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _scan_all_vaults(request: Request) -> list[dict[str, Any]]:
+def _scan_all_vaults(runtimes: list[Any]) -> list[dict[str, Any]]:
     """Cross-vault scan with cwd-based project attribution.
 
     Thin shim over :func:`collect_lost_sessions` — fixes a long-standing
     leakage where every vault would surface every other vault's sessions
     as "lost" simply because they were missing from its own manifest.
+
+    Takes an already-resolved list of ``VaultRuntime`` (resolved on the
+    event loop via ``all_runtimes(request)``). It must NOT touch
+    ``request`` / ``app.state`` so it is safe to run under
+    ``asyncio.to_thread`` while mount/unmount mutates ``daemon.runtimes``
+    under its async lock on the loop thread.
     """
-    return collect_lost_sessions(list(all_runtimes(request)))
+    return collect_lost_sessions(list(runtimes))
 
 
 def _scan_vault_sync(runtime: Any) -> list[core_lost_sessions.LostSession]:
@@ -149,9 +155,12 @@ def _scan_vault_sync(runtime: Any) -> list[core_lost_sessions.LostSession]:
 
 @router.get("/lost-sessions")
 async def list_lost_route(request: Request) -> dict[str, Any]:
-    # Cross-vault scan walks JSONL files on disk; offload to a worker
-    # thread so the event loop stays responsive even with 500+ files.
-    sessions = await asyncio.to_thread(_scan_all_vaults, request)
+    # Resolve runtimes on the event loop (reading the daemon's runtimes dict
+    # is only safe under its async lock / on the loop thread). The scan then
+    # walks JSONL files on disk — offload to a worker thread so the event
+    # loop stays responsive even with 500+ files, passing in plain values.
+    runtimes = list(all_runtimes(request))
+    sessions = await asyncio.to_thread(_scan_all_vaults, runtimes)
     return {"sessions": sessions, "total": len(sessions)}
 
 
@@ -159,13 +168,17 @@ async def list_lost_route(request: Request) -> dict[str, Any]:
 async def rescan_route(request: Request) -> dict[str, Any]:
     """Invalidate caches in every mounted vault, then rescan."""
     invalidate_transcripts_cache()
-    for runtime in all_runtimes(request):
+    # Resolve runtimes once on the event loop; reuse the same list for cache
+    # invalidation and for the threaded scan so the worker thread never reads
+    # the daemon's runtimes dict (mutated under an async lock on mount/unmount).
+    runtimes = list(all_runtimes(request))
+    for runtime in runtimes:
         cache = runtime.lost_sessions_cache
         if cache is not None:
             cache.invalidate()
     # Cross-vault scan walks JSONL files on disk; offload to a worker
     # thread to unblock the event loop during long rescans.
-    sessions = await asyncio.to_thread(_scan_all_vaults, request)
+    sessions = await asyncio.to_thread(_scan_all_vaults, runtimes)
     return {"sessions": sessions, "total": len(sessions)}
 
 

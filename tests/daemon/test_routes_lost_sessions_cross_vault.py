@@ -440,7 +440,7 @@ class TestGroupRoot:
         # git-фоллбэк выключаем, чтобы тест не зависел от того, лежит ли
         # tmp_path внутри чьего-то репозитория
         monkeypatch.setattr(
-            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            "claude_mnemos.daemon.routes.lost_sessions.git_toplevel",
             lambda _cwd: None,
         )
         client.post("/api/lost-sessions/scan")
@@ -472,7 +472,7 @@ class TestGroupRoot:
             _json.dumps({"cwd": str(sub_b)}), encoding="utf-8")
         monkeypatch.setenv("MNEMOS_TRANSCRIPTS_ROOT", str(root))
         monkeypatch.setattr(
-            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            "claude_mnemos.daemon.routes.lost_sessions.git_toplevel",
             lambda cwd: repo if str(cwd).startswith(str(repo)) else None,
         )
         client.post("/api/lost-sessions/scan")
@@ -497,7 +497,7 @@ class TestGroupRoot:
             raise OSError("git exploded")
 
         monkeypatch.setattr(
-            "claude_mnemos.daemon.routes.lost_sessions._git_toplevel",
+            "claude_mnemos.daemon.routes.lost_sessions.git_toplevel",
             _boom,
         )
         client.post("/api/lost-sessions/scan")
@@ -520,3 +520,37 @@ class TestGroupRoot:
         items = [s for s in r.json()["sessions"] if s["session_id"] == "sess-nocwd"]
         assert items
         assert items[0]["group_root"] is None
+
+
+class TestScanAllVaultsSignature:
+    """Task 9: ``_scan_all_vaults`` must NOT take a ``Request``.
+
+    The cross-thread layer leak (dereferencing ``request.app.state`` /
+    iterating the daemon's runtimes dict inside a worker thread) is fixed by
+    resolving the runtimes on the event loop and passing a plain list into
+    the threaded function. This test pins the new contract: the function is
+    callable with a plain list of runtimes — no ``Request`` involved.
+    """
+
+    def test_scan_all_vaults_accepts_plain_runtimes(
+        self,
+        daemon_with_two: tuple[MnemosDaemon, TestClient, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import inspect
+
+        from claude_mnemos.daemon.routes.lost_sessions import _scan_all_vaults
+
+        # Signature must not mention a Request parameter anymore.
+        params = list(inspect.signature(_scan_all_vaults).parameters)
+        assert "request" not in params, params
+
+        daemon, _client, _va, _vb = daemon_with_two
+        _make_shared_transcripts(tmp_path, monkeypatch, "sess-plain")
+
+        runtimes = [daemon.runtimes[name] for name in sorted(daemon.runtimes)]
+        # Called with a plain list of VaultRuntime — no Request, no app.state.
+        result = _scan_all_vaults(runtimes)
+        sids = {item["session_id"] for item in result}
+        assert "sess-plain" in sids
