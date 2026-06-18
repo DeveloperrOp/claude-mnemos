@@ -235,22 +235,33 @@ def render_inner_script(
 $ErrorActionPreference = "Stop"
 try {{
     Start-Sleep 2
-    # No /T: kill only the named exes, NOT their child tree — the
-    # (interactively-spawned) outer relaunch.ps1 is a child of the daemon, and
-    # /T would take it down mid-swap, killing relaunch+verify+cleanup. /IM alone
-    # still gets the supervisor + daemon + launcher (all claude-mnemos.exe).
-    try {{ taskkill /F /IM claude-mnemos.exe }} catch {{ }}
-    try {{ taskkill /F /IM claude-mnemos-cli.exe }} catch {{ }}
-    $deadline = (Get-Date).AddSeconds(20)
-    while ((Get-Date) -lt $deadline) {{
-        if (-not (Get-Process claude-mnemos* -ErrorAction SilentlyContinue)) {{ break }}
-        Start-Sleep 1
-    }}
 
-    # Clean leftovers from a prior aborted run (single-flight guarantees no
-    # concurrent run owns these).
+    # Clean stale leftovers from a prior aborted run FIRST - before any kill or
+    # throw - so {old}/{new} only ever exist when THIS run created them. That
+    # makes the catch-block rollback always safe: it can never restore an
+    # UNRELATED stale backup (e.g. an old version's leftover .old) over a
+    # healthy install.
     if (Test-Path -LiteralPath "{old}") {{ Remove-Item -LiteralPath "{old}" -Recurse -Force }}
     if (Test-Path -LiteralPath "{new}") {{ Remove-Item -LiteralPath "{new}" -Recurse -Force }}
+
+    # Kill in a LOOP until no claude-mnemos process survives. A single taskkill
+    # can lose the race against the tray supervisor respawning the daemon, which
+    # left the swap spinning forever (v0.0.56 regression). /IM (no /T) so the
+    # interactively-spawned outer relaunch.ps1 - a powershell child of the
+    # daemon - is never taken down with the tree.
+    $killDeadline = (Get-Date).AddSeconds(25)
+    while ($true) {{
+        try {{ taskkill /F /IM claude-mnemos.exe 2>$null | Out-Null }} catch {{ }}
+        try {{ taskkill /F /IM claude-mnemos-cli.exe 2>$null | Out-Null }} catch {{ }}
+        Start-Sleep -Milliseconds 700
+        if (-not (Get-Process claude-mnemos* -ErrorAction SilentlyContinue)) {{ break }}
+        if ((Get-Date) -ge $killDeadline) {{ break }}
+    }}
+    if (Get-Process claude-mnemos* -ErrorAction SilentlyContinue) {{
+        # Couldn't free the install (something keeps respawning it). FAIL CLEANLY
+        # no rename was attempted, so the install is byte-for-byte intact.
+        throw "claude-mnemos processes still running after 25s; aborting swap, install left intact"
+    }}
 
     # Extract the validated build into a SAME-VOLUME sibling of the install so
     # both swap steps below are metadata-only renames. The install is untouched

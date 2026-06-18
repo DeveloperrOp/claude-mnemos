@@ -164,10 +164,40 @@ def test_inner_error_action_stop_and_wildcard_kill(inner: str) -> None:
     # No /T: the tree-kill would take down the interactively-spawned outer
     # (a child of the daemon) mid-swap. /IM alone still kills supervisor +
     # daemon + launcher (all claude-mnemos.exe).
-    assert "taskkill /F /IM claude-mnemos.exe }" in inner
-    assert "taskkill /F /IM claude-mnemos-cli.exe }" in inner
+    assert "taskkill /F /IM claude-mnemos.exe" in inner
+    assert "taskkill /F /IM claude-mnemos-cli.exe" in inner
     assert "taskkill /F /IM claude-mnemos.exe /T" not in inner
     assert "Get-Process claude-mnemos*" in inner
+
+
+def test_inner_kills_in_loop_until_processes_gone(inner: str) -> None:
+    # A single taskkill can lose the race against the tray supervisor respawning
+    # the daemon (v0.0.56 regression → swap spun forever). The kill must LOOP and
+    # re-check Get-Process until the process list is actually empty.
+    assert "while" in inner
+    # in-loop liveness check + the final post-loop guard = at least 2 references
+    assert inner.count("Get-Process claude-mnemos*") >= 2
+
+
+def test_inner_aborts_clean_when_processes_survive(inner: str) -> None:
+    # If the processes can't be freed within the deadline, ABORT before any
+    # rename so the install is byte-for-byte intact (no half-swap, no loop).
+    assert "still running" in inner
+    abort_idx = inner.index("still running")
+    first_rename_idx = inner.index(
+        'Move-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos" '
+    )
+    assert abort_idx < first_rename_idx
+
+
+def test_inner_cleans_stale_leftovers_before_abort(inner: str) -> None:
+    # Stale .old/.new must be removed BEFORE any throw so the catch-block can
+    # never restore an UNRELATED stale backup over a healthy install.
+    remove_old_idx = inner.index(
+        'Remove-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos.old"'
+    )
+    abort_idx = inner.index("still running")
+    assert remove_old_idx < abort_idx
 
 
 def test_inner_extracts_into_samevolume_new_sibling(inner: str) -> None:
