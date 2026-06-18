@@ -81,7 +81,7 @@
         "auto_dump_overdue": "Автодамп прострочено на {{minutes}} хв.",
         "ingest_failure_streak": "Останні {{count}} інжест-задач провалилися за 24 години.",
         "runaway_job": "Задача {{job_id}} виконується вже понад {{minutes}} хв.",
-        "hook_silence": "Виявлено {{count}} нещодавніх сесій Claude Code, але за останні 6 годин жодна інжест-задача не завершилася успішно. Перевір що хуки встановлені.",
+        "hook_silence": "Виявлено {{count}} нещодавніх сесій Claude Code, але хуки mnemos не встановлені — нічого не зберігається. Перевстановіть хуки.",
         "disk_low": "Vault «{{vault}}» — вільно лише {{percent_free}}% диску.",
         "project_map_broken": "Project-map пошкоджено: {{detail}}.",
         "daemon_uptime_warning": "Daemon нещодавно перезапустився."

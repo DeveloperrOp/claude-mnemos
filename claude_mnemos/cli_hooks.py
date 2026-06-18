@@ -100,6 +100,25 @@ def _is_mnemos_command(cmd: str) -> bool:
     return MNEMOS_TOKEN in cmd or MNEMOS_DASHED in cmd
 
 
+def all_hooks_installed() -> bool:
+    """True when BOTH SessionStart and SessionEnd carry a mnemos hook command.
+
+    Mirrors ``daemon/routes/hooks._summarize_event`` so the detector and the
+    REST status route agree on what "installed" means.
+    """
+    settings = _load_settings()
+    hooks_section = settings.get("hooks", {})
+
+    def _event_has_mnemos(event: str) -> bool:
+        for block in hooks_section.get(event, []):
+            for h in block.get("hooks", []):
+                if _is_mnemos_command(h.get("command", "")):
+                    return True
+        return False
+
+    return _event_has_mnemos("SessionStart") and _event_has_mnemos("SessionEnd")
+
+
 def _build_hook_block(command: str) -> dict[str, Any]:
     return {
         "hooks": [

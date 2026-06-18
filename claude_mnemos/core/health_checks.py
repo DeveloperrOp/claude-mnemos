@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from claude_mnemos.cli_hooks import all_hooks_installed
 from claude_mnemos.core.clock import utcnow
 from claude_mnemos.state.alerts_store import StoredAlert
 
@@ -238,10 +239,13 @@ def check_hook_silence(
 
     Heuristic interpretation: a successful SessionEnd/PreCompact hook always
     enqueues an ingest job. So a recent JSONL without any successful
-    ``kind == "ingest"`` activity in 6h is a strong signal the hook isn't
-    firing (most common cause: hooks not installed or installed but pointing
-    at the wrong project). Other successful job kinds (e.g. ``lint``) are
-    irrelevant — they don't prove hooks are firing.
+    ``kind == "ingest"`` activity in 6h is a candidate signal the hook isn't
+    firing. We only fire, however, when mnemos hooks are **not** installed —
+    ``all_hooks_installed()`` is the final gate. If the hooks ARE installed the
+    silence has a benign explanation (e.g. sessions ran from a folder that
+    isn't a registered project) and we stay quiet to avoid telling the user to
+    "install your hooks" when they already are. Other successful job kinds
+    (e.g. ``lint``) are irrelevant — they don't prove hooks are firing.
 
     Heuristic limit: this assumes the operator runs at least one Claude Code
     session per 6h while working. A 6h+ idle gap with hooks healthy is
@@ -297,17 +301,27 @@ def check_hook_silence(
             if finished is not None and finished >= cutoff:
                 return None
 
+    # Final gate: if mnemos hooks ARE installed, this silence is not a hook
+    # problem (most likely cause: sessions ran from a folder that isn't a
+    # registered project). Suppress the false alarm. On any error reading the
+    # settings, fall through and fire so we don't lose a real signal.
+    try:
+        if all_hooks_installed():
+            return None
+    except Exception:
+        logger.exception("hook_silence: all_hooks_installed() failed; firing anyway")
+
     return _make(
         id_="hook_silence",
         detector="hook_silence",
         severity="warning",
         message=(
-            f"{len(recent_jsonls)} recent Claude Code session(s) detected, but no "
-            f"ingest job has succeeded in the last 6h. Check that hooks are installed."
+            f"{len(recent_jsonls)} recent Claude Code session(s) detected but mnemos "
+            f"hooks aren't installed, so nothing is being saved. Reinstall the hooks."
         ),
         i18n_key="overview.health_alerts.detectors.hook_silence",
         i18n_params={"count": len(recent_jsonls)},
-        context={"recent_jsonl_count": len(recent_jsonls)},
+        context={"recent_jsonl_count": len(recent_jsonls), "hooks_installed": False},
         now=n,
     )
 

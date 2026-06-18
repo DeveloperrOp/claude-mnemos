@@ -81,7 +81,7 @@
         "auto_dump_overdue": "Автодамп просрочен на {{minutes}} мин.",
         "ingest_failure_streak": "Последние {{count}} ingest-задач провалились за 24 часа.",
         "runaway_job": "Задача {{job_id}} выполняется уже более {{minutes}} мин.",
-        "hook_silence": "Обнаружено {{count}} недавних сессий Claude Code, но за последние 6 часов ни одна ingest-задача не завершилась успешно. Проверь что хуки установлены.",
+        "hook_silence": "Обнаружено {{count}} недавних сессий Claude Code, но хуки mnemos не установлены — ничего не сохраняется. Переустановите хуки.",
         "disk_low": "Vault «{{vault}}» — свободно только {{percent_free}}% диска.",
         "project_map_broken": "Project-map повреждён: {{detail}}.",
         "daemon_uptime_warning": "Daemon недавно перезапустился."

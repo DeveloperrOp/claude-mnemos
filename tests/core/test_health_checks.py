@@ -174,7 +174,12 @@ def test_runaway_jobs_quiet_under_30_min(tmp_path: Path) -> None:
 # ─── 4. hook_silence ────────────────────────────────────────
 
 
-def test_hook_silence_triggers_with_recent_jsonl_no_ingest(tmp_path: Path) -> None:
+def test_hook_silence_triggers_with_recent_jsonl_no_ingest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "claude_mnemos.core.health_checks.all_hooks_installed", lambda: False
+    )
     rt = _FakeRuntime("alpha", tmp_path / "vault")
     rt.vault_root.mkdir(parents=True, exist_ok=True)
     pd = tmp_path / "claude-projects"
@@ -186,9 +191,14 @@ def test_hook_silence_triggers_with_recent_jsonl_no_ingest(tmp_path: Path) -> No
     assert a.severity == "warning"
 
 
-def test_hook_silence_emits_i18n_key_and_params(tmp_path: Path) -> None:
+def test_hook_silence_emits_i18n_key_and_params(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """v0.0.12: hook_silence detector populates i18n_key + i18n_params
     alongside the legacy English message, so the dashboard can localize."""
+    monkeypatch.setattr(
+        "claude_mnemos.core.health_checks.all_hooks_installed", lambda: False
+    )
     rt = _FakeRuntime("alpha", tmp_path / "vault")
     rt.vault_root.mkdir(parents=True, exist_ok=True)
     pd = tmp_path / "claude-projects"
@@ -203,6 +213,45 @@ def test_hook_silence_emits_i18n_key_and_params(tmp_path: Path) -> None:
     assert isinstance(alert.i18n_params["count"], int)
     # Legacy English message is preserved for v0.0.11- consumers:
     assert "recent" in alert.message.lower()
+
+
+def test_hook_silence_suppressed_when_hooks_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recent JSONL + no ingest, but hooks ARE installed → not a hook problem,
+    so the detector stays quiet (no false 'install your hooks' alarm)."""
+    monkeypatch.setattr(
+        "claude_mnemos.core.health_checks.all_hooks_installed", lambda: True
+    )
+    rt = _FakeRuntime("alpha", tmp_path / "vault")
+    rt.vault_root.mkdir(parents=True, exist_ok=True)
+    pd = tmp_path / "claude-projects"
+    sub = pd / "abc"
+    sub.mkdir(parents=True)
+    (sub / "session.jsonl").write_text("{}", encoding="utf-8")
+    assert check_hook_silence({"alpha": rt}, projects_dir=pd) is None
+
+
+def test_hook_silence_fires_when_hooks_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recent JSONL + no ingest + hooks NOT installed → fire a warning that
+    frames it as a missing-hooks problem and records hooks_installed=False."""
+    monkeypatch.setattr(
+        "claude_mnemos.core.health_checks.all_hooks_installed", lambda: False
+    )
+    rt = _FakeRuntime("alpha", tmp_path / "vault")
+    rt.vault_root.mkdir(parents=True, exist_ok=True)
+    pd = tmp_path / "claude-projects"
+    sub = pd / "abc"
+    sub.mkdir(parents=True)
+    (sub / "session.jsonl").write_text("{}", encoding="utf-8")
+    alert = check_hook_silence({"alpha": rt}, projects_dir=pd)
+
+    assert alert is not None
+    assert alert.detector == "hook_silence"
+    assert alert.severity == "warning"
+    assert alert.context["hooks_installed"] is False
 
 
 def test_hook_silence_quiet_with_recent_success(tmp_path: Path) -> None:

@@ -133,7 +133,7 @@
         "auto_dump_overdue": "Auto-dump is overdue by {{minutes}} min.",
         "ingest_failure_streak": "Last {{count}} ingest jobs all failed within 24h.",
         "runaway_job": "Job {{job_id}} has been running for {{minutes}}+ min.",
-        "hook_silence": "{{count}} recent Claude Code session(s) detected, but no ingest job has succeeded in the last 6h. Check that hooks are installed.",
+        "hook_silence": "{{count}} recent Claude Code session(s) detected but mnemos hooks aren't installed, so nothing is being saved. Reinstall the hooks.",
         "disk_low": "Vault \"{{vault}}\" disk has only {{percent_free}}% free.",
         "project_map_broken": "Project map is corrupted: {{detail}}.",
         "daemon_uptime_warning": "Daemon was recently restarted."
