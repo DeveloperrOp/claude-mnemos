@@ -9,7 +9,7 @@ from claude_mnemos.ingest.transcript import (
     CorruptTranscriptError,
     EmptyTranscriptError,
 )
-from claude_mnemos.state.jobs import Job
+from claude_mnemos.state.jobs import JOBS_DB_FILENAME, Job, JobStore
 
 
 def _job(payload: dict) -> Job:
@@ -295,6 +295,57 @@ async def test_ingest_handler_applies_max_input_tokens_and_chunk_extract(tmp_pat
     assert cfg.overridden_to == 1_200_000
     assert seen["cfg_max_input_tokens"] == 1_200_000
     assert seen["chunk_extract"] is True
+
+
+@pytest.mark.asyncio
+async def test_extract_requested_but_no_llm_records_warning(tmp_path: Path):
+    """When extract is requested but no LLM client is available, the silent
+    downgrade to raw-only must surface as a visible job warning (so the user
+    knows no knowledge pages were created and can fix their auth)."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True})
+
+    def fake_ingest(*args, **kwargs):  # no-op: warning is what we assert
+        pass
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,  # no LLM client available
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning and "llm" in reloaded.warning.lower()
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_extract_with_llm_records_no_warning(tmp_path: Path):
+    """When the LLM client IS available, extract proceeds normally and no
+    downgrade warning is recorded."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True})
+
+    def fake_ingest(*args, **kwargs):
+        pass
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: object(),  # LLM available
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is None
+    store.close()
 
 
 @pytest.mark.asyncio

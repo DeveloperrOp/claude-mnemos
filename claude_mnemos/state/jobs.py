@@ -22,7 +22,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 JOBS_DB_FILENAME = ".jobs.db"
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 MAX_ATTEMPTS = 4
 RETRY_DELAYS_S: list[float] = [30.0, 120.0, 1200.0]
@@ -55,6 +55,7 @@ class Job(BaseModel):
     finished_at: datetime | None = None
     error: str | None = None
     error_traceback: str | None = None
+    warning: str | None = None
 
 
 _SCHEMA_SQL = """
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     finished_at     REAL,
     error           TEXT,
     error_traceback TEXT,
+    warning         TEXT,
     CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'dead_letter', 'cancelled')),
     CHECK (attempt >= 0)
 );
@@ -146,6 +148,24 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
         raise JobsCorruptError(f"migration v1→v2 failed: {exc}") from exc
 
 
+def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
+    """In-place upgrade of a v2 .jobs.db to v3.
+
+    Adds the non-fatal ``warning`` column. SQLite supports ADD COLUMN
+    directly (no CHECK-constraint change here), so no rename-dance is needed.
+    """
+    try:
+        conn.execute("BEGIN")
+        conn.execute("ALTER TABLE jobs ADD COLUMN warning TEXT")
+        conn.execute(
+            "UPDATE schema_meta SET value='3' WHERE key='version'"
+        )
+        conn.execute("COMMIT")
+    except Exception as exc:
+        conn.execute("ROLLBACK")
+        raise JobsCorruptError(f"migration v2→v3 failed: {exc}") from exc
+
+
 def _ts(dt: datetime) -> float:
     return dt.timestamp()
 
@@ -169,6 +189,7 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         finished_at=_from_ts(row["finished_at"]),
         error=row["error"],
         error_traceback=row["error_traceback"],
+        warning=row["warning"],
     )
 
 
@@ -193,26 +214,34 @@ class JobStore:
             conn.close()
             raise JobsCorruptError(f"schema init failed for {db_path}: {exc}") from exc
 
-        # Version check / write / migrate
+        # Version check / write / migrate. Migrations are chained so that a v1
+        # DB walks v1→v2→v3 and a v2 DB walks v2→v3 in a single open.
         cur = conn.execute("SELECT value FROM schema_meta WHERE key='version'")
         row = cur.fetchone()
-        if row is None:
+        version = row[0] if row is not None else None
+        if version is None:
             conn.execute(
                 "INSERT INTO schema_meta (key, value) VALUES ('version', ?)",
                 (SCHEMA_VERSION,),
             )
-        elif row[0] == "1":
-            # α→β1 one-step migration: extend CHECK constraint to include 'cancelled'
+        else:
             try:
-                _migrate_v1_to_v2(conn)
+                if version == "1":
+                    # α→β1: extend CHECK constraint to include 'cancelled'
+                    _migrate_v1_to_v2(conn)
+                    version = "2"
+                if version == "2":
+                    # add the non-fatal 'warning' column
+                    _migrate_v2_to_v3(conn)
+                    version = "3"
             except JobsCorruptError:
                 conn.close()
                 raise
-        elif row[0] != SCHEMA_VERSION:
-            conn.close()
-            raise JobsCorruptError(
-                f"unknown jobs DB schema version {row[0]!r}; expected {SCHEMA_VERSION}"
-            )
+            if version != SCHEMA_VERSION:
+                conn.close()
+                raise JobsCorruptError(
+                    f"unknown jobs DB schema version {row[0]!r}; expected {SCHEMA_VERSION}"
+                )
 
         self._conn = conn
         self._closed = False
@@ -341,6 +370,9 @@ class JobStore:
         return self.get_by_id(row["id"])
 
     def mark_succeeded(self, job_id: str, *, finished_at: datetime) -> None:
+        # NOTE: does NOT touch 'warning' — a non-fatal warning (e.g. extract
+        # silently downgraded to raw-only) must survive the job succeeding so
+        # the UI can still surface it.
         self._conn.execute(
             """
             UPDATE jobs
@@ -348,6 +380,18 @@ class JobStore:
             WHERE id=?
             """,
             (_ts(finished_at), job_id),
+        )
+
+    def set_warning(self, job_id: str, warning: str) -> None:
+        """Attach a non-fatal warning to a job without changing its status.
+
+        Used when a job completes but with a caveat the user should see (e.g.
+        extract was requested but no LLM client was available, so only the raw
+        transcript was saved — no knowledge pages were created).
+        """
+        self._conn.execute(
+            "UPDATE jobs SET warning=? WHERE id=?",
+            (warning, job_id),
         )
 
     def mark_dead_letter(

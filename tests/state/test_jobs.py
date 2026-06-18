@@ -24,9 +24,9 @@ def test_open_creates_db_with_schema(tmp_path: Path):
     db_path = tmp_path / JOBS_DB_FILENAME
     with JobStore(db_path) as store:
         assert db_path.is_file()
-        # schema_meta has version 2 (added 'cancelled' status)
+        # schema_meta has version 3 (added 'warning' column)
         cur = store._conn.execute("SELECT value FROM schema_meta WHERE key='version'")
-        assert cur.fetchone()[0] == "2"
+        assert cur.fetchone()[0] == "3"
 
 
 def test_create_returns_job_with_uuid(tmp_path: Path):
@@ -349,3 +349,58 @@ def test_dismiss_dead_letter_wrong_status_returns_false(tmp_path: Path):
         # status=queued
         assert store.dismiss_dead_letter(job.id) is False
         assert store.get_by_id(job.id) is not None
+
+
+def test_set_warning_persists_and_survives_succeeded(tmp_path: Path):
+    """A non-fatal warning (e.g. extract silently downgraded) must persist on
+    the job and NOT be cleared when the job later completes succeeded."""
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        store.set_warning(job.id, "no LLM client")
+        store.mark_succeeded(job.id, finished_at=datetime.now(UTC))
+        reloaded = store.get_by_id(job.id)
+        assert reloaded is not None
+        assert reloaded.warning == "no LLM client"
+        assert reloaded.status == "succeeded"
+
+
+def test_warning_defaults_to_none(tmp_path: Path):
+    with JobStore(tmp_path / JOBS_DB_FILENAME) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/x"})
+        reloaded = store.get_by_id(job.id)
+        assert reloaded is not None
+        assert reloaded.warning is None
+
+
+def test_migrate_v2_to_v3_adds_warning_column(tmp_path: Path):
+    """A pre-existing v2 DB (no 'warning' column) must migrate cleanly to v3 on
+    open: the column is added and existing rows round-trip with warning=None."""
+    import sqlite3
+
+    db_path = tmp_path / JOBS_DB_FILENAME
+    # Create a real store, then downgrade it to a v2-shaped DB: drop the
+    # 'warning' column and reset the recorded version to '2'.
+    with JobStore(db_path) as store:
+        job = store.create(kind="ingest", payload={"transcript_path": "/legacy"})
+        job_id = job.id
+
+    conn = sqlite3.connect(db_path)
+    # SQLite 3.35+ supports DROP COLUMN; recreate the v2 shape to be safe across
+    # versions via the rename-dance equivalent — simplest is to drop the column.
+    conn.execute("ALTER TABLE jobs DROP COLUMN warning")
+    conn.execute("UPDATE schema_meta SET value='2' WHERE key='version'")
+    conn.commit()
+    conn.close()
+
+    # Reopen — __init__ must run _migrate_v2_to_v3 and bump to v3.
+    with JobStore(db_path) as store:
+        cur = store._conn.execute("SELECT value FROM schema_meta WHERE key='version'")
+        assert cur.fetchone()[0] == "3"
+        reloaded = store.get_by_id(job_id)
+        assert reloaded is not None
+        assert reloaded.warning is None
+        # New warnings still work on the migrated DB.
+        store.set_warning(job_id, "post-migration warning")
+        again = store.get_by_id(job_id)
+        assert again is not None
+        assert again.warning == "post-migration warning"
