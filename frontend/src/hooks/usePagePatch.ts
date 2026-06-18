@@ -23,6 +23,16 @@ export function usePagePatch() {
       void qc.invalidateQueries({ queryKey: ["activity"] });
       toast.success(t("pages.editor.saved_toast"));
     },
-    onError: (err) => toast.error(extractApiError(err)),
+    onError: (err, vars) => {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        // The file changed on disk since the editor loaded it. Refetch so the
+        // user sees the new version, then tell them to re-apply their edit.
+        void qc.invalidateQueries({ queryKey: ["page", vars.project, vars.page_ref] });
+        toast.error(t("pages.editor.stale_conflict"));
+        return;
+      }
+      toast.error(extractApiError(err));
+    },
   });
 }
