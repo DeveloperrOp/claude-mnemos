@@ -7,6 +7,7 @@ import {
   useApplyUpdate,
   useVersionInfo,
 } from "@/hooks/useUpdateStatus";
+import { getVersionInfo } from "@/api/update.api";
 
 // If the swap really runs, the daemon goes down and the page reconnects to the
 // new build within a few seconds. If it hasn't after this long the elevated
@@ -14,12 +15,19 @@ import {
 // pretending and let the user retry or update manually.
 const APPLY_TIMEOUT_MS = 90_000;
 
+// While "updating", poll /api/version so the swap completing is reflected
+// promptly ("Updated to vX") instead of waiting for a manual page reload.
+const VERSION_POLL_MS = 3_000;
+
 export function UpdateBanner({
   applyTimeoutMs = APPLY_TIMEOUT_MS,
+  versionPollMs = VERSION_POLL_MS,
 }: {
   /** Watchdog window before a stuck "updating" flips to the timeout state.
    * Injectable so tests don't have to fake-timer the whole react-query tree. */
   applyTimeoutMs?: number;
+  /** Poll cadence for /api/version while updating. Injectable for tests. */
+  versionPollMs?: number;
 } = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -30,6 +38,8 @@ export function UpdateBanner({
 
   const updating = apply.isSuccess;
   const [stuck, setStuck] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const latestVersion = q.data?.latest ?? null;
 
   // Watchdog: once "updating" latches, arm a timeout. If we're still mounted
   // and showing this banner when it fires, the swap never completed. ("stuck"
@@ -40,6 +50,28 @@ export function UpdateBanner({
     const id = setTimeout(() => setStuck(true), applyTimeoutMs);
     return () => clearTimeout(id);
   }, [updating, applyTimeoutMs]);
+
+  // While "updating", poll /api/version directly (not via the react-query
+  // cache, which we deliberately stop refetching once the daemon restarts).
+  // When the live version matches the release we're updating to, the swap
+  // landed — surface "Updated to vX" promptly. A thrown request just means the
+  // daemon is mid-restart, so ignore it and let the next tick retry.
+  useEffect(() => {
+    if (!updating || applied || !latestVersion) return;
+    const id = setInterval(() => {
+      getVersionInfo()
+        .then((info) => {
+          if (info.version === latestVersion) {
+            setApplied(true);
+            clearInterval(id);
+          }
+        })
+        .catch(() => {
+          /* daemon restarting — retry on the next tick */
+        });
+    }, versionPollMs);
+    return () => clearInterval(id);
+  }, [updating, applied, latestVersion, versionPollMs]);
 
   if (q.isLoading || !q.data) return null;
   const {
@@ -93,7 +125,16 @@ export function UpdateBanner({
         {t("overview.update.eyebrow")}
       </span>
 
-      {updating && !stuck ? (
+      {updating && applied ? (
+        <div
+          className="flex-1 text-sm"
+          data-testid="update-banner-applied"
+        >
+          <span className="font-medium text-green-500">
+            {t("overview.update.applied", { version: latest })}
+          </span>
+        </div>
+      ) : updating && !stuck ? (
         <div className="flex-1 text-sm" data-testid="update-banner-updating">
           <span className="font-medium">{t("overview.update.applying")}</span>
         </div>

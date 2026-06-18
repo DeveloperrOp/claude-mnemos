@@ -154,7 +154,9 @@
       "apply_uac_hint": "This will close the app and ask Windows (UAC) for permission to write to Program Files. If the panel doesn't come back within ~1 min, launch claude-mnemos from the Start menu.",
       "last_failed": "The last update attempt failed — your previous version was restored: {{error}}. Use the release link.",
       "apply_timeout": "The update didn't finish automatically. Launch claude-mnemos from the Start menu, or download the new version from the release link.",
-      "apply_retry": "Try again"
+      "apply_retry": "Try again",
+      "applied": "Updated to v{{version}}",
+      "restarting": "Restarting…"
     },
     "version_status": {
       "label": "Version {{version}}",
