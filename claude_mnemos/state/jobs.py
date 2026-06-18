@@ -382,12 +382,17 @@ class JobStore:
             (_ts(finished_at), job_id),
         )
 
-    def set_warning(self, job_id: str, warning: str) -> None:
-        """Attach a non-fatal warning to a job without changing its status.
+    def set_warning(self, job_id: str, warning: str | None) -> None:
+        """Set (or clear) a non-fatal warning on a job without changing status.
 
         Used when a job completes but with a caveat the user should see (e.g.
         extract was requested but no LLM client was available, so only the raw
         transcript was saved — no knowledge pages were created).
+
+        Passing ``None`` stores SQL NULL, clearing any stale warning from a
+        prior attempt — each attempt writes its own outcome so a job that
+        ultimately succeeds WITH extraction does not keep showing an old
+        "saved raw only" warning.
         """
         self._conn.execute(
             "UPDATE jobs SET warning=? WHERE id=?",

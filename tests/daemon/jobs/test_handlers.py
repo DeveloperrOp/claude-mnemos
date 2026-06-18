@@ -349,6 +349,39 @@ async def test_extract_with_llm_records_no_warning(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_warning_cleared_when_retry_has_llm(tmp_path: Path):
+    """A job may carry a stale 'saved raw only' warning from a prior attempt that
+    ran with no LLM client. If a later attempt HAS an LLM and succeeds WITH
+    extraction, the warning must be cleared — it must reflect the CURRENT
+    attempt's outcome, not a dead one."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(
+        kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True}
+    )
+    # Simulate a prior no-LLM attempt that left a stale warning behind.
+    store.set_warning(job.id, "extract requested but no LLM client available — saved raw only")
+    stale = store.get_by_id(job.id)
+    assert stale is not None and stale.warning is not None  # precondition
+
+    def fake_ingest(*args, **kwargs):
+        pass
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: object(),  # LLM now available
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is None  # stale warning cleared
+    store.close()
+
+
+@pytest.mark.asyncio
 async def test_ingest_handler_no_override_passes_chunk_extract_false(tmp_path: Path):
     """Task 9: without the new payload keys, no override is applied and chunk_extract=False."""
     seen: dict = {}

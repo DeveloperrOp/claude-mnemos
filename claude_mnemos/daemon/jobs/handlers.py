@@ -83,16 +83,22 @@ class IngestHandler:
         # users without ANTHROPIC_API_KEY — the transcript still lands in
         # raw/chats/, just no wiki extraction.
         effective_extract = extract_requested and llm is not None
-        if extract_requested and not effective_extract:
-            # Don't fail the job (raw-only still lands the transcript), but make
-            # the silent downgrade VISIBLE so the user knows no wiki pages were
-            # created and can fix their LLM/auth setup.
-            warning = (
+        # Don't fail the job (raw-only still lands the transcript), but make the
+        # silent downgrade VISIBLE so the user knows no wiki pages were created
+        # and can fix their LLM/auth setup. Write the warning UNCONDITIONALLY
+        # (computed value, or None) so a RETRY where the downgrade no longer
+        # applies clears the stale warning from the prior attempt — the warning
+        # must reflect THIS attempt's outcome, not a dead one.
+        downgrade_warning = (
+            (
                 "extract requested but no LLM client available — saved raw only, "
                 "no knowledge pages created (check Claude CLI / API auth)"
             )
-            if self._job_store is not None:
-                self._job_store.set_warning(job.id, warning)
+            if (extract_requested and not effective_extract)
+            else None
+        )
+        if self._job_store is not None:
+            self._job_store.set_warning(job.id, downgrade_warning)
 
         try:
             await asyncio.to_thread(
