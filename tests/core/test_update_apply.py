@@ -190,14 +190,27 @@ def test_inner_aborts_clean_when_processes_survive(inner: str) -> None:
     assert abort_idx < first_rename_idx
 
 
-def test_inner_cleans_stale_leftovers_before_abort(inner: str) -> None:
-    # Stale .old/.new must be removed BEFORE any throw so the catch-block can
-    # never restore an UNRELATED stale backup over a healthy install.
-    remove_old_idx = inner.index(
-        'Remove-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos.old"'
-    )
+def test_inner_renames_stale_aside_no_blocking_delete_before_kill(inner: str) -> None:
+    # v0.0.58 hung because it Remove-Item -Recurse'd the stale .old BEFORE the
+    # kill (a recursive delete on a large/locked tree can block forever). Now:
+    # kill first, then move stale leftovers ASIDE with an INSTANT rename to a
+    # unique .trash name. There must be NO recursive delete of the .old backup
+    # before the abort/kill stage.
+    assert ".trash-" in inner
     abort_idx = inner.index("still running")
-    assert remove_old_idx < abort_idx
+    before_abort = inner[:abort_idx]
+    assert (
+        'Remove-Item -LiteralPath "C:\\Program Files\\ClaudeMnemos.old"'
+        not in before_abort
+    )
+
+
+def test_inner_catch_restores_only_when_this_run_renamed(inner: str) -> None:
+    # Corruption guard: the rollback restores the backup ONLY if THIS run did
+    # the install -> .old rename, so a stale/unrelated .old can never be moved
+    # over a healthy install.
+    assert "$renamed = $false" in inner
+    assert "if ($renamed)" in inner
 
 
 def test_inner_extracts_into_samevolume_new_sibling(inner: str) -> None:

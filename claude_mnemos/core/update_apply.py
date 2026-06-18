@@ -233,21 +233,15 @@ def render_inner_script(
     result = _ps(result_path)
     return f"""\
 $ErrorActionPreference = "Stop"
+$renamed = $false
+$stamp = [DateTime]::Now.ToString("yyyyMMddHHmmssfff")
 try {{
     Start-Sleep 2
 
-    # Clean stale leftovers from a prior aborted run FIRST - before any kill or
-    # throw - so {old}/{new} only ever exist when THIS run created them. That
-    # makes the catch-block rollback always safe: it can never restore an
-    # UNRELATED stale backup (e.g. an old version's leftover .old) over a
-    # healthy install.
-    if (Test-Path -LiteralPath "{old}") {{ Remove-Item -LiteralPath "{old}" -Recurse -Force }}
-    if (Test-Path -LiteralPath "{new}") {{ Remove-Item -LiteralPath "{new}" -Recurse -Force }}
-
-    # Kill in a LOOP until no claude-mnemos process survives. A single taskkill
-    # can lose the race against the tray supervisor respawning the daemon, which
-    # left the swap spinning forever (v0.0.56 regression). /IM (no /T) so the
-    # interactively-spawned outer relaunch.ps1 - a powershell child of the
+    # Kill FIRST, in a LOOP until no claude-mnemos process survives. Elevated
+    # taskkill is proven to work; a single shot can still lose a race vs the tray
+    # supervisor respawning the daemon, so loop until Get-Process is empty. /IM
+    # (no /T) so the interactive outer relaunch.ps1 - a powershell child of the
     # daemon - is never taken down with the tree.
     $killDeadline = (Get-Date).AddSeconds(25)
     while ($true) {{
@@ -263,6 +257,17 @@ try {{
         throw "claude-mnemos processes still running after 25s; aborting swap, install left intact"
     }}
 
+    # Move any leftover .old/.new ASIDE with an INSTANT rename to a unique
+    # .trash name - NEVER a recursive delete here, which can HANG on a large or
+    # locked tree and wedge the whole swap (the v0.0.58 spin). A rename is
+    # metadata-only and cannot block.
+    if (Test-Path -LiteralPath "{old}") {{
+        Move-Item -LiteralPath "{old}" -Destination "{old}.trash-$stamp" -Force
+    }}
+    if (Test-Path -LiteralPath "{new}") {{
+        Move-Item -LiteralPath "{new}" -Destination "{new}.trash-$stamp" -Force
+    }}
+
     # Extract the validated build into a SAME-VOLUME sibling of the install so
     # both swap steps below are metadata-only renames. The install is untouched
     # until both renames; an extract failure here leaves it fully intact.
@@ -273,11 +278,20 @@ try {{
 
     # Atomic same-volume renames: aside the live install, then move the new in.
     Move-Item -LiteralPath "{inst}" -Destination "{old}"
+    $renamed = $true
     Move-Item -LiteralPath "{new}" -Destination "{inst}"
     if (-not (Test-Path -LiteralPath "{inst}\\claude-mnemos.exe")) {{
         throw "swap left no claude-mnemos.exe at the install path"
     }}
     "OK {version}" | Out-File -FilePath "{result}" -Encoding utf8
+
+    # Best-effort cleanup of the trash moved aside above - AFTER success and
+    # never fatal: a slow/locked delete must not fail a completed swap.
+    foreach ($t in @("{old}.trash-$stamp", "{new}.trash-$stamp")) {{
+        if (Test-Path -LiteralPath $t) {{
+            try {{ Remove-Item -LiteralPath $t -Recurse -Force }} catch {{ }}
+        }}
+    }}
 }}
 catch {{
     $err = $_.Exception.Message
@@ -285,14 +299,18 @@ catch {{
     try {{
         if (Test-Path -LiteralPath "{new}") {{ Remove-Item -LiteralPath "{new}" -Recurse -Force }}
     }} catch {{ }}
-    try {{
-        if (Test-Path -LiteralPath "{old}") {{
-            if (Test-Path -LiteralPath "{inst}") {{
-                Remove-Item -LiteralPath "{inst}" -Recurse -Force
+    # Restore the backup ONLY if THIS run created it (renamed install -> .old);
+    # a stale/unrelated .old is never moved over a healthy install.
+    if ($renamed) {{
+        try {{
+            if (Test-Path -LiteralPath "{old}") {{
+                if (Test-Path -LiteralPath "{inst}") {{
+                    Remove-Item -LiteralPath "{inst}" -Recurse -Force
+                }}
+                Move-Item -LiteralPath "{old}" -Destination "{inst}"
             }}
-            Move-Item -LiteralPath "{old}" -Destination "{inst}"
-        }}
-    }} catch {{ }}
+        }} catch {{ }}
+    }}
     "FAILED: $err" | Out-File -FilePath "{result}" -Encoding utf8
 }}
 """
