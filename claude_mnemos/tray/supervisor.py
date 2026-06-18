@@ -386,11 +386,9 @@ class Supervisor:
             logger.exception("[supervisor] open_launcher Popen failed")
 
     def _post_to_daemon(self, path: str) -> None:
-        if self._http is None:
-            return
         try:
             url = self.health_url.replace("/api/health", path)
-            self._http.post(url)
+            self._http_client().post(url)
         except Exception:
             logger.exception("[supervisor] POST %s failed", path)
 

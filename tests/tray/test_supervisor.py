@@ -88,6 +88,26 @@ def test_supervisor_pause_resume_daemon_post_endpoints(tmp_path: Path) -> None:
     assert resumed, f"expected resume URL in {posts}"
 
 
+def test_post_to_daemon_works_before_first_tick(tmp_path: Path, monkeypatch) -> None:
+    """A pause/resume issued before the first tick() (so ``self._http`` is still
+    None) must still POST — via the lazy ``_http_client()`` — not be dropped."""
+    pid_file = tmp_path / "daemon.pid"
+    from claude_mnemos.tray.supervisor import Supervisor
+
+    sv = Supervisor(daemon_pid_file=pid_file, log_path=None)
+    assert sv._http is None  # never ticked → lazy client not built yet (bug repro)
+
+    posted: dict = {}
+
+    class FakeClient:
+        def post(self, url, **kw):
+            posted["url"] = url
+
+    monkeypatch.setattr(sv, "_http_client", lambda: FakeClient())
+    sv._post_to_daemon("/api/daemon/pause")
+    assert posted.get("url", "").endswith("/api/daemon/pause")
+
+
 def test_supervisor_shutdown_terminates_launcher_then_stops_daemon(
     tmp_path: Path, monkeypatch
 ) -> None:
