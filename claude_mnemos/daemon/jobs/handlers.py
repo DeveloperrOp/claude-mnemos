@@ -123,6 +123,11 @@ class IngestHandler:
             # no-op, NOT a failure: returning normally marks the job succeeded
             # so it never burns 4 retries and lands in dead-letter with a
             # cryptic "no message entries" message the user can't act on.
+            # Clear any downgrade warning written before the try block: there
+            # was nothing to extract, so a "saved raw only, no knowledge pages
+            # created" warning would be misleading on this no-op.
+            if self._job_store is not None:
+                self._job_store.set_warning(job.id, None)
             _LOG.info(
                 "ingest: %s has no text messages (pure-tool session) — "
                 "nothing to ingest, marking job done",

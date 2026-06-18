@@ -350,6 +350,36 @@ async def test_extract_with_llm_records_no_warning(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_empty_transcript_noop_clears_downgrade_warning(tmp_path: Path):
+    """A pure-tool no-op session (EmptyTranscriptError) is marked succeeded, but
+    the downgrade warning written before the try block ('saved raw only, no
+    knowledge pages created') would be misleading — there was nothing to
+    extract. The no-op branch must clear it so the job ends with warning=None."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(
+        kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True}
+    )
+
+    def empty(*args, **kwargs):
+        raise EmptyTranscriptError("no message entries in /x.jsonl")
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,  # no LLM → downgrade warning gets written
+        ingest_fn=empty,
+        job_store=store,
+    )
+    # Must NOT raise — no-op success.
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is None  # misleading downgrade warning cleared
+    store.close()
+
+
+@pytest.mark.asyncio
 async def test_warning_cleared_when_retry_has_llm(tmp_path: Path):
     """A job may carry a stale 'saved raw only' warning from a prior attempt that
     ran with no LLM client. If a later attempt HAS an LLM and succeeds WITH

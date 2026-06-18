@@ -236,6 +236,40 @@ def test_migration_v2_to_v3_preserves_existing_row(tmp_path: Path) -> None:
         assert job.attempt == 0
 
 
+def test_migration_v1_to_v3_chained(tmp_path: Path) -> None:
+    """A v1 DB must walk the WHOLE chain (v1→v2→v3) in one open:
+
+    (a) schema_meta version ends at '3',
+    (b) the v2→v3 step ran — the 'warning' column now exists on jobs,
+    (c) the v1→v2 step ran — a row with status 'cancelled' is now accepted
+        (the v1 CHECK constraint that lacked 'cancelled' was widened).
+    """
+    db_path = tmp_path / JOBS_DB_FILENAME
+    _build_v1_db(db_path)
+
+    with JobStore(db_path) as store:
+        # (a) ended at the current SCHEMA_VERSION
+        cur = store._conn.execute(
+            "SELECT value FROM schema_meta WHERE key='version'"
+        )
+        assert cur.fetchone()[0] == "3"
+
+        # (b) the warning column exists (v2→v3 ran)
+        cols = {
+            row[1]
+            for row in store._conn.execute("PRAGMA table_info(jobs)").fetchall()
+        }
+        assert "warning" in cols
+
+        # (c) the v1→v2 CHECK widening ran — 'cancelled' is accepted
+        job = store.create(kind="ingest", payload={"transcript_path": "/c.jsonl"})
+        n = store.cancel_all_queued()
+        assert n >= 1
+        cancelled = [j for j in store.list_by_status(None) if j.id == job.id]
+        assert len(cancelled) == 1
+        assert cancelled[0].status == "cancelled"
+
+
 def test_unknown_version_above_3_still_raises(tmp_path: Path) -> None:
     """Version '99' (future/unknown) must still raise JobsCorruptError."""
     db_path = tmp_path / JOBS_DB_FILENAME

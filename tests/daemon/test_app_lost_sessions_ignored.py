@@ -13,15 +13,18 @@ from claude_mnemos.daemon.our_writes import OurWritesTracker
 
 
 class _FakeRuntime:
-    def __init__(self, vault: Path) -> None:
+    def __init__(self, vault: Path, name: str = "alpha") -> None:
         self.vault_root = vault
         self.tracker = OurWritesTracker(ttl_s=60.0)
         self.lost_sessions_cache = None
+        # list_ignored_route derives project_name from runtime.name (the same
+        # way every other cross-vault route does), so the fake must expose it.
+        self.name = name
 
 
 class _FakeDaemon:
     def __init__(self, vault: Path) -> None:
-        self._alpha_runtime = _FakeRuntime(vault)
+        self._alpha_runtime = _FakeRuntime(vault, name="alpha")
         self.runtimes: dict[str, Any] = {"alpha": self._alpha_runtime}
         self.started_at_monotonic = 0.0
 

@@ -576,14 +576,17 @@ async def ignore_route(
 @router.get("/lost-sessions/ignored")
 async def list_ignored_route(request: Request) -> dict[str, Any]:
     """List all ignored session SHAs across every mounted vault."""
-    daemon = request.app.state.daemon
+    # Resolve runtimes via the shared helper (same as every other cross-vault
+    # route) instead of touching ``daemon.runtimes`` directly — the helper
+    # reads the dict under the daemon's locking discipline and yields a stable,
+    # name-sorted snapshot. ``runtime.name`` carries the project name.
     all_details: list[dict[str, Any]] = []
-    for project_name, runtime in daemon.runtimes.items():
+    for runtime in all_runtimes(request):
         for detail in core_lost_sessions.list_ignored_session_details(
             runtime.vault_root
         ):
             d = detail.model_dump(mode="json")
-            d["project_name"] = project_name
+            d["project_name"] = runtime.name
             all_details.append(d)
     return {"ignored": all_details, "total": len(all_details)}
 
