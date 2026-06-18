@@ -5,6 +5,7 @@ import pytest
 
 from claude_mnemos.daemon.jobs.handlers import IngestHandler, JobDeadLetterError
 from claude_mnemos.ingest.llm import TranscriptTooLargeError
+from claude_mnemos.ingest.pipeline import IngestResult
 from claude_mnemos.ingest.transcript import (
     CorruptTranscriptError,
     EmptyTranscriptError,
@@ -421,3 +422,106 @@ async def test_ingest_handler_no_override_passes_chunk_extract_false(tmp_path: P
     await handler.run(_job({"transcript_path": "/x.jsonl", "extract": True}))
     assert cfg.override_called is False
     assert seen["chunk_extract"] is False
+
+
+@pytest.mark.asyncio
+async def test_skipped_collisions_recorded_on_job(tmp_path: Path):
+    """When ingest skips pages because an older version already exists, that
+    must surface on the job's warning (Queue/Overview render it) — otherwise the
+    user thinks 'nothing interesting happened' and silently misses pages."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(
+        kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True}
+    )
+
+    def fake_ingest(*args, **kwargs):
+        return IngestResult(
+            status="extracted",
+            session_id="sess-1",
+            raw_path=tmp_path / "raw.md",
+            skipped_collisions=["wiki/concepts/foo.md", "wiki/concepts/bar.md"],
+        )
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: object(),  # LLM present → no downgrade
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is not None
+    assert "foo.md" in reloaded.warning
+    assert "skipped" in reloaded.warning.lower()
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_skipped_collisions_combine_with_downgrade_warning(tmp_path: Path):
+    """Both the no-LLM downgrade warning AND skipped collisions can apply in the
+    same run (raw-only ingest can still collide). They must COMBINE on the job's
+    warning rather than one clobbering the other."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(
+        kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True}
+    )
+
+    def fake_ingest(*args, **kwargs):
+        return IngestResult(
+            status="raw_only",
+            session_id="sess-2",
+            raw_path=tmp_path / "raw.md",
+            skipped_collisions=["raw/chats/baz.md"],
+        )
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: None,  # no LLM → downgrade warning applies
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is not None
+    # Both signals present, neither clobbered the other.
+    assert "llm" in reloaded.warning.lower()
+    assert "baz.md" in reloaded.warning
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_no_skipped_collisions_keeps_clean_warning(tmp_path: Path):
+    """A clean run (LLM present, no skips) leaves warning as None — the success
+    path must not write a spurious warning when there is nothing to surface."""
+    store = JobStore(tmp_path / JOBS_DB_FILENAME)
+    job = store.create(
+        kind="ingest", payload={"transcript_path": "/x.jsonl", "extract": True}
+    )
+
+    def fake_ingest(*args, **kwargs):
+        return IngestResult(
+            status="extracted",
+            session_id="sess-3",
+            raw_path=tmp_path / "raw.md",
+            skipped_collisions=[],
+        )
+
+    handler = IngestHandler(
+        vault=tmp_path,
+        cfg_factory=lambda: object(),
+        llm_factory=lambda cfg: object(),
+        ingest_fn=fake_ingest,
+        job_store=store,
+    )
+    await handler.run(job)
+
+    reloaded = store.get_by_id(job.id)
+    assert reloaded is not None
+    assert reloaded.warning is None
+    store.close()

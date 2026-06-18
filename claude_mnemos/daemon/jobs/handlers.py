@@ -101,7 +101,7 @@ class IngestHandler:
             self._job_store.set_warning(job.id, downgrade_warning)
 
         try:
-            await asyncio.to_thread(
+            result = await asyncio.to_thread(
                 self._ingest_fn,
                 transcript_path,
                 self._vault,
@@ -155,3 +155,20 @@ class IngestHandler:
             if self._job_store is not None:
                 self._job_store.pause_queue(until=exc.reset_at)
             raise
+
+        # SUCCESS path (only the normal completion reaches here — the early
+        # `return`/`raise` branches above don't). If ingest skipped pages
+        # because an older version already exists, surface that on the job's
+        # warning so it shows in Queue/Overview — otherwise the user thinks
+        # "nothing happened" and silently misses pages. Combine with the
+        # downgrade warning (if any) instead of clobbering it, and only
+        # re-write when there ARE skips so the downgrade-only and clean cases
+        # keep the value already written before the ingest call.
+        skipped = getattr(result, "skipped_collisions", None) if result is not None else None
+        if skipped:
+            n = len(skipped)
+            preview = ", ".join(skipped[:5])
+            skip_msg = f"skipped {n} page(s) — already exist: {preview}"
+            parts = [p for p in (downgrade_warning, skip_msg) if p]
+            if self._job_store is not None:
+                self._job_store.set_warning(job.id, " | ".join(parts))
