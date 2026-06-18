@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from claude_mnemos.core.vault_stats import count_md, vault_size
+
 if TYPE_CHECKING:
     from claude_mnemos.daemon.our_writes import OurWritesTracker
 
@@ -449,25 +451,6 @@ def _ignore_internal(directory: str, names: list[str]) -> set[str]:
     return {n for n in names if n in _EXCLUDED_DIRS or n in _EXCLUDED_FILES}
 
 
-def _count_pages(root: Path) -> int:
-    if not root.exists():
-        return 0
-    return sum(1 for p in root.rglob("*.md") if p.is_file())
-
-
-def _vault_size(root: Path) -> int:
-    if not root.exists():
-        return 0
-    total = 0
-    for p in root.rglob("*"):
-        if p.is_file():
-            try:
-                total += p.stat().st_size
-            except OSError:
-                continue
-    return total
-
-
 def create_snapshot_at(
     vault: Path,
     snap_path: Path,
@@ -515,8 +498,8 @@ def create_snapshot_at(
             else:
                 shutil.copy2(item, dest)
 
-    page_count = _count_pages(snap_path)
-    size_bytes = _vault_size(snap_path)
+    page_count = count_md(snap_path)
+    size_bytes = vault_size(snap_path)
 
     meta = SnapshotMeta(
         timestamp=datetime.now(UTC).isoformat(),
