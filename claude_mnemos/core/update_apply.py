@@ -207,6 +207,14 @@ def write_pending_marker(*, version: str, install_dir: Path, old_dir: Path) -> P
     return marker
 
 
+def _ps(path: str | Path) -> str:
+    """Escape a path for embedding inside a double-quoted PowerShell string.
+
+    PowerShell escapes a double quote inside "..." with a backtick: `".
+    """
+    return str(path).replace('"', '`"')
+
+
 def render_inner_script(
     *,
     install_dir: Path,
@@ -218,11 +226,11 @@ def render_inner_script(
 ) -> str:
     """The ELEVATED inner script: kill -> extract to .new -> two same-volume
     renames -> restore-on-fail. No relaunch, no scheduled task."""
-    inst = str(install_dir)
-    old = str(old_dir)
-    new = str(new_dir)
-    zp = str(zip_path)
-    result = str(result_path)
+    inst = _ps(install_dir)
+    old = _ps(old_dir)
+    new = _ps(new_dir)
+    zp = _ps(zip_path)
+    result = _ps(result_path)
     return f"""\
 $ErrorActionPreference = "Stop"
 try {{
@@ -291,11 +299,11 @@ def render_outer_script(
 ) -> str:
     """The NON-elevated outer script run as the user: elevate-and-wait, then
     relaunch the tray as the user and verify the new build's version."""
-    inst = str(install_dir)
-    inner = str(inner_path)
-    old = str(old_dir)
-    marker = str(marker_path)
-    result = str(result_path)
+    inst = _ps(install_dir)
+    inner = _ps(inner_path)
+    old = _ps(old_dir)
+    marker = _ps(marker_path)
+    result = _ps(result_path)
     url = daemon_url.rstrip("/")
     exe = f"{inst}\\claude-mnemos.exe"
     return f"""\

@@ -200,6 +200,21 @@ def test_inner_restore_renames_old_back(inner: str) -> None:
     assert "FAILED:" in inner
 
 
+def test_inner_script_escapes_double_quotes_in_paths() -> None:
+    inner = update_apply.render_inner_script(
+        install_dir=Path(r'C:\My "Apps"\claude-mnemos'),
+        old_dir=Path(r'C:\My "Apps"\claude-mnemos.old'),
+        new_dir=Path(r'C:\My "Apps"\claude-mnemos.new'),
+        zip_path=Path(r'C:\x\p.zip'),
+        result_path=Path(r'C:\x\result.txt'),
+        version="0.0.99",
+    )
+    # A raw unescaped " would terminate the PS string early. After escaping
+    # (PowerShell uses backtick-quote inside double quotes) the escaped form must appear.
+    assert '`"' in inner
+    assert 'My `"Apps`"' in inner
+
+
 # --------------------------------------------------------------------------
 # render_outer_script  (UAC-cancel branch + relaunch + version-verify)
 # --------------------------------------------------------------------------
