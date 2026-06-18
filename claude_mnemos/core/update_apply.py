@@ -358,17 +358,25 @@ def stage_update(asset_url: str, version: str) -> Path:
     if update_in_progress():
         raise UpdateApplyError("an update is already in progress")
 
-    zip_path = download_and_validate(asset_url, version)
-    work = zip_path.parent
     install_dir = current_install_dir()
     old_dir = install_dir.parent / f"{install_dir.name}.old"
     new_dir = install_dir.parent / f"{install_dir.name}.new"
+
+    # Claim the single-flight lock (O_EXCL) BEFORE the multi-second download so a
+    # concurrent apply is refused immediately and can't race into the same dir.
+    write_pending_marker(version=version, install_dir=install_dir, old_dir=old_dir)
+
+    try:
+        zip_path = download_and_validate(asset_url, version)
+    except Exception:
+        # Don't leave the lock claimed if we never staged anything.
+        pending_marker_path().unlink(missing_ok=True)
+        raise
+
+    work = zip_path.parent
     inner_path = work / "swap.ps1"
     outer_path = work / "relaunch.ps1"
     result_path = work / "result.txt"
-
-    # Claim the single-flight lock (O_EXCL) — raises if a concurrent apply won.
-    write_pending_marker(version=version, install_dir=install_dir, old_dir=old_dir)
 
     inner_path.write_text(
         render_inner_script(

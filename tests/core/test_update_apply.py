@@ -271,6 +271,41 @@ def test_stage_update_refuses_when_in_progress(monkeypatch) -> None:
         update_apply.stage_update("https://example/portable.zip", "0.9.0")
 
 
+def test_stage_update_claims_marker_before_download(monkeypatch) -> None:
+    order: list[str] = []
+    monkeypatch.setattr(update_apply, "update_in_progress", lambda: False)
+
+    def fake_marker(**kw):
+        order.append("marker")
+        return update_apply.pending_marker_path()
+
+    def fake_download(asset_url, version):
+        order.append("download")
+        work = update_apply.updates_dir() / version
+        work.mkdir(parents=True, exist_ok=True)
+        return work / "portable.zip"
+
+    monkeypatch.setattr(update_apply, "write_pending_marker", fake_marker)
+    monkeypatch.setattr(update_apply, "download_and_validate", fake_download)
+    monkeypatch.setattr(update_apply, "render_inner_script", lambda **k: "x")
+    monkeypatch.setattr(update_apply, "render_outer_script", lambda **k: "x")
+    update_apply.stage_update("https://example/p.zip", "0.0.99")
+    assert order[0] == "marker", f"marker must be claimed before download, got {order}"
+
+
+def test_stage_update_unlinks_marker_when_download_fails(monkeypatch) -> None:
+    monkeypatch.setattr(update_apply, "update_in_progress", lambda: False)
+
+    def fake_download(asset_url, version):
+        raise UpdateApplyError("boom")
+
+    monkeypatch.setattr(update_apply, "download_and_validate", fake_download)
+    with pytest.raises(UpdateApplyError):
+        update_apply.stage_update("https://example/p.zip", "0.0.99")
+    # marker must NOT be left behind after a failed download
+    assert not update_apply.pending_marker_path().exists()
+
+
 def test_spawn_updater_direct_interactive(monkeypatch, tmp_path: Path) -> None:
     popen_calls: list[Any] = []
     run_calls: list[Any] = []
