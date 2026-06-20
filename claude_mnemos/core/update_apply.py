@@ -276,8 +276,26 @@ try {{
         throw "extracted build is missing claude-mnemos.exe"
     }}
 
+    # Give Windows a moment to release the just-killed daemon's memory-mapped
+    # .pyd/.dll handles before renaming the install dir. Killing the process
+    # does NOT instantly free its mapped files, so an immediate rename races
+    # them and fails "file in use by another process".
+    Start-Sleep -Seconds 2
+
     # Atomic same-volume renames: aside the live install, then move the new in.
-    Move-Item -LiteralPath "{inst}" -Destination "{old}"
+    # Retry the aside-rename: a lingering handle (mmap release, an AV scan) can
+    # briefly hold a file even after the processes are gone.
+    $moved = $false
+    for ($i = 0; $i -lt 10; $i++) {{
+        try {{
+            Move-Item -LiteralPath "{inst}" -Destination "{old}"
+            $moved = $true
+            break
+        }} catch {{
+            if ($i -ge 9) {{ throw }}
+            Start-Sleep -Milliseconds 800
+        }}
+    }}
     $renamed = $true
     Move-Item -LiteralPath "{new}" -Destination "{inst}"
     if (-not (Test-Path -LiteralPath "{inst}\\claude-mnemos.exe")) {{
