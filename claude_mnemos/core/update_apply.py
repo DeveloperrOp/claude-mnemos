@@ -370,10 +370,27 @@ def render_outer_script(
     old = _ps(old_dir)
     marker = _ps(marker_path)
     result = _ps(result_path)
+    lock = _ps(marker_path.parent / "swap.lock")
     url = daemon_url.rstrip("/")
     exe = f"{inst}\\claude-mnemos.exe"
     return f"""\
 $ErrorActionPreference = "Continue"
+
+# Single-flight: hold an exclusive handle for the WHOLE update so a second
+# relaunch (a double-clicked button, a watchdog re-fire, a reconcile that
+# cleared the marker mid-swap) bails out here instead of starting a competing
+# kill+swap that races this one on the install dir -- two such swaps renaming
+# the install at once is exactly what produced "file in use by another
+# process". Handle-based, so a crash still frees it (the OS drops the handle on
+# process exit). A loser exits BEFORE killing or relaunching anything.
+$updLock = $null
+try {{
+    $updLock = [IO.File]::Open(
+        "{lock}", [IO.FileMode]::OpenOrCreate,
+        [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+}} catch {{
+    exit 0
+}}
 
 # 1. Run the elevated swap and WAIT (this raises the single UAC prompt).
 try {{
@@ -420,6 +437,8 @@ if ($ok) {{
     Remove-Item -LiteralPath "{marker}" -Force -ErrorAction SilentlyContinue
 }}
 # else: leave the marker + backup for boot-time recovery + the failure banner.
+
+if ($updLock) {{ $updLock.Close() }}
 """
 
 

@@ -305,6 +305,19 @@ def test_outer_cleans_up_only_on_success(outer: str) -> None:
     assert r'Remove-Item -LiteralPath "C:\Users\joe\.claude-mnemos\updates\swap.pending"' in outer
 
 
+def test_outer_single_flight_lock(outer: str) -> None:
+    # An exclusive (FileShare.None) handle next to the marker guards the whole
+    # update, so a second relaunch bails (exit 0) instead of racing this swap on
+    # the install dir. The acquire must come BEFORE the elevated swap so a loser
+    # never kills/relaunches anything.
+    assert r"C:\Users\joe\.claude-mnemos\updates\swap.lock" in outer
+    assert "[IO.FileShare]::None" in outer
+    lock_at = outer.index("swap.lock")
+    swap_at = outer.index("Start-Process powershell -Verb RunAs -Wait")
+    assert lock_at < swap_at, "the lock must be acquired before the swap is run"
+    assert "$updLock.Close()" in outer
+
+
 # --------------------------------------------------------------------------
 # stage_update + spawn_updater
 # --------------------------------------------------------------------------
