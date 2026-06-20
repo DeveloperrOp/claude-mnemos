@@ -104,6 +104,37 @@ def test_non_matching_version_failed_no_result_default_error(updates: Path) -> N
     assert old_dir.exists()
 
 
+def test_swap_in_progress_defers_without_phantom_failure(
+    updates: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The tray supervisor respawned the OLD build mid-swap while swap.lock is
+    # still held. reconcile must NOT stamp a phantom 'failed' and must LEAVE the
+    # marker so the real new build reconciles it once the swap finishes.
+    old_dir = updates / "install.old"
+    old_dir.mkdir()
+    _write_marker(updates, version="0.9.0", old_dir=old_dir)
+    monkeypatch.setattr(update_recovery, "_swap_in_progress", lambda: True)
+
+    assert update_recovery.reconcile_pending("0.0.1") is None
+    assert update_apply.pending_marker_path().exists()  # marker preserved
+    assert not update_recovery.last_apply_path().exists()  # no phantom record
+
+    # Swap completes, the new build boots → reconciles to 'ok'.
+    monkeypatch.setattr(update_recovery, "_swap_in_progress", lambda: False)
+    result = update_recovery.reconcile_pending("0.9.0")
+    assert result is not None
+    assert result["status"] == "ok"
+    assert not update_apply.pending_marker_path().exists()
+
+
+def test_swap_in_progress_reads_lock_file(updates: Path) -> None:
+    # No lock file → not in progress.
+    assert update_recovery._swap_in_progress() is False
+    # An openable lock (no live outer holding it) → not in progress.
+    (updates / "swap.lock").write_bytes(b"")
+    assert update_recovery._swap_in_progress() is False
+
+
 def test_corrupt_marker_returns_none_no_raise(updates: Path) -> None:
     update_apply.pending_marker_path().write_text('"{bad', encoding="utf-8")
     # Must not raise.

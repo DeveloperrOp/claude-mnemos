@@ -73,6 +73,25 @@ def _result_error(target: str) -> str:
     return first_line or "update did not complete"
 
 
+def _swap_in_progress() -> bool:
+    """True when the updater's exclusive ``swap.lock`` is still held by a live
+    outer script — i.e. a swap is actively in flight.
+
+    The outer ``relaunch.ps1`` holds the lock with ``FileShare.None`` for the
+    whole update, so any other open conflicts. A missing lock file, or one we
+    can open, means no swap is running. The OS drops the handle when the outer
+    exits, so a crashed updater never wedges this on ``True``.
+    """
+    lock = update_apply.updates_dir() / "swap.lock"
+    if not lock.exists():
+        return False
+    try:
+        with open(lock, "rb"):
+            return False
+    except OSError:
+        return True
+
+
 def reconcile_pending(running_version: str = __version__) -> dict[str, Any] | None:
     """Reconcile a pending swap marker against the running version.
 
@@ -101,9 +120,17 @@ def reconcile_pending(running_version: str = __version__) -> dict[str, Any] | No
         if isinstance(old_dir, str) and old_dir:
             shutil.rmtree(old_dir, ignore_errors=True)
         _remove_marker(marker_path)
+    elif _swap_in_progress():
+        # We are NOT the target, but the updater's exclusive swap.lock is still
+        # held → the swap is mid-flight and the tray supervisor merely respawned
+        # the OLD build in the kill→rename window. Recording 'failed' + clearing
+        # the marker here would stamp a phantom failure over a swap that then
+        # succeeds. Leave the marker untouched so the REAL new build reconciles
+        # it to 'ok' once the swap completes.
+        return None
     else:
-        # The swap never reached the target: rolled back / interrupted / the
-        # old build relaunched. Record the failure; KEEP the backup (old_dir).
+        # The swap is no longer running and we are not the target: it rolled
+        # back / was interrupted. Record the failure; KEEP the backup (old_dir).
         status = "failed"
         error = _result_error(target)
         _remove_marker(marker_path)

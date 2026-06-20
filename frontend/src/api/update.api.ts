@@ -49,7 +49,30 @@ export async function dismissUpdate(days: number = 7): Promise<void> {
   await apiClient.post("/update-status/dismiss", { days });
 }
 
+function isUpdateInProgress(err: unknown): boolean {
+  // The daemon answers a re-fired /update/apply with 409 {detail:{error:
+  // "in_progress"}} while a swap is already running. FastAPI nests our detail.
+  const e = err as {
+    response?: { status?: number; data?: { detail?: { error?: string } } };
+  };
+  return (
+    e?.response?.status === 409 &&
+    e?.response?.data?.detail?.error === "in_progress"
+  );
+}
+
 export async function applyUpdate(): Promise<ApplyUpdateResult> {
-  const r = await apiClient.post<ApplyUpdateResult>("/update/apply");
-  return r.data;
+  try {
+    const r = await apiClient.post<ApplyUpdateResult>("/update/apply");
+    return r.data;
+  } catch (err) {
+    // A 409 "in_progress" is NOT a failure: an update IS running (the user
+    // re-clicked after a slow UAC, a watchdog re-fired, …). Treat it as "still
+    // updating" so the banner keeps polling for completion instead of flashing
+    // a misleading error over a daemon that is updating fine.
+    if (isUpdateInProgress(err)) {
+      return { started: true, version: null };
+    }
+    throw err;
+  }
 }
