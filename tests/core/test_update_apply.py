@@ -233,6 +233,21 @@ def test_inner_two_atomic_renames(inner: str) -> None:
     assert "robocopy" not in inner and "/MIR" not in inner and "schtasks" not in inner
 
 
+def test_inner_retries_both_renames_and_probes_locker_on_giveup(inner: str) -> None:
+    # Both renames retry (a transient AV/handle lock clears within the window),
+    # and on final give-up the Restart-Manager probe is invoked to name the holder.
+    assert "$i -lt 36" in inner  # aside-rename retry window
+    assert "$j -lt 36" in inner  # new->install retry window
+    assert "lockcheck.ps1" in inner
+    assert "mnemos-lockers.log" in inner
+
+
+def test_lockcheck_script_is_ascii_and_uses_restart_manager() -> None:
+    s = update_apply.render_lockcheck_script()
+    assert "RmGetList" in s and "RmStartSession" in s
+    assert all(ord(c) < 128 for c in s)  # frozen exe reads no-BOM scripts as ANSI
+
+
 def test_inner_restore_renames_old_back(inner: str) -> None:
     assert "catch" in inner
     assert (
@@ -333,6 +348,8 @@ def test_stage_update_writes_marker_and_scripts(monkeypatch) -> None:
     work = update_apply.stage_update("https://example/portable.zip", "0.9.0")
     assert (work / "swap.ps1").read_text(encoding="utf-8")
     assert (work / "relaunch.ps1").read_text(encoding="utf-8")
+    # The RM locker probe ships alongside so the inner swap can name a holder.
+    assert "RmGetList" in (work / "lockcheck.ps1").read_text(encoding="utf-8")
     assert update_apply.pending_marker_path().exists()
 
 

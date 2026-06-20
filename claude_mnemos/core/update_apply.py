@@ -215,6 +215,78 @@ def _ps(path: str | Path) -> str:
     return str(path).replace('"', '`"')
 
 
+# Standalone Restart-Manager probe invoked by the inner swap when the rename
+# can't free the install. It names the EXACT process holding the file (handle
+# level — a plain process list can't see it). A raw string so its C# / PS braces
+# stay literal; it takes $args[0]=target file, $args[1]=log path.
+_LOCKCHECK_SCRIPT = r'''$ErrorActionPreference = "Continue"
+$target = $args[0]
+$logPath = $args[1]
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class RMLC {
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RM_UNIQUE_PROCESS {
+    public int dwProcessId;
+    public System.Runtime.InteropServices.ComTypes.FILETIME ProcessStartTime;
+  }
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct RM_PROCESS_INFO {
+    public RM_UNIQUE_PROCESS Process;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst=256)] public string strAppName;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst=64)] public string strServiceShortName;
+    public int ApplicationType; public uint AppStatus; public uint TSSessionId;
+    [MarshalAs(UnmanagedType.Bool)] public bool bRestartable;
+  }
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)]
+  public static extern int RmStartSession(out uint h, int flags, string key);
+  [DllImport("rstrtmgr.dll")]
+  public static extern int RmEndSession(uint h);
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)]
+  public static extern int RmRegisterResources(
+    uint h, uint nf, string[] f, uint na, RM_UNIQUE_PROCESS[] a, uint ns, string[] s);
+  [DllImport("rstrtmgr.dll")]
+  public static extern int RmGetList(
+    uint h, out uint need, ref uint cnt, [In,Out] RM_PROCESS_INFO[] arr, ref uint reason);
+}
+"@
+try {
+  $key = [Guid]::NewGuid().ToString()
+  $h = [uint32]0
+  if ([RMLC]::RmStartSession([ref]$h, 0, $key) -eq 0) {
+    $files = @($target)
+    $null = [RMLC]::RmRegisterResources($h, [uint32]1, $files, 0, $null, 0, $null)
+    [uint32]$need = 0; [uint32]$cnt = 0; [uint32]$rsn = 0
+    $null = [RMLC]::RmGetList($h, [ref]$need, [ref]$cnt, $null, [ref]$rsn)
+    if ($need -eq 0) {
+      "RM: NO LOCKERS for $target" | Out-File $logPath -Append -Encoding utf8
+    } else {
+      $arr = New-Object RMLC+RM_PROCESS_INFO[] $need; $cnt = $need
+      $null = [RMLC]::RmGetList($h, [ref]$need, [ref]$cnt, $arr, [ref]$rsn)
+      for ($i = 0; $i -lt $cnt; $i++) {
+        $rpid = $arr[$i].Process.dwProcessId
+        $p = Get-Process -Id $rpid -ErrorAction SilentlyContinue
+        $img = if ($p) { $p.Path } else { "(process gone)" }
+        "RM LOCKER pid=$rpid app=$($arr[$i].strAppName) image=$img" |
+          Out-File $logPath -Append -Encoding utf8
+      }
+    }
+    $null = [RMLC]::RmEndSession($h)
+  } else {
+    "RM: RmStartSession failed" | Out-File $logPath -Append -Encoding utf8
+  }
+} catch {
+  "RM: exception $($_.Exception.Message)" | Out-File $logPath -Append -Encoding utf8
+}
+'''
+
+
+def render_lockcheck_script() -> str:
+    """The standalone Restart-Manager locker probe (see :data:`_LOCKCHECK_SCRIPT`)."""
+    return _LOCKCHECK_SCRIPT
+
+
 def render_inner_script(
     *,
     install_dir: Path,
@@ -231,6 +303,7 @@ def render_inner_script(
     new = _ps(new_dir)
     zp = _ps(zip_path)
     result = _ps(result_path)
+    lockcheck = _ps(result_path.parent / "lockcheck.ps1")
     return f"""\
 $ErrorActionPreference = "Stop"
 $renamed = $false
@@ -286,19 +359,23 @@ try {{
     # Retry the aside-rename: a lingering handle (mmap release, an AV scan) can
     # briefly hold a file even after the processes are gone.
     $moved = $false
-    for ($i = 0; $i -lt 10; $i++) {{
+    for ($i = 0; $i -lt 36; $i++) {{
         try {{
             Move-Item -LiteralPath "{inst}" -Destination "{old}"
             $moved = $true
             break
         }} catch {{
-            if ($i -ge 9) {{
-                # Couldn't free the install after retrying. Log every candidate
-                # locker (anything referencing claude-mnemos, all WebView2, any
-                # exe under the install) so the holder can be identified.
+            if ($i -ge 35) {{
+                # Couldn't free the install after ~30s of retrying. Name the
+                # EXACT holder via the Restart Manager (handle level - a process
+                # list can't see it) plus a best-effort process snapshot.
                 $ll = Join-Path $env:TEMP "mnemos-lockers.log"
                 "LOCK $(Get-Date -Format o) :: $($_.Exception.Message)" |
                     Out-File $ll -Append -Encoding utf8
+                try {{
+                    & powershell -NoProfile -ExecutionPolicy Bypass `
+                        -File "{lockcheck}" "{inst}\\claude-mnemos.exe" $ll
+                }} catch {{ }}
                 try {{
                     Get-CimInstance Win32_Process | Where-Object {{
                         ($_.CommandLine -match "claude-mnemos") -or
@@ -316,7 +393,13 @@ try {{
         }}
     }}
     $renamed = $true
-    Move-Item -LiteralPath "{new}" -Destination "{inst}"
+    # Move the new build into place, retrying too: the freshly-extracted .new can
+    # be briefly held (an AV scan of the new files) just like the install was.
+    $placed = $false
+    for ($j = 0; $j -lt 36; $j++) {{
+        try {{ Move-Item -LiteralPath "{new}" -Destination "{inst}"; $placed = $true; break }}
+        catch {{ if ($j -ge 35) {{ throw }}; Start-Sleep -Milliseconds 800 }}
+    }}
     if (-not (Test-Path -LiteralPath "{inst}\\claude-mnemos.exe")) {{
         throw "swap left no claude-mnemos.exe at the install path"
     }}
@@ -470,6 +553,10 @@ def stage_update(asset_url: str, version: str) -> Path:
     inner_path = work / "swap.ps1"
     outer_path = work / "relaunch.ps1"
     result_path = work / "result.txt"
+
+    # Restart-Manager locker probe the inner swap runs if the rename can't free
+    # the install — names the exact holder for diagnosis.
+    (work / "lockcheck.ps1").write_text(render_lockcheck_script(), encoding="utf-8")
 
     inner_path.write_text(
         render_inner_script(
