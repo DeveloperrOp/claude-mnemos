@@ -292,7 +292,26 @@ try {{
             $moved = $true
             break
         }} catch {{
-            if ($i -ge 9) {{ throw }}
+            if ($i -ge 9) {{
+                # Couldn't free the install after retrying. Log every candidate
+                # locker (anything referencing claude-mnemos, all WebView2, any
+                # exe under the install) so the holder can be identified.
+                $ll = Join-Path $env:TEMP "mnemos-lockers.log"
+                "LOCK $(Get-Date -Format o) :: $($_.Exception.Message)" |
+                    Out-File $ll -Append -Encoding utf8
+                try {{
+                    Get-CimInstance Win32_Process | Where-Object {{
+                        ($_.CommandLine -match "claude-mnemos") -or
+                        ($_.Name -eq "msedgewebview2.exe") -or
+                        ($_.ExecutablePath -like "*claude-mnemos*")
+                    }} | ForEach-Object {{
+                        $m = "PROC pid=$($_.ProcessId) name=$($_.Name) " +
+                            "path=$($_.ExecutablePath) :: $($_.CommandLine)"
+                        $m | Out-File $ll -Append -Encoding utf8
+                    }}
+                }} catch {{ }}
+                throw
+            }}
             Start-Sleep -Milliseconds 800
         }}
     }}
