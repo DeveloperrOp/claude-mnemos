@@ -445,22 +445,22 @@ def spawn_updater(work_dir: Path) -> None:
 
     A plain child ``Popen`` from the daemon inherits the interactive window
     station, so the outer's ``Start-Process -Verb RunAs`` raises a UAC prompt
-    the user actually SEES. (The old WMI ``Win32_Process.Create`` path ran the
-    outer under the WMI host's non-interactive station, so the prompt never
-    surfaced — and WDAC blocks ``Win32_Process.Create`` outright.)
+    the user actually SEES.
 
-    The outer is a child of the daemon, but the inner swap kills the daemon
-    WITHOUT ``/T``, so this powershell survives to relaunch + verify + cleanup.
-    ``DETACHED_PROCESS`` detaches only the console (not the window station), so
-    UAC visibility is unaffected; ``CREATE_NO_WINDOW`` keeps a console from
-    flashing.
+    MUST NOT use ``DETACHED_PROCESS``: a detached process has no interactive
+    window station, so the elevation request can't surface its UAC dialog -- it
+    silently no-ops and the swap never runs (proven live: with DETACHED the
+    consent dialog never appears; without it, it does). ``CREATE_NO_WINDOW``
+    alone keeps the console from flashing while leaving the window station
+    intact. The outer is a child of the daemon, but the inner swap kills the
+    daemon WITHOUT ``/T``, so this powershell survives to relaunch + verify +
+    cleanup regardless.
     """
     outer = str(work_dir / "relaunch.ps1")
     creationflags = 0
     if sys.platform == "win32":
         creationflags = (
             getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            | getattr(subprocess, "DETACHED_PROCESS", 0)
             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         )
     subprocess.Popen(  # noqa: S603 — fixed argv, no shell
