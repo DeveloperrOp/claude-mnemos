@@ -74,6 +74,9 @@ export function UpdateBanner({
   }, [updating, applied, latestVersion, versionPollMs]);
 
   if (q.isLoading || !q.data) return null;
+  // Source checkout (Python under a signed interpreter): the exe-swap updater
+  // is both irrelevant and SAC-blocked — VersionStatus shows a git-pull button.
+  if (q.data.can_git_pull) return null;
   const {
     current,
     latest,

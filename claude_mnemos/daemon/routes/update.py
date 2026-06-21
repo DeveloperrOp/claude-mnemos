@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
 
-from claude_mnemos.core import update_recovery
+from claude_mnemos.core import update_git, update_recovery
 from claude_mnemos.core.update_apply import (
     UpdateApplyError,
     can_apply,
@@ -38,6 +38,10 @@ def _serialize_status(force: bool) -> dict[str, Any]:
         ),
         "error": s.error,
         "last_apply": update_recovery.read_last_apply(),
+        # Source checkout (Python under a signed interpreter): updating is a
+        # git pull + rebuild, not a SAC-blocked exe swap. Drives the in-app
+        # "update from git" button.
+        "can_git_pull": update_git.can_git_pull(),
     }
 
 
@@ -98,3 +102,32 @@ def apply_update_route() -> dict[str, Any]:
 
     spawn_updater(work)
     return {"started": True, "version": s.latest}
+
+
+@router.post("/update/pull")
+def pull_update_route() -> dict[str, Any]:
+    """Source-mode self-update: ``git pull`` + frontend rebuild.
+
+    For a git checkout running under a signed Python (the Smart-App-Control
+    workaround) there's no exe to swap — pull the new code and rebuild the
+    dashboard. The caller then restarts the daemon (POST /daemon/restart) so the
+    tray respawns it on the new code. Refuses (409) when not a source checkout.
+    """
+    if not update_git.can_git_pull():
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "not_source_checkout"},
+        )
+    pulled, git_out = update_git.git_pull()
+    if not pulled:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "git_pull_failed", "detail": git_out},
+        )
+    built, build_out = update_git.frontend_build()
+    return {
+        "pulled": True,
+        "git": git_out,
+        "built": built,
+        "build_detail": build_out,
+    }

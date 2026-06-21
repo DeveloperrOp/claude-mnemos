@@ -4,6 +4,7 @@ import {
   useVersionInfo,
   useCheckForUpdate,
 } from "@/hooks/useUpdateStatus";
+import { GitUpdateButton } from "./GitUpdateButton";
 
 /**
  * Always-visible footer line on Overview: the installed version plus a manual
@@ -42,6 +43,8 @@ export function VersionStatus() {
           ? t("overview.version_status.checking")
           : t("overview.version_status.check_button")}
       </button>
+
+      {status.data?.can_git_pull && <GitUpdateButton />}
 
       {checkedUpToDate && (
         <span data-testid="version-status-uptodate" className="text-success">

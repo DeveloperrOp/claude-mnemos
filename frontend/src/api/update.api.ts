@@ -15,6 +15,16 @@ export interface UpdateStatus {
     error: string | null;
     at: string;
   } | null;
+  // True when the daemon runs from a git checkout (Python under a signed
+  // interpreter): updating is a git pull + rebuild, not a SAC-blocked exe swap.
+  can_git_pull?: boolean;
+}
+
+export interface PullUpdateResult {
+  pulled: boolean;
+  git: string;
+  built: boolean;
+  build_detail: string;
 }
 
 export interface VersionInfo {
@@ -59,6 +69,19 @@ function isUpdateInProgress(err: unknown): boolean {
     e?.response?.status === 409 &&
     e?.response?.data?.detail?.error === "in_progress"
   );
+}
+
+export async function pullUpdate(): Promise<PullUpdateResult> {
+  // Source-mode update: git pull + frontend rebuild on the daemon side.
+  const r = await apiClient.post<PullUpdateResult>("/update/pull");
+  return r.data;
+}
+
+export async function restartDaemon(): Promise<{ ok: boolean; supervised: boolean }> {
+  const r = await apiClient.post<{ ok: boolean; supervised: boolean }>(
+    "/daemon/restart",
+  );
+  return r.data;
 }
 
 export async function applyUpdate(): Promise<ApplyUpdateResult> {
