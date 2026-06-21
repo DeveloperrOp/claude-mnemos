@@ -242,6 +242,23 @@ def test_inner_retries_both_renames_and_probes_locker_on_giveup(inner: str) -> N
     assert "mnemos-lockers.log" in inner
 
 
+def test_inner_leaves_install_cwd_before_rename(inner: str) -> None:
+    # THE root cause: a directory can't be renamed while a process holds it as
+    # its cwd, and the swap's cwd is inherited from the daemon living in the
+    # install dir (RM reports no file locker — it isn't a handle). So the swap
+    # must Set-Location away BEFORE the install->.old rename.
+    assert "Set-Location $env:SystemRoot" in inner
+    cwd_at = inner.index("Set-Location $env:SystemRoot")
+    rename_at = inner.index('-Destination "C:\\Program Files\\ClaudeMnemos.old"')
+    assert cwd_at < rename_at, "must leave the install cwd before renaming it"
+
+
+def test_outer_leaves_install_cwd(outer: str) -> None:
+    # The outer (and the swap it spawns, which inherits its cwd) must also not
+    # sit in the install dir, or it blocks the rename just the same.
+    assert "Set-Location $env:SystemRoot" in outer
+
+
 def test_lockcheck_script_is_ascii_and_uses_restart_manager() -> None:
     s = update_apply.render_lockcheck_script()
     assert "RmGetList" in s and "RmStartSession" in s

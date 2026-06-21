@@ -62,7 +62,7 @@ def _result_error(target: str) -> str:
     """First line of ``<target>/result.txt`` (sans ``FAILED: `` prefix), or default."""
     result_path = update_apply.updates_dir() / target / "result.txt"
     try:
-        first_line = result_path.read_text(encoding="utf-8").splitlines()[0].strip()
+        first_line = result_path.read_text(encoding="utf-8-sig").splitlines()[0].strip()
     except (OSError, IndexError):
         return "update did not complete"
     if not first_line:

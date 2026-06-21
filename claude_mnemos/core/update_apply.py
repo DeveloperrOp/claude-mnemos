@@ -306,6 +306,13 @@ def render_inner_script(
     lockcheck = _ps(result_path.parent / "lockcheck.ps1")
     return f"""\
 $ErrorActionPreference = "Stop"
+# Move our working directory OUT of the install dir FIRST. A directory cannot be
+# renamed while ANY process holds it as its cwd, and ours was inherited from the
+# daemon (a frozen exe that lives in the install dir) down through relaunch.ps1.
+# THAT is the "file in use" on the install->.old rename: not a file handle (the
+# Restart Manager reports none), but this very script's working directory. A
+# manual repro never hit it because its cwd differed.
+Set-Location $env:SystemRoot
 $renamed = $false
 $stamp = [DateTime]::Now.ToString("yyyyMMddHHmmssfff")
 try {{
@@ -458,6 +465,12 @@ def render_outer_script(
     exe = f"{inst}\\claude-mnemos.exe"
     return f"""\
 $ErrorActionPreference = "Continue"
+
+# Move our cwd out of the install dir before anything else: a directory cannot
+# be renamed while a process holds it as its working directory, and ours (plus
+# the elevated swap we spawn, which inherits it) was inherited from the daemon
+# living in the install dir.
+Set-Location $env:SystemRoot
 
 # Single-flight: hold an exclusive handle for the WHOLE update so a second
 # relaunch (a double-clicked button, a watchdog re-fire, a reconcile that
@@ -617,6 +630,9 @@ def spawn_updater(work_dir: Path) -> None:
             "-File",
             outer,
         ],
+        # NOT the install dir: a process whose cwd is the install dir blocks its
+        # rename. The scripts also Set-Location away, but start them clear too.
+        cwd=str(work_dir),
         creationflags=creationflags,
     )
     logger.info("[update] outer relaunch.ps1 spawned (interactive)")
