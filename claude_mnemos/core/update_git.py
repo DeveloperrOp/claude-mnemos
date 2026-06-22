@@ -87,6 +87,44 @@ def git_pull() -> tuple[bool, str]:
     return _run(["git", "pull", "--ff-only", "origin", branch], root, timeout=120)
 
 
+def restart_daemon_detached() -> None:
+    """Restart the daemon without relying on a supervisor (tray-less Python run).
+
+    A detached helper waits for the response to flush, kills EVERY running
+    claude_mnemos daemon (the environment can spawn a duplicate that would keep
+    the port held), then ``daemon start`` brings a fresh one up on the new code.
+    Windows-only: the source/Python install is the Smart-App-Control workaround
+    there, and the dashboard polls /api/version until the new daemon answers.
+    """
+    if sys.platform != "win32":
+        return
+    root = repo_root()
+    if root is None:
+        return
+    python = sys.executable
+    ps = (
+        "Start-Sleep -Seconds 2; "
+        "Get-CimInstance Win32_Process | Where-Object { "
+        "($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') "
+        "-and $_.CommandLine -match 'claude_mnemos.daemon' } | "
+        "ForEach-Object { taskkill /F /PID $_.ProcessId 2>$null }; "
+        "Start-Sleep -Seconds 2; "
+        f"& '{python}' -m claude_mnemos daemon start"
+    )
+    creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+        subprocess, "CREATE_NO_WINDOW", 0
+    )
+    subprocess.Popen(  # noqa: S603 — fixed argv, no shell injection (python is ours)
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+        cwd=str(root),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+        close_fds=True,
+    )
+
+
 def frontend_build() -> tuple[bool, str]:
     """Rebuild the dashboard into ``daemon/static``. Returns ``(ok, output)``."""
     root = repo_root()

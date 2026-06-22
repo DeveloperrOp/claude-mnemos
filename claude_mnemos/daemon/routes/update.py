@@ -128,9 +128,15 @@ def pull_update_route() -> dict[str, Any]:
             detail={"error": "git_pull_failed", "detail": git_out},
         )
     built, build_out = update_git.frontend_build()
+    # Restart so backend changes take effect. Tray-less: a detached helper
+    # kills + relaunches the daemon after this response flushes. The dashboard
+    # then polls /api/version and reloads once the fresh daemon answers.
+    if built:
+        update_git.restart_daemon_detached()
     return {
         "pulled": True,
         "git": git_out,
         "built": built,
         "build_detail": build_out,
+        "restarting": built,
     }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { pullUpdate, restartDaemon, getVersionInfo } from "@/api/update.api";
+import { pullUpdate, getVersionInfo } from "@/api/update.api";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,12 +26,12 @@ export function GitUpdateButton() {
         setError("Сборка фронтенда не удалась — смотри консоль демона");
         return;
       }
+      // The /update/pull endpoint already kicked off a detached restart; wait
+      // for the old daemon to go down, then poll until the fresh one answers.
       setMsg("Перезапуск…");
-      await restartDaemon();
-      await sleep(3000); // let the daemon actually exit before polling
-      const deadline = Date.now() + 45000;
+      await sleep(5000); // let the helper kill the old daemon first
+      const deadline = Date.now() + 60000;
       while (Date.now() < deadline) {
-        await sleep(2000);
         try {
           await getVersionInfo();
           window.location.reload();
@@ -39,9 +39,10 @@ export function GitUpdateButton() {
         } catch {
           /* daemon mid-restart — keep polling */
         }
+        await sleep(2000);
       }
       setWorking(false);
-      setError("Демон не вернулся за 45с — перезапусти вручную");
+      setError("Демон не вернулся за минуту — перезапусти вручную");
     } catch (err) {
       setWorking(false);
       const e = err as {

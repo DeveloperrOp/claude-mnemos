@@ -25,6 +25,7 @@ export interface PullUpdateResult {
   git: string;
   built: boolean;
   build_detail: string;
+  restarting?: boolean;
 }
 
 export interface VersionInfo {
@@ -72,8 +73,11 @@ function isUpdateInProgress(err: unknown): boolean {
 }
 
 export async function pullUpdate(): Promise<PullUpdateResult> {
-  // Source-mode update: git pull + frontend rebuild on the daemon side.
-  const r = await apiClient.post<PullUpdateResult>("/update/pull");
+  // Source-mode update: git pull + frontend rebuild on the daemon side. This
+  // can take well over the default 5s client timeout (npm build), so allow 3min.
+  const r = await apiClient.post<PullUpdateResult>("/update/pull", undefined, {
+    timeout: 180_000,
+  });
   return r.data;
 }
 
