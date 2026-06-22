@@ -22,6 +22,7 @@ export interface UpdateStatus {
 
 export interface PullUpdateResult {
   pulled: boolean;
+  changed?: boolean;
   git: string;
   built: boolean;
   build_detail: string;

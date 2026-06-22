@@ -14,13 +14,21 @@ export function GitUpdateButton() {
   const [working, setWorking] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
 
   async function onUpdate() {
     setError("");
+    setOk("");
     setWorking(true);
-    setMsg("Тяну обновления…");
+    setMsg("Проверяю обновления…");
     try {
       const r = await pullUpdate();
+      if (!r.changed) {
+        // git pull found nothing new — say so instead of a pointless restart.
+        setWorking(false);
+        setOk("✓ Уже актуально");
+        return;
+      }
       if (!r.built) {
         setWorking(false);
         setError("Сборка фронтенда не удалась — смотри консоль демона");
@@ -28,7 +36,7 @@ export function GitUpdateButton() {
       }
       // The /update/pull endpoint already kicked off a detached restart; wait
       // for the old daemon to go down, then poll until the fresh one answers.
-      setMsg("Перезапуск…");
+      setMsg("Обновлено, перезапуск…");
       await sleep(5000); // let the helper kill the old daemon first
       const deadline = Date.now() + 60000;
       while (Date.now() < deadline) {
@@ -69,6 +77,11 @@ export function GitUpdateButton() {
       >
         {working ? msg : "Обновить из git"}
       </button>
+      {ok && (
+        <span data-testid="git-update-ok" className="text-success">
+          {ok}
+        </span>
+      )}
       {error && (
         <span data-testid="git-update-error" className="text-destructive">
           {error}

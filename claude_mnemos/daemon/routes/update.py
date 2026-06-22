@@ -121,12 +121,25 @@ def pull_update_route() -> dict[str, Any]:
             status_code=409,
             detail={"error": "not_source_checkout"},
         )
+    before = update_git.head_rev()
     pulled, git_out = update_git.git_pull()
     if not pulled:
         raise HTTPException(
             status_code=502,
             detail={"error": "git_pull_failed", "detail": git_out},
         )
+    after = update_git.head_rev()
+    changed = bool(before) and before != after
+    if not changed:
+        # Already up to date — nothing to build or restart, just say so.
+        return {
+            "pulled": True,
+            "changed": False,
+            "git": git_out,
+            "built": False,
+            "build_detail": "",
+            "restarting": False,
+        }
     built, build_out = update_git.frontend_build()
     # Restart so backend changes take effect. Tray-less: a detached helper
     # kills + relaunches the daemon after this response flushes. The dashboard
@@ -135,6 +148,7 @@ def pull_update_route() -> dict[str, Any]:
         update_git.restart_daemon_detached()
     return {
         "pulled": True,
+        "changed": True,
         "git": git_out,
         "built": built,
         "build_detail": build_out,

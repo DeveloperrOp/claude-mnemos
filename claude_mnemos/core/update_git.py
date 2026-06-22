@@ -68,6 +68,16 @@ def display_version() -> str:
     return out if ok and out else __version__
 
 
+def head_rev() -> str:
+    """Current HEAD commit (short), or "" off a checkout — to tell whether a
+    pull actually moved the tree."""
+    root = repo_root()
+    if root is None:
+        return ""
+    ok, out = _run(["git", "rev-parse", "--short", "HEAD"], root, timeout=15)
+    return out.strip() if ok else ""
+
+
 def current_branch(root: Path) -> str:
     """The checked-out branch name, or ``main`` if detached/unknown."""
     ok, name = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], root, timeout=15)
