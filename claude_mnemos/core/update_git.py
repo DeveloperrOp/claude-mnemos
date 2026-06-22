@@ -30,6 +30,10 @@ def can_git_pull() -> bool:
 
 
 def _run(cmd: list[str], cwd: Path, timeout: float) -> tuple[bool, str]:
+    # The daemon runs windowless (pythonw); spawning a console exe (git) without
+    # CREATE_NO_WINDOW can fail to allocate a console and exit non-zero with no
+    # captured output. The flag runs it cleanly without a console.
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
     try:
         proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
             cmd,
@@ -38,10 +42,13 @@ def _run(cmd: list[str], cwd: Path, timeout: float) -> tuple[bool, str]:
             text=True,
             timeout=timeout,
             check=False,
+            creationflags=creationflags,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"{cmd[0]} failed: {exc}"
+        return False, f"{cmd[0]} failed to start: {exc}"
     out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    if proc.returncode != 0 and not out:
+        out = f"{cmd[0]} exited with code {proc.returncode}"
     return proc.returncode == 0, out
 
 
