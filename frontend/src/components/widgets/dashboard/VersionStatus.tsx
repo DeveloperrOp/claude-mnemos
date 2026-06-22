@@ -69,6 +69,18 @@ export function VersionStatus() {
           )}
         </>
       )}
+
+      {/* Self-service reload: the embedded app window has no browser refresh,
+          so this forces a fresh load (e.g. after an update). */}
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        title="Перезагрузить интерфейс"
+        data-testid="version-status-reload"
+        className="rounded border border-border/60 px-2 py-0.5 text-foreground/80 transition hover:bg-muted/50"
+      >
+        ↻ Перезагрузить
+      </button>
     </div>
   );
 }

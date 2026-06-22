@@ -141,6 +141,15 @@ class TrayApp:
         else:
             self.supervisor.pause_daemon()
 
+    def _open_browser(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+        """Always-works fallback: open the dashboard in the default browser. A
+        real browser can hard-refresh and never goes stale the way the embedded
+        WebView window can, so this is the reliable way back in."""
+        try:
+            webbrowser.open(self.dashboard_url)
+        except Exception:
+            logger.exception("[tray] open in browser failed")
+
     def _open_settings(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         """Open the launcher and let the React SPA route to /settings/global itself."""
         self._open_dashboard(_icon, _item)
@@ -180,6 +189,7 @@ class TrayApp:
 
         return pystray.Menu(
             pystray.MenuItem("Open Dashboard", self._open_dashboard, default=True),
+            pystray.MenuItem("Open in Browser", self._open_browser),
             pystray.MenuItem(_daemon_status_label, None, enabled=False),
             pystray.MenuItem(_toggle_label, self._toggle_pause,
                              enabled=lambda _: self.supervisor is not None),
