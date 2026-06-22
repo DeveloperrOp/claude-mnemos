@@ -75,7 +75,7 @@ export function GitUpdateButton() {
         data-testid="git-update-button"
         className="rounded border border-blue-500/50 bg-blue-500/10 px-2 py-0.5 text-blue-400 transition hover:bg-blue-500/20 disabled:opacity-60"
       >
-        {working ? msg : "Обновить из git ✨ (тест прошёл)"}
+        {working ? msg : "Обновить из git"}
       </button>
       {ok && (
         <span data-testid="git-update-ok" className="text-success">
