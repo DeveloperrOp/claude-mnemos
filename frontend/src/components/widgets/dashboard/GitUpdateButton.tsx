@@ -44,9 +44,15 @@ export function GitUpdateButton() {
       setError("Демон не вернулся за 45с — перезапусти вручную");
     } catch (err) {
       setWorking(false);
-      const detail = (
-        err as { response?: { data?: { detail?: { detail?: string } } } }
-      )?.response?.data?.detail?.detail;
+      const e = err as {
+        response?: {
+          status?: number;
+          data?: { detail?: { error?: string; detail?: string } };
+        };
+        message?: string;
+      };
+      const d = e?.response?.data?.detail;
+      const detail = d?.detail || d?.error || e?.message;
       setError(detail ? `Не удалось: ${detail}` : "Не удалось обновить");
     }
   }
