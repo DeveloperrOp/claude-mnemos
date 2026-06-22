@@ -33,29 +33,41 @@ export function VersionStatus() {
         {t("overview.version_status.label", { version: current })}
       </span>
 
-      <button
-        type="button"
-        onClick={() => check.mutate()}
-        disabled={check.isPending}
-        className="rounded border border-border/60 px-2 py-0.5 text-foreground/80 transition hover:bg-muted/50 disabled:opacity-60"
-      >
-        {check.isPending
-          ? t("overview.version_status.checking")
-          : t("overview.version_status.check_button")}
-      </button>
+      {/* Source checkout updates via git; the release-check button only makes
+          sense for installed (frozen) builds. */}
+      {status.data?.can_git_pull ? (
+        <GitUpdateButton />
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => check.mutate()}
+            disabled={check.isPending}
+            className="rounded border border-border/60 px-2 py-0.5 text-foreground/80 transition hover:bg-muted/50 disabled:opacity-60"
+          >
+            {check.isPending
+              ? t("overview.version_status.checking")
+              : t("overview.version_status.check_button")}
+          </button>
 
-      {status.data?.can_git_pull && <GitUpdateButton />}
+          {checkedUpToDate && (
+            <span
+              data-testid="version-status-uptodate"
+              className="text-success"
+            >
+              {t("overview.version_status.up_to_date")}
+            </span>
+          )}
 
-      {checkedUpToDate && (
-        <span data-testid="version-status-uptodate" className="text-success">
-          {t("overview.version_status.up_to_date")}
-        </span>
-      )}
-
-      {check.isError && (
-        <span data-testid="version-status-error" className="text-destructive">
-          {t("overview.version_status.check_error")}
-        </span>
+          {check.isError && (
+            <span
+              data-testid="version-status-error"
+              className="text-destructive"
+            >
+              {t("overview.version_status.check_error")}
+            </span>
+          )}
+        </>
       )}
     </div>
   );

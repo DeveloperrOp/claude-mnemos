@@ -26,8 +26,11 @@ def _serialize_status(force: bool) -> dict[str, Any]:
         s.dismissed_until is not None
         and s.dismissed_until > datetime.now(tz=UTC)
     )
+    git_pullable = update_git.can_git_pull()
     return {
-        "current": s.current,
+        # On a source checkout show git describe (the real checked-out state)
+        # instead of the 0.0.1 source placeholder.
+        "current": update_git.display_version() if git_pullable else s.current,
         "latest": s.latest,
         "download_url": s.download_url,
         "asset_url": s.asset_url,
@@ -41,7 +44,7 @@ def _serialize_status(force: bool) -> dict[str, Any]:
         # Source checkout (Python under a signed interpreter): updating is a
         # git pull + rebuild, not a SAC-blocked exe swap. Drives the in-app
         # "update from git" button.
-        "can_git_pull": update_git.can_git_pull(),
+        "can_git_pull": git_pullable,
     }
 
 

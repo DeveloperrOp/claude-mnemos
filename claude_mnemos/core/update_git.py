@@ -45,12 +45,39 @@ def _run(cmd: list[str], cwd: Path, timeout: float) -> tuple[bool, str]:
     return proc.returncode == 0, out
 
 
+def display_version() -> str:
+    """A meaningful version string for a source checkout: ``git describe`` (e.g.
+    ``v0.0.70-6-gabc123``). Falls back to ``__version__`` (frozen builds rewrite
+    it from the tag at build time; source keeps the placeholder ``0.0.1``)."""
+    from claude_mnemos import __version__
+
+    root = repo_root()
+    if root is None:
+        return __version__
+    ok, out = _run(
+        ["git", "describe", "--tags", "--always", "--dirty"], root, timeout=15
+    )
+    out = out.strip()
+    return out if ok and out else __version__
+
+
+def current_branch(root: Path) -> str:
+    """The checked-out branch name, or ``main`` if detached/unknown."""
+    ok, name = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], root, timeout=15)
+    name = name.strip()
+    return name if ok and name and name != "HEAD" else "main"
+
+
 def git_pull() -> tuple[bool, str]:
-    """Fast-forward the checkout. Returns ``(ok, combined_output)``."""
+    """Fast-forward the checkout. Returns ``(ok, combined_output)``.
+
+    Pulls ``origin <branch>`` explicitly so it works even when the branch has no
+    upstream configured (a re-inited .git frequently has none)."""
     root = repo_root()
     if root is None:
         return False, "not a git checkout"
-    return _run(["git", "pull", "--ff-only"], root, timeout=120)
+    branch = current_branch(root)
+    return _run(["git", "pull", "--ff-only", "origin", branch], root, timeout=120)
 
 
 def frontend_build() -> tuple[bool, str]:
