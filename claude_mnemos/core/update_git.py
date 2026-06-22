@@ -95,27 +95,47 @@ def restart_daemon_detached() -> None:
     the port held), then ``daemon start`` brings a fresh one up on the new code.
     Windows-only: the source/Python install is the Smart-App-Control workaround
     there, and the dashboard polls /api/version until the new daemon answers.
+
+    The helper is written to a ``.ps1`` and run with ``-File`` (a complex
+    ``-Command`` string gets mangled when joined into the Windows command line).
     """
     if sys.platform != "win32":
         return
     root = repo_root()
     if root is None:
         return
-    python = sys.executable
-    ps = (
-        "Start-Sleep -Seconds 2; "
+    home = Path.home() / ".claude-mnemos"
+    home.mkdir(parents=True, exist_ok=True)
+    helper = home / "restart-helper.ps1"
+    log = home / "restart-helper.log"
+    script = (
+        f'"start $(Get-Date -Format o)" | Out-File -FilePath "{log}" -Encoding utf8\n'
+        "Start-Sleep -Seconds 2\n"
         "Get-CimInstance Win32_Process | Where-Object { "
         "($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') "
         "-and $_.CommandLine -match 'claude_mnemos.daemon' } | "
-        "ForEach-Object { taskkill /F /PID $_.ProcessId 2>$null }; "
-        "Start-Sleep -Seconds 2; "
-        f"& '{python}' -m claude_mnemos daemon start"
+        "ForEach-Object { taskkill /F /PID $_.ProcessId 2>$null | Out-Null }\n"
+        "Start-Sleep -Seconds 2\n"
+        f'& "{sys.executable}" -m claude_mnemos daemon start '
+        f'*>> "{log}"\n'
+        f'"done $(Get-Date -Format o)" | Out-File -FilePath "{log}" '
+        "-Append -Encoding utf8\n"
     )
-    creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-        subprocess, "CREATE_NO_WINDOW", 0
-    )
-    subprocess.Popen(  # noqa: S603 — fixed argv, no shell injection (python is ours)
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+    helper.write_text(script, encoding="utf-8")
+    # CREATE_NO_WINDOW only: DETACHED_PROCESS + CREATE_NO_WINDOW are conflicting
+    # console flags and the process silently fails to run. A plain hidden child
+    # outlives us anyway (Windows doesn't kill children when the parent dies, and
+    # the helper kills by PID without /T, so it survives the daemon it kills).
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.Popen(  # noqa: S603 — fixed argv, no shell injection (paths are ours)
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(helper),
+        ],
         cwd=str(root),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
